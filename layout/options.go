@@ -48,6 +48,10 @@ type Options struct {
 	// nil is http, https, mailto and tel for links, and http and https for images.
 	NoLinks, NoImages         bool
 	LinkSchemes, ImageSchemes []string
+	// Padding is the room about a diagram, Pele's padding option: nil is Pele's 8, and a
+	// pointer to 0 is none. Set it with new(12.0). A host that wants no room about some
+	// diagram and the default about others tells them apart this way, since 0 is a padding.
+	Padding *float64
 	// Snap rounds where things are to whole multiples of it, for a backend that draws on a
 	// grid of pixels. 0 leaves them as they fall. limu.Layout and Diagram.Layout snap the
 	// scene; a diagram package's own Layout leaves it to its caller, who snaps the scene
@@ -64,6 +68,14 @@ type Options struct {
 	// does in the machine's: the days that tasks start on, the ticks of its axis. nil is
 	// time.Local.
 	Location *time.Location
+}
+
+// Pad is the options' Padding, or 8, as Pele takes options.padding ?? 8.
+func (o *Options) Pad() float64 {
+	if o == nil || o.Padding == nil {
+		return 8
+	}
+	return *o.Padding
 }
 
 // Clock is the options' Now, or time.Now() when it is the zero time.

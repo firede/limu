@@ -87,7 +87,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	natural := jsmath.Round(max(100, length(config, "chartWidth", 500, 4000)))
 	width := jsmath.Round(common.CapWidth(o, natural, 280, 0))
 	height := jsmath.Round(max(100, length(config, "chartHeight", 500, 4000)) * width / natural)
-	outer := length(config, "quadrantPadding", common.Padding, 200)
+	outer := length(config, "quadrantPadding", o.Pad(), 200)
 	xPad := length(config, "xAxisLabelPadding", 5, 200)
 	yPad := length(config, "yAxisLabelPadding", 5, 200)
 	hasPoints := len(m.Points) > 0

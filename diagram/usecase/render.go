@@ -406,7 +406,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	small := jsmath.Round(size * 0.875)
 	tiny := jsmath.Round(size * 0.8125)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	rootDir := layout.Direction(m.Direction)
 	if turned {
 		rootDir = layout.TB

@@ -176,7 +176,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	}
 	size := o.Size()
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	now := float64(o.Clock().UnixMilli())
 
 	labelSize := settingOr(config, "fontSize", 4, 72, jsmath.Round(size*0.8125))

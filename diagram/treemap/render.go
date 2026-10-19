@@ -83,7 +83,11 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	least := jsmath.Round(size * 0.5625)
 	measure := o.Measure()
 	section, _ := config["treemap"].(diagram.Config)
+	// The host's padding, or the diagram's own.
 	pad := option(config, "diagramPadding", 8, 0, 2000)
+	if o.Padding != nil {
+		pad = *o.Padding
+	}
 
 	// Mermaid sizes the diagram as ten times nodeWidth by ten times nodeHeight.
 	width := jsmath.Round(common.CapWidth(o, option(config, "nodeWidth", 64, 1, 400)*10, 200, float64(2*pad)))

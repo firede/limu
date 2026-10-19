@@ -150,7 +150,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, plotW, naturalW fl
 	small := jsmath.Round(size * 0.8125)
 	tiny := jsmath.Round(size * 0.6875)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 
 	// A narrower map is not as much shorter, so that components keep some room between them.
 	plotH := float64(dimension(config, givenHeight, "height", 600) * max(0.75, plotW/naturalW))

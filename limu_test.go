@@ -2,6 +2,7 @@ package limu
 
 import (
 	"errors"
+	"math"
 	"reflect"
 	"slices"
 	"sync"
@@ -118,8 +119,8 @@ func TestLayoutManyTimes(t *testing.T) {
 		{Now: now},
 		{Now: now, MaxWidth: 300},
 		{Now: now, FontSize: 20, Snap: 1},
-		{Now: now, MaxWidth: 200, KeepDirection: true},
-		{Now: now, Routing: layout.Orthogonal},
+		{Now: now, MaxWidth: 200, KeepDirection: true, Padding: new(0.0)},
+		{Now: now, Padding: new(20.0), Routing: layout.Orthogonal},
 	}
 	for _, typ := range types {
 		d := parsed(t, typ)
@@ -203,5 +204,34 @@ func TestLayoutSnaps(t *testing.T) {
 	loose.Snap(4)
 	if !reflect.DeepEqual(loose, snapped) {
 		t.Error("Layout with Snap 4 is not the scene snapped to 4")
+	}
+}
+
+// Padding moves what a diagram draws and widens it, as Pele's padding option does; nil is
+// Pele's 8. The render suites of flowcharts, pie charts and treemaps check paddings of 0, 2.5
+// and 20 against Pele, number for number.
+func TestLayoutPadding(t *testing.T) {
+	d := parsed(t, diagram.Pie)
+	def, _ := d.Layout(nil)
+	eight, _ := d.Layout(&layout.Options{Padding: new(8.0)})
+	if !reflect.DeepEqual(def, eight) {
+		t.Error("nil padding is not a padding of 8")
+	}
+	none, _ := d.Layout(&layout.Options{Padding: new(0.0)})
+	wide, _ := d.Layout(&layout.Options{Padding: new(20.0)})
+	if wide.Width-none.Width != 40 || wide.Height-none.Height != 40 || none.Width != def.Width-16 {
+		t.Errorf("sizes %vx%v at 0, %vx%v at 8, %vx%v at 20", none.Width, none.Height, def.Width, def.Height, wide.Width, wide.Height)
+	}
+	// Pele adds the padding to each place, so the last bit may differ.
+	near := func(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
+	for i := range none.Items {
+		a, b := none.Items[i], wide.Items[i]
+		moved := near(b.At.X-a.At.X, 20) && near(b.At.Y-a.At.Y, 20)
+		if a.Box != (scene.Rect{}) {
+			moved = moved && near(b.Box.X-a.Box.X, 20) && near(b.Box.Y-a.Box.Y, 20) && near(a.Box.W, b.Box.W) && near(a.Box.H, b.Box.H)
+		}
+		if !moved {
+			t.Errorf("item %d at %v, %v with no padding, at %v, %v with 20", i, a.Box, a.At, b.Box, b.At)
+		}
 	}
 }

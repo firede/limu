@@ -23,7 +23,6 @@ const (
 	rankSep  = 48
 	groupPad = 20
 	loop     = 26
-	padding  = 8
 )
 
 // A Variant is a diagram type that is a flowchart laid out its own way, which may draw its
@@ -102,6 +101,7 @@ type view struct {
 // down lays out a flowchart that runs across as one that runs down; tight sets nodes closer
 // together.
 func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, down, tight bool) *scene.Scene {
+	padding := o.Pad()
 	gpad := float64(groupPad)
 	if tight {
 		gpad = 12

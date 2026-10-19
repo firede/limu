@@ -31,7 +31,6 @@ const (
 	emptySection = 10 // the height of a compartment with no members
 	minWidth     = 64 // of a class
 	fold         = 8  // of a note's corner
-	padding      = common.Padding
 )
 
 // Layout lays out a parsed class diagram as a scene, as Pele's renderClass draws it: across
@@ -103,6 +102,7 @@ type card struct {
 // across as one that runs down; tight gives up the room that keeps a namespace's name clear
 // of an edge coming in beside it.
 func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *scene.Scene {
+	padding := o.Pad()
 	conf, _ := config["class"].(diagram.Config)
 	graph := BuildGraph(db, Hierarchical(config))
 	hideEmpty, _ := conf["hideEmptyMembersBox"].(bool)
@@ -755,7 +755,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	for _, layer := range [][]scene.Item{clusters, edges, struck, labels, cardItems, nodeItems} {
 		sc.Items = append(sc.Items, layer...)
 	}
-	common.WithTitle(sc, db.Title, "class.title", measure, size)
+	common.WithTitle(sc, db.Title, "class.title", measure, size, padding)
 	return sc
 }
 

@@ -207,14 +207,15 @@ func specRows(spec Specification) []string {
 	return append(rows, "Then  "+strings.Join(spec.Then, ", "))
 }
 
-// titleItem is the title, centered at the top of a scene width wide, or nothing for none.
-func titleItem(title text.Label, width float64) []scene.Item {
+// titleItem is the title, centered at the top of a scene width wide, pad under its top, or
+// nothing for none.
+func titleItem(title text.Label, width, pad float64) []scene.Item {
 	if title.Empty() {
 		return nil
 	}
 	return []scene.Item{{
 		Kind: scene.Text, Role: RoleTitle, Label: &title,
-		At:    scene.Point{X: width / 2, Y: common.Padding + title.Height/2},
+		At:    scene.Point{X: width / 2, Y: pad + title.Height/2},
 		Style: style.Style{Text: style.Fg},
 	}}
 }
@@ -245,7 +246,7 @@ func draw(m *Model, o *layout.Options) *scene.Scene {
 	monoStep := jsmath.Round(mono * 1.4)
 	smallStep := jsmath.Round(small * 1.5)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	widest := func(rows []string, size float64, face text.Face) float64 {
 		width := 0.0
 		for _, row := range rows {
@@ -311,7 +312,7 @@ func draw(m *Model, o *layout.Options) *scene.Scene {
 	if title.Height > 0 {
 		titleHeight = title.Height + 12
 	}
-	const left = pad
+	left := pad
 	top := pad + titleHeight
 
 	y := top
@@ -450,7 +451,7 @@ func draw(m *Model, o *layout.Options) *scene.Scene {
 		Title:    m.AccTitle,
 		Desc:     m.AccDescr,
 	}
-	sc.Items = titleItem(title, sc.Width)
+	sc.Items = titleItem(title, sc.Width, pad)
 	sc.Items = append(sc.Items, lanes...)
 	sc.Items = append(sc.Items, edges...)
 	sc.Items = append(sc.Items, nodes...)
@@ -474,7 +475,7 @@ func verticalEventModel(m *Model, o *layout.Options) *scene.Scene {
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	mono := jsmath.Round(size * 0.75)
-	const pad = common.Padding
+	pad := o.Pad()
 	measure := o.Measure()
 	room := max(160, o.MaxWidth-2*pad)
 
@@ -650,7 +651,7 @@ func verticalEventModel(m *Model, o *layout.Options) *scene.Scene {
 		Title:    m.AccTitle,
 		Desc:     m.AccDescr,
 	}
-	sc.Items = titleItem(title, sc.Width)
+	sc.Items = titleItem(title, sc.Width, pad)
 	sc.Items = append(sc.Items, edges...)
 	sc.Items = append(sc.Items, nodes...)
 	sc.Items = append(sc.Items, cards...)

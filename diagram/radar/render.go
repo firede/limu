@@ -32,7 +32,6 @@ const (
 	swatch = 12
 	row    = 26
 	gap    = 24
-	pad    = common.Padding
 )
 
 // point is a place about the chart's center, Pele's Point.
@@ -101,6 +100,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 // which is then moved to where the margins, the labels, the legend and the title leave it.
 // tight is set when the chart does not fit the width it has with its legend beside it.
 func draw(m *Model, config diagram.Config, o *layout.Options, width, height float64, tight bool) *scene.Scene {
+	pad := o.Pad()
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()

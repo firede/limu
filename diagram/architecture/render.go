@@ -339,7 +339,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene.
 	}
 	small := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	half := iconSize / 2
 	layoutLabel := func(raw string, markdown bool, size, maxWidth float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: maxWidth, Bounded: true, Face: face,

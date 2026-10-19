@@ -30,7 +30,6 @@ const (
 	noteWrap  = 320
 	corner    = 10
 	bar       = 8
-	padding   = common.Padding
 )
 
 // kind is what a node is drawn as, Pele's K.
@@ -163,7 +162,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()
 	wrapWidth := numberOption(config, "wrappingWidth", 200)
-	const pad = padding
+	pad := o.Pad()
 	rootDir := layout.Direction(db.Direction())
 	if turned {
 		rootDir = layout.TB
@@ -976,7 +975,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	for _, layer := range [][]scene.Item{clusters, dividers, edges, labels, nodes, notes} {
 		sc.Items = append(sc.Items, layer...)
 	}
-	common.WithTitle(sc, db.Title, "state.title", measure, size)
+	common.WithTitle(sc, db.Title, "state.title", measure, size, pad)
 	return sc
 }
 

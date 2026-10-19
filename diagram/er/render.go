@@ -37,7 +37,6 @@ const (
 	noWrap      float64 = 1e6
 	portGap     float64 = 18
 	portMargin  float64 = 14
-	padding     float64 = 8
 	// markerLength is how far a marker reaches back along its line from the box it touches,
 	// Pele's MARKER_LENGTH.
 	markerLength float64 = 18
@@ -124,6 +123,7 @@ func cellText(raw string) string {
 // lay lays the diagram out once, as Pele's draw does. turned lays out a diagram that runs
 // across as one that runs down.
 func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
+	padding := o.Pad()
 	graph := BuildGraph(db)
 	size := o.Size()
 	smallSize := jsmath.Round(float64(size * 0.875))
