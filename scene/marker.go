@@ -1,40 +1,69 @@
 package scene
 
+import "github.com/firede/limu/style"
+
 // MarkerSize is the length of an arrowhead.
 const MarkerSize = 8
 
-// Trim is how far an edge stops short of its end to leave room for a marker of the type.
-func (t MarkerType) Trim() float64 {
-	switch t {
-	case "arrow_point":
-		return MarkerSize - 1
-	case "arrow_circle":
-		return MarkerSize
-	case "arrow_cross":
-		return 4
-	}
-	return 0
+// A markerKind is what a type of marker is: how far an edge stops short of its end for it,
+// and its outline.
+type markerKind struct {
+	trim    float64
+	outline func(m Marker) []Part
 }
 
-// Outline is the marker's shape, as Pele draws it, and whether it is filled; a cross is
-// stroked. It is nil for a marker of no type, or of one it does not know.
-func (m Marker) Outline() (p *Path, filled bool) {
-	x, y, dx, dy := m.At.X, m.At.Y, m.DX, m.DY
-	nx, ny := -dy, dx
-	switch m.Type {
-	case "arrow_point":
-		bx, by := x-dx*MarkerSize, y-dy*MarkerSize
+// markers are the types of marker the scene knows, by name. Pele's flowchart markers are
+// here; a diagram with markers of its own adds them, under names with the diagram's prefix
+// ("class.extension"), in a file of its own, from an init function.
+var markers = map[MarkerType]markerKind{
+	"arrow_point": {MarkerSize - 1, func(m Marker) []Part {
+		x, y, dx, dy, nx, ny := m.frame()
+		bx, by := x-float64(dx*MarkerSize), y-float64(dy*MarkerSize)
 		half := MarkerSize * 0.42
-		return new(Path).Polygon(x, y, bx+nx*half, by+ny*half, bx-nx*half, by-ny*half), true
-	case "arrow_circle":
-		return new(Path).Ellipse(x-dx*4, y-dy*4, 3.5, 3.5), true
-	case "arrow_cross":
-		cx, cy := x-dx*4, y-dy*4
+		lx, ly := float64(nx*half), float64(ny*half)
+		return []Part{{Path: new(Path).Polygon(x, y, bx+lx, by+ly, bx-lx, by-ly), Paint: FillOnly}}
+	}},
+	"arrow_circle": {MarkerSize, func(m Marker) []Part {
+		x, y, dx, dy, _, _ := m.frame()
+		return []Part{{Path: new(Path).Ellipse(x-float64(dx*4), y-float64(dy*4), 3.5, 3.5), Paint: FillOnly}}
+	}},
+	"arrow_cross": {4, func(m Marker) []Part {
+		x, y, dx, dy, nx, ny := m.frame()
+		cx, cy := x-float64(dx*4), y-float64(dy*4)
 		const a = 3.5
-		ux, uy := (dx+nx)*a, (dy+ny)*a
-		vx, vy := (dx-nx)*a, (dy-ny)*a
-		p = new(Path).MoveTo(cx-ux, cy-uy).LineTo(cx+ux, cy+uy).MoveTo(cx-vx, cy-vy).LineTo(cx+vx, cy+vy)
-		return p, false
+		ux, uy := float64((dx+nx)*a), float64((dy+ny)*a)
+		vx, vy := float64((dx-nx)*a), float64((dy-ny)*a)
+		p := new(Path).MoveTo(cx-ux, cy-uy).LineTo(cx+ux, cy+uy).MoveTo(cx-vx, cy-vy).LineTo(cx+vx, cy+vy)
+		return []Part{{Path: p, Paint: StrokeOnly}}
+	}},
+}
+
+// markerJoins are the joins of the types of marker whose outlines Pele strokes with joins of
+// their own, by name; a diagram adds its own with its markers.
+var markerJoins = map[MarkerType]style.Join{}
+
+// frame is where a marker's tip is, the way it points, and the normal to that, a quarter
+// turn to the left of it.
+func (m Marker) frame() (x, y, dx, dy, nx, ny float64) {
+	return m.At.X, m.At.Y, m.DX, m.DY, -m.DY, m.DX
+}
+
+// Trim is how far an edge stops short of its end to leave room for a marker of the type.
+func (t MarkerType) Trim() float64 { return markers[t].trim }
+
+// Join is how a marker of the type turns the corners of its outline when they are stroked,
+// over whatever the edge's style says, as Pele sets it on the marker itself; unset, the
+// marker's corners are the edge's. Its ends are the edge's, as Pele's take theirs from the
+// group the edges are drawn in.
+func (t MarkerType) Join() style.Join { return markerJoins[t] }
+
+// Outline is the marker's shape, as Pele draws it: parts painted in the color of the edge's
+// line. FillOnly fills a part in it and FillAndStroke strokes it too; StrokeOnly strokes it
+// only, and Hollow fills it with the background and strokes it, so that it hides the line
+// beneath. It is nil for a marker of no type, or of one the scene does not know.
+func (m Marker) Outline() []Part {
+	if k, ok := markers[m.Type]; ok {
+		return k.outline(m)
 	}
-	return nil, false
+	return nil
 }

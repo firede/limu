@@ -12,6 +12,8 @@
 package scene
 
 import (
+	"slices"
+
 	"github.com/firede/limu/style"
 	"github.com/firede/limu/text"
 )
@@ -48,8 +50,11 @@ type Item struct {
 	Kind  Kind
 	Role  Role
 	Shape Shape
-	ID    string   // the id the diagram's text gave it, if any
-	Class []string // classes its author gave it with classDef
+	ID    string // the id the diagram's text gave it, if any
+	// Class is the classes the diagram's text gives the part, as classDef does, or a gantt
+	// task's tags, and those a diagram sorts its parts into, as a gantt chart's sections.
+	// The svg backend writes them as the element's classes, for a host's CSS.
+	Class []string
 
 	// Box is where the part is. For an edge, it holds its route.
 	Box Rect
@@ -69,11 +74,63 @@ type Item struct {
 	Align  Align
 	Rotate float64
 
+	// Picture is an image or an icon the part shows, as a flowchart's node may.
+	Picture *Picture
+
 	Style  style.Style // the diagram's own
 	Author style.Style // what the author set with classDef and style lines
 
 	Link    string // where the part leads, when it is a link
 	Tooltip string
+}
+
+// Move moves the item by dx, dy: its box, parts, route, markers, label and picture. Its
+// parts and paths are copied before they are moved, as other items may share them.
+func (it *Item) Move(dx, dy float64) {
+	box := func(r *Rect) {
+		r.X += dx
+		r.Y += dy
+	}
+	point := func(p *Point) {
+		p.X += dx
+		p.Y += dy
+	}
+	box(&it.Box)
+	parts := slices.Clone(it.Parts)
+	for k := range parts {
+		box(&parts[k].Box)
+		if p := parts[k].Path; p != nil {
+			q := &Path{Ops: p.Ops, Args: slices.Clone(p.Args)}
+			for j := 0; j+1 < len(q.Args); j += 2 {
+				q.Args[j] += dx
+				q.Args[j+1] += dy
+			}
+			parts[k].Path = q
+		}
+	}
+	it.Parts = parts
+	route := slices.Clone(it.Route)
+	for k := range route {
+		point(&route[k])
+	}
+	it.Route = route
+	for k := range it.Ends {
+		point(&it.Ends[k].At)
+	}
+	point(&it.At)
+	if it.Picture != nil {
+		pic := *it.Picture
+		box(&pic.Box)
+		it.Picture = &pic
+	}
+}
+
+// A Picture is an image, or an icon by name, drawn in a box.
+type Picture struct {
+	Image string // the image's address, checked as the diagram's options allow
+	Icon  string // or the icon's name, as "fa:fa-car", drawn in the color of text
+	Box   Rect
+	Fit   bool // the image keeps its proportions in the box; it fills it otherwise
 }
 
 // Align is where a label's lines are about the point it is drawn at, across; down, the
@@ -92,9 +149,32 @@ type Part struct {
 	Path    *Path
 	Box     Rect
 	Rounded bool
-	// Line is drawn with the stroke only, as a detail on the shape: the lid of a cylinder.
-	Line bool
+	Paint   Painting
 }
+
+// Painting is how a part is painted in its item's style.
+type Painting uint8
+
+const (
+	// FillAndStroke fills the part and strokes its outline.
+	FillAndStroke Painting = iota
+	// StrokeOnly strokes the part only: an edge, or a detail on a shape, as the lid of a
+	// cylinder.
+	StrokeOnly
+	// FillOnly fills the part and does not stroke it: the body of a datastore, which lines
+	// close at its top and bottom only.
+	FillOnly
+	// Solid fills the part in the theme's color of lines, and strokes it: the dot of a final
+	// state, the bar of a fork.
+	Solid
+	// Hollow fills the part with the theme's background, and strokes it: the ring of a final
+	// state, which hides what is beneath it.
+	Hollow
+	// Shade fills the part with the theme's background and does not stroke it: a stripe of
+	// an entity's table. Over a fill the item's author set, it is the background at 60% laid
+	// over that fill, a tint of it.
+	Shade
+)
 
 // A MarkerType is the kind of marker at an end of an edge, by Mermaid's names:
 // "arrow_point", "arrow_circle", "arrow_cross"… The empty one is no marker.

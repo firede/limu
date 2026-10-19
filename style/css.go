@@ -3,6 +3,8 @@ package style
 import (
 	"strconv"
 	"strings"
+
+	"github.com/firede/limu/internal/chars"
 )
 
 // Author is what a diagram's author set in its text, with classDef and style lines, in the
@@ -17,7 +19,8 @@ type Author struct {
 // Declarations reads Mermaid's style declarations, as "fill:#f9f" and "stroke-width:4px",
 // as Pele's resolveStyle does: later ones win, !important is ignored, and a value that could
 // reach outside the diagram is dropped. Of the properties, fill, stroke, color, the widths,
-// dashes, opacities and rx or ry are kept, and the font's weight, style and size.
+// dashes, caps and joins, opacities and rx or ry are kept, and the font's weight, style and
+// size.
 func Declarations(decls []string) Author {
 	var a Author
 	fill, stroke := 1.0, 1.0
@@ -53,6 +56,12 @@ func Declarations(decls []string) Author {
 			}
 		case "stroke-dasharray":
 			a.Style.Dash = dashes(value)
+		case "stroke-linecap":
+			// Pele keeps the last value of a property alone, and one the browser drops
+			// leaves the property to what is under it.
+			a.Style.Cap = Cap(keyword(value, caps))
+		case "stroke-linejoin":
+			a.Style.Join = Join(keyword(value, joins))
 		case "rx", "ry":
 			if f, ok := length(value); ok && f >= 0 {
 				a.Style.Radius = N(f)
@@ -71,13 +80,54 @@ func Declarations(decls []string) Author {
 	if stroke < 1 {
 		a.Style.Stroke = a.Style.Stroke.Alpha(stroke)
 	}
-	n, err := strconv.ParseFloat(weight, 64)
-	a.Bold = weight == "bold" || weight == "bolder" || err == nil && n >= 600
+	a.Bold = weight == "bold" || weight == "bolder" || chars.Number(weight) >= 600
 	a.Italic = fontStyle == "italic"
-	if px, ok := length(fontSize); ok && px > 0 && px <= 200 && !strings.HasSuffix(fontSize, "%") {
+	if px, ok := fontPixels(fontSize); ok && px > 0 && px <= 200 {
 		a.FontSize = px
 	}
 	return a
+}
+
+// LineDeclared reports whether declarations set anything of a line: a property of a shape
+// other than its fill and fill opacity, with a value that is not dropped, whether or not it
+// can be read. It is whether the line of Pele's resolveStyle is not empty.
+func LineDeclared(decls []string) bool {
+	for _, decl := range decls {
+		prop, value, ok := strings.Cut(decl, ":")
+		if !ok {
+			continue
+		}
+		switch chars.ToLower(chars.Trim(prop)) {
+		case "stroke", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap",
+			"stroke-linejoin", "stroke-opacity", "opacity", "rx", "ry":
+			value = chars.Trim(replaceFold(value, "!important", ""))
+			if value != "" && !unsafe(value) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// The keywords of stroke-linecap and stroke-linejoin, by the Cap or Join each is. Pele
+// passes the properties through to the browser, which takes these, initial for the
+// property's initial value, and inherit or unset for what the element would inherit, which
+// is what an unset style takes from under it here. It takes no others: SVG 2's miter-clip
+// and arcs are not drawn by browsers, and a value they do not take is dropped.
+var (
+	caps  = map[string]uint8{"butt": uint8(CapButt), "round": uint8(CapRound), "square": uint8(CapSquare), "initial": uint8(CapButt), "inherit": 0, "unset": 0}
+	joins = map[string]uint8{"miter": uint8(JoinMiter), "round": uint8(JoinRound), "bevel": uint8(JoinBevel), "initial": uint8(JoinMiter), "inherit": 0, "unset": 0}
+)
+
+// keyword reads a keyword of CSS, in either case of its ASCII letters, from those given, or
+// 0 for one it is not.
+func keyword(value string, of map[string]uint8) uint8 {
+	for k, v := range of {
+		if len(k) == len(value) && asciiFold(k, value) {
+			return v
+		}
+	}
+	return 0
 }
 
 // paint is a paint of a color, None for none, or unset for one it cannot read.
@@ -101,6 +151,23 @@ func fraction(value string, was float64) float64 {
 		return was
 	}
 	return max(0, min(1, f))
+}
+
+// fontPixels reads a font size as Pele's resolveStyle does: one that /^[\d.]+(px)?$/ takes,
+// read with parseFloat, which stops at a second point.
+func fontPixels(value string) (float64, bool) {
+	body := strings.TrimSuffix(value, "px")
+	if body == "" || strings.TrimLeft(body, "0123456789.") != "" {
+		return 0, false
+	}
+	end := strings.IndexByte(body, '.')
+	if end >= 0 {
+		if next := strings.IndexByte(body[end+1:], '.'); next >= 0 {
+			body = body[:end+1+next]
+		}
+	}
+	f, err := strconv.ParseFloat(body, 64)
+	return f, err == nil
 }
 
 // length reads a number of pixels, with or without px.

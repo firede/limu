@@ -17,10 +17,19 @@ backend. Its tests compare what it does with what Pele does, number for
 number.
 
 > [!WARNING]
-> **An early, personal project.** Nothing reads diagrams yet: this is the
-> first stage of the work, the types the rest is built on, text laid out as
-> Pele lays it out, styles, and an SVG backend. Flowcharts come next. The API
-> will change in any 0.x release.
+> **An early, personal project.** It reads flowcharts; state, class, entity
+> relationship, requirement, use case, agent flow and swimlane diagrams; and
+> sequence, gantt, timeline, user journey, git graph, packet and kanban diagrams.
+> The charts and the rest follow, one family at a time. The API will change in
+> any 0.x release.
+
+```go
+sc, err := limu.Layout("flowchart LR\n  A[Text] --> B[Scene] --> C{Backend}", nil)
+if err != nil {
+	return err
+}
+out := svg.Render(sc, nil)
+```
 
 ## How it is built
 
@@ -30,11 +39,15 @@ text ──parse──▶ model ──layout──▶ scene ──backend──�
 
 | Package | What it does |
 |---|---|
+| `limu` | `Layout`: a diagram's text to its scene. |
+| `diagram` | Reads a diagram's front matter and directives, and tells its type; a package for each type parses it and lays it out. |
 | `text` | Measures text, through a `Measurer` the host gives, and lays out labels: lines, wrapping, emphasis, icons, entities. `text.Arial` measures with a table of Arial's advances, with no font at hand. |
 | `scene` | A diagram laid out: items, their roles and shapes, boxes, paths, markers, labels. |
 | `style` | How a scene looks, at three levels: a theme of colors by token, overrides by role, and a backend's drawing of its own. |
-| `layout` | What changes where things are: the measurer, the size of text, a grid to snap to, how edges are routed. |
+| `layout` | What changes where things are: the measurer, the size of text, a grid to snap to, how edges are routed, the present and the time zone of a gantt chart. The layered and compound layouts. |
+| `draw` | The geometry diagrams share: shapes' outlines and edges' paths. |
 | `svg` | Draws a scene as SVG, its theme as CSS variables. |
+| `mygoui` | Draws a scene with MyGo's native UI, and finds the item under the pointer. A module of its own, so that the rest needs only the standard library. |
 
 What changes where things are goes to layout; everything else is style, and a
 change of it only redraws. [docs/design.md](docs/design.md) has the details and

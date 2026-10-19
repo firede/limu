@@ -2,7 +2,11 @@
 // where things are. A change of them lays a diagram out again; a change of style does not.
 package layout
 
-import "github.com/firede/limu/text"
+import (
+	"time"
+
+	"github.com/firede/limu/text"
+)
 
 // Routing is how edges run between the things they join.
 type Routing uint8
@@ -26,10 +30,46 @@ type Options struct {
 	// MaxWidth is the width the host has for the diagram; a diagram that can draw itself
 	// narrower does. 0 is no limit.
 	MaxWidth float64
+	// KeepDirection keeps a diagram that runs across from being laid out running down when it
+	// does not fit MaxWidth; it is, by default, when MaxWidth is under DirectionBreakpoint
+	// (0 is 640) and running down is narrower.
+	KeepDirection       bool
+	DirectionBreakpoint float64
+
+	// NoLinks and NoImages leave out the links and the images a diagram's text asks for.
+	// LinkSchemes and ImageSchemes are the schemes they may use besides a relative address:
+	// nil is http, https, mailto and tel for links, and http and https for images.
+	NoLinks, NoImages         bool
+	LinkSchemes, ImageSchemes []string
 	// Snap rounds where things are to whole multiples of it, for a backend that draws on a
 	// grid of pixels. 0 leaves them as they fall.
 	Snap    float64
 	Routing Routing
+
+	// Now is the time a diagram that places things in time takes as the present: where a
+	// gantt chart draws today, and where a task with no start begins. The zero time is
+	// time.Now().
+	Now time.Time
+	// Location is the time zone such a diagram reads and writes dates in, as JavaScript
+	// does in the machine's: the days that tasks start on, the ticks of its axis. nil is
+	// time.Local.
+	Location *time.Location
+}
+
+// Clock is the options' Now, or time.Now() when it is the zero time.
+func (o *Options) Clock() time.Time {
+	if o == nil || o.Now.IsZero() {
+		return time.Now()
+	}
+	return o.Now
+}
+
+// Zone is the options' Location, or time.Local.
+func (o *Options) Zone() *time.Location {
+	if o == nil || o.Location == nil {
+		return time.Local
+	}
+	return o.Location
 }
 
 // Measure is the options' measurer, or text.Arial.

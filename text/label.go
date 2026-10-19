@@ -4,6 +4,8 @@ import (
 	"math"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/firede/limu/internal/jsmath"
 )
 
 // A Span is a run of a line in one face: text, or an icon in its place.
@@ -40,6 +42,9 @@ type Options struct {
 	// Icons reports whether the host can draw an icon by name. A label leaves room for an
 	// icon only where it can; with nil, it never does.
 	Icons func(name string) bool
+	// Bounded takes MaxWidth as it is even at 0 or below, as Pele's layoutLabel does: a width
+	// worked out to fit text in a box of a set size can come out at nothing or less.
+	Bounded bool
 }
 
 // Layout lays out a label as Pele's layoutLabel does: <br> and new lines break it, <b>,
@@ -50,10 +55,10 @@ func Layout(raw string, o Options) Label {
 	if raw == "" {
 		return Label{}
 	}
-	if o.MaxWidth <= 0 {
+	if o.MaxWidth <= 0 && !o.Bounded {
 		o.MaxWidth = math.Inf(1)
 	}
-	lineHeight := jsRound(o.Size * LineHeight)
+	lineHeight := jsmath.Round(o.Size * LineHeight)
 
 	if !hasMarkup(raw) && !strings.Contains(raw, "&") && !strings.Contains(raw, "ﬂ") {
 		text := trim(raw)
@@ -105,9 +110,6 @@ func Layout(raw string, o Options) Label {
 	}
 	return Label{Lines: lines, Widths: widths, Width: width, Height: float64(len(lines)) * lineHeight, Size: o.Size, LineHeight: lineHeight}
 }
-
-// jsRound is JavaScript's Math.round: halves go up.
-func jsRound(x float64) float64 { return math.Floor(x + 0.5) }
 
 // hasMarkup matches /[<\\\n*_]|fa[bklrs]?:fa-/.
 func hasMarkup(s string) bool {

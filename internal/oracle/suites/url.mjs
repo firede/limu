@@ -1,0 +1,152 @@
+// Pele's checks of the URLs diagrams link to and show: sanitizeUrl, which follows
+// @braintree/sanitize-url, safeUrl, and the schemes linkUrl and imageUrl let through.
+import { lone } from './parse.mjs';
+
+const WRITTEN = [
+  // Pele's own cases, tests/util/url.test.ts.
+  'https://example.com',
+  'http://EXAMPLE.com/Path?q=1#frag',
+  'click.html',
+  './relative/path',
+  '/absolute/path',
+  'mailto:someone@example.com',
+  'obsidian://open?vault=Notes&file=Idea',
+  'javascript:alert(1)',
+  'JaVaScRiPt:alert(1)',
+  '  javascript:alert(1)',
+  'java\nscript:alert(1)',
+  'jav&#x09;ascript:alert(1)',
+  '&#106;avascript:alert(1)',
+  'data:text/html,<script>alert(1)</script>',
+  'vbscript:msgbox(1)',
+  'javascript&colon;alert(1)',
+  '%6A%61%76%61%73%63%72%69%70%74:alert(1)',
+  'https://example.com/a b',
+  'http://',
+  'ftp://example.com/file',
+  'www.example.com',
+  'C:\\Users\\file.txt',
+  '\\\\server\\share',
+  'note name with spaces',
+  '#heading',
+  '?query=1',
+  '',
+  'about:blank',
+  'tel:+123456',
+  'https://example.com/%E0%A4%A',
+  // More.
+  'http:example.com',
+  'HTTPS:/EXAMPLE.COM/a/./b/../c/%2e%2E/d?x="y" z#f g`h',
+  'http://user@host/',
+  'http://a@b@c/',
+  'http://@host/',
+  'http://host@/',
+  'http://0x7f.1/',
+  'http://1.2.3/',
+  'http://256.1/',
+  'http://1.256/',
+  'http://4294967296/',
+  'http://0300.0250.1.1/',
+  'http://1.2.3.4.5/',
+  'http://a.b./',
+  'http://a.1./',
+  'http://É.com/',
+  'http://ex%41mple.com/',
+  'http://ex%2Fmple.com/',
+  'http://xn--9ca.com/',
+  'http://xn--zz.com/',
+  'http://ex ample.com/',
+  'http://ex<ample.com/',
+  'http://[1::2]/',
+  'http://host/^{}|`<>"\'',
+  'http://host/?^{}|`<>"\'#^{}|`<>"\'',
+  'http://host/é?é#é',
+  'http://host/😀',
+  'http://host/%zz',
+  'http://host/a%2Fb',
+  'http://host/..',
+  'http://host/a/..',
+  'http://host/a/%2e',
+  'http://host/a/.%2E/b',
+  'http://host/a/?',
+  'http://host/a/#',
+  'http://host?a#b',
+  'http://host#b',
+  'http:///host',
+  'http:\\\\host\\path',
+  'http://host\u2028x',
+  'https://host\u2028:80',
+  '&#104;ttp://host',
+  '&#0104;&#x74;tp://h',
+  '&#55357;&#56832;',
+  '&#65601;',
+  '&#x;',
+  '&#1e2;',
+  '&#Infinity;',
+  '&newline;javascript:x',
+  '&NewLine;javascript:x',
+  '&Tab;',
+  'java%5cnscript:x',
+  'java\\tscript:x',
+  'java%5C%6Escript:x',
+  '%2568%2574tp://x',
+  '%25'.repeat(40) + '20',
+  '%E2%80%A8http://x',
+  '\u2028http://x',
+  'a\u2028http://x',
+  'a\u2029javascript:x',
+  ' \u3000http://x ',
+  '\u00a0http://x',
+  '\ufeffjavascript:x',
+  'mailto:a@b.c',
+  'MAILTO:a@b.c',
+  'tel:1',
+  'sms:1',
+  'file:///etc/passwd',
+  '//evil.com/x',
+  '/\\evil.com',
+  'x:y',
+  '1x:y',
+  'jav\u0130script:x',
+  'JAVASCRİPT:x',
+  'data&colon;x',
+  'a&colon;b:c',
+  '.hidden',
+  '...',
+  ':',
+  'a:',
+  '&#58;',
+  'http&colon;//x',
+];
+
+const FRAGMENTS = [
+  'http', 'https', 'HTTP', ':', ':', '//', '/', '\\', 'javascript', 'JaVa', 'script', 'data', 'mailto:', 'tel:', 'ftp://', '&#',
+  '&#106;', '&#x6A;', '&#58', ';', '&colon;', '&newline;', '&TAB;', '%', '%20', '%3A', '%5c', '%5Cn', '%6e', '\\n', 'a', 'b',
+  'example.com', 'EXAMPLE', '.', '..', '%2e', '?', '#', '@', ' ', '\t', '\n', '\u2028', 'é', '😀', '0x7f', '1', '256', '.1',
+  '~', '<', '"', "'", '`', '{', '^', '|', 'xn--', 'xn--9ca', '\u0000', '\u00a0', '\ufeff', '\u200b', '%E2%80%A8', '%C3%A9',
+  '%ZZ', '%25', '&amp;', '&#35;', '#35;', '&#0;',
+];
+
+export default async function ({ src, write, random }) {
+  const { sanitizeUrl, safeUrl, linkUrl, imageUrl } = await src('util/url.ts');
+  const next = random(5);
+  const fuzz = [];
+  while (fuzz.length < 4000) {
+    let s = '';
+    const n = 1 + Math.floor(next() * 10);
+    for (let k = 0; k < n; k++) s += FRAGMENTS[Math.floor(next() * FRAGMENTS.length)];
+    if (!lone(s)) fuzz.push(s);
+  }
+  const url = [...WRITTEN, ...fuzz].map((input) => {
+    const sanitized = sanitizeUrl(input);
+    return {
+      input,
+      sanitized,
+      safe: safeUrl(input),
+      link: linkUrl(sanitized, {}) ?? null,
+      image: imageUrl(sanitized, {}) ?? null,
+      mail: linkUrl(sanitized, { linkSchemes: ['mailto', 'obsidian'] }) ?? null,
+    };
+  });
+  write('internal/url/testdata/pele/url.json', { url });
+}

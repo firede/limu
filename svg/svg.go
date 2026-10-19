@@ -24,6 +24,9 @@ type Options struct {
 	// LinkSchemes are the schemes a link may use besides a relative address; nil is http,
 	// https, mailto and tel. A link of another is drawn as no link.
 	LinkSchemes []string
+	// ImageSchemes are the schemes an image may be loaded with besides a relative address;
+	// nil is http and https.
+	ImageSchemes []string
 	// Icons gives the inside of an icon's <svg>, on a box of 24 by 24, by the icon's name;
 	// labels leave room only for icons the measurer was told of.
 	Icons func(name string) string
@@ -107,20 +110,42 @@ func (w *Writer) Paint(p style.Paint) {
 		return
 	}
 	name := p.Token().Name()
-	if name == "" {
+	switch {
+	case name == "" && p.Base() == 0:
 		w.b.WriteString(p.Own().String())
 		return
-	}
-	if w.o.Literal {
-		c := w.th.Color(p.Token())
+	case name == "" || w.o.Literal:
+		// A color of its own mixed with the theme's is settled here, as are all of them
+		// when they are written as colors.
+		c := p.Color(w.th)
+		if p.Base() == 0 {
+			c = w.th.Color(p.Token())
+		}
 		c.A = 255
 		w.b.WriteString(c.String())
 		return
 	}
+	if p.Base() != 0 {
+		// The paint's opacity is its share of the mix.
+		w.b.WriteString("color-mix(in srgb,")
+		w.variable(p.Token())
+		w.b.WriteByte(' ')
+		w.Num(100 * float64(p.Factor()) * float64(w.th.Color(p.Token()).A) / 255)
+		w.b.WriteString("%,")
+		w.variable(p.Base())
+		w.b.WriteByte(')')
+		return
+	}
+	w.variable(p.Token())
+}
+
+// variable writes a token of the theme as a CSS variable, its color in the theme the
+// fallback.
+func (w *Writer) variable(t style.Token) {
 	w.b.WriteString("var(--limu-")
-	w.b.WriteString(name)
+	w.b.WriteString(t.Name())
 	w.b.WriteByte(',')
-	c := w.th.Color(p.Token())
+	c := w.th.Color(t)
 	c.A = 255
 	w.b.WriteString(c.String())
 	w.b.WriteByte(')')
@@ -139,13 +164,32 @@ func (w *Writer) paintAttr(name string, p style.Paint) {
 	} else if p.Visible() {
 		a *= float64(w.th.Color(p.Token()).A) / 255
 	}
-	if p.Visible() && a < 1 {
+	if p.Visible() && a < 1 && p.Base() == 0 {
 		w.b.WriteByte(' ')
 		w.b.WriteString(name)
 		w.b.WriteString(`-opacity="`)
 		w.Num(a)
 		w.b.WriteByte('"')
 	}
+}
+
+// tint writes the fill of a part painted Shade over a fill its author set: the background
+// at 60% laid over the fill.
+func (w *Writer) tint(fill style.Paint) {
+	b := &w.b
+	b.WriteString(` fill="`)
+	if w.o.Literal {
+		bg, c := w.th.Color(style.Bg.Token()), fill.Color(w.th)
+		mix := func(x, y uint8) uint8 { return uint8(float64(x)*0.6 + float64(y)*0.4 + 0.5) }
+		b.WriteString(style.RGB(mix(bg.R, c.R), mix(bg.G, c.G), mix(bg.B, c.B)).String())
+	} else {
+		b.WriteString("color-mix(in srgb,")
+		w.variable(style.Bg.Token())
+		b.WriteString(" 60%,")
+		w.Paint(fill)
+		b.WriteByte(')')
+	}
+	b.WriteByte('"')
 }
 
 // Path writes the path's steps, as the d of a <path>.
@@ -173,6 +217,48 @@ func or(s, d string) string {
 		return d
 	}
 	return s
+}
+
+// picture writes an image, or an icon in the color of the part's text.
+func (w *Writer) picture(pic *scene.Picture, st style.Style) {
+	b := &w.b
+	box := func() {
+		b.WriteString(` x="`)
+		w.Num(pic.Box.X)
+		b.WriteString(`" y="`)
+		w.Num(pic.Box.Y)
+		b.WriteString(`" width="`)
+		w.Num(pic.Box.W)
+		b.WriteString(`" height="`)
+		w.Num(pic.Box.H)
+		b.WriteByte('"')
+	}
+	switch {
+	case pic.Image != "":
+		href := safeURL(pic.Image, w.o.ImageSchemes, imageSchemes)
+		if href == "" {
+			return
+		}
+		b.WriteString(`<image href="`)
+		w.Text(href)
+		b.WriteByte('"')
+		box()
+		if pic.Fit {
+			b.WriteString(` preserveAspectRatio="xMidYMid meet"/>`)
+		} else {
+			b.WriteString(` preserveAspectRatio="none"/>`)
+		}
+	case pic.Icon != "" && w.o.Icons != nil:
+		b.WriteString(`<svg class="limu-icon" data-icon="`)
+		w.Text(pic.Icon)
+		b.WriteByte('"')
+		box()
+		b.WriteString(` color="`)
+		w.Paint(st.Text)
+		b.WriteString(`" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`)
+		b.WriteString(w.o.Icons(pic.Icon))
+		b.WriteString("</svg>")
+	}
 }
 
 // item writes an item as Pele does: a group of its outline, its markers and its label.
@@ -237,32 +323,70 @@ func (w *Writer) item(sc *scene.Scene, it *scene.Item, st style.Style) {
 			w.Path(part.Path)
 			b.WriteByte('"')
 		}
-		if part.Line {
-			b.WriteString(` fill="none"`)
-		} else {
-			w.paintAttr("fill", st.Fill)
+		fill, stroke := st.Fill, st.Stroke
+		tint := false
+		switch part.Paint {
+		case scene.StrokeOnly:
+			fill = style.None
+		case scene.FillOnly:
+			stroke = style.None
+		case scene.Solid:
+			fill = style.Line
+		case scene.Hollow:
+			fill = style.Bg
+		case scene.Shade:
+			stroke = style.None
+			tint = it.Author.Fill.Visible() && st.Fill.Visible()
+			if !tint {
+				fill = style.Bg
+			}
 		}
-		w.paintAttr("stroke", st.Stroke)
-		w.strokeAttrs(st, sw)
-		b.WriteString("/>")
-	}
-	for _, m := range it.Ends {
-		p, filled := m.Outline()
-		if p == nil {
-			continue
-		}
-		b.WriteString(`<path class="limu-marker" d="`)
-		w.Path(p)
-		b.WriteByte('"')
-		if filled {
-			w.paintAttr("fill", st.Stroke)
-			b.WriteString(` stroke="none"`)
+		if tint {
+			w.tint(st.Fill)
 		} else {
-			b.WriteString(` fill="none"`)
-			w.paintAttr("stroke", st.Stroke)
+			w.paintAttr("fill", fill)
+		}
+		w.paintAttr("stroke", stroke)
+		if stroke.Visible() {
 			w.strokeAttrs(st, sw)
 		}
 		b.WriteString("/>")
+	}
+	// Markers are drawn solid, on a dashed edge too, as Pele draws them.
+	solid := st
+	solid.Dash = style.Dash{}
+	for _, m := range it.Ends {
+		for _, part := range m.Outline() {
+			b.WriteString(`<path class="limu-marker" d="`)
+			if part.Path != nil {
+				w.Path(part.Path)
+			} else {
+				w.Path(new(scene.Path).RoundRect(part.Box, 0))
+			}
+			b.WriteByte('"')
+			fill, stroke := st.Stroke, st.Stroke
+			switch part.Paint {
+			case scene.FillOnly, scene.Solid:
+				stroke = style.None
+			case scene.StrokeOnly:
+				fill = style.None
+			case scene.Hollow:
+				fill = style.Bg
+			}
+			w.paintAttr("fill", fill)
+			w.paintAttr("stroke", stroke)
+			if stroke.Visible() {
+				ms := solid
+				if j := m.Type.Join(); j.Set() {
+					ms.Join = j
+				}
+				w.strokeAttrs(ms, sw)
+			}
+			b.WriteString("/>")
+		}
+	}
+	if pic := it.Picture; pic != nil {
+		w.picture(pic, st)
 	}
 	if it.Label != nil && !it.Label.Empty() {
 		w.label(sc, it, st)
@@ -290,22 +414,49 @@ func (w *Writer) strokeAttrs(st style.Style, sw float64) {
 		}
 		b.WriteByte('"')
 	}
+	if st.Cap.Set() {
+		b.WriteString(` stroke-linecap="`)
+		b.WriteString(st.Cap.String())
+		b.WriteByte('"')
+	}
+	if st.Join.Set() {
+		b.WriteString(` stroke-linejoin="`)
+		b.WriteString(st.Join.String())
+		b.WriteByte('"')
+	}
 }
 
 var kindClass = [...]string{"item", "node", "group", "edge", "text", "mark"}
 
 // label writes a label about the item's At, as Pele's labelSvg does: a line's
-// baseline is a little below the middle of its line's height.
+// baseline is a little below the middle of its line's height. A halo is the text again
+// under it, stroked.
 func (w *Writer) label(sc *scene.Scene, it *scene.Item, st style.Style) {
+	if st.Halo.Visible() {
+		w.text(sc, it, func() {
+			w.b.WriteString(` fill="none"`)
+			w.paintAttr("stroke", st.Halo)
+			w.b.WriteString(` stroke-width="`)
+			w.Num(st.HaloWidth.Or(0))
+			w.b.WriteString(`" stroke-linejoin="round"`)
+		}, false)
+	}
+	w.text(sc, it, func() {
+		if st.Text != style.Fg {
+			w.paintAttr("fill", st.Text)
+		}
+	}, true)
+}
+
+// text writes a label's <text>, with attrs writing its attributes of paint.
+func (w *Writer) text(sc *scene.Scene, it *scene.Item, attrs func(), icons bool) {
 	b := &w.b
 	l := it.Label
 	cx, cy := it.At.X, it.At.Y
 	shift := l.Size * 0.35
 	y := cy - l.Height/2 + l.LineHeight/2 + shift
 	b.WriteString(`<text text-anchor="middle" xml:space="preserve"`)
-	if st.Text != style.Fg {
-		w.paintAttr("fill", st.Text)
-	}
+	attrs()
 	if l.Size != sc.FontSize {
 		b.WriteString(` font-size="`)
 		w.Num(l.Size)
@@ -339,7 +490,7 @@ func (w *Writer) label(sc *scene.Scene, it *scene.Item, st style.Style) {
 			b.WriteString(`"> </tspan>`)
 		}
 		for _, s := range line {
-			if s.Icon != "" && w.o.Icons != nil {
+			if icons && s.Icon != "" && w.o.Icons != nil {
 				w.icons = append(w.icons, icon{s.Icon, x, y - shift - l.Size*1.1/2, l.Size * 1.1})
 			}
 			if s.Icon == "" && s.Text != "" {
@@ -391,20 +542,26 @@ type icon struct {
 	x, y, side float64
 }
 
-var linkSchemes = []string{"http", "https", "mailto", "tel"}
+var (
+	linkSchemes  = []string{"http", "https", "mailto", "tel"}
+	imageSchemes = []string{"http", "https"}
+)
 
 // safeLink is the link, if it is relative or of a scheme the options allow, or nothing.
 // The diagrams sanitize what their authors write as Mermaid does; this is the last check.
 func (w *Writer) safeLink(link string) string {
+	return safeURL(link, w.o.LinkSchemes, linkSchemes)
+}
+
+func safeURL(link string, schemes, defaults []string) string {
 	link = strings.TrimSpace(link)
 	for _, r := range link {
 		if r < 0x20 || r >= 0x7f && r <= 0x9f {
 			return ""
 		}
 	}
-	schemes := w.o.LinkSchemes
 	if schemes == nil {
-		schemes = linkSchemes
+		schemes = defaults
 	}
 	end := strings.IndexAny(link, ":/?#")
 	if end <= 0 || link[end] != ':' {
