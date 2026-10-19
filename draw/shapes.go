@@ -498,9 +498,9 @@ var shapes = map[string]*shapeDef{
 		inset: sides(2, 1),
 		draw: func(d *drawing, w, h float64) {
 			x, y := w/2, h/2
-			r := y * 0.55
+			r := float64(y * 0.55)
 			d.pen().M(-x+r, y).
-				A(r, r, false, true, -x+r*0.6, -y*0.1).
+				A(r, r, false, true, -x+float64(r*0.6), -y*0.1).
 				A(x*0.42, y*0.7, false, true, -x*0.1, -y*0.72).
 				A(x*0.4, y*0.62, false, true, x*0.62, -y*0.42).
 				A(r*1.05, r*1.05, false, true, x-r, y).Z().done(scene.FillAndStroke)
