@@ -423,6 +423,10 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 				y += head.Height + 8
 			}
 		}
+		// Pele measures a task's label at the small size and writes its text with no
+		// font-size, so that a browser draws it at the diagram's own size, wider than it was
+		// measured. Here it is drawn at the size it was measured at, as the scene's labels
+		// are; where it is placed is Pele's.
 		label := common.FitLabel(task.Task, measure, small, room-72, 0)
 		type person struct {
 			name  string

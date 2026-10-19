@@ -6,6 +6,12 @@
 // Dates are computed as JavaScript computes them in local time (see internal/jsdate), in the
 // zone layout.Options.Location gives, and against the time layout.Options.Now gives, so that
 // a host decides both.
+//
+// The scene's items carry the classes Pele gives the chart's elements, for a host's CSS. A
+// task ("gantt.task") has, in this order, "active" or "done", "crit", "milestone",
+// "clickable" when a click line gives it a link or a callback, and "unscheduled" when its
+// dates could not be worked out. A section's band ("gantt.section") has "section-N", N the
+// section's place among the colors numberSectionStyles sets, counted from 0.
 package gantt
 
 import (
