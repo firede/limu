@@ -1,6 +1,6 @@
 package architecture
 
-import "github.com/firede/limu/scene"
+import "github.com/firede/limu/diagram/internal/common"
 
 // glyphs are the outlines of the icon names Mermaid's architecture diagrams know without an
 // icon pack, drawn on a 24 by 24 grid, as Pele's icons.ts has them. Any other name is left to
@@ -14,17 +14,4 @@ var glyphs = map[string]string{
 }
 
 // glyphPaths are the glyphs read into paths.
-var glyphPaths = func() map[string]*scene.Path {
-	out := map[string]*scene.Path{}
-	for name, d := range glyphs {
-		p, err := scene.ParsePath(d)
-		if err != nil {
-			panic(err)
-		}
-		out[name] = p
-	}
-	return out
-}()
-
-// glyphStroke is how wide Pele strokes a glyph, in units of its grid.
-const glyphStroke = 1.5
+var glyphPaths = common.Glyphs(glyphs)

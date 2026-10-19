@@ -266,7 +266,6 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 		})
 	}
 
-	host := func(name string) bool { return o.Icons != nil && o.Icons(text.DecodeEntities(name)) }
 	for _, r := range rows {
 		node := r.node
 		cy := top + r.cy
@@ -289,7 +288,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 		var glyph *scene.Item
 		if r.icon != "" {
 			box := scene.Rect{X: inset + r.x, Y: cy - iconSize/2, W: iconSize, H: iconSize}
-			if host(r.icon) {
+			if common.HostIcon(o, r.icon) {
 				it.Picture = &scene.Picture{Icon: text.DecodeEntities(r.icon), Box: box}
 			} else {
 				name, ok := strings.CutPrefix(r.icon, builtinPack+":")
@@ -299,13 +298,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 						name = "folder"
 					}
 				}
-				glyph = &scene.Item{
-					Kind: scene.Mark, Role: RoleIcon, Shape: scene.Shape(name), ID: node.Name,
-					Box:   box,
-					Parts: []scene.Part{{Path: glyphPaths[name].Scaled(box.W/24, box.X, box.Y), Paint: scene.StrokeOnly}},
-					Style: style.Style{Stroke: style.Muted, Fill: style.None, StrokeWidth: style.N(float64(glyphStroke*box.W) / 24),
-						Cap: style.CapRound, Join: style.JoinRound},
-				}
+				glyph = common.Glyph(RoleIcon, name, node.Name, glyphPaths[name], box, style.Muted)
 			}
 		}
 		if r.tight {

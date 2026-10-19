@@ -92,7 +92,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 		wrap = min(v, 2000)
 	}
 	glyph := float64(size * 1.25)
-	has := func(name string) bool { return name != "" && o.Icons != nil && o.Icons(text.DecodeEntities(name)) }
+	has := func(name string) bool { return name != "" && common.HostIcon(o, name) }
 
 	nodes := m.Nodes
 	n := len(nodes)

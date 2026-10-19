@@ -4,9 +4,9 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/yaml"
-	"github.com/firede/limu/scene"
 )
 
 // builtinPack is Mermaid's name for its pack of the tree view's own icons, Pele's
@@ -21,20 +21,7 @@ var glyphs = map[string]string{
 }
 
 // glyphPaths are the glyphs read into paths.
-var glyphPaths = func() map[string]*scene.Path {
-	out := map[string]*scene.Path{}
-	for name, d := range glyphs {
-		p, err := scene.ParsePath(d)
-		if err != nil {
-			panic(err)
-		}
-		out[name] = p
-	}
-	return out
-}()
-
-// glyphStroke is how wide Pele strokes a glyph, in units of its grid.
-const glyphStroke = 1.5
+var glyphPaths = common.Glyphs(glyphs)
 
 // IconConfig is how a tree view shows icons, as its config sets it, Pele's IconConfig:
 // whether entries show one without an icon() of their own, the pack a name without one is

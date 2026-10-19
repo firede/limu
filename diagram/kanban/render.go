@@ -159,7 +159,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	cardWidth := columnWidth - 2*columnPad
 	textWidth := cardWidth - 2*cardPad
 	glyph := small * 1.25
-	has := func(name string) bool { return name != "" && o.Icons != nil && o.Icons(text.DecodeEntities(name)) }
+	has := func(name string) bool { return name != "" && common.HostIcon(o, name) }
 	iconRoom := func(name string) float64 {
 		if has(name) {
 			return glyph + iconGap
