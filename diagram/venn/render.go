@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -32,7 +31,6 @@ const (
 	radius      = 100
 	maxGrowth   = 1.6
 	fillOpacity = 0.2
-	pad         = common.Padding
 )
 
 // line is a line of what is written in a region, its label first, then its texts; id is that
@@ -72,6 +70,7 @@ func keyOf(ids []string) string {
 // reads nothing of the config for a venn diagram, and draws it at its own size whatever the
 // width of the host.
 func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
+	pad := o.Pad()
 	if o == nil {
 		o = &layout.Options{}
 	}

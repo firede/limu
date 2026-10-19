@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -130,7 +129,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	small := jsmath.Round(size * 0.8125)
 	itemSize := jsmath.Round(size * 0.875)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	section, _ := config["cynefin"].(diagram.Config)
 	showDescriptions := section["showDomainDescriptions"] != false
 	amplitude := setting(config, "boundaryAmplitude", 8, 0, 50)

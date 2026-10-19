@@ -1,4 +1,4 @@
-// Pie charts drawn end to end: what Pele's render draws, read back out of its SVG as one line
+// Pie charts drawn end to end, some with a padding other than Pele's 8: what Pele's render draws, read back out of its SVG as one line
 // per thing drawn, in the order drawn, and the errors of the charts it refuses to draw. limu's
 // test writes the same lines from its scene.
 //
@@ -196,11 +196,11 @@ export default async function ({ pele, src, write, random }) {
   const { metricsMeasurer } = await src('text/measurer.ts');
 
   const out = [];
-  const draw = (source, maxWidth, fontSize) => {
+  const draw = (source, maxWidth, fontSize, padding) => {
     let r;
     globalThis.limuExactNumbers = true;
     try {
-      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, outputLimit: Infinity });
+      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, padding, outputLimit: Infinity });
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
       return false;
@@ -208,11 +208,12 @@ export default async function ({ pele, src, write, random }) {
       globalThis.limuExactNumbers = false;
     }
     if (r.type !== 'pie') return false;
-    out.push({ src: source, maxWidth, fontSize, lines: readSvg(r.svg, fontSize) });
+    out.push({ src: source, maxWidth, fontSize, padding, lines: readSvg(r.svg, fontSize) });
     return true;
   };
   const NARROW = [360, 320, 280, 240, 200, 160, 120, 100, 600, 500, 400, 300];
   const SIZES = [13, 20, 11, 24, 15, 8];
+  const PADS = [0, 20, 2.5];
   const seen = new Set();
   let drawn = 0;
   const each = (source) => {
@@ -224,6 +225,9 @@ export default async function ({ pele, src, write, random }) {
     // under it, and every fifth in another size of type.
     if (drawn % 3 === 0) draw(source, NARROW[(drawn / 3) % NARROW.length]);
     if (drawn % 5 === 0) draw(source, drawn % 10 === 0 ? undefined : NARROW[(drawn / 5) % NARROW.length], SIZES[(drawn / 5) % SIZES.length]);
+    // Every twentieth with a padding of its own, some in a narrow host, which takes the
+    // padding from the room for the title.
+    if (drawn % 20 === 0) draw(source, drawn % 40 === 0 ? undefined : NARROW[(drawn / 20) % NARROW.length], undefined, PADS[(drawn / 20) % PADS.length]);
     drawn++;
   };
   corpus(pele).forEach(each);

@@ -19,7 +19,6 @@ import (
 const (
 	labelGap = 6
 	valueGap = 15
-	pad      = common.Padding
 )
 
 // The roles of a sankey diagram's items.
@@ -132,6 +131,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 
 // draw lays the diagram out with its chart chartWidth wide, as Pele's draw does.
 func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) (*scene.Scene, error) {
+	pad := o.Pad()
 	size := o.Size()
 	small := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()

@@ -479,7 +479,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 	size := o.Size()
 	edgeSize := jsmath.Round(size * 0.875)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	gap := float64(gapDefault)
 	section, _ := config["block"].(diagram.Config)
 	if configured, ok := section["padding"].(float64); ok && configured >= 0 {

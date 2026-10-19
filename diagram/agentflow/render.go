@@ -25,7 +25,6 @@ const (
 	groupPad = 20
 	loop     = 26
 	dots     = 14
-	padding  = common.Padding
 )
 
 // collapsed is the shape a collapsed flow is drawn with: a box with a dashed rule and three
@@ -118,6 +117,7 @@ type held struct {
 // lay lays the agent flow out once, as Pele's draw does. down lays out one that runs across
 // as one that runs down.
 func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Scene {
+	padding := o.Pad()
 	graph := db.Graph(DefaultCurve(config))
 	size := o.Size()
 	edgeSize := math.Floor(size*0.875 + 0.5)

@@ -147,7 +147,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 	size := o.Size()
 	small := jsmath.Round(float64(size * 0.8125))
 	l := labeler{measure: o.Measure(), icons: o.Icons}
-	const pad = common.Padding
+	pad := o.Pad()
 	room := 0.0
 	if tight {
 		width := o.MaxWidth

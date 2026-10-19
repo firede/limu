@@ -18,6 +18,7 @@ type peleRender struct {
 	Cases []struct {
 		Src      string   `json:"src"`
 		MaxWidth float64  `json:"maxWidth"`
+		Padding  *float64 `json:"padding"`
 		Lines    []string `json:"lines"`
 	} `json:"cases"`
 }
@@ -46,11 +47,11 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := pelesvg.FlowLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
+		got := pelesvg.FlowLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, Padding: c.Padding}))
 		want := pelesvg.TagsLast(c.Lines, "clickable")
 		if i := pelesvg.FirstDiff(got, want); i >= 0 {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, pelesvg.At(got, i), pelesvg.At(want, i))
+				t.Errorf("Layout(%q, max %v, padding %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, (&layout.Options{Padding: c.Padding}).Pad(), i, pelesvg.At(got, i), pelesvg.At(want, i))
 			}
 		}
 	}

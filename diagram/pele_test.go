@@ -70,7 +70,7 @@ func sameError(err error, want *peleError) bool {
 	if want.Type != nil {
 		typ = *want.Type
 	}
-	return e.Code == want.Code && e.Message == want.Message && e.Type == typ && e.Line == want.Line &&
+	return e.Code == want.Code && e.Message == want.Message && string(e.Type) == typ && e.Line == want.Line &&
 		e.Column == want.Column && e.Snippet == want.Snippet
 }
 
