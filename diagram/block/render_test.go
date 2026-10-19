@@ -356,7 +356,7 @@ func sceneLines(sc *scene.Scene, want []string) []string {
 			}
 		case RoleEdgeLabel:
 			r := it.Box
-			if it.Parts[0].Box != r {
+			if pelesvg.D(it.Parts[0].Path) != pelesvg.D(new(scene.Path).RoundRect(r, draw.LabelPatchRadius)) {
 				lines = append(lines, "patch not the label's box")
 			}
 			lines = append(lines, "elabel "+id+" "+pt(r.X, r.Y)+","+pt(r.W, r.H)+" "+paintName(it.Style.Fill))

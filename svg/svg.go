@@ -303,7 +303,7 @@ func (w *Writer) item(sc *scene.Scene, it *scene.Item, st style.Style) {
 	}
 	sw := st.StrokeWidth.Or(1)
 	for _, part := range it.Parts {
-		if part.Rounded || part.Path == nil {
+		if part.Path == nil {
 			b.WriteString(`<rect x="`)
 			w.Num(part.Box.X)
 			b.WriteString(`" y="`)

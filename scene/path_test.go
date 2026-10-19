@@ -2,6 +2,7 @@ package scene
 
 import (
 	"math"
+	"slices"
 	"testing"
 )
 
@@ -106,5 +107,24 @@ func TestSnap(t *testing.T) {
 	}
 	if r, m := sc.Items[1].Route[0], sc.Items[1].Ends[0].At; r != (Point{1, 4}) || m != (Point{2, 0}) {
 		t.Errorf("route %v marker %v", r, m)
+	}
+
+	// A path with curves moves as a whole, by what puts its first point on the grid; a path
+	// part's box is not snapped, as it is not used.
+	circle := new(Path).Ellipse(10.3, 20.6, 3.3, 3.3)
+	want := slices.Clone(circle.Args)
+	sc = &Scene{Items: []Item{{Parts: []Part{{Path: circle, Box: Rect{0.4, 0.4, 1, 1}}}}}}
+	sc.Snap(1)
+	if a := circle.Args; a[0] != 14 || a[1] != 21 {
+		t.Errorf("a circle's first point is at %v,%v", a[0], a[1])
+	}
+	for k := 2; k+1 < len(circle.Args); k += 2 {
+		dx, dy := circle.Args[k]-want[k], circle.Args[k+1]-want[k+1]
+		if math.Abs(dx-0.4) > 1e-9 || math.Abs(dy-0.4) > 1e-9 {
+			t.Errorf("point %d moved by %v,%v", k/2, dx, dy)
+		}
+	}
+	if b := sc.Items[0].Parts[0].Box; b != (Rect{0.4, 0.4, 1, 1}) {
+		t.Errorf("a path part's box snapped to %v", b)
 	}
 }

@@ -127,7 +127,7 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "labels "+num(it.Label.Size))
 				labels = true
 			}
-			lines = append(lines, "label "+peleText(it.ID), "rect "+box(it.Parts[0].Box, 0, 0)+" "+pen(it, ""))
+			lines = append(lines, "label "+peleText(it.ID), "rect "+box(it.Box, 0, 0)+" "+pen(it, ""))
 			text(it, "-", "", "", it.At.X, it.At.Y)
 		case "requirement.requirement", "requirement.element":
 			// Pele draws a box about its middle, which it moves to with a translate. The scene

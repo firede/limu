@@ -146,7 +146,7 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 			stroke = ui.Color{}
 			fill = Color(shade(s.Bg, s.Fill, it.Author.Fill.Visible()), s.Opacity)
 		}
-		if part.Rounded || part.Path == nil {
+		if part.Path == nil {
 			radius := 0.0
 			if part.Rounded {
 				radius = max(s.Radius, 0)

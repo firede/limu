@@ -295,7 +295,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Tooltip != "" {
 				lines = append(lines, "tip "+it.Tooltip)
 			}
-			lines = append(lines, fmt.Sprintf("patch %s %d %s - -", box(it.Parts[0].Box), patchRadius, paintName(it.Style.Fill)))
+			lines = append(lines, fmt.Sprintf("patch %s %d %s - -", box(it.Box), patchRadius, paintName(it.Style.Fill)))
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
 			}

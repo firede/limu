@@ -391,7 +391,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		it := scene.Item{
 			Kind: scene.Text, Role: RoleRelLabel, ID: id,
 			Box:     patch,
-			Parts:   []scene.Part{{Path: new(scene.Path).RoundRect(patch, patchRadius), Box: patch, Paint: scene.FillOnly}},
+			Parts:   []scene.Part{{Path: new(scene.Path).RoundRect(patch, patchRadius), Paint: scene.FillOnly}},
 			At:      scene.Point{X: cx, Y: top + label.Height/2},
 			Style:   style.Style{Fill: style.Bg, Stroke: style.None, Text: style.Fg},
 			Author:  style.Style{Text: author.Text},

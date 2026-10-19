@@ -172,7 +172,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 		case "state.edge-label":
 			lines = append(lines, "label "+id)
-			rect("rect", it.Parts[0].Box, 0, 0, "3")
+			rect("rect", it.Box, 0, 0, "3")
 			label(it.Label, it.At.X, it.At.Y)
 		case "state.description":
 			if it.Label != nil && len(it.Label.Lines) > 0 {

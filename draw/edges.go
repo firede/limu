@@ -315,11 +315,16 @@ const LabelPatchRadius = 3
 
 // LabelPatch is the patch of the background an edge's label centered on x, y is drawn on,
 // so the line does not run through the text, as Pele's edgeLabelSvg draws it: the label's
-// box and 4 more on the left and right, its corners rounded by LabelPatchRadius. The part
-// has the box as its Box, and as a path, since the radius is not the theme's. (SVG's rect
+// box and 4 more on the left and right, LabelPatchBox, its corners rounded by
+// LabelPatchRadius. The part is a path, since the radius is not the theme's. (SVG's rect
 // would round the corners of a patch less than 6 high elliptically, which no label is.)
 func LabelPatch(l *text.Label, x, y float64) scene.Part {
+	return scene.Part{Path: new(scene.Path).RoundRect(LabelPatchBox(l, x, y), LabelPatchRadius)}
+}
+
+// LabelPatchBox is the box of LabelPatch: the label's, centered on x, y, and 4 more on the
+// left and right.
+func LabelPatchBox(l *text.Label, x, y float64) scene.Rect {
 	w, h := l.Width+8, l.Height
-	r := scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h}
-	return scene.Part{Path: new(scene.Path).RoundRect(r, LabelPatchRadius), Box: r}
+	return scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h}
 }

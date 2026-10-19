@@ -150,6 +150,10 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 	}
 	rect := func(it *scene.Item, part *scene.Part) {
 		r := part.Box
+		if part.Path != nil {
+			// A label's patch, a path with the item's box.
+			r = it.Box
+		}
 		radius := "-"
 		switch {
 		case part.Rounded:

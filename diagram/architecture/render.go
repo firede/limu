@@ -722,7 +722,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene.
 			patch := draw.LabelPatch(label, x, y)
 			labelItems = append(labelItems, scene.Item{
 				Kind: scene.Text, Role: RoleEdgeLabel, ID: id,
-				Box:   patch.Box,
+				Box:   draw.LabelPatchBox(label, x, y),
 				Parts: []scene.Part{patch},
 				Label: label,
 				At:    scene.Point{X: x, Y: y},
