@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -346,7 +347,7 @@ func buildGraph(rootDoc []Stmt, states map[string]*StateStmt, classes map[string
 
 	for _, node := range g.Nodes {
 		if node.IsGroup && len(node.Description) > 0 {
-			return nil, diagram.NewError("Group nodes can only have label. Remove the additional description for node ["+
+			return nil, common.NewError("Group nodes can only have label. Remove the additional description for node ["+
 				node.ID+"]", diagram.Semantic, "state")
 		}
 	}

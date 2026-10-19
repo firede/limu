@@ -6,7 +6,8 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -85,7 +86,7 @@ type view struct {
 	index  int
 	shape  string
 	label  text.Label
-	author style.Author
+	author css.Author
 	mask   int
 	dx, dy float64
 	// bw and bh are the size as drawn, which for a fixed shape is smaller than its cell.
@@ -491,7 +492,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 	// authorOf reads the declarations of a block's classes and styles, as Pele's styleOf
 	// does: a style list is split on commas only, so one entry can still hold several
 	// declarations.
-	authorOf := func(b *Block) style.Author {
+	authorOf := func(b *Block) css.Author {
 		var decls []string
 		add := func(styles []string) {
 			for _, s := range styles {
@@ -508,7 +509,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 			}
 		}
 		add(b.Styles)
-		return style.Declarations(decls)
+		return css.Declarations(decls)
 	}
 
 	newView := func(b *Block, index int) *view {

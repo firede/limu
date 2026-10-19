@@ -248,7 +248,7 @@ export default async function ({ pele, src, cases, write, random }) {
     hypot.push([a, b, Math.hypot(a, b)]);
   }
 
-  write('draw/testdata/pele/draw.json', {
+  write('diagram/internal/draw/testdata/pele/draw.json', {
     names,
     size,
     inset,

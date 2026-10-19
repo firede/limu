@@ -1,6 +1,6 @@
 // Package swimlane lays out Mermaid's swimlane diagrams, as Pele's src/diagrams/swimlane does.
 // A swimlane diagram is a flowchart whose top-level subgraphs are lanes: it has the
-// flowchart's syntax and model, and is laid out with layout.Lanes, each lane drawn as a band
+// flowchart's syntax and model, and is laid out with graphs.Lanes, each lane drawn as a band
 // the length of the diagram with its title in a band at its start.
 //
 // A lane has the role swimlane.lane (RoleLane). Everything else is drawn by the flowchart's
@@ -13,6 +13,8 @@ package swimlane
 import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/flowchart"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
@@ -44,12 +46,12 @@ func Layout(db *flowchart.DB, config diagram.Config, o *layout.Options) *scene.S
 var variant = flowchart.Variant{
 	Type:    "swimlane",
 	Prepare: prepare,
-	Layout: func(nodes []layout.CNode, edges []layout.CEdge, dir layout.Dir, opt layout.LayeredOptions, tight bool) layout.CompoundResult {
-		pad := float64(layout.DefaultLanePad)
+	Layout: func(nodes []graphs.CNode, edges []graphs.CEdge, dir graphs.Dir, opt graphs.LayeredOptions, tight bool) graphs.CompoundResult {
+		pad := float64(graphs.DefaultLanePad)
 		if tight {
 			pad = 12
 		}
-		return layout.Lanes(nodes, edges, dir, opt, pad)
+		return graphs.Lanes(nodes, edges, dir, opt, pad)
 	},
 	DrawGroup: drawLane,
 }
@@ -88,10 +90,10 @@ func prepare(g *flowchart.Graph) {
 // drawLane draws a lane, as Pele's drawLane does: an outline the length of the diagram, with
 // its title in a band at the start. Where the lanes run across, the band is at their left
 // and the title is turned to read upwards.
-func drawLane(c *layout.CNode, label *text.Label, author style.Author, classes []string, id string, dir layout.Dir) scene.Item {
+func drawLane(c *graphs.CNode, label *text.Label, author css.Author, classes []string, id string, dir graphs.Dir) scene.Item {
 	left := c.X - c.W/2
 	top := c.Y - c.H/2
-	sideways := dir == layout.LR || dir == layout.RL
+	sideways := dir == graphs.LR || dir == graphs.RL
 	outline := scene.Rect{X: left, Y: top, W: c.W, H: c.H}
 	band := scene.Rect{X: left, Y: top, W: c.W, H: c.PadTop}
 	at := scene.Point{X: c.X, Y: top + c.PadTop/2}

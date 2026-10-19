@@ -2,6 +2,7 @@ package c4
 
 import (
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -88,9 +89,9 @@ func parseC4(src string, db *DB) (err error) {
 	fail := func(expected string) {
 		t := types[i]
 		if t == tError {
-			panic(failure{diagram.SyntaxError("c4", src, starts[i], "", true)})
+			panic(failure{common.SyntaxError("c4", src, starts[i], "", true)})
 		}
-		panic(failure{diagram.SyntaxError("c4", src, starts[i], "Expecting "+expected+", got '"+tokenNames[t]+"'", false)})
+		panic(failure{common.SyntaxError("c4", src, starts[i], "Expecting "+expected+", got '"+tokenNames[t]+"'", false)})
 	}
 	// expect steps past a token of typ, or fails, as Pele's expect does.
 	expect := func(typ int) {

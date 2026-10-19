@@ -4,29 +4,29 @@ import (
 	"math"
 	"slices"
 
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
-	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/text"
 )
 
-// Arrow is the length of an arrowhead.
-const Arrow = scene.MarkerSize
+// arrow is the length of an arrowhead.
+const arrow = scene.MarkerSize
 
 const (
-	// Corner is the most a corner is rounded by in a stepped route.
-	Corner = 12
-	// Handle is how far the handles of a wide turn reach along its two legs. A little more
+	// corner is the most a corner is rounded by in a stepped route.
+	corner = 12
+	// handle is how far the handles of a wide turn reach along its two legs. A little more
 	// than a circle's, which makes the turn fuller.
-	Handle = 0.62
-	// Lead is how far an edge runs straight before a marker at its end, where it has the
+	handle = 0.62
+	// lead is how far an edge runs straight before a marker at its end, where it has the
 	// room.
-	Lead = 6
+	lead = 6
 )
 
-// handleRest is what is left of a leg past a handle, 1 − Handle, worked out as JavaScript
+// handleRest is what is left of a leg past a handle, 1 − handle, worked out as JavaScript
 // works it out.
-var handleRest = 1 - float64(Handle)
+var handleRest = 1 - float64(handle)
 
 // An EdgePath is the path an edge is drawn along, and where its markers go: the tip of the
 // one at its start and the way it points, and the same for its end.
@@ -68,11 +68,11 @@ type SideReach struct {
 func (r *SideReach) Add(node, side int, t scene.MarkerType) {
 	trim := t.Trim()
 	key := [2]int{node, side}
-	if side >= 0 && trim > 0 && trim+Lead > r.reach[key] {
+	if side >= 0 && trim > 0 && trim+lead > r.reach[key] {
 		if r.reach == nil {
 			r.reach = map[[2]int]float64{}
 		}
-		r.reach[key] = trim + Lead
+		r.reach[key] = trim + lead
 	}
 }
 
@@ -89,7 +89,7 @@ func (r *SideReach) Of(node, side int) float64 {
 // Pele's routePath takes when it is given no reach.
 func OwnReach(trim float64) float64 {
 	if trim > 0 {
-		return trim + Lead
+		return trim + lead
 	}
 	return 0
 }
@@ -178,7 +178,7 @@ func RoutePath(route []float64, curve string, startTrim, endTrim, startReach, en
 	// larger marker beside this one is kept where it can be, and the rest is at most a
 	// quarter of what is left, so that ends on one side of a node turn equally far from it.
 	lead := func(reach, trim, run float64) float64 {
-		room := min(max(0, reach-Lead-trim), run/4)
+		room := min(max(0, reach-lead-trim), run/4)
 		return room + min(reach-trim-room, (run-room)/4)
 	}
 	var arrives, leaves float64
@@ -218,7 +218,7 @@ func RoutePath(route []float64, curve string, startTrim, endTrim, startReach, en
 			if down {
 				run, across = across, run
 			}
-			k := float64(math.Abs(run) * layout.Ease(across, run))
+			k := float64(math.Abs(run) * graphs.Ease(across, run))
 			var ux, uy float64
 			if down {
 				uy = float64(jsmath.Sign(run) * k)
@@ -248,7 +248,7 @@ func RoutePath(route []float64, curve string, startTrim, endTrim, startReach, en
 			after = length(i+1) / 2
 		}
 		if stepped {
-			before = min(Corner, before, after)
+			before = min(corner, before, after)
 			after = before
 		}
 		ux, uy := unit(i-1, i, axes[i])

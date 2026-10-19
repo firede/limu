@@ -7,7 +7,8 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
@@ -69,7 +70,7 @@ func userStyle(fill, stroke, color string) style.Style {
 	if decls == nil {
 		return style.Style{}
 	}
-	return style.Declarations(decls).Style
+	return css.Declarations(decls).Style
 }
 
 // unhide puts back the `#name;` that entity encoding hid in an address as ﬂ°°name¶ß, as
@@ -184,7 +185,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 			}
 		}
 		if a == nil || b == nil {
-			return nil, 0, diagram.NewError(`C4 rel "`+rel.From+`" -> "`+rel.To+`" references an unknown shape or boundary`, diagram.Semantic, "c4")
+			return nil, 0, common.NewError(`C4 rel "`+rel.From+`" -> "`+rel.To+`" references an unknown shape or boundary`, diagram.Semantic, "c4")
 		}
 		ends = append(ends, a, b)
 		if pairs[a] == nil {

@@ -15,14 +15,14 @@ func Parse(source string, config diagram.Config, title string, lineOffset int, l
 	flow, _ := config["flowchart"].(diagram.Config)
 	inherit, _ := flow["inheritDir"].(bool)
 	dir, _ := config["direction"].(string)
-	db := NewDB(Options{InheritDir: inherit, Direction: dir, LineOffset: lineOffset, MaxEdges: limits.MaxEdges})
+	db := newDB(options{InheritDir: inherit, Direction: dir, LineOffset: lineOffset, MaxEdges: limits.MaxEdges})
 	if title != "" {
 		db.Title = title
 	}
-	if err := ParseInto(source, db); err != nil {
+	if err := parseInto(source, db); err != nil {
 		return nil, err
 	}
-	db.Graph(DefaultCurve(config))
+	db.agentGraph(defaultCurve(config))
 	return db, nil
 }
 
@@ -32,9 +32,9 @@ func ParsePrepared(p *diagram.Prepared) (*DB, error) {
 	return Parse(p.Source(true), p.Config, p.Title, p.LineOffset, p.Limits)
 }
 
-// DefaultCurve is the curve the flowchart's config gives edges, as Pele's agentGraph reads it:
+// defaultCurve is the curve the flowchart's config gives edges, as Pele's agentGraph reads it:
 // "" where it gives none.
-func DefaultCurve(config diagram.Config) string {
+func defaultCurve(config diagram.Config) string {
 	flow, _ := config["flowchart"].(diagram.Config)
 	curve, _ := flow["curve"].(string)
 	return curve

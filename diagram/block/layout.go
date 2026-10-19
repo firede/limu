@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -34,10 +35,10 @@ const maxSpan = 1000
 // as Pele's calculateBlockPosition gives them.
 func calculateBlockPosition(columns, position float64) (px, py float64, err error) {
 	if columns == 0 || !isInteger(columns) {
-		return 0, 0, diagram.NewError("Columns must be an integer !== 0.", diagram.Semantic, "block")
+		return 0, 0, common.NewError("Columns must be an integer !== 0.", diagram.Semantic, "block")
 	}
 	if position < 0 || !isInteger(position) {
-		return 0, 0, diagram.NewError("Position must be a non-negative integer."+chars.NumberString(position), diagram.Semantic, "block")
+		return 0, 0, common.NewError("Position must be a non-negative integer."+chars.NumberString(position), diagram.Semantic, "block")
 	}
 	if columns < 0 {
 		return position, 0, nil

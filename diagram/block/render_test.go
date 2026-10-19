@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"

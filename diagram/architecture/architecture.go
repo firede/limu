@@ -7,6 +7,7 @@ package architecture
 
 import (
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -66,7 +67,7 @@ type db struct {
 }
 
 func fail(message string) {
-	panic(diagram.NewError(message, diagram.Semantic, "architecture"))
+	panic(common.NewError(message, diagram.Semantic, "architecture"))
 }
 
 func (d *db) register(kind, id, parent string) {

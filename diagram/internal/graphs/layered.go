@@ -1,4 +1,8 @@
-package layout
+// Package graphs lays out the graphs that more than one diagram places its things with, as
+// Pele's src/layout does in layered.ts, compound.ts and lanes.ts: the layered layout of a
+// flat graph (layered), the compound one of a graph with groups (Compound), and the lanes of
+// a swimlane diagram (Lanes).
+package graphs
 
 import (
 	"math"
@@ -26,7 +30,7 @@ import (
 //  5. The drawing is balanced, and what is alike is drawn alike. A label sits midway along the
 //     line that shows, the curves either side of it have much the same room to turn in, and a
 //     gap whose curves mostly cross has them all as the same plain curve rather than each on a
-//     level of its own (HeadRoom in Layered, the crossed gaps in assignTracks).
+//     level of its own (HeadRoom in layered, the crossed gaps in assignTracks).
 //  6. An edge leaves and reaches a node square to it, and an arrowhead points straight at the
 //     node (Pele's routePath in svg/edges.ts, which draws the routes).
 //  7. Nodes keep the order they were written in, where nothing above says otherwise.
@@ -37,22 +41,22 @@ import (
 // stable sorts with the comparators Pele gives, and insertion order wherever Pele iterates a
 // Map or a Set.
 
-// Kind is what a node of the layered layout stands for, as Pele's Kind is.
-type Kind uint8
+// kind is what a node of the layered layout stands for, as Pele's Kind is.
+type kind uint8
 
 const (
-	KindNode      Kind = iota // a node of the diagram
-	KindDummy                 // a bend of an edge, in a rank that the edge passes
-	KindLabel                 // the label of an edge, in a rank that the edge passes
-	KindStartPort             // where an edge passes the border of a group on the side its flow starts from
-	KindEndPort               // where an edge passes the border of a group on the side its flow ends at
+	kindNode      kind = iota // a node of the diagram
+	kindDummy                 // a bend of an edge, in a rank that the edge passes
+	kindLabel                 // the label of an edge, in a rank that the edge passes
+	kindStartPort             // where an edge passes the border of a group on the side its flow starts from
+	kindEndPort               // where an edge passes the border of a group on the side its flow ends at
 )
 
-// LNode is a node of the layered layout, as Pele's LNode is. Layered sets X, Y (its middle)
+// lNode is a node of the layered layout, as Pele's LNode is. layered sets X, Y (its middle)
 // and Rank.
-type LNode struct {
+type lNode struct {
 	W, H float64
-	Kind Kind
+	Kind kind
 	// Pin keeps a node at one end of its rank: below zero at the start, above zero at the end.
 	Pin float64
 	// Span is how much of the side that edges meet may be shared out between them; 0 keeps them
@@ -62,10 +66,10 @@ type LNode struct {
 	Rank int
 }
 
-// LEdge is an edge of the layered layout, as Pele's LEdge is. Layered sets Reversed, Points
+// lEdge is an edge of the layered layout, as Pele's LEdge is. layered sets Reversed, Points
 // (x, y pairs from the tail to the head), and LabelX and LabelY for an edge with a label; where
 // nodes spread the ends of their edges, it sets TailDx and HeadDx as well.
-type LEdge struct {
+type lEdge struct {
 	Tail, Head     int
 	Minlen         float64
 	LabelW, LabelH float64
@@ -99,20 +103,20 @@ type LayeredOptions struct {
 	HeadRoom float64
 }
 
-// LayeredResult is the size of a layered layout, as Pele's LayeredResult is.
-type LayeredResult struct {
+// layeredResult is the size of a layered layout, as Pele's LayeredResult is.
+type layeredResult struct {
 	Width, Height float64
 }
 
-// NewLNode is a node of the given size and kind, as Pele's lnode makes.
-func NewLNode(w, h float64, kind Kind) LNode {
-	return LNode{W: w, H: h, Kind: kind}
+// newLNode is a node of the given size and kind, as Pele's lnode makes.
+func newLNode(w, h float64, kind kind) lNode {
+	return lNode{W: w, H: h, Kind: kind}
 }
 
-// NewLEdge is an edge from tail to head, as Pele's ledge makes; Pele's defaults are a minlen
+// newLEdge is an edge from tail to head, as Pele's ledge makes; Pele's defaults are a minlen
 // of 1 and no label.
-func NewLEdge(tail, head int, minlen, labelW, labelH float64) LEdge {
-	return LEdge{Tail: tail, Head: head, Minlen: minlen, LabelW: labelW, LabelH: labelH, Points: []float64{}}
+func newLEdge(tail, head int, minlen, labelW, labelH float64) lEdge {
+	return lEdge{Tail: tail, Head: head, Minlen: minlen, LabelW: labelW, LabelH: labelH, Points: []float64{}}
 }
 
 const maxSweeps = 24
@@ -187,17 +191,17 @@ const leanClear = 40
 // pair of edges against each other would take too long.
 const maxWeighed = 400
 
-// End is what the end of a segment is to the node it meets, as Pele's End is.
-type End uint8
+// end is what the end of a segment is to the node it meets, as Pele's End is.
+type end uint8
 
 const (
-	endHeld End = iota
+	endHeld end = iota
 	endLeaves
 	endArrives
 )
 
-func isDummy(kind Kind) bool {
-	return kind == KindDummy || kind == KindLabel
+func isDummy(kind kind) bool {
+	return kind == kindDummy || kind == kindLabel
 }
 
 // sortRange sorts list[from:to] by key, and by value where the keys are equal, as Pele's
@@ -220,7 +224,7 @@ func sortRange(list []int, from, to int, key []int) {
 type graph struct {
 	n, real, maxRank int
 	W                []float64
-	KIND             []Kind
+	KIND             []kind
 	RANK             []int
 	// Segment endpoints, and where each segment attaches on them.
 	EF, ET            []int
@@ -248,14 +252,14 @@ type pieces struct {
 	wide     []bool
 }
 
-// Layered lays out a flat graph, as Pele's layered does: it sets where every node is, and the
+// layered lays out a flat graph, as Pele's layered does: it sets where every node is, and the
 // points every edge runs through, and returns the size of the whole. Ranks run down.
 // It takes no edge from a node to itself: Pele's typed arrays make nonsense of one, and here
 // it would run past the end of a slice. Compound keeps those out and places their labels itself.
-func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
+func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 	real := len(nodes)
 	if real == 0 {
-		return LayeredResult{}
+		return layeredResult{}
 	}
 	m := len(edges)
 
@@ -276,8 +280,8 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 		}
 	}
 
-	Orient(nodes, edges)
-	Rank(nodes, edges, step)
+	orient(nodes, edges)
+	rank(nodes, edges, step)
 
 	span := make([]int, m)
 	dummies := 0
@@ -314,7 +318,7 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 	n := real + dummies
 	W := make([]float64, n)
 	H := make([]float64, n)
-	KIND := make([]Kind, n)
+	KIND := make([]kind, n)
 	RANK := make([]int, n)
 	maxRank := 0
 	for i := 0; i < real; i++ {
@@ -345,16 +349,16 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 	labelNode := filled(m, -1)
 	spans := false
 	for i := 0; i < real; i++ {
-		if nodes[i].Span > 0 && nodes[i].Kind == KindNode {
+		if nodes[i].Span > 0 && nodes[i].Kind == kindNode {
 			spans = true
 		}
 	}
 	// What each segment's end is to the node it meets, for the ends that may move along the
 	// node's side.
-	var EFK, ETK []End
+	var EFK, ETK []end
 	if spans {
-		EFK = make([]End, segments)
-		ETK = make([]End, segments)
+		EFK = make([]end, segments)
+		ETK = make([]end, segments)
 	}
 	firstSeg := filled(m, -1)
 	lastSeg := filled(m, -1)
@@ -411,7 +415,7 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 				if r == labelRank {
 					W[d] = e.LabelW
 					H[d] = e.LabelH
-					KIND[d] = KindLabel
+					KIND[d] = kindLabel
 					labelNode[ei] = d
 					if e.Reversed {
 						heads[r] |= 2
@@ -419,7 +423,7 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 						heads[r] |= 1
 					}
 				} else {
-					KIND[d] = KindDummy
+					KIND[d] = kindDummy
 				}
 				EF[ce] = prev
 				ET[ce] = d
@@ -654,24 +658,24 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 	}
 
 	// Ranks that hold only border ports or their pass-through dummies need little room of their own.
-	portOnly := func(r int, kind Kind) bool {
+	portOnly := func(r int, kind kind) bool {
 		found := false
 		for i := layerStart[r]; i < layerStart[r+1]; i++ {
 			k := KIND[order[i]]
 			if k == kind {
 				found = true
-			} else if k != KindDummy {
+			} else if k != kindDummy {
 				return false
 			}
 		}
 		return found
 	}
 	startRanks := 0
-	if portOnly(0, KindStartPort) {
+	if portOnly(0, kindStartPort) {
 		startRanks = step
 	}
 	endRanks := 0
-	if portOnly(maxRank, KindEndPort) {
+	if portOnly(maxRank, kindEndPort) {
 		endRanks = step
 	}
 	// The longest way across that any edge travels in the gap below each rank.
@@ -729,7 +733,7 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 	// beside labels keeps to the middle half, which leaves the curves either side of it more
 	// room and still keeps them clear of the labels' corners.
 	inset := func(d int) float64 {
-		if KIND[d] == KindDummy && between[RANK[d]] && !opt.Tracks {
+		if KIND[d] == kindDummy && between[RANK[d]] && !opt.Tracks {
 			return (bandBottom[RANK[d]] - bandTop[RANK[d]]) / 4
 		}
 		return 0
@@ -817,7 +821,7 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 	arrives := make([]bool, maxRank+1)
 	leaves := make([]bool, maxRank+1)
 	for i := 0; i < real; i++ {
-		if KIND[i] != KindNode || EFK == nil {
+		if KIND[i] != kindNode || EFK == nil {
 			continue
 		}
 		if predStart[i+1] > predStart[i] {
@@ -831,9 +835,9 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 		node := &nodes[i]
 		r := node.Rank
 		node.X = xs[i] - minX
-		if KIND[i] == KindNode && leaves[r] && !arrives[r] {
+		if KIND[i] == kindNode && leaves[r] && !arrives[r] {
 			node.Y = bandBottom[r] - node.H/2
-		} else if KIND[i] == KindNode && arrives[r] && !leaves[r] {
+		} else if KIND[i] == kindNode && arrives[r] && !leaves[r] {
 			node.Y = bandTop[r] + node.H/2
 		} else {
 			node.Y = (bandTop[r] + bandBottom[r]) / 2
@@ -900,7 +904,7 @@ func Layered(nodes []LNode, edges []LEdge, opt LayeredOptions) LayeredResult {
 		}
 	}
 
-	return LayeredResult{Width: maxX - minX, Height: height}
+	return layeredResult{Width: maxX - minX, Height: height}
 }
 
 // reversedStep is the way a label's rank moves off the middle of its edge: down, towards the
@@ -935,16 +939,16 @@ func absInt(x int) int {
 	return x
 }
 
-// Orient reverses the edges that close a cycle, found by depth-first search in declaration
+// orient reverses the edges that close a cycle, found by depth-first search in declaration
 // order, as Pele's orient does. An edge into a start port or out of an end port is reversed
 // too.
-func Orient(nodes []LNode, edges []LEdge) {
+func orient(nodes []lNode, edges []lEdge) {
 	n := len(nodes)
 	m := len(edges)
 	start := make([]int, n+1)
 	for i := 0; i < m; i++ {
 		e := &edges[i]
-		e.Reversed = nodes[e.Head].Kind == KindStartPort || nodes[e.Tail].Kind == KindEndPort
+		e.Reversed = nodes[e.Head].Kind == kindStartPort || nodes[e.Tail].Kind == kindEndPort
 		if !e.Reversed {
 			start[e.Tail+1]++
 		}
@@ -991,10 +995,10 @@ func Orient(nodes []LNode, edges []LEdge) {
 	}
 }
 
-// Rank gives every node its rank, as Pele's rank does: the longest path from the top, with
+// rank gives every node its rank, as Pele's rank does: the longest path from the top, with
 // each edge at least minlen times step ranks long, and then each node moved towards the side
 // that has more of its edges. Start ports go a step above the rest, and end ports a step below.
-func Rank(nodes []LNode, edges []LEdge, step int) {
+func rank(nodes []lNode, edges []lEdge, step int) {
 	n := len(nodes)
 	m := len(edges)
 	from := make([]int, m)
@@ -1105,10 +1109,10 @@ func Rank(nodes []LNode, edges []LEdge, step int) {
 	startPorts := false
 	for i := 0; i < n; i++ {
 		kind := nodes[i].Kind
-		if kind == KindStartPort {
+		if kind == kindStartPort {
 			startPorts = true
 		}
-		if kind == KindStartPort || kind == KindEndPort {
+		if kind == kindStartPort || kind == kindEndPort {
 			continue
 		}
 		if !found || r[i] < lo {
@@ -1120,9 +1124,9 @@ func Rank(nodes []LNode, edges []LEdge, step int) {
 		found = true
 	}
 	for i := 0; i < n; i++ {
-		if nodes[i].Kind == KindStartPort {
+		if nodes[i].Kind == kindStartPort {
 			r[i] = lo - step
-		} else if nodes[i].Kind == KindEndPort {
+		} else if nodes[i].Kind == kindEndPort {
 			r[i] = hi + step
 		}
 	}

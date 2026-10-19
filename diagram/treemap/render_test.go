@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -104,21 +105,21 @@ func authorLine(line string) string {
 	} else {
 		end += at + 1
 	}
-	css, err := url.PathUnescape(line[at+len(" css=") : end])
+	written, err := url.PathUnescape(line[at+len(" css=") : end])
 	if err != nil {
 		return line
 	}
-	decls := strings.Split(css, ";")
+	decls := strings.Split(written, ";")
 	var field string
 	if strings.HasPrefix(line, "section ") || strings.HasPrefix(line, "leaf ") {
-		field = author(shapeView, style.Declarations(decls).Style)
+		field = author(shapeView, css.Declarations(decls).Style)
 	} else {
 		for i, d := range decls {
 			if strings.HasPrefix(d, "fill:") {
 				decls[i] = "color:" + d[len("fill:"):]
 			}
 		}
-		field = author(textView, style.Declarations(decls).Style)
+		field = author(textView, css.Declarations(decls).Style)
 	}
 	return line[:at] + " " + field + line[end:]
 }

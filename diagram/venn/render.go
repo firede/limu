@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -153,7 +154,7 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 			}
 		}
 		decls := declsOf(key)
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var raw string
 		has := false
 		if subset.Label != nil {
@@ -310,7 +311,7 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 	for _, r := range all {
 		// An overlap is only drawn when a style gives it a look of its own; otherwise the
 		// circles show it.
-		if len(r.sets) < 2 || style.ShapeCSS(r.decls) == "" {
+		if len(r.sets) < 2 || css.ShapeCSS(r.decls) == "" {
 			continue
 		}
 		shared := make([]circle, len(r.inside))
@@ -367,13 +368,13 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 // shapeStyle is what of an author's declarations a set's circle or an overlap takes: all
 // but the color of text.
 func shapeStyle(decls []string) style.Style {
-	s := style.Declarations(decls).Style
+	s := css.Declarations(decls).Style
 	s.Text = style.Paint{}
 	return s
 }
 
 // textStyle is what of an author's declarations a text takes: its color and its opacity.
 func textStyle(decls []string) style.Style {
-	s := style.Declarations(decls).Style
+	s := css.Declarations(decls).Style
 	return style.Style{Text: s.Text, Opacity: s.Opacity}
 }

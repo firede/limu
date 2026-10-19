@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -87,7 +88,7 @@ func readCSS(line string) string {
 		return line
 	}
 	decls := strings.Split(line[m[2]:m[3]], ";")
-	return line[:m[0]] + " css=" + colors(style.Declarations(decls).Style.Fill, style.Declarations(decls).Style.Stroke)
+	return line[:m[0]] + " css=" + colors(css.Declarations(decls).Style.Fill, css.Declarations(decls).Style.Stroke)
 }
 
 // colors is an author's fill and stroke as the test writes them, and nothing where the author

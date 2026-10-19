@@ -5,6 +5,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -94,7 +95,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	var sections, leaves []scene.Item
 	for _, b := range boxes {
 		node := b.node
-		author := style.Declarations(node.CSS)
+		author := css.Declarations(node.CSS)
 		// The value's text takes what of the author's style a text does.
 		valueAuthor := style.Style{Text: author.Style.Text, Opacity: author.Style.Opacity}
 		color := style.Series(b.series)
@@ -117,7 +118,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			// A section is a tint of its color, unless a class gives it a fill of its own.
 			it.Kind, it.Role = scene.Group, RoleSection
 			it.Style = style.Style{Fill: color, Stroke: color, Text: style.Fg}
-			if !style.FillDeclared(node.CSS) {
+			if !css.FillDeclared(node.CSS) {
 				it.Style.FillOpacity = style.N(0.12)
 			}
 			var shown *scene.Item

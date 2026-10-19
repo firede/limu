@@ -124,8 +124,8 @@ type DB struct {
 	dividerCount int
 }
 
-// NewDB is an empty DB.
-func NewDB() *DB {
+// newDB is an empty DB.
+func newDB() *DB {
 	return &DB{Graph: &Graph{}, states: map[string]*StateStmt{}, classes: map[string]*ClassDef{}, links: map[string]int{}}
 }
 

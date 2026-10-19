@@ -6,12 +6,13 @@ import (
 	"strconv"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
 // fail panics with Pele's semantic error, which buildGit recovers.
 func fail(message string) {
-	panic(diagram.NewError(message, diagram.Semantic, "gitGraph"))
+	panic(common.NewError(message, diagram.Semantic, "gitGraph"))
 }
 
 // typeCode is the commitType of a type's name, as Pele's typeCode gives it.
@@ -270,7 +271,7 @@ func (b *builder) cherryPick(sourceID *string, targetID string, tags []string, p
 }
 
 // statement replays a statement, as Pele's parseStatement does.
-func (b *builder) statement(s *Statement) {
+func (b *builder) statement(s *statement) {
 	switch s.Kind {
 	case "Commit":
 		msg := ""
@@ -313,7 +314,7 @@ func (b *builder) statement(s *Statement) {
 // buildGit replays a git graph's tree into its model, as Pele's buildGit does: config is the
 // diagram's configuration and title the title its front matter gives. An error is a
 // *diagram.Error.
-func buildGit(ast *AST, config diagram.Config, title string) (m *Model, err error) {
+func buildGit(ast *gitGraphAst, config diagram.Config, title string) (m *Model, err error) {
 	defer func() {
 		if v := recover(); v != nil {
 			e, ok := v.(*diagram.Error)

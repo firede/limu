@@ -222,7 +222,7 @@ func (d *Diagram) Layout(o *layout.Options) (*scene.Scene, error) {
 		sc.Snap(o.Snap)
 	}
 	if !sc.Finite() {
-		return nil, diagram.NewError("Diagram cannot be laid out in finite numbers.", diagram.Limit, d.typ)
+		return nil, &diagram.Error{Code: diagram.Limit, Message: "Diagram cannot be laid out in finite numbers.", Type: d.typ}
 	}
 	return sc, nil
 }

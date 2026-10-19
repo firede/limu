@@ -105,8 +105,8 @@ type DB struct {
 	claimed        map[string]bool
 }
 
-// NewDB is an empty ER diagram, as Pele's new ErDb is.
-func NewDB() *DB {
+// newDB is an empty ER diagram, as Pele's new ErDb is.
+func newDB() *DB {
 	return &DB{
 		Direction:      "TB",
 		entities:       map[string]*Entity{},

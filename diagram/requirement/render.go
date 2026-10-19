@@ -7,7 +7,9 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -47,8 +49,8 @@ type row struct {
 
 // A view is a requirement or an element as it is drawn: Pele's NodeView.
 type view struct {
-	node       *GraphNode
-	author     style.Author
+	node       *graphNode
+	author     css.Author
 	kind, name text.Label
 	rows       []row
 	keyWidth   float64
@@ -90,7 +92,7 @@ func restyle(l text.Label, bits text.Face, m text.Measurer) text.Label {
 // does. The layout attaches every edge to the middle of a side; ends that share one are
 // spread along it, in the order of where they head, so their markers do not sit on each
 // other.
-func spreadEnds(cnodes []layout.CNode, cedges []layout.CEdge, views []view) {
+func spreadEnds(cnodes []graphs.CNode, cedges []graphs.CEdge, views []view) {
 	type end struct {
 		route  []float64
 		at     int
@@ -179,7 +181,7 @@ func Layout(db *DB, _ diagram.Config, o *layout.Options) *scene.Scene {
 // lay lays the diagram out once, as Pele's draw does. down lays out a diagram that runs
 // across as one that runs down.
 func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
-	graph := BuildGraph(db)
+	graph := buildGraph(db)
 	size := o.Size()
 	small := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
@@ -190,10 +192,10 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 
 	index := make(map[string]int, len(graph.Nodes))
 	views := make([]view, 0, len(graph.Nodes))
-	cnodes := make([]layout.CNode, 0, len(graph.Nodes))
+	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for i := range graph.Nodes {
 		node := &graph.Nodes[i]
-		author := style.Declarations(node.CSSStyles)
+		author := css.Declarations(node.CSSStyles)
 		var base text.Face
 		if author.Bold {
 			base |= text.Bold
@@ -243,21 +245,21 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		if _, ok := index[node.ID]; !ok {
 			index[node.ID] = len(views)
 		}
-		c := layout.NewCNode(w, headHeight+bodyHeight, -1)
+		c := graphs.NewCNode(w, headHeight+bodyHeight, -1)
 		c.Seq = float64(len(views))
 		views = append(views, view{node: node, author: author, kind: kind, name: name, rows: rows,
 			keyWidth: keyWidth, headHeight: headHeight, w: w, h: headHeight + bodyHeight})
 		cnodes = append(cnodes, c)
 	}
 
-	rootDir := layout.Direction(graph.Direction)
+	rootDir := graphs.Direction(graph.Direction)
 	if down {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
-	sideways := rootDir == layout.LR || rootDir == layout.RL
-	var cedges []layout.CEdge
+	sideways := rootDir == graphs.LR || rootDir == graphs.RL
+	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	for i := range graph.Edges {
 		edge := &graph.Edges[i]
 		if !edge.HasStart || !edge.HasEnd {
@@ -276,12 +278,12 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		}
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, label)
-		cedges = append(cedges, layout.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: label.Width + 12, LabelH: label.Height + 4})
+		cedges = append(cedges, graphs.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: label.Width + 12, LabelH: label.Height + 4})
 	}
 
 	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
 	curve := common.RoutingCurve(o.Routing)
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
 		Tracks:   curve == "step",
 		Straight: curve == "linear",
 		NodeSep:  nodeSep,
@@ -300,7 +302,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	inner := max(result.Width, title.Width)
 	ox := padding + (inner-result.Width)/2
 	oy := padding + titleHeight
-	layout.Shift(cnodes, cedges, ox, oy)
+	graphs.Shift(cnodes, cedges, ox, oy)
 	sc := &scene.Scene{
 		Type:     "requirement",
 		Width:    math.Ceil(inner + 2*padding),
@@ -450,7 +452,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 
 // textItem is a text of a box beside its name: its kind, or a field's name or value, drawn
 // about x, y in the color own and the color of text its author gave the box.
-func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, own style.Paint, author style.Author) scene.Item {
+func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, own style.Paint, author css.Author) scene.Item {
 	box := scene.Rect{X: x - l.Width/2, Y: y - l.Height/2, W: l.Width, H: l.Height}
 	if align == scene.Start {
 		box.X = x

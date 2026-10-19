@@ -56,7 +56,7 @@ type db struct {
 func (d *db) GetType(start, end string) int { return common.OutlineType(start, end) }
 
 func kanbanError(message string, code diagram.Code) *diagram.Error {
-	return diagram.NewError(message, code, "kanban")
+	return common.NewError(message, code, "kanban")
 }
 
 // AddNode adds a column, or a card to the last column, as Pele's addNode does.

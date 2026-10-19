@@ -1,7 +1,7 @@
 package gantt
 
 import (
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -51,7 +51,7 @@ func parseInto(src string, db *DB) (err error) {
 		if t != tEND {
 			got = tokenNames[t]
 		}
-		panic(parseError{diagram.SyntaxError("gantt", src, toks[i].start, "Expecting "+expected+", got '"+got+"'", false)})
+		panic(parseError{common.SyntaxError("gantt", src, toks[i].start, "Expecting "+expected+", got '"+got+"'", false)})
 	}
 	// end is Pele's end.
 	// Mermaid's parser runs a statement's action only after seeing that the next token can

@@ -3,7 +3,7 @@ package er
 import (
 	"strings"
 
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -57,9 +57,9 @@ type parser struct {
 	db   *DB
 }
 
-// ParseInto parses an ER diagram's text into db, as Pele's parseEr does. An error is a
+// parseInto parses an ER diagram's text into db, as Pele's parseEr does. An error is a
 // *diagram.Error.
-func ParseInto(src string, db *DB) (err error) {
+func parseInto(src string, db *DB) (err error) {
 	p := &parser{src: src, toks: tokenize(src), db: db}
 	defer func() {
 		if r := recover(); r != nil {
@@ -89,13 +89,13 @@ func (p *parser) next() string {
 func (p *parser) fail(expected string) {
 	t := p.toks[p.i]
 	if t.typ == t_ERROR {
-		panic(parseError{diagram.SyntaxError("er", p.src, t.start, "", true)})
+		panic(parseError{common.SyntaxError("er", p.src, t.start, "", true)})
 	}
 	got := tokenNames[t.typ]
 	if t.typ == t_CHAR {
 		got = t.text
 	}
-	panic(parseError{diagram.SyntaxError("er", p.src, t.start, "Expecting "+expected+", got '"+got+"'", false)})
+	panic(parseError{common.SyntaxError("er", p.src, t.start, "Expecting "+expected+", got '"+got+"'", false)})
 }
 
 // expect steps past a token of type typ and gives its text, or fails, as the expect of Pele's

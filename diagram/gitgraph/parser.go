@@ -8,7 +8,7 @@ import (
 )
 
 // parseGit parses a git graph's text into its tree, as Pele's parseGit does.
-func parseGit(src string) (ast *AST, err error) {
+func parseGit(src string) (ast *gitGraphAst, err error) {
 	t, err := common.Tokenize(src, gitTable, "gitGraph")
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func parseGit(src string) (ast *AST, err error) {
 		}
 	}()
 	r := &common.Reader{Tokens: t, Types: gitTokens, Diagram: "gitGraph"}
-	ast = &AST{Type: "GitGraph", Statements: []Statement{}}
+	ast = &gitGraphAst{Type: "GitGraph", Statements: []statement{}}
 
 	endOfLine := func() {
 		if r.Kind() == tEnd {
@@ -96,7 +96,7 @@ func parseGit(src string) (ast *AST, err error) {
 			endOfLine()
 		case tCommit:
 			r.I++
-			node := Statement{Kind: "Commit", Tags: []string{}}
+			node := statement{Kind: "Commit", Tags: []string{}}
 			for {
 				if r.Accept(tID) {
 					node.ID = str()
@@ -114,7 +114,7 @@ func parseGit(src string) (ast *AST, err error) {
 			ast.Statements = append(ast.Statements, node)
 		case tBranch:
 			r.I++
-			node := Statement{Kind: "Branch", Name: name()}
+			node := statement{Kind: "Branch", Name: name()}
 			if r.Accept(tOrder) {
 				// parseInt of a run of digits: the nearest number, Infinity past the
 				// largest.
@@ -125,7 +125,7 @@ func parseGit(src string) (ast *AST, err error) {
 			ast.Statements = append(ast.Statements, node)
 		case tMerge:
 			r.I++
-			node := Statement{Kind: "Merge", Branch: name(), Tags: []string{}}
+			node := statement{Kind: "Merge", Branch: name(), Tags: []string{}}
 			for {
 				if r.Accept(tID) {
 					node.ID = str()
@@ -141,12 +141,12 @@ func parseGit(src string) (ast *AST, err error) {
 			ast.Statements = append(ast.Statements, node)
 		case tCheckout, tSwitch:
 			r.I++
-			node := Statement{Kind: "Checkout", Branch: name()}
+			node := statement{Kind: "Checkout", Branch: name()}
 			endOfLine()
 			ast.Statements = append(ast.Statements, node)
 		case tCherryPick:
 			r.I++
-			node := Statement{Kind: "CherryPicking", Tags: []string{}}
+			node := statement{Kind: "CherryPicking", Tags: []string{}}
 			for {
 				if r.Accept(tID) {
 					node.ID = str()

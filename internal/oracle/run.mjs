@@ -11,10 +11,13 @@
 // y.json there, as gantt-render writes diagram/gantt/testdata/pele/render.json. These are
 // otherwise:
 //
-//   parse     diagram/testdata/pele/parse.json, for what every diagram's text goes through
-//   common    diagram/internal/common/testdata/pele/common.json
-//   jsmath    internal/jsmath/testdata/pele/math.json
-//   gantt     dates.json too, beside gantt.json
+//   parse         diagram/testdata/pele/parse.json, for what every diagram's text goes through
+//   common        diagram/internal/common/testdata/pele/common.json
+//   draw          diagram/internal/draw/testdata/pele/draw.json
+//   graphs-layout diagram/internal/graphs/testdata/pele/layout.json
+//   graphs-lanes  diagram/internal/graphs/testdata/pele/lanes.json
+//   jsmath        internal/jsmath/testdata/pele/math.json
+//   gantt         dates.json too, beside gantt.json
 //
 // A fixture named render.json holds drawings: for each case, as lines, the lines its suite read
 // out of what Pele drew, one per thing drawn. The first FULL cases keep their lines; each case

@@ -1,7 +1,7 @@
 package quadrant
 
 import (
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -55,9 +55,9 @@ func parse(src string, db *db) (err error) {
 	fail := func(expected string) {
 		typ := types[i]
 		if typ == tError {
-			throw(diagram.SyntaxError("quadrantChart", src, t.Starts[i], "", true))
+			throw(common.SyntaxError("quadrantChart", src, t.Starts[i], "", true))
 		}
-		throw(diagram.SyntaxError("quadrantChart", src, t.Starts[i], "Expecting "+expected+", got '"+tokenNames[typ]+"'", false))
+		throw(common.SyntaxError("quadrantChart", src, t.Starts[i], "Expecting "+expected+", got '"+tokenNames[typ]+"'", false))
 	}
 	expect := func(typ int) string {
 		if types[i] != typ {

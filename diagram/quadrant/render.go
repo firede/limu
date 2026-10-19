@@ -6,6 +6,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -273,7 +274,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			Box:    scene.Rect{X: cx - r, Y: cy - r, W: 2 * r, H: 2 * r},
 			Parts:  []scene.Part{{Path: new(scene.Path).Ellipse(cx, cy, r, r)}},
 			Style:  style.Style{Fill: style.Series(0), Stroke: style.None},
-			Author: style.Declarations(styles).Style,
+			Author: css.Declarations(styles).Style,
 		}
 		if point.Class != "" {
 			it.Class = []string{point.Class}

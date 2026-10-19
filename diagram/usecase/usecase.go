@@ -1,6 +1,6 @@
 // Package usecase parses Mermaid's use case diagrams and lays them out, as Pele's
 // src/diagrams/usecase does: a lexer and a parser that make the decisions Mermaid's Chevrotain
-// parser makes, the resolution of what they read into a Model, BuildGraph, which turns the
+// parser makes, the resolution of what they read into a Model, buildGraph, which turns the
 // model into the nodes and edges that are drawn, and Layout, which lays them out as a scene.
 //
 // Offsets into the source, in a Span, are bytes of the Go string; the offsets and columns in
