@@ -23,7 +23,10 @@ export async function resolve(spec, ctx, next) {
 // label, the point it is centered on, its size and the text of its lines; and a sankey
 // diagram's labels write the middle of their line as y, with an m before it; and an
 // architecture diagram's labels write, in place of their text, the point they are centered on
-// and all that is in them, and its markers their tips and the way they point.
+// and all that is in them, and its markers their tips and the way they point; and a tree
+// view's labels write, in place of their text, the point the scene holds them at and all that
+// is in them, and its names and descriptions in one line the middle of their row as y, with
+// an m before it.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -38,6 +41,9 @@ const dataY = (y) => `<text\${(globalThis as any).limuExactNumbers ? \` data-y="
 const RADAR_IMPORT = "import { escText, labelSvg, num } from '../../svg/builder.js';";
 const SANKEY_Y = 'y="${num(y + small * 0.35)}"';
 const ARCH_EDGES = "import { edgeLabelSvg, marker, markerTrim } from '../../svg/edges.js';";
+const TREE_BUILDER = "import { esc, escText, labelSvg, num } from '../../svg/builder.js';";
+const TREE_LITERAL = "import { literalLabel, leftLabelSvg } from '../common/literal-label.js';";
+const TREE_BASELINE = /num\(\s*cy \+ baseline\s*\)/g;
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -120,6 +126,31 @@ function edgeLabelSvg(id: string, label: Label, x: number, y: number, attrs: str
 function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
   if (!(globalThis as any).limuExactNumbers) return markerPele(type, x, y, dx, dy, color);
   return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" fill="\${color}"/>\`;
+}
+`;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/treeview/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = patch(url, String(loaded.source), TREE_BUILDER, TREE_BUILDER.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, TREE_LITERAL, TREE_LITERAL.replace('leftLabelSvg', 'leftLabelSvg as leftLabelSvgPele'));
+    if (source.match(TREE_BASELINE)?.length !== 2) throw new Error(`no cy + baseline in ${url}`);
+    source = source.replace(TREE_BASELINE, `(${EXACT.slice(4, -1)} ? 'm' + cy : num(cy + baseline))`);
+    source += `
+function limuLabel(label: Label, x: number, y: number, attrs: string, anchor: string): string {
+  const lines = label.lines.map((line) => line.map((span) => [span.icon ?? null, span.text, span.style, span.width]));
+  const data = { size: label.size, lineHeight: label.lineHeight, width: label.width, height: label.height, widths: label.widths, lines };
+  return \`<limu-label x="\${x}" y="\${y}" anchor="\${anchor}" attrs="\${encodeURIComponent(attrs)}" data="\${encodeURIComponent(JSON.stringify(data))}"/>\`;
+}
+function labelSvg(label: Label, cx: number, cy: number, attrs: string): string {
+  const s = labelSvgPele(label, cx, cy, attrs);
+  if (!${EXACT.slice(4, -1)} || s === '') return s;
+  return limuLabel(label, cx, cy, attrs, 'middle');
+}
+function leftLabelSvg(label: Label, x: number, top: number, attrs: string): string {
+  const s = leftLabelSvgPele(label, x, top, attrs);
+  if (!${EXACT.slice(4, -1)} || s === '') return s;
+  return limuLabel(label, x, top + label.height / 2, attrs, 'start');
 }
 `;
     return { ...loaded, source, shortCircuit: true };
