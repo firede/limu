@@ -7,6 +7,18 @@
 // for each. Lines end and turn their corners as the style's Cap and Join say, as SVG's
 // stroke-linecap and stroke-linejoin do: MyGo strokes paths only with round ends and
 // corners, so a line with others is drawn by filling its outline.
+//
+// An item's opacity is laid on each color it is drawn in, where SVG draws the item as a
+// group at that opacity: MyGo's painter has no group of its own to draw at an opacity. Where
+// an item's parts overlap, the part below shows through the one above, as it does not in
+// SVG.
+//
+// A scene is drawn where Paint's x and y and Options.Scale place it, in the painter's DIPs.
+// To zoom or pan it, change those, and do not draw it under a ui.Painter.Transform, nor in
+// an element that is transformed: a path too large for one of MyGo's masks is drawn only
+// where ui.Painter.Visible says the painter shows, which is in the window's DIPs, and MyGo
+// does not tell a painter the transform that would take the scene's DIPs there. Under a
+// transform, such a path is drawn in part, or not at all.
 package mygoui
 
 import (
@@ -24,12 +36,21 @@ type Options struct {
 	Fonts *Fonts
 	// Scale is how many DIPs a unit of the scene takes; 0 is 1.
 	Scale float64
-	// Icon, when set, draws an icon of a label, by its name, in r, in the label's color, as
-	// with ui.Painter.Icon; labels leave room only for icons the measurer was told of.
-	// Without it, icons are left out.
-	Icon func(p *ui.Painter, name string, r ui.Rect, c ui.Color)
-	// Draw, when set, draws each item in place of the default, which next draws. It is
-	// given the item's style, settled from the look.
+	// DrawIcon, when set, draws an icon by its name in r, in c, as ui.Painter.Icon would: an
+	// item's picture, or an icon in a label, in the color of the item's text. Labels leave
+	// room only for icons the measurer was told of; without DrawIcon, icons are left out.
+	DrawIcon func(p *ui.Painter, name string, r ui.Rect, c ui.Color)
+	// DrawImage, when set, draws an item's picture that is an image, from its address, in
+	// r: fitted in it and centered, keeping its proportions, when fit is set, and otherwise
+	// stretched to fill it, as the svg package's preserveAspectRatio says. The address is
+	// as layout let it through (layout.Options.ImageSchemes); loading the image, and keeping
+	// it, is the host's. Opacity is the item's, for ui.ImageOptions.Tint. Without DrawImage,
+	// images are left out.
+	DrawImage func(p *ui.Painter, src string, r ui.Rect, fit bool, opacity float64)
+	// Draw, when set, draws each item in place of the default, which next draws; the
+	// Painter's Item, Parts, Ends, Picture and Label draw the default's pieces. It is given
+	// the item's style settled from the look into colors and measures, as MyGo draws with
+	// colors and has no variables of a theme to write.
 	Draw func(p *Painter, it *scene.Item, s style.Resolved, next func())
 }
 
@@ -111,7 +132,8 @@ func (p *Painter) Path(sp *scene.Path) *ui.Path {
 	return &out
 }
 
-// Color is a color of a style at an opacity, as MyGo takes it.
+// Color is a color of a style at an opacity, as MyGo takes it. Paint draws each color of an
+// item at the item's opacity, as MyGo has no opacity of a group.
 func Color(c style.Color, opacity float64) ui.Color {
 	a := float64(c.A)
 	if opacity < 1 {
@@ -144,7 +166,7 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 			fill = Color(s.Bg, s.Opacity)
 		case scene.Shade:
 			stroke = ui.Color{}
-			fill = Color(shade(s.Bg, s.Fill, it.Author.Fill.Visible()), s.Opacity)
+			fill = Color(shade(s.Bg, it.Author.Fill.Set()), s.Opacity)
 		}
 		if part.Rounded || part.Path == nil {
 			radius := 0.0
@@ -163,20 +185,27 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 	}
 }
 
-// shade is the color of a part painted Shade: the background, or, over a fill its author
-// set, the background at 60% laid over that fill.
-func shade(bg, fill style.Color, tint bool) style.Color {
-	if !tint || fill.A == 0 {
-		return bg
+// shade is the color of a part painted Shade: the background, or, when its item's author
+// set a fill, the background at 60% opacity over the parts below, as the svg package writes
+// it and Pele draws an entity's stripes.
+func shade(bg style.Color, author bool) style.Color {
+	if author {
+		bg.A = uint8(float64(bg.A)*0.6 + 0.5)
 	}
-	mix := func(x, y uint8) uint8 { return uint8(float64(x)*0.6 + float64(y)*0.4 + 0.5) }
-	return style.Color{R: mix(bg.R, fill.R), G: mix(bg.G, fill.G), B: mix(bg.B, fill.B), A: fill.A}
+	return bg
 }
 
 // box draws a box of an outline. MyGo strokes a box inside its edge, where SVG strokes it
 // about its edge: the box stroked is grown by half the stroke's width. A box with square
 // corners is stroked mitred, or with round joins with its outer corners rounded by half the
 // stroke's width; one with bevelled corners, or dashed, is stroked as a path.
+//
+// It is not drawn quite as SVG draws it. A radius too large for the box is the smaller of
+// half its width and half its height, both ways, where SVG takes half its width across and
+// half its height down, so that a narrow box's corners stay round where SVG's are
+// elliptical; on macOS, MyGo curves the corners of a box as Apple does, not in arcs. And
+// MyGo rounds a box's edges to whole device pixels, where a path is drawn where it falls, so
+// that a box and a path along its edge may be half a device pixel apart.
 func (p *Painter) box(b scene.Rect, radius float64, fill, stroke ui.Color, s style.Resolved) {
 	if b.W < 0 || b.H < 0 {
 		return
@@ -242,6 +271,12 @@ func (p *Painter) Ends(it *scene.Item, s style.Resolved) {
 // atlas, an opaque line longer than piece device pixels is stroked in pieces no larger than
 // that, whose masks are thin along any line; and a path too large for a mask is drawn in
 // pieces, only where the painter shows (ui.Painter.Visible).
+//
+// The drawing of a path too large for a mask, maxMask, fillTiles, clipPolygon and the large
+// lines of strokeLines, works around MyGo, and goes once MyGo draws such a path itself, in
+// tiles of a mask, as egoist/mygo#529 ("Draw paths too large for one mask in tiles of it")
+// would have it. The cutting of opaque lines longer than piece stays after that: it is for
+// the room the masks of many lines take in the atlas, which #529 does not change.
 const (
 	maxMask = 4000
 	piece   = 256
@@ -266,7 +301,10 @@ func (p *Painter) fill(sp *scene.Path, c ui.Color) {
 }
 
 // stroke strokes a path of the scene with a pen. MyGo strokes it when its ends and corners
-// are round, which are all MyGo draws; with others, its outline is filled.
+// are round, which are all MyGo draws; with others, its outline is filled. The filling of
+// outlines, and the cutting of dashed lines into dashes, work around MyGo, and go once
+// ui.Painter.StrokePath takes caps, joins, a miter limit and dashes, as egoist/mygo#530
+// asks.
 func (p *Painter) stroke(sp *scene.Path, c ui.Color, pn pen) {
 	if c.A == 0 || !(pn.width > 0) {
 		return
@@ -300,8 +338,10 @@ func (p *Painter) stroke(sp *scene.Path, c ui.Color, pn pen) {
 }
 
 // strokeLines strokes polylines of the scene w DIPs wide, in pieces no more than limit DIPs
-// across, and with cull only those that show. With round joins and caps, a closed polyline
-// is drawn as an open one back to its start.
+// across, and with cull only those that show, which is right only with no transform (see
+// the package's documentation). With round joins and caps, a closed polyline is drawn as an
+// open one back to its start. Its large lines work around MyGo until egoist/mygo#529; its
+// pieces of opaque lines stay after it.
 func (p *Painter) strokeLines(lines []scene.Polyline, w float32, c ui.Color, limit float32, cull bool) {
 	view := p.Visible()
 	var path ui.Path
@@ -358,7 +398,9 @@ func (p *Painter) strokeLines(lines []scene.Polyline, w float32, c ui.Color, lim
 // pixels at a time: each polygon is clipped to the tile, which keeps how many times it winds
 // about each point inside it, and so what a fill with the non-zero rule covers. The tiles'
 // sides are on the edges of device pixels, so that where two meet neither covers a part of
-// a pixel the other covers too, and no seam shows.
+// a pixel the other covers too, and no seam shows. What shows is taken to be in the scene's
+// DIPs, which it is only with no transform (see the package's documentation). It works
+// around MyGo until egoist/mygo#529.
 func (p *Painter) fillTiles(polys []scene.Polyline, c ui.Color, tile int) {
 	var dips [][][2]float32
 	x0, y0 := float32(math.Inf(1)), float32(math.Inf(1))
@@ -402,7 +444,8 @@ func (p *Painter) fillTiles(polys []scene.Polyline, c ui.Color, tile int) {
 	}
 }
 
-// clipPolygon is a polygon clipped to a box, as Sutherland and Hodgman do it.
+// clipPolygon is a polygon clipped to a box, as Sutherland and Hodgman do it, for
+// fillTiles, until egoist/mygo#529.
 func clipPolygon(poly [][2]float32, r ui.Rect) [][2]float32 {
 	edges := [4]struct {
 		axis int
@@ -475,9 +518,9 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 			for _, sp := range line {
 				switch {
 				case sp.Icon != "":
-					if p.o.Icon != nil {
+					if p.o.DrawIcon != nil {
 						side := l.Size * 1.1
-						p.o.Icon(p.Painter, sp.Icon, p.Rect(scene.Rect{X: x, Y: y - shift - side/2, W: side, H: side}), c)
+						p.o.DrawIcon(p.Painter, sp.Icon, p.Rect(scene.Rect{X: x, Y: y - shift - side/2, W: side, H: side}), c)
 					}
 				case sp.Text != "":
 					glyphs, w := p.fonts.Shape(sp.Text, size, sp.Face)
@@ -509,12 +552,15 @@ func (p *Painter) halo(glyphs []ui.Glyph, x, y, r float32, c ui.Color) {
 	}
 }
 
-// Picture draws an item's picture: an icon, through Options.Icon, in the color of its text.
-// Images are left to an Options.Draw of the host's, which can load them.
+// Picture draws an item's picture: an icon, through Options.DrawIcon, in the color of its
+// text, or an image, through Options.DrawImage.
 func (p *Painter) Picture(it *scene.Item, s style.Resolved) {
 	pic := it.Picture
-	if pic == nil || pic.Icon == "" || p.o.Icon == nil {
-		return
+	switch {
+	case pic == nil:
+	case pic.Image != "" && p.o.DrawImage != nil:
+		p.o.DrawImage(p.Painter, pic.Image, p.Rect(pic.Box), pic.Fit, s.Opacity)
+	case pic.Icon != "" && p.o.DrawIcon != nil:
+		p.o.DrawIcon(p.Painter, pic.Icon, p.Rect(pic.Box), Color(s.Text, s.Opacity))
 	}
-	p.o.Icon(p.Painter, pic.Icon, p.Rect(pic.Box), Color(s.Text, s.Opacity))
 }
