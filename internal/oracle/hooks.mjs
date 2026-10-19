@@ -40,6 +40,7 @@ export async function resolve(spec, ctx, next) {
 // of Pele's name and version. A tree view's labels write, in place of their text, the point the
 // scene holds them at and all that is in them, and its names and descriptions in one line the
 // middle of their row as y, with an m before it.
+// A Cynefin diagram's labels and markers write, before each, what a Wardley map's write.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -313,6 +314,27 @@ function labelSvg(label: Label, cx: number, cy: number, attrs: string): string {
 function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
   if (!(globalThis as any).limuExactNumbers) return markerPele(type, x, y, dx, dy, color);
   return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" fill="\${color}"/>\`;
+}
+`;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/cynefin/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = String(loaded.source);
+    source = patch(url, source, RADAR_IMPORT, RADAR_IMPORT.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, WARDLEY_EDGES, WARDLEY_EDGES.replace('marker,', 'marker as markerPele,'));
+    source += `
+function labelSvg(label: Label, cx: number, cy: number, attrs: string, icons?: any): string {
+  const s = labelSvgPele(label, cx, cy, attrs, icons);
+  if (!(globalThis as any).limuExactNumbers || s === '') return s;
+  const lines = label.lines.map((line) => line.map((s) => [s.icon ?? null, s.style, s.text, s.width]));
+  const data = { w: label.width, h: label.height, size: label.size, lh: label.lineHeight, widths: label.widths, lines };
+  return \`<limu-label x="\${cx}" y="\${cy}" attrs="\${encodeURIComponent(attrs)}" data="\${encodeURIComponent(JSON.stringify(data))}"/>\` + s;
+}
+function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
+  const s = markerPele(type, x, y, dx, dy, color);
+  if (!(globalThis as any).limuExactNumbers) return s;
+  return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" color="\${color}"/>\` + s;
 }
 `;
     return { ...loaded, source, shortCircuit: true };
