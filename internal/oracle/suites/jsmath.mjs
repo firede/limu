@@ -1,5 +1,6 @@
 // Math.sin, Math.cos, Math.atan2, Math.acos and Math.asin as V8 works them out, which Pele's
-// charts and block diagrams compute with: on the angles and coordinates charts reach, the arithmetic charts do
+// charts and block diagrams compute with, and Math.round, which Pele's num writes every
+// coordinate with: on the angles and coordinates charts reach, the arithmetic charts do
 // on them, random bit patterns and the special values. An angle written [k, n] is k·π/n,
 // worked out as k * Math.PI / n, which keeps the fixture small; any other input is itself.
 import { enc } from '../lib/value.mjs';
@@ -108,5 +109,22 @@ export default async function ({ write, random }) {
   for (let i = 0; i < 1000; i++) as(sign() * next() * 2 ** -int(0, 70));
   for (let i = 0; i < 1000; i++) as(anyBits());
 
-  write('internal/jsmath/testdata/pele/math.json', { trig, atan2, acos, asin });
+  // Math.round on halves of either sign, which round up, on the numbers either side of them,
+  // on what is too large to have a fraction, and on hundredths as num rounds them.
+  const round = [];
+  const r = (x) => round.push([enc(x), enc(Math.round(x))]);
+  for (const x of SPECIAL) r(x);
+  for (const x of [0.49999999999999994, -0.49999999999999994, 0.5000000000000001, -0.5000000000000001, -0.25,
+    -1e-300, 2 ** 52 - 0.5, -(2 ** 52) + 0.5, 2 ** 52 + 1, 2 ** 53 + 1, 1e21, -1e21, 1e21 + 2 ** 20]) r(x);
+  for (let k = -64; k <= 64; k++) {
+    r(k + 0.5);
+    r(nudge(k + 0.5, 1));
+    r(nudge(k + 0.5, -1));
+  }
+  for (let i = 0; i < 2000; i++) r(decimal(1000, 3) * 100);
+  for (let i = 0; i < 2000; i++) r(sign() * (int(0, 2 ** 30) + 0.5) * 2 ** -int(0, 20));
+  for (let i = 0; i < 1000; i++) r(anySize(-60, 60));
+  for (let i = 0; i < 1000; i++) r(anyBits());
+
+  write('internal/jsmath/testdata/pele/math.json', { trig, atan2, acos, asin, round });
 }

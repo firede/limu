@@ -7,21 +7,25 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/scene"
 )
 
-// Num is Pele's num: a number written to two decimals, as its SVG writes coordinates.
+// Num is Pele's num: a number written to two decimals, as its SVG writes coordinates. Where
+// the number of hundredths is 1e11 or more either way, or is not a finite number, it is
+// written as String writes it divided by 100: 1e+21, Infinity, NaN.
 func Num(v float64) string {
-	n := round(float64(v * 100))
+	n := jsmath.Round(float64(v * 100))
 	if n == 0 {
 		return "0"
+	}
+	if !(math.Abs(n) < 1e11) {
+		return chars.NumberString(n / 100)
 	}
 	sign := ""
 	if n < 0 {
 		sign, n = "-", -n
-	}
-	if n >= 1e11 {
-		return strconv.FormatFloat(round(float64(v*100))/100, 'f', -1, 64)
 	}
 	q := math.Floor(n / 100)
 	s := sign + strconv.FormatFloat(q, 'f', -1, 64)
@@ -50,13 +54,4 @@ func D(p *scene.Path) string {
 		}
 	})
 	return b.String()
-}
-
-// round is JavaScript's Math.round.
-func round(x float64) float64 {
-	r := math.Floor(x)
-	if x-r >= 0.5 {
-		r++
-	}
-	return r
 }
