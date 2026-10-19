@@ -26,20 +26,21 @@ type peleRender struct {
 		MaxWidth float64  `json:"maxWidth"`
 		Padding  *float64 `json:"padding"`
 		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
 	var p peleRender
-	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, outside, empty := 0, 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -51,10 +52,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		sc := Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding})
-		got := sceneLines(sc, c.Lines)
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		got := sceneLines(sc, c.Line)
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v, padding %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, (&layout.Options{Padding: c.Padding}).Pad(), i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v, padding %v), %s", c.Src, c.MaxWidth, c.FontSize, (&layout.Options{Padding: c.Padding}).Pad(), msg)
 			}
 		}
 		for _, it := range sc.Items {
@@ -128,9 +129,11 @@ func arcs(line string) []arc {
 
 // sceneLines writes a scene as the oracle reads Pele's SVG, every number as JavaScript's
 // String writes it. The curves an arc was drawn with are written as the arc of Pele's line
-// at the same place, want, where ArcTo draws that arc with exactly those curves; elsewhere
-// they are written as curves, which no line of Pele's has.
-func sceneLines(sc *scene.Scene, want []string) []string {
+// at the same place, want(i), where ArcTo draws that arc with exactly those curves; elsewhere
+// they are written as curves, which no line of Pele's has. want is the line Pele drew at an
+// index, or "" where the fixture does not hold it; the oracle keeps the lines of paths and
+// circles in full.
+func sceneLines(sc *scene.Scene, want func(int) string) []string {
 	n := chars.NumberString
 	pt := func(x, y float64) string { return n(x) + "," + n(y) }
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
@@ -140,12 +143,7 @@ func sceneLines(sc *scene.Scene, want []string) []string {
 	if sc.Desc != "" {
 		lines = append(lines, "acc-desc "+pelesvg.ID(sc.Desc))
 	}
-	hint := func() string {
-		if len(lines) < len(want) {
-			return want[len(lines)]
-		}
-		return ""
-	}
+	hint := func() string { return want(len(lines)) }
 	contexts := map[scene.Role]string{RoleTitle: "title", RoleSliceLabel: "slice-labels", RoleLegend: "legend"}
 	// Where Pele's text puts the first line of a label, with its fill, anchor and size and the
 	// text of its lines: a percentage at its point, and any other as Pele's labelSvg centers

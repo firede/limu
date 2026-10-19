@@ -149,5 +149,7 @@ export default async function ({ pele, src, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, fragments(pele), random(32));
   while (drawn < 5000) each(next());
-  write('diagram/venn/testdata/pele/render.json', { cases: out });
+  // The test reads the style of sets, overlaps and texts as a browser draws it, and an
+  // overlap's arcs as limu draws them, so their lines are kept in full.
+  write('diagram/venn/testdata/pele/render.json', { cases: out }, { keep: (line) => /^(set|overlap|title|label|text) /.test(line) });
 }

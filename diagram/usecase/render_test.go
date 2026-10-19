@@ -23,23 +23,24 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
 	var p peleRender
-	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, skipped := 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		// A Go string cannot hold a surrogate with no partner, which JSON can write and
 		// JavaScript measures as wide; the parser holds U+FFFD in its place.
 		if loneSurrogate(c.Src) {
@@ -57,9 +58,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		if i := fixture.FirstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i, lineAt(got, i), lineAt(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
 		}
 	}
@@ -95,13 +96,6 @@ func loneSurrogate(s string) bool {
 		return true
 	}
 	return false
-}
-
-func lineAt(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
-	}
-	return "(none)"
 }
 
 // paintNames are the theme's paints as Pele's SVG names them.

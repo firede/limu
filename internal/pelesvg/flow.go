@@ -24,20 +24,19 @@ func Classes(it *scene.Item) string {
 	return strings.Join(append(append([]string(nil), it.Class...), it.Tags...), " ")
 }
 
-// TagsLast is lines with the words of tags moved to the end of the first list in brackets
-// of each, "[a clickable b]" to "[a b clickable]": where Pele writes what the scene holds as
+// TagsLast reads a line with the words of tags moved to the end of its first list in
+// brackets, "[a clickable b]" to "[a b clickable]": where Pele writes what the scene holds as
 // a tag among an author's classes, in the order they were given, the scene holds them apart.
-func TagsLast(lines []string, tags ...string) []string {
-	out := make([]string, len(lines))
-	for i, line := range lines {
-		out[i] = line
+// A line with none of the tags in that list is read as it is.
+func TagsLast(tags ...string) func(line string) string {
+	return func(line string) string {
 		open := strings.Index(line, " [")
 		if open < 0 {
-			continue
+			return line
 		}
 		end := strings.IndexByte(line[open:], ']')
 		if end < 0 {
-			continue
+			return line
 		}
 		end += open
 		var class, tagged []string
@@ -48,11 +47,11 @@ func TagsLast(lines []string, tags ...string) []string {
 				class = append(class, w)
 			}
 		}
-		if len(tagged) > 0 {
-			out[i] = line[:open+2] + strings.Join(append(class, tagged...), " ") + line[end:]
+		if len(tagged) == 0 {
+			return line
 		}
+		return line[:open+2] + strings.Join(append(class, tagged...), " ") + line[end:]
 	}
-	return out
 }
 
 // OwnFill is the item's own fill at its own fill opacity, one paint, as the render oracles
@@ -174,22 +173,4 @@ func Marker(m scene.Marker) string {
 			"M" + num(cx-vx) + "," + num(cy-vy) + "L" + num(cx+vx) + "," + num(cy+vy)
 	}
 	return ""
-}
-
-// FirstDiff is the first line where two lists of lines differ, or -1 where they are the same.
-func FirstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
-}
-
-// At is the line i of lines, or "(none)" past their end.
-func At(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
-	}
-	return "(none)"
 }

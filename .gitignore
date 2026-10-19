@@ -7,3 +7,7 @@
 
 # Notes and handoffs of local work, kept out of the repository.
 local/
+
+# The full lines of fixtures of drawings, written by ./scripts/oracle.sh --full to find which
+# line differs from a digest; the tracked fixture beside each is what the tests compare with.
+*.full.json.gz

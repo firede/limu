@@ -22,19 +22,20 @@ import (
 type peleRender struct {
 	Zones []string `json:"zones"`
 	Cases []struct {
-		Src      string         `json:"src"`
-		Zone     string         `json:"zone"`
-		Now      int64          `json:"now"`
-		MaxWidth float64        `json:"maxWidth"`
-		FontSize float64        `json:"fontSize"`
-		Lines    []string       `json:"lines"`
-		Error    map[string]any `json:"error"`
+		Src      string  `json:"src"`
+		Zone     string  `json:"zone"`
+		Now      int64   `json:"now"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
+		Error map[string]any `json:"error"`
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
 	var p peleRender
-	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
@@ -50,7 +51,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf(format, args...)
 		}
 	}
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			fail("Prepare(%q): %v", c.Src, err)
@@ -78,9 +79,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(sc)
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
-			fail("Layout(%q) in %s at %d, max %v, size %v, line %d\n got %s\nPele %s",
-				c.Src, c.Zone, c.Now, c.MaxWidth, c.FontSize, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
+			fail("Layout(%q) in %s at %d, max %v, size %v, %s",
+				c.Src, c.Zone, c.Now, c.MaxWidth, c.FontSize, msg)
 		}
 	}
 	if failed > 0 {

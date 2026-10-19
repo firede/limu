@@ -209,5 +209,7 @@ export default async function ({ src, pele, write, random }) {
     const s = next();
     if (s.length <= 3000) each(s);
   }
-  write('diagram/sequence/testdata/pele/render.json', { cases: out });
+  // The test reads the fill an author gave as the style package reads it, so the lines with
+  // one are kept in full.
+  write('diagram/sequence/testdata/pele/render.json', { cases: out }, { keep: (line) => line.includes(' author="') });
 }

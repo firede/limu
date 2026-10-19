@@ -25,24 +25,25 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
-		Error    string   `json:"error"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
+		Error string `json:"error"`
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
 	var p peleRender
-	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -68,10 +69,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			}
 			continue
 		}
-		got := sceneLines(sc, c.Lines)
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		got := sceneLines(sc, c.Line)
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
 		}
 	}
@@ -275,16 +276,12 @@ func partsOf(parts []scene.Part) string {
 	return b.String()
 }
 
-// sceneLines writes a scene as the oracle reads Pele's SVG; want is Pele's lines, whose arcs
-// are hints for writing the scene's curves.
-func sceneLines(sc *scene.Scene, want []string) []string {
+// sceneLines writes a scene as the oracle reads Pele's SVG; want is the line Pele drew at an
+// index, or "" where the fixture does not hold it, and the arcs of its lines are hints for
+// writing the scene's curves. The oracle keeps the lines of paths with arcs in full.
+func sceneLines(sc *scene.Scene, want func(int) string) []string {
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
-	hint := func() string {
-		if len(lines) < len(want) {
-			return want[len(lines)]
-		}
-		return ""
-	}
+	hint := func() string { return want(len(lines)) }
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		id := pelesvg.ID(it.ID)

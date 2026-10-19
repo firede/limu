@@ -22,25 +22,26 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src                 string   `json:"src"`
-		MaxWidth            float64  `json:"maxWidth"`
-		FontSize            float64  `json:"fontSize"`
-		AutoDirection       *bool    `json:"autoDirection"`
-		DirectionBreakpoint float64  `json:"directionBreakpoint"`
-		Lines               []string `json:"lines"`
+		Src                 string  `json:"src"`
+		MaxWidth            float64 `json:"maxWidth"`
+		FontSize            float64 `json:"fontSize"`
+		AutoDirection       *bool   `json:"autoDirection"`
+		DirectionBreakpoint float64 `json:"directionBreakpoint"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
 	var p peleRender
-	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, down := 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -61,10 +62,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			}
 		}
 		got := sceneLines(sc)
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v, auto %v, breakpoint %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize,
-					c.AutoDirection, c.DirectionBreakpoint, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v, auto %v, breakpoint %v), %s", c.Src, c.MaxWidth, c.FontSize,
+					c.AutoDirection, c.DirectionBreakpoint, msg)
 			}
 		}
 	}

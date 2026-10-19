@@ -320,5 +320,7 @@ export default async function ({ src, cases, write, random }) {
       draw(s, i % 2 === 0 ? 520 : 200);
     }
   }
-  write('diagram/class/testdata/pele/render.json', { cases: out });
+  // The test reads a line with a tag among its classes with the tag moved last, so the lines
+  // that name one are kept in full.
+  write('diagram/class/testdata/pele/render.json', { cases: out }, { keep: (line) => line.includes('clickable') });
 }

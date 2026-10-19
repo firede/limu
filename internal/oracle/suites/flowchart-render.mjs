@@ -141,5 +141,7 @@ export default async function ({ src, cases, write, random }) {
     const s = next();
     if (s.length <= 3000) each(s);
   }
-  write('diagram/flowchart/testdata/pele/render.json', { cases: out });
+  // The test reads a line with a tag among its classes with the tag moved last, so the lines
+  // that name one are kept in full.
+  write('diagram/flowchart/testdata/pele/render.json', { cases: out }, { keep: (line) => line.includes('clickable') });
 }
