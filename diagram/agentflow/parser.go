@@ -42,7 +42,7 @@ var directions = [...]string{"TB", "BT", "RL", "LR", "TD"}
 type frame struct {
 	global    bool
 	at        int
-	id, title *Text
+	id, title *flowText
 	data      string
 	hasData   bool
 	dataFrom  int
@@ -105,9 +105,9 @@ func braceTrail(s string) string {
 	return b.String()
 }
 
-// ParseInto parses an agent flow's text into db, as Pele's parseAgentflow does. An error is
+// parseInto parses an agent flow's text into db, as Pele's parseAgentflow does. An error is
 // a *diagram.Error.
-func ParseInto(source string, db *DB) (err error) {
+func parseInto(source string, db *DB) (err error) {
 	src := braceTrail(source)
 	p := &parser{src: src, toks: tokenize(src), db: db}
 	defer func() {
@@ -155,8 +155,8 @@ func (p *parser) fail(expected string) {
 
 // span is the span from the start of token a to the end of token b.
 // It is Pele's span.
-func (p *parser) span(a, b int) *Loc {
-	return &Loc{p.toks[a].loc[0], p.toks[a].loc[1], p.toks[b].loc[2], p.toks[b].loc[3]}
+func (p *parser) span(a, b int) *loc {
+	return &loc{p.toks[a].loc[0], p.toks[a].loc[1], p.toks[b].loc[2], p.toks[b].loc[3]}
 }
 
 // expect reads a token of type typ and gives its text, or fails naming typ and also, as Pele's
@@ -207,7 +207,7 @@ func isTextPart(t token) bool {
 
 // label reads a label, a string, a Markdown string or a run of text tokens, as Pele's text
 // does.
-func (p *parser) label() *Text {
+func (p *parser) label() *flowText {
 	var lt LabelType
 	switch t := p.typ(); {
 	case t == t_STR:
@@ -223,14 +223,14 @@ func (p *parser) label() *Text {
 	for isTextPart(p.typ()) {
 		s += p.next()
 	}
-	return &Text{s, lt}
+	return &flowText{s, lt}
 }
 
 // closed reads the token typ that closes a label, as Pele's closed does.
 func (p *parser) closed(typ token) { p.expect(typ, textTokens) }
 
 // edgeText reads the label of a link written inside it, as Pele's edgeText does.
-func (p *parser) edgeText() *Text {
+func (p *parser) edgeText() *flowText {
 	var lt LabelType
 	switch t := p.typ(); t {
 	case t_STR:
@@ -246,12 +246,12 @@ func (p *parser) edgeText() *Text {
 	for p.typ() == t_EDGE_TEXT || p.typ() == t_UNICODE_TEXT {
 		s += p.next()
 	}
-	return &Text{s, lt}
+	return &flowText{s, lt}
 }
 
 // textNoTags reads the id of a flow or connector, as Pele's textNoTags does: a string is taken
 // as text.
-func (p *parser) textNoTags() *Text {
+func (p *parser) textNoTags() *flowText {
 	var lt LabelType
 	switch t := p.typ(); {
 	case t == t_STR:
@@ -267,7 +267,7 @@ func (p *parser) textNoTags() *Text {
 	for noTagsTokens[p.typ()] {
 		s += p.next()
 	}
-	return &Text{s, lt}
+	return &flowText{s, lt}
 }
 
 // shapeData reads a metadata block, its tokens joined, and remembers the tokens it spans, as
@@ -305,7 +305,7 @@ func (p *parser) attachData(id string, f *frame) {
 func (p *parser) vertex() string {
 	from := p.i
 	id := p.idString()
-	var label *Text
+	var label *flowText
 	typ := ""
 	var props []Prop
 	switch p.typ() {
@@ -458,7 +458,7 @@ func (p *parser) node() []string {
 }
 
 // link reads a link, with its id and its label if it has them, as Pele's link does.
-func (p *parser) link() *LinkInfo {
+func (p *parser) link() *linkInfo {
 	id, hasID := "", false
 	if p.typ() == t_LINK_ID {
 		id, hasID = p.next(), true
@@ -628,7 +628,7 @@ func (p *parser) clickStatement() {
 func (p *parser) header(at int) *frame {
 	p.expect(t_SPACE, separators)
 	id := p.textNoTags()
-	title := &Text{"", LabelText}
+	title := &flowText{"", LabelText}
 	if p.typ() == t_SQS {
 		p.i++
 		title = p.label()

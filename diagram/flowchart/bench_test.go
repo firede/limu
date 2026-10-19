@@ -43,6 +43,6 @@ func BenchmarkParse500(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		BuildGraph(db, DefaultCurve(p.Config))
+		buildGraph(db, defaultCurve(p.Config))
 	}
 }

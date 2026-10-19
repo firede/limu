@@ -24,11 +24,11 @@ type parser struct {
 	db  *DB
 }
 
-// ParseInto parses a state diagram's text into db, as Pele's parseState does: it reads the
+// parseInto parses a state diagram's text into db, as Pele's parseState does: it reads the
 // statements in a loop, with a stack of the composites open, and accepts what Mermaid's
 // stateDiagram.jison accepts. It then sets the root document, which resolves the DB's states
 // and its graph. An error is a *diagram.Error.
-func ParseInto(source string, db *DB) (err error) {
+func parseInto(source string, db *DB) (err error) {
 	p := &parser{src: source, lex: tokenize(source), db: db}
 	defer func() {
 		if r := recover(); r != nil {

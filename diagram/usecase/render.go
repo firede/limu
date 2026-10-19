@@ -47,7 +47,7 @@ const (
 // A view is a node as it is drawn: Pele's View. w and h are the size of what is drawn; the
 // layout's box is larger when the node carries a self-relationship.
 type view struct {
-	node       *GraphNode
+	node       *graphNode
 	kind       int
 	author     css.Author
 	label      text.Label
@@ -398,7 +398,7 @@ func leftLabel(l *text.Label, x, y, left, cy float64, it scene.Item) []scene.Ite
 // lay lays the diagram out once, as Pele's draw does. turned lays out a diagram that runs
 // across as one that runs down.
 func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
-	graph := BuildGraph(m)
+	graph := buildGraph(m)
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	tiny := jsmath.Round(size * 0.8125)
@@ -433,7 +433,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	for _, b := range m.SystemBoundaries {
 		boundaryClasses[b.ID] = b.Classes
 	}
-	relationClasses := map[*GraphEdge][]string{}
+	relationClasses := map[*graphEdge][]string{}
 	for i, r := range m.Relationships {
 		relationClasses[graph.Edges[i]] = r.Classes
 	}
@@ -560,7 +560,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 
 	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	for _, edge := range graph.Edges {
 		src, ok1 := index[edge.Start]
 		dst, ok2 := index[edge.End]

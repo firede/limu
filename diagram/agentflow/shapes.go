@@ -29,8 +29,8 @@ var allowedShapes = map[string]bool{
 	"connector": true, "collapsedGroup": true,
 }
 
-// DefaultShape is the shape of a node that names none, or one agent flows do not draw.
-const DefaultShape = "roundedRect"
+// defaultShape is the shape of a node that names none, or one agent flows do not draw.
+const defaultShape = "roundedRect"
 
 // resolveShapeAlias is the shape an author-facing name stands for, or the name itself, as
 // Pele's resolveShapeAlias gives it.
@@ -49,20 +49,20 @@ func isValidShape(name string) bool {
 
 // normaliseNodeShapes reduces every node's shape to one agent flows draw, reporting the
 // removed and unsupported ones, as Pele's normaliseNodeShapes does.
-func normaliseNodeShapes(nodes []*GraphNode, d *DB) {
+func normaliseNodeShapes(nodes []*graphNode, d *DB) {
 	for _, node := range nodes {
 		if node.IsGroup {
 			continue
 		}
 		if node.Shape == "" || node.Shape == "squareRect" || node.Shape == "rect" {
-			node.Shape = DefaultShape
+			node.Shape = defaultShape
 		}
 		if removedShapes[node.Shape] {
-			d.emitError(ShapeRemoved, `shape "`+node.Shape+`" was removed in v0.8.1, using "`+DefaultShape+`"`, node.ID)
-			node.Shape = DefaultShape
+			d.emitError(ShapeRemoved, `shape "`+node.Shape+`" was removed in v0.8.1, using "`+defaultShape+`"`, node.ID)
+			node.Shape = defaultShape
 		} else if !allowedShapes[node.Shape] {
-			d.emitWarning(ShapeUnsupported, `shape "`+node.Shape+`" is not supported, using "`+DefaultShape+`"`, node.ID)
-			node.Shape = DefaultShape
+			d.emitWarning(ShapeUnsupported, `shape "`+node.Shape+`" is not supported, using "`+defaultShape+`"`, node.ID)
+			node.Shape = defaultShape
 		}
 	}
 }

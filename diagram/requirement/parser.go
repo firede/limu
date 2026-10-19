@@ -49,10 +49,10 @@ type parser struct {
 	values []string
 }
 
-// ParseInto parses a requirement diagram's text into db, as Pele's parseRequirement does: a
+// parseInto parses a requirement diagram's text into db, as Pele's parseRequirement does: a
 // recursive-descent parser that agrees with Mermaid's requirementDiagram.jison. An error is
 // a *diagram.Error.
-func ParseInto(source string, db *DB) (err error) {
+func parseInto(source string, db *DB) (err error) {
 	p := &parser{src: source, toks: tokenize(source), db: db}
 	defer func() {
 		if r := recover(); r != nil {

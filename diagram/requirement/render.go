@@ -49,7 +49,7 @@ type row struct {
 
 // A view is a requirement or an element as it is drawn: Pele's NodeView.
 type view struct {
-	node       *GraphNode
+	node       *graphNode
 	author     css.Author
 	kind, name text.Label
 	rows       []row
@@ -181,7 +181,7 @@ func Layout(db *DB, _ diagram.Config, o *layout.Options) *scene.Scene {
 // lay lays the diagram out once, as Pele's draw does. down lays out a diagram that runs
 // across as one that runs down.
 func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
-	graph := BuildGraph(db)
+	graph := buildGraph(db)
 	size := o.Size()
 	small := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
@@ -259,7 +259,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	sideways := rootDir == graphs.LR || rootDir == graphs.RL
 	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	for i := range graph.Edges {
 		edge := &graph.Edges[i]
 		if !edge.HasStart || !edge.HasEnd {

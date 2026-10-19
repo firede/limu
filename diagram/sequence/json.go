@@ -28,9 +28,9 @@ type Entries struct {
 	Values map[string]any
 }
 
-// Set sets key to v; a key set again keeps its place. It stands for Map.set on the links and
+// set sets key to v; a key set again keeps its place. It stands for Map.set on the links and
 // properties of Pele's SeqActor.
-func (e *Entries) Set(key string, v any) {
+func (e *Entries) set(key string, v any) {
 	if e.Values == nil {
 		e.Values = map[string]any{}
 	}

@@ -70,7 +70,7 @@ type line struct {
 
 // A view is a node as it is drawn: Pele's View.
 type view struct {
-	node        *GraphNode
+	node        *graphNode
 	author      css.Author
 	label       text.Label
 	w, h        float64
@@ -108,7 +108,7 @@ type card struct {
 func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *scene.Scene {
 	padding := o.Pad()
 	conf, _ := config["class"].(diagram.Config)
-	graph := BuildGraph(db, Hierarchical(config))
+	graph := buildGraph(db, hierarchical(config))
 	hideEmpty, _ := conf["hideEmptyMembersBox"].(bool)
 	size := o.Size()
 	small := jsmath.Round(float64(size * 0.875))
@@ -162,7 +162,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	}
 	// classView measures a class as it is drawn: its name, its annotations and its members,
 	// and the box they fit in, as the classView of Pele's draw does.
-	classView := func(node *GraphNode, cls *Class) view {
+	classView := func(node *graphNode, cls *Class) view {
 		author := classStyle(db, cls)
 		fontSize := size
 		if author.FontSize > 0 {
@@ -272,7 +272,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	}
 
 	var cedges []graphs.CEdge
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	var edgeLabels []text.Label
 	var startRoom, endRoom []float64
 	// Edges leave one side of a class and arrive at the other, so a class with many of them

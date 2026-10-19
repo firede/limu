@@ -217,7 +217,7 @@ func TestParseMatchesPele(t *testing.T) {
 	for _, c := range p.Cases {
 		ok := compare(t, "tokens", c.Src, dumpTokens(c.Src), c.Tokens)
 		if ok {
-			db := NewDB()
+			db := newDB()
 			err := parseBlock(c.Src, db)
 			if err != nil {
 				db = nil

@@ -69,7 +69,7 @@ func numberOption(config diagram.Config, key string, fallback float64) float64 {
 
 // A view is a node as it is drawn: Pele's NodeView.
 type view struct {
-	node   *GraphNode
+	node   *graphNode
 	author css.Author
 	label  text.Label
 	shape  string
@@ -82,7 +82,7 @@ type view struct {
 
 // slot is the palette slot of a flow, collapsed or not: its own, or the one past the kinds.
 // It is Pele's node.colorIndex ?? KIND_SLOT.size, in its draw.
-func slot(n *GraphNode) int {
+func slot(n *graphNode) int {
 	if n.ColorIndex >= 0 {
 		return n.ColorIndex
 	}
@@ -103,7 +103,7 @@ func tint(slot int, wash float64, filled bool) style.Style {
 
 // A held edge runs between a node and a flow around it, which the layout has no place for.
 type held struct {
-	edge     *GraphEdge
+	edge     *graphEdge
 	label    text.Label
 	src, dst int
 }
@@ -112,7 +112,7 @@ type held struct {
 // as one that runs down.
 func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Scene {
 	padding := o.Pad()
-	graph := db.Graph(DefaultCurve(config))
+	graph := db.agentGraph(defaultCurve(config))
 	size := o.Size()
 	edgeSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
@@ -251,7 +251,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 
 	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	// Edges between a node and a flow around it. The layout has no place for them, so they
 	// are drawn afterwards, between the node and the flow's border.
 	var holds []held
@@ -526,7 +526,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 
 	// put adds an edge and its label, as Pele's put draws them; route, which Pele does not
 	// have, is the route the edge was laid out along.
-	put := func(edge *GraphEdge, label *text.Label, path draw.EdgePath, route []float64, x, y float64) {
+	put := func(edge *graphEdge, label *text.Label, path draw.EdgePath, route []float64, x, y float64) {
 		var author css.Author
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
 			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))

@@ -107,8 +107,8 @@ type DB struct {
 	styleCopies                              int
 }
 
-// NewDB is an empty DB.
-func NewDB() *DB {
+// newDB is an empty DB.
+func newDB() *DB {
 	return &DB{
 		Direction:    "TB",
 		requirements: map[string]*Requirement{},

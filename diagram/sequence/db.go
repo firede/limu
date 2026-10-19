@@ -347,7 +347,7 @@ func (db *DB) addLinks(id string, text seqText) {
 		return
 	}
 	if v, ok := parseJSON(text.text); ok {
-		entriesOf(v, a.Links.Set)
+		entriesOf(v, a.Links.set)
 	}
 }
 
@@ -366,7 +366,7 @@ func (db *DB) addALink(id string, text seqText) {
 	}
 	key := chars.Trim(slice16(s, 0, sep16-1))
 	value := chars.Trim(slice16(s, sep16+1, chars.Len16(s)))
-	a.Links.Set(key, value)
+	a.Links.set(key, value)
 }
 
 // slice16 is s.slice(from, to) in code units, with JavaScript's negative ends counted from
@@ -395,7 +395,7 @@ func (db *DB) addProperties(id string, text seqText) {
 		return
 	}
 	if v, ok := parseJSON(text.text); ok {
-		entriesOf(v, a.Properties.Set)
+		entriesOf(v, a.Properties.set)
 	}
 }
 

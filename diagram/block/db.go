@@ -162,8 +162,8 @@ type DB struct {
 	spaces    float64
 }
 
-// NewDB is a model with nothing in it, as Pele's BlockDb starts.
-func NewDB() *DB {
+// newDB is a model with nothing in it, as Pele's BlockDb starts.
+func newDB() *DB {
 	columns := -1.0
 	return &DB{
 		Root:      &Block{ID: "root", Type: "composite", Children: []*Block{}, Columns: &columns},

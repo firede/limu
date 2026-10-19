@@ -57,9 +57,9 @@ type parser struct {
 	db   *DB
 }
 
-// ParseInto parses an ER diagram's text into db, as Pele's parseEr does. An error is a
+// parseInto parses an ER diagram's text into db, as Pele's parseEr does. An error is a
 // *diagram.Error.
-func ParseInto(src string, db *DB) (err error) {
+func parseInto(src string, db *DB) (err error) {
 	p := &parser{src: src, toks: tokenize(src), db: db}
 	defer func() {
 		if r := recover(); r != nil {

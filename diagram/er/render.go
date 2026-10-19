@@ -90,7 +90,7 @@ type row struct {
 
 // A view is an entity or a subgraph as it is drawn: Pele's NodeView.
 type view struct {
-	node   *GraphNode
+	node   *graphNode
 	author css.Author
 	label  text.Label
 	w, h   float64
@@ -126,7 +126,7 @@ func cellText(raw string) string {
 // across as one that runs down.
 func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
 	padding := o.Pad()
-	graph := BuildGraph(db)
+	graph := buildGraph(db)
 	size := o.Size()
 	smallSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
@@ -143,7 +143,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 
 	var cedges []graphs.CEdge
 	var edgeLabels []*text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	loops := map[int][]*selfLoop{}
 	var loopOrder []int
 	var loopOf []*selfLoop

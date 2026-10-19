@@ -37,7 +37,7 @@ var directions = [...]string{"TB", "BT", "RL", "LR", "TD"}
 
 // frame is an open subgraph: its id and title, and the list and collect flag of its parent.
 type frame struct {
-	id, title *Text
+	id, title *flowText
 	list      []docItem
 	collect   bool
 }
@@ -84,9 +84,9 @@ func braceTrail(s string) string {
 	return b.String()
 }
 
-// ParseInto parses a flowchart's text into db, as Pele's parseFlowchart does. An error is a
+// parseInto parses a flowchart's text into db, as Pele's parseFlowchart does. An error is a
 // *diagram.Error.
-func ParseInto(source string, db *DB) (err error) {
+func parseInto(source string, db *DB) (err error) {
 	src := braceTrail(source)
 	p := &parser{src: src, toks: tokenize(src), db: db}
 	defer func() {
@@ -183,7 +183,7 @@ func isTextPart(t token) bool {
 
 // label reads a node's label, a string, a Markdown string or a run of text tokens, as Pele's
 // text does.
-func (p *parser) label() *Text {
+func (p *parser) label() *flowText {
 	var lt LabelType
 	switch t := p.typ(); {
 	case t == t_STR:
@@ -199,14 +199,14 @@ func (p *parser) label() *Text {
 	for isTextPart(p.typ()) {
 		s += p.next()
 	}
-	return &Text{s, lt}
+	return &flowText{s, lt}
 }
 
 // closed expects the token of type typ that closes a label, as Pele's closed does.
 func (p *parser) closed(typ token) { p.expect(typ, textTokens) }
 
 // edgeText reads the label of a link written inside it, as Pele's edgeText does.
-func (p *parser) edgeText() *Text {
+func (p *parser) edgeText() *flowText {
 	var lt LabelType
 	switch t := p.typ(); t {
 	case t_STR:
@@ -222,11 +222,11 @@ func (p *parser) edgeText() *Text {
 	for p.typ() == t_EDGE_TEXT || p.typ() == t_UNICODE_TEXT {
 		s += p.next()
 	}
-	return &Text{s, lt}
+	return &flowText{s, lt}
 }
 
 // textNoTags reads a subgraph's id, which takes no tags, as Pele's textNoTags does.
-func (p *parser) textNoTags() *Text {
+func (p *parser) textNoTags() *flowText {
 	var lt LabelType
 	switch t := p.typ(); {
 	case t == t_STR:
@@ -242,7 +242,7 @@ func (p *parser) textNoTags() *Text {
 	for noTagsTokens[p.typ()] {
 		s += p.next()
 	}
-	return &Text{s, lt}
+	return &flowText{s, lt}
 }
 
 // shapeData joins the run of a node's shape data, as Pele's shapeData does.
@@ -256,7 +256,7 @@ func (p *parser) shapeData() string {
 
 // add adds a vertex with a label and a shape, the call to db.addVertex that each case of
 // Pele's vertex makes.
-func (p *parser) add(id string, label *Text, typ string) {
+func (p *parser) add(id string, label *flowText, typ string) {
 	p.check(p.db.addVertex(id, label, typ, nil, nil, "", nil, "", false))
 }
 
@@ -270,7 +270,7 @@ func (p *parser) addData(id, data string) {
 // vertex, as Pele's vertex does. It gives the id.
 func (p *parser) vertex() string {
 	id := p.idString()
-	var label *Text
+	var label *flowText
 	switch p.typ() {
 	case t_SQS:
 		p.i++
@@ -418,7 +418,7 @@ func (p *parser) node() []string {
 }
 
 // link reads a link, with its id and its label, as Pele's link does.
-func (p *parser) link() *LinkInfo {
+func (p *parser) link() *linkInfo {
 	id := ""
 	if p.typ() == t_LINK_ID {
 		id = p.next()

@@ -114,7 +114,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 	if routed := common.RoutingCurve(o.Routing); routed != "" {
 		curve = routed
 	}
-	graph := BuildGraph(db, curve)
+	graph := buildGraph(db, curve)
 	if variant != nil {
 		variant.Prepare(graph)
 	}
