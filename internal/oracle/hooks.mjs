@@ -25,9 +25,11 @@ export async function resolve(spec, ctx, next) {
 // architecture diagram's labels write, in place of their text, the point they are centered on
 // and all that is in them, and its markers their tips and the way they point; a block
 // diagram's labelSvg writes, before each label, the point it is centered on, its size and its
-// spans, and its blocks write the size they are drawn at as data-limu; and a Wardley
+// spans, and its blocks write the size they are drawn at as data-limu; a Wardley
 // map's labels write, before each, the point it is drawn about, its measures, its
-// attributes and its spans, and its markers where their tips are and the way they point.
+// attributes and its spans, and its markers where their tips are and the way they point; and a
+// railroad diagram's names of rules and texts of its boxes write as y, with an m before it,
+// the middle of their line before Pele adds the shift to their baseline.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -46,6 +48,8 @@ const BLOCK_NODE = 'transform="translate(${num(v.x)},${num(v.y)})">`';
 const WARDLEY_BUILDER = "import { esc, escText, labelSvg, num, sharedStyle, spanStyle, textStyle } from '../../svg/builder.js';";
 const WARDLEY_EDGES = "import { marker, markerTrim } from '../../svg/edges.js';";
 const WARDLEY_START = 'function startLabel(';
+const RAILROAD_NAME_Y = 'y="${num(top + headHeight / 2 + headSize * 0.35)}"';
+const RAILROAD_TEXT_Y = 'y="${num(y + textShift)}"';
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -178,6 +182,14 @@ function marker(type: string, x: number, y: number, dx: number, dy: number, colo
   return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" color="\${color}"/>\` + s;
 }
 `;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/railroad/render.ts')) {
+    const loaded = await next(url, ctx);
+    const exact = EXACT.slice(4, -1);
+    let source = String(loaded.source);
+    source = patch(url, source, RAILROAD_NAME_Y, `y="\${${exact} ? 'm' + (top + headHeight / 2) : num(top + headHeight / 2 + headSize * 0.35)}"`);
+    source = patch(url, source, RAILROAD_TEXT_Y, `y="\${${exact} ? 'm' + y : num(y + textShift)}"`);
     return { ...loaded, source, shortCircuit: true };
   }
   if (url.endsWith('.json')) {

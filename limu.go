@@ -17,6 +17,7 @@ import (
 	"github.com/firede/limu/diagram/pie"
 	"github.com/firede/limu/diagram/quadrant"
 	"github.com/firede/limu/diagram/radar"
+	"github.com/firede/limu/diagram/railroad"
 	"github.com/firede/limu/diagram/requirement"
 	"github.com/firede/limu/diagram/sankey"
 	"github.com/firede/limu/diagram/sequence"
@@ -209,6 +210,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = wardley.Layout(m, p.Config, o)
+	case diagram.Railroad:
+		m, err := railroad.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = railroad.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
