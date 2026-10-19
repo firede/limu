@@ -43,7 +43,10 @@ type Options struct {
 	LinkSchemes, ImageSchemes []string
 	// Snap rounds where things are to whole multiples of it, for a backend that draws on a
 	// grid of pixels. 0 leaves them as they fall.
-	Snap    float64
+	Snap float64
+	// Routing is how edges run in the diagrams laid out in ranks: flowcharts, swimlane
+	// diagrams, agent flows, and state, class, ER, requirement and use case diagrams. The
+	// others draw their edges their own way and leave it.
 	Routing Routing
 
 	// Now is the time a diagram that places things in time takes as the present: where a
