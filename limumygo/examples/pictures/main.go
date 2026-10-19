@@ -7,8 +7,16 @@
 //	go run ./examples/pictures -out pictures
 //
 // The scene is written as SVG in currentColor, so that a page can color it. The others
-// are drawn with MyGo and written as PNG, at twice their size in DIPs by default. They are rendered on a Mac and committed, as MyGo
-// sets text with Pango on Linux and would draw them otherwise.
+// are drawn with MyGo and written as PNG, at twice their size in DIPs by default.
+//
+// Given the website's font, Hanken Grotesk, as a TrueType file, it also draws the pictures
+// a link to the website or to the repository shows: og.png, 1200 by 630, and github.png,
+// 1280 by 640, for the repository's social preview.
+//
+//	go run ./examples/pictures -font HankenGrotesk.ttf
+//
+// The pictures are rendered on a Mac and committed, as MyGo sets text with Pango on Linux
+// and would draw them otherwise.
 package main
 
 import (
@@ -23,6 +31,7 @@ import (
 
 	"github.com/egoist/mygo/plugins/glass"
 	"github.com/egoist/mygo/ui"
+	"github.com/egoist/mygo/ui/shader"
 	"github.com/firede/limu"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/limumygo"
@@ -42,6 +51,8 @@ const pad = 16
 func main() {
 	out := flag.String("out", "../website/public/pictures", "the directory to write the pictures to")
 	scale := flag.Float64("scale", 2, "device pixels per DIP of the PNG pictures")
+	font := flag.String("font", "", "Hanken Grotesk as a TrueType file, to draw the pictures for links with")
+	mark := flag.String("mark", "../website/public/mark.svg", "limu's mark as SVG")
 	flag.Parse()
 
 	sc, err := limu.Layout(source, &layout.Options{Measurer: limumygo.DefaultFonts})
@@ -58,14 +69,39 @@ func main() {
 	}
 	write("scene.svg", []byte(wireframe(sc)))
 	k := float32(*scale)
-	for _, p := range []struct {
+	pngs := []struct {
 		name string
 		img  *image.RGBA
 	}{
 		{"kohu.png", render(sc, themed(style.Kohu()), k)},
 		{"kohu-dark.png", render(sc, themed(style.KohuDark()), k)},
-		{"glass.png", render(sc, glassy(), k)},
-	} {
+		{"glass.png", render(sc, glassy(limumygo.DefaultFonts), k)},
+	}
+	if *font != "" {
+		data, err := os.ReadFile(*font)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := ui.RegisterFont(data, cardFont); err != nil {
+			log.Fatal(err)
+		}
+		svg, err := os.ReadFile(*mark)
+		if err != nil {
+			log.Fatal(err)
+		}
+		m, err := ui.ParseSVG(svg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pngs = append(pngs, struct {
+			name string
+			img  *image.RGBA
+		}{"og.png", card(1200, 630, m)}, struct {
+			name string
+			img  *image.RGBA
+		}{"github.png", card(1280, 640, m)})
+	}
+	for _, p := range pngs {
 		var b strings.Builder
 		if err := png.Encode(&b, p.img); err != nil {
 			log.Fatal(err)
@@ -100,19 +136,47 @@ func render(sc *scene.Scene, l look, scale float32) *image.RGBA {
 	}, w, h, scale)
 }
 
-// glassy is Liquid Glass: soft colors and a grid under the diagram, its lines and text in
-// white, and each node and edge label a pane of clear glass, which what is under it shows
-// through, bent at its rim.
-func glassy() look {
+// glassy is Liquid Glass, with text in fonts: the canvas under the diagram, its lines and
+// text in white, and each node and edge label a pane of clear glass, which what is under it
+// shows through, bent at its rim.
+func glassy(fonts *limumygo.Fonts) look {
 	th := *style.Kohu()
 	th.Line = style.Hex("#ffffff")
 	th.Fg = style.Hex("#ffffff")
-	const away = 4000
-	ground := func(p *ui.Painter, r ui.Rect) {
+	draw := func(p *limumygo.Painter, it *scene.Item, s style.Resolved, next func()) {
+		var r ui.Rect
+		switch {
+		case it.Kind == scene.Node:
+			r = p.Rect(it.Box)
+		case it.Kind == scene.Text && it.Label != nil && !it.Label.Empty():
+			b, em := it.LabelBox(), it.Label.Size
+			r = p.Rect(scene.Rect{X: b.X - em/2, Y: b.Y - em/8, W: b.W + em, H: b.H + em/4})
+		default:
+			next()
+			return
+		}
+		// A box's corners are rounded by a quarter of its height, and any other outline, as
+		// a stadium's, is rounded fully.
+		radius := r.H / 2
+		if len(it.Parts) > 0 && it.Parts[0].Path == nil {
+			radius = r.H / 4
+		}
+		glass.Paint(p.Painter, r, radius, glass.Glass{Style: glass.Clear})
+		p.Label(it, s)
+	}
+	return look{ground: canvas(16), opts: &limumygo.Options{Look: style.Look{Theme: &th}, Fonts: fonts, Draw: draw}}
+}
+
+// canvas paints what is under the glass: a gradient of limu's teal and blue, glows of the
+// series colors, which the glass bends where it passes over them, and a grid of dark lines
+// cell DIPs apart, as on a canvas, which it bends at its rim, and which the white of a
+// diagram stands out over.
+func canvas(cell float32) func(p *ui.Painter, r ui.Rect) {
+	// A glow is the shadow of a disc far to the left, cast back onto the picture, as a
+	// shadow is not painted under what casts it.
+	const away = 8000
+	return func(p *ui.Painter, r ui.Rect) {
 		p.FillGradient(r, ui.LinearGradient{From: ui.Hex("#23817d"), To: ui.Hex("#3d6aa3"), Angle: 135, Oklab: true}, 0)
-		// Glows of the series colors, which the glass bends where it passes over them: the
-		// shadow of a disc far to the left, cast back onto the picture, as a shadow is not
-		// painted under what casts it.
 		for _, g := range []struct {
 			x, y, d float32
 			c       string
@@ -121,38 +185,138 @@ func glassy() look {
 			b := ui.Rect{X: r.X + g.x*r.W - d/2 - away, Y: r.Y + g.y*r.H - d/2, W: d, H: d}
 			p.Shadow(b, d/2, away, 0, d/2, d/8, ui.Hex(g.c))
 		}
-		// A grid of dark lines, as on a canvas, which the glass bends at its rim, and which the
-		// white of the diagram stands out over.
 		line := ui.RGBA(6, 21, 24, 0.4)
-		for x := r.X + 8; x < r.X+r.W; x += 16 {
+		for x := r.X + cell/2; x < r.X+r.W; x += cell {
 			p.Line(x, r.Y, x, r.Y+r.H, 1.25, line)
 		}
-		for y := r.Y + 8; y < r.Y+r.H; y += 16 {
+		for y := r.Y + cell/2; y < r.Y+r.H; y += cell {
 			p.Line(r.X, y, r.X+r.W, y, 1.25, line)
 		}
 	}
-	draw := func(p *limumygo.Painter, it *scene.Item, s style.Resolved, next func()) {
-		var r ui.Rect
-		switch {
-		case it.Kind == scene.Node:
-			r = p.Rect(it.Box)
-		case it.Kind == scene.Text && it.Label != nil && !it.Label.Empty():
-			b := it.LabelBox()
-			r = p.Rect(scene.Rect{X: b.X - 8, Y: b.Y - 2, W: b.W + 16, H: b.H + 4})
-		default:
-			next()
-			return
-		}
-		// A box keeps its corners rounded as the glass's, and any other outline, as a
-		// stadium's, rounds them fully.
-		radius := r.H / 2
-		if len(it.Parts) > 0 && it.Parts[0].Path == nil {
-			radius = min(radius, p.Len(12))
-		}
-		glass.Paint(p.Painter, r, radius, glass.Glass{Style: glass.Clear})
-		p.Label(it, s)
+}
+
+// cardFont is the family the website's font is registered as.
+const cardFont = "Hanken Grotesk"
+
+// cardSource is the diagram a picture for links draws: how limu works, read from the
+// bottom up, as the bubbles it is drawn in rise.
+const cardSource = `flowchart BT
+  mermaid((Mermaid)) -->|layout| scene((Scene))
+  scene --> mygo((MyGo))
+  scene --> svg((SVG))`
+
+// water is the shader of the sea a picture for links is set in: light near the surface
+// and deep below, with shafts of light slanting down, and caustics, the net of light the
+// surface throws, which fade with depth.
+var water = shader.MustCompile(`package main
+
+var Time float
+
+// caustic is the brightness of the caustics at uv, at time t.
+func caustic(uv vec2, t float) float {
+	p := mod(uv*6.28318, 6.28318) - 250.0
+	i := p
+	c := 1.0
+	inten := 0.005
+	for n := 0; n < 5; n++ {
+		tt := t * (1.0 - 3.5/float(n+1))
+		i = p + vec2(cos(tt-i.x)+sin(tt+i.y), sin(tt-i.y)+cos(tt+i.x))
+		c += 1.0 / length(vec2(p.x/(sin(i.x+tt)/inten), p.y/(cos(i.y+tt)/inten)))
 	}
-	return look{ground: ground, opts: &limumygo.Options{Look: style.Look{Theme: &th}, Fonts: limumygo.DefaultFonts, Draw: draw}}
+	c /= 5.0
+	c = 1.17 - pow(c, 1.4)
+	return clamp(pow(abs(c), 8.0), 0.0, 1.0)
+}
+
+func Fragment(dst vec4, pos vec2) vec4 {
+	size := rectSize()
+	depth := pos.y / size.y
+	col := mix(vec3(0.20, 0.56, 0.62), vec3(0.08, 0.40, 0.49), smoothstep(0.0, 0.55, depth))
+	col = mix(col, vec3(0.03, 0.15, 0.24), smoothstep(0.45, 1.0, depth))
+	x := pos.x/size.y + depth*0.45
+	rays := 0.5 + 0.5*sin(x*7.0+4.0)*sin(x*3.1+0.4)
+	col += vec3(0.60, 0.90, 0.88) * pow(rays, 4.0) * 0.24 * (1.0 - smoothstep(0.0, 0.85, depth))
+	c := caustic(pos/size.y*2.4, Time)
+	col += vec3(0.75, 1.0, 0.95) * c * 0.30 * (1.0 - smoothstep(0.0, 0.42, depth))
+	return vec4(col, 1.0)
+}
+`)
+
+// bubble paints a bubble of clear glass over r, rounded by radius, with a glint of the
+// light above, up and to the left.
+func bubble(p *ui.Painter, r ui.Rect, radius float32) {
+	glass.Paint(p, r, radius, glass.Glass{Style: glass.Clear})
+	// The glint is the shadow of a dot far to the left, cast back, as for canvas's glows.
+	const away = 8000
+	g := min(r.W, r.H) * 0.16
+	p.Shadow(ui.Rect{X: r.X + r.W*0.24 - away, Y: r.Y + r.H*0.2, W: g, H: g}, g/2, away, 0, g*0.6, 0, ui.RGBA(255, 255, 255, 0.85))
+}
+
+// card draws the picture a link shows, w by h DIPs, under the sea: limu's name, what it is
+// and where it is on the left, and on the right how it works, in bubbles rising from limu
+// kohu, drawn with limu's mark, that grows from the floor. Its text is in the website's
+// font.
+func card(w, h int, mark *ui.SVG) *image.RGBA {
+	W, H := float32(w), float32(h)
+	k := H / 630 // what the sizes below, set for a picture 630 high, are multiplied by
+	fonts := limumygo.NewFonts(cardFont, "monospace")
+	sc, err := limu.Layout(cardSource, &layout.Options{Measurer: fonts, FontSize: float64(22 * k), KeepDirection: true})
+	if err != nil {
+		log.Fatal(err)
+	}
+	th := *style.Kohu()
+	th.Line = style.Hex("#ffffff")
+	th.Fg = style.Hex("#ffffff")
+	opts := &limumygo.Options{
+		Look: style.Look{Theme: &th, Overrides: style.Overrides{
+			"flowchart.edge": {StrokeWidth: style.N(float64(2 * k)), StrokeOpacity: style.N(0.75)},
+		}},
+		Fonts: fonts,
+		// Each node and edge label is a bubble.
+		Draw: func(p *limumygo.Painter, it *scene.Item, s style.Resolved, next func()) {
+			var r ui.Rect
+			switch {
+			case it.Kind == scene.Node:
+				r = p.Rect(it.Box)
+			case it.Kind == scene.Text && it.Label != nil && !it.Label.Empty():
+				b, em := it.LabelBox(), it.Label.Size
+				r = p.Rect(scene.Rect{X: b.X - em/2, Y: b.Y - em/8, W: b.W + em, H: b.H + em/4})
+			default:
+				next()
+				return
+			}
+			bubble(p.Painter, r, r.H/2)
+			p.Label(it, s)
+		},
+	}
+	white := ui.RGB(255, 255, 255)
+	return ui.Render(func(c *ui.Context) {
+		ui.Box(c).Size(W, H).Draw(func(p *ui.Painter, r ui.Rect) {
+			water.Draw(p, r, shader.Options{Uniforms: map[string]any{"Time": 4.2}})
+			// Limu kohu, the far ones in the water's color, and the near ones in limu's.
+			deep := ui.Hex("#0e3a4a")
+			for _, a := range []struct {
+				x, s, far float32
+				c         string
+			}{{0.62, 170, 0.55, "#b5435c"}, {0.98, 200, 0.5, "#c0668a"}, {0.88, 210, 0.3, "#b5435c"}, {0.76, 170, 0, "#a92e4a"}, {0.94, 150, 0, "#c0668a"}, {0.67, 120, 0.15, "#c0668a"}} {
+				s := a.s * k
+				p.Icon(mark, ui.Rect{X: r.X + a.x*W - s/2, Y: r.Y + H - s*0.92, W: s, H: s}, ui.Hex(a.c).Mix(deep, a.far))
+			}
+			// Small bubbles rising from the limu at 0.76 to the diagram's first, which stands
+			// over it.
+			for _, b := range []struct{ x, y, d float32 }{{0.764, 0.735, 7}, {0.758, 0.708, 10}} {
+				d := b.d * k
+				bubble(p, ui.Rect{X: r.X + b.x*W - d/2, Y: r.Y + b.y*H - d/2, W: d, H: d}, d/2)
+			}
+			limumygo.Paint(p, sc, r.X+0.76*W-float32(sc.Width)/2, r.Y+22*k, opts)
+			x := r.X + 80*k
+			p.RichText(x-6*k, r.Y+150*k, 0, ui.Span{Text: "limu", Font: cardFont, Size: 128 * k, Weight: 700, Color: white})
+			p.RichText(x, r.Y+330*k, 0,
+				ui.Span{Text: "A diagram layout engine in Go.\n", Font: cardFont, Size: 38 * k, Weight: 600, Color: white},
+				ui.Span{Text: "Drawn natively with MyGo, or as SVG.", Font: cardFont, Size: 38 * k, Weight: 400, Color: white.Alpha(0.85)})
+			p.RichText(x, r.Y+H-90*k, 0, ui.Span{Text: "limu.firede.com", Font: cardFont, Size: 26 * k, Weight: 500, Color: white.Alpha(0.8)})
+		})
+	}, w, h, 1)
 }
 
 // wireframe writes the scene as SVG with no style: each item's box dashed, its parts and

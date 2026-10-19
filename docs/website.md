@@ -72,6 +72,18 @@ document shows where a paragraph holds nothing but their images, as Architecture
 After the pictures come the code, a switch between MyGo and SVG with MyGo first, cards to
 the examples, the playground, Getting started and Theming, and a paragraph on limu and Pele.
 
+Given the website's font, Hanken Grotesk, as a TrueType file, the same program draws the
+picture a link shows, under the sea that limu is named for: water drawn by a shader of
+MyGo's, light near the surface, with shafts of light and the caustics the surface throws;
+limu kohu, drawn with limu's mark, growing from the floor; on the left limu's name, the
+lede's first sentence, a line on drawing with MyGo or as SVG, and the address; and on the
+right how limu works, Mermaid, layout, the scene, MyGo and SVG, laid out by limu from the
+bottom up and drawn as bubbles of clear glass, which rise from the limu and bend the light
+behind them. `og.png`, 1200 by 630, is every page's `og:image` and `twitter:image`, with a
+large card; `github.png`, 1280 by 640, is the repository's social preview, which GitHub
+takes only through its settings. The font is not in the repository: the program reads the
+file it is given, as Google Fonts serves it.
+
 The pictures drawn natively are rendered with `ui.Render`, as limumygo's tests render
 theirs, on a Mac, and committed: MyGo sets text with Pango on Linux, so CI would draw them
 otherwise.
