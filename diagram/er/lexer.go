@@ -32,6 +32,7 @@ const (
 	cAttrRest  = 8 // the others
 )
 
+// class is the class of each ASCII character, as Pele's CLASS.
 var class = func() (t [128]uint8) {
 	for c := 0; c < 128; c++ {
 		word := c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122 || c == 95
@@ -55,7 +56,8 @@ var class = func() (t [128]uint8) {
 }()
 
 // isAttr reports whether code unit c is of the attribute class kind. Mermaid's attribute
-// pattern is case-insensitive, which lets the micro sign into its À-￿ range.
+// pattern is case-insensitive, which lets the micro sign into its À-￿ range. It is Pele's
+// isAttr.
 func isAttr(c, kind int) bool {
 	if c < 0 {
 		return false
@@ -66,11 +68,13 @@ func isAttr(c, kind int) bool {
 	return c >= 0xc0 || c == 0xb5
 }
 
-// isClass reports whether c is of the class kind, any character past ASCII being of it.
+// isClass reports whether c is of the class kind, any character past ASCII being of it. It is
+// the test `c >= 128 || (CLASS[c] & kind) !== 0` that Pele's tokenize writes out in place.
 func isClass(c, kind int) bool {
 	return c >= 128 || c >= 0 && int(class[c])&kind != 0
 }
 
+// directionNames are the names after `direction` in Pele's RE_DIRECTION, in its order.
 var directionNames = [4]string{"TB", "BT", "RL", "LR"}
 
 // lexer is the state of Pele's tokenize.
@@ -167,14 +171,19 @@ func tokenize(src string) []tok {
 	return append(l.toks, tok{t_END, "", l.n})
 }
 
+// emit appends a token of type typ for the text from s to e and moves the lexer to e, as the
+// emit of Pele's tokenize does.
 func (l *lexer) emit(typ token, s, e int) {
 	l.toks = append(l.toks, tok{typ, l.src[s:e], s})
 	l.p = e
 }
 
+// unit is the code unit at byte q, or -1 past the end: Pele's src.charCodeAt(q), whose NaN
+// past the end matches nothing.
 func (l *lexer) unit(q int) int { return chars.Unit(l.src, q) }
 
-// indexOr is the first b at or after q, or or.
+// indexOr is the first b at or after q, or or: Pele's src.indexOf(b, q), with what Pele puts
+// in place of -1.
 func (l *lexer) indexOr(q int, b byte, or int) int {
 	if i := strings.IndexByte(l.src[q:], b); i >= 0 {
 		return q + i
@@ -182,7 +191,8 @@ func (l *lexer) indexOr(q int, b byte, or int) int {
 	return or
 }
 
-// run is the end of the run of characters of class kind that starts at q.
+// run is the end of the run of characters of class kind that starts at q, as the loops of
+// Pele's tokenize that read UNICODE_TEXT and STYLE_TEXT find it.
 func (l *lexer) run(q, kind int) int {
 	for q < l.n {
 		c, size := chars.UnitAt(l.src, q)
@@ -194,7 +204,7 @@ func (l *lexer) run(q, kind int) int {
 	return q
 }
 
-// kw matches a lower-case keyword at p, ignoring case.
+// kw matches a lower-case keyword at p, ignoring case, as the kw of Pele's tokenize does.
 func (l *lexer) kw(word string) bool {
 	if l.p+len(word) > l.n {
 		return false
@@ -208,12 +218,14 @@ func (l *lexer) kw(word string) bool {
 	return true
 }
 
-// kwb matches a keyword at p that no word character follows.
+// kwb matches a keyword at p that no word character follows, as the kwb of Pele's tokenize
+// does.
 func (l *lexer) kwb(word string) bool {
 	return l.kw(word) && !chars.IsWord(l.unit(l.p+len(word)))
 }
 
-// lower is the code unit at q, lowered if it is an ASCII capital.
+// lower is the code unit at q, lowered if it is an ASCII capital, as the lower of Pele's
+// tokenize gives it.
 func (l *lexer) lower(q int) int {
 	c := l.unit(q)
 	if c >= 'A' && c <= 'Z' {
@@ -222,7 +234,8 @@ func (l *lexer) lower(q int) int {
 	return c
 }
 
-// nextLineEnd is the first line terminator at or after q, or the end.
+// nextLineEnd is the first line terminator at or after q, or the end, as the nextLineEnd of
+// Pele's tokenize finds it with RE_LINE_END.
 func (l *lexer) nextLineEnd(q int) int {
 	for q < l.n {
 		c, size := chars.UnitAt(l.src, q)
@@ -234,6 +247,8 @@ func (l *lexer) nextLineEnd(q int) int {
 	return l.n
 }
 
+// digits is the end of the run of ASCII digits from q, as the digits of Pele's tokenize gives
+// it.
 func (l *lexer) digits(q int) int {
 	for q < l.n && chars.IsDigit(int(l.src[q])) {
 		q++
@@ -241,7 +256,8 @@ func (l *lexer) digits(q int) int {
 	return q
 }
 
-// indexFold is the first "direction" at or after q, its case ignored: /direction/gi.
+// indexFold is the first "direction" at or after q, its case ignored: /direction/gi, Pele's
+// RE_DIR_WORD, as the direction of Pele's tokenize searches with it.
 func (l *lexer) indexFold(q int) int {
 	for ; q+9 <= l.n; q++ {
 		if l.src[q]|32 == 'd' && chars.HasPrefixFold(l.src[q:], "direction") {
@@ -252,7 +268,8 @@ func (l *lexer) indexFold(q int) int {
 }
 
 // wordFold matches /<word>\s*:\s*/iy at q, or with open for the colon; it gives the end of
-// the match or -1.
+// the match or -1. It reads Pele's RE_ACC_TITLE, RE_ACC_DESCR and RE_ACC_DESCR_ML, as the at
+// of Pele's tokenize matches them.
 func (l *lexer) wordFold(q int, word string, sep byte) int {
 	if !chars.HasPrefixFold(l.src[q:], word) {
 		return -1
@@ -266,7 +283,8 @@ func (l *lexer) wordFold(q int, word string, sep byte) int {
 
 // directionAt matches /.*direction\s+<name>[^\n]*/iy at q: the last `direction` on the line
 // that white space and the name follow, and the rest of the line its match ends on. The
-// white space may run onto further lines.
+// white space may run onto further lines. It is one of Pele's RE_DIRECTION, written out with
+// the backtracking it does.
 func (l *lexer) directionAt(q int, name string) int {
 	end := l.nextLineEnd(q)
 	for x := end - 1; x >= q; x-- {
@@ -283,7 +301,7 @@ func (l *lexer) directionAt(q int, name string) int {
 }
 
 // direction lexes a direction statement, which swallows its whole line from wherever the
-// lexer stands on it.
+// lexer stands on it, as the direction of Pele's tokenize does.
 func (l *lexer) direction() bool {
 	if l.dirNext == -1 {
 		return false
@@ -313,6 +331,9 @@ func (l *lexer) direction() bool {
 	return false
 }
 
+// quoted lexes a double quote at p, as the quoted of Pele's tokenize does: an ENTITY_NAME
+// through the next quote when the text between is not empty and holds none of % \ \r \n \v
+// \b, a WORD through it when it does, and a CHAR when no quote closes it.
 func (l *lexer) quoted() {
 	p := l.p
 	e := strings.IndexByte(l.src[p+1:], '"')
@@ -335,6 +356,8 @@ func (l *lexer) quoted() {
 	}
 }
 
+// number lexes what starts with the digit c at p, as the number of Pele's tokenize does: the
+// cardinalities 1+ and 0+, a DECIMAL_NUM, a 1 that is a cardinality, or a NUM.
 func (l *lexer) number(c int) {
 	p := l.p
 	d, dsize := chars.UnitAt(l.src, p+1)
@@ -372,6 +395,8 @@ func (l *lexer) number(c int) {
 	l.emit(t_NUM, p, q)
 }
 
+// keyword lexes a keyword, a cardinality or a relationship mark at p, whose first code unit
+// lowered is lc, and reports whether it found one, as the keyword of Pele's tokenize does.
 func (l *lexer) keyword(lc int) bool {
 	p := l.p
 	d := l.unit(p + 1)
@@ -491,6 +516,8 @@ func (l *lexer) keyword(lc int) bool {
 	return true
 }
 
+// initial lexes one token in the INITIAL state from code unit c, size bytes long, at p, as
+// the initial of Pele's tokenize does.
 func (l *lexer) initial(c, size int) {
 	p := l.p
 	if (c == 'a' || c == 'A') && l.kw("acc") {
@@ -574,7 +601,7 @@ func (l *lexer) initial(c, size int) {
 }
 
 // generic lexes Mermaid's generic type rule: a run of non-space characters holding a `~`,
-// through the last `~` on the line.
+// through the last `~` on the line, as the generic of Pele's tokenize does.
 func (l *lexer) generic() bool {
 	if l.tildeNext == -1 {
 		return false
@@ -602,7 +629,8 @@ func (l *lexer) generic() bool {
 	return true
 }
 
-// spaceNext is the first white space at or after q, or the end.
+// spaceNext is the first white space at or after q, or the end, as the loops in the generic
+// of Pele's tokenize find it.
 func (l *lexer) spaceNext(q int) int {
 	for q < l.n {
 		c, size := chars.UnitAt(l.src, q)
@@ -614,6 +642,8 @@ func (l *lexer) spaceNext(q int) int {
 	return q
 }
 
+// block lexes one token in an entity's block of attributes from code unit c, size bytes long,
+// at p, as the block of Pele's tokenize does.
 func (l *lexer) block(c, size int) {
 	p := l.p
 	if chars.IsSpace(c) {

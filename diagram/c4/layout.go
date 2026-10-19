@@ -100,6 +100,8 @@ type labeler struct {
 	icons   func(string) bool
 }
 
+// label lays out one label, as Pele's layoutLabel does when given the measurer, here with
+// the icons of the options too.
 func (l labeler) label(raw string, size, maxWidth float64, face text.Face) text.Label {
 	return text.Layout(raw, text.Options{Measurer: l.measure, Size: size, MaxWidth: maxWidth, Bounded: true, Face: face, Icons: l.icons})
 }
@@ -255,6 +257,8 @@ func layoutC4(db *DB, l labeler, size, small float64, tight bool, room, gap floa
 		if tight {
 			columnGap = gap
 		}
+		// count is how many boxes go in a row: limit, or when tight as many of the widest box
+		// as fit room, as the count of Pele's layoutC4 gives it.
 		count := func(boxes []*box, limit, gap float64) float64 {
 			if !tight {
 				return limit

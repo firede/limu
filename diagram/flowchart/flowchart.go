@@ -22,6 +22,8 @@ func Parse(source string, config diagram.Config, title string, lineOffset int, l
 }
 
 // ParsePrepared parses a prepared flowchart.
+// It is limu's own: it hands Parse what Pele's caller hands the parse of its flowchart
+// diagram.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
 	return Parse(p.Source(false), p.Config, p.Title, p.LineOffset, p.Limits)
 }

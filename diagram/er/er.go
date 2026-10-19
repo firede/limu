@@ -20,7 +20,8 @@ func Parse(source, title string) (*DB, error) {
 	return db, nil
 }
 
-// ParsePrepared parses a prepared ER diagram.
+// ParsePrepared parses a prepared ER diagram: Parse of the source and title that Pele's
+// parseSource hands the parse of its er diagram.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
 	return Parse(p.Source(false), p.Title)
 }

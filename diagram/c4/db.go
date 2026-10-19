@@ -84,13 +84,15 @@ type Rel struct {
 	defined uint32
 }
 
-// Defined reports whether the field of the name Pele gives it, as "descr", is defined.
+// Defined reports whether the field of the name Pele gives it, as "descr", is defined. Pele
+// has no such method: its fields are left undefined, and this reads what that tells.
 func (e *Element) Defined(field string) bool {
 	_, bit := e.field(field)
 	return bit != 0 && e.defined&bit != 0
 }
 
-// Defined reports whether the field of the name Pele gives it, as "techn", is defined.
+// Defined reports whether the field of the name Pele gives it, as "techn", is defined, as
+// Element's Defined does for a relation.
 func (r *Rel) Defined(field string) bool {
 	_, bit := r.field(field)
 	switch field {
@@ -103,7 +105,8 @@ func (r *Rel) Defined(field string) bool {
 }
 
 // field is the field of an element of the name, and its bit, as ELEMENT_FIELDS lists them; a
-// label has no bit, as it is always defined. nil for a name not in the list.
+// label has no bit, as it is always defined. nil for a name not in the list. It stands for
+// the lookup of Pele's named in ELEMENT_FIELDS and for its assigning a field by name.
 func (e *Element) field(name string) (*string, uint32) {
 	switch name {
 	case "label":
@@ -138,7 +141,8 @@ func (e *Element) field(name string) (*string, uint32) {
 	return nil, 0
 }
 
-// field is the field of a relation of the name, and its bit, as REL_FIELDS lists them.
+// field is the field of a relation of the name, and its bit, as REL_FIELDS lists them. It
+// stands for the lookup of Pele's named in REL_FIELDS and for its assigning a field by name.
 func (r *Rel) field(name string) (*string, uint32) {
 	switch name {
 	case "label":
@@ -169,6 +173,9 @@ type target interface {
 	extra() *[]Named
 }
 
+// define, isDefined and extra let an element and a relation be a target: they mark a field
+// defined, tell whether it is, and give the list of other named arguments, which Pele keeps
+// in the Map extra. Pele has no such methods, as its fields are left undefined.
 func (e *Element) define(bit uint32)         { e.defined |= bit }
 func (e *Element) isDefined(bit uint32) bool { return e.defined&bit != 0 }
 func (e *Element) extra() *[]Named           { return &e.Extra }
@@ -176,7 +183,7 @@ func (r *Rel) define(bit uint32)             { r.defined |= bit }
 func (r *Rel) isDefined(bit uint32) bool     { return r.defined&bit != 0 }
 func (r *Rel) extra() *[]Named               { return &r.Extra }
 
-// set sets the field of the name.
+// set sets the field of the name, as Pele's put and named do in assigning it.
 func set(t target, name, value string) {
 	f, bit := t.field(name)
 	*f = value
@@ -184,7 +191,7 @@ func set(t target, name, value string) {
 }
 
 // setExtra keeps a named argument that sets no known field, as a Map keeps a key: where it
-// was first set.
+// was first set. It is the `(target.extra ??= new Map()).set(key, value)` of Pele's named.
 func setExtra(t target, key, value string) {
 	list := t.extra()
 	for i := range *list {
@@ -197,6 +204,7 @@ func setExtra(t target, key, value string) {
 }
 
 // parseInt is JavaScript's parseInt with no radix: in base 16 after 0x, in base 10 otherwise.
+// Pele's named, updateRelStyle and updateLayoutConfig call it.
 func parseInt(s string) float64 {
 	t := chars.TrimStart(s)
 	body := t
@@ -257,7 +265,8 @@ func putText(t target, field string, a attr, has bool) {
 	put(t, field, a, true)
 }
 
-// arg is the argument at index i, and whether there is one.
+// arg is the argument at index i, and whether there is one: Pele's attrs[i], which is
+// undefined past the end.
 func arg(attrs []attr, i int) (attr, bool) {
 	if i < len(attrs) {
 		return attrs[i], true
@@ -307,6 +316,8 @@ type DB struct {
 	stack         []*Boundary
 }
 
+// newDB makes an empty model, as Pele's C4Db is made: the unnamed top-level boundary is
+// current, and four shapes and two boundaries go in a row.
 func newDB() *DB {
 	global := &Boundary{Element: Element{Alias: "global", Label: "global", Type: "global", defined: fType}}
 	return &DB{
@@ -320,11 +331,14 @@ func newDB() *DB {
 	}
 }
 
+// setTitle sets the title, as Pele's setTitle does.
 func (db *DB) setTitle(title string) {
 	db.Title = title
 	db.HasTitle = true
 }
 
+// setAccDescription sets the accessible description with the indents after its line breaks
+// taken out, as Pele's setAccDescription does.
 func (db *DB) setAccDescription(descr string) {
 	db.AccDescr = chars.DropIndents(descr)
 	db.HasAccDescr = true
@@ -354,10 +368,13 @@ func element[E any](list *[]*E, index map[string]*E, base func(*E) *Element, ali
 	return el
 }
 
+// shapeBase and boundaryBase give the element a shape or a boundary holds, for element. They
+// are limu's own: Pele's element works on the element itself.
 func shapeBase(s *Shape) *Element       { return &s.Element }
 func boundaryBase(b *Boundary) *Element { return &b.Element }
 
-// addPersonOrSystem: alias, label, ?descr, ?sprite, ?tags, $link.
+// addPersonOrSystem: alias, label, ?descr, ?sprite, ?tags, $link. It adds or updates a
+// person or a system, as Pele's addPersonOrSystem does.
 func (db *DB) addPersonOrSystem(kind string, attrs []attr) {
 	title, has := arg(attrs, 1)
 	shape := element(&db.Shapes, db.shapeIndex, shapeBase, attrs[0], title, has)
@@ -366,7 +383,8 @@ func (db *DB) addPersonOrSystem(kind string, attrs []attr) {
 	db.finishShape(shape, kind, attrs, 3)
 }
 
-// addContainer: alias, label, ?techn, ?descr, ?sprite, ?tags, $link.
+// addContainer: alias, label, ?techn, ?descr, ?sprite, ?tags, $link. It adds or updates a
+// container, as Pele's addContainer does.
 func (db *DB) addContainer(kind string, attrs []attr) {
 	title, has := arg(attrs, 1)
 	shape := element(&db.Shapes, db.shapeIndex, shapeBase, attrs[0], title, has)
@@ -377,8 +395,12 @@ func (db *DB) addContainer(kind string, attrs []attr) {
 	db.finishShape(shape, kind, attrs, 4)
 }
 
+// addComponent adds or updates a component, which takes the arguments of a container, as
+// Pele's addComponent does.
 func (db *DB) addComponent(kind string, attrs []attr) { db.addContainer(kind, attrs) }
 
+// finishShape fills a shape's sprite, tags and link from the arguments at index at and on,
+// and gives it its kind and the current boundary as parent, as Pele's finishShape does.
 func (db *DB) finishShape(shape *Shape, kind string, attrs []attr, at int) {
 	for k, field := range [...]string{"sprite", "tags", "link"} {
 		a, has := arg(attrs, at+k)
@@ -388,6 +410,8 @@ func (db *DB) finishShape(shape *Shape, kind string, attrs []attr, at int) {
 	shape.Parent = db.current
 }
 
+// boundary finds or makes the boundary of the arguments' alias, sets its label, and its type
+// from the third argument or fallback when there is none, as Pele's boundary does.
 func (db *DB) boundary(attrs []attr, fallback string) *Boundary {
 	title, has := arg(attrs, 1)
 	b := element(&db.Boundaries, db.boundaryIndex, boundaryBase, attrs[0], title, has)
@@ -399,13 +423,16 @@ func (db *DB) boundary(attrs []attr, fallback string) *Boundary {
 	return b
 }
 
+// open makes a boundary a child of the current one and the current one in its place, until
+// popBoundaryParseStack, as Pele's open does.
 func (db *DB) open(b *Boundary) {
 	b.Parent = db.current
 	db.stack = append(db.stack, db.current)
 	db.current = b
 }
 
-// addPersonOrSystemBoundary: alias, label, ?type, ?tags, $link.
+// addPersonOrSystemBoundary: alias, label, ?type, ?tags, $link. It adds or updates a
+// boundary and opens it, as Pele's addPersonOrSystemBoundary does.
 func (db *DB) addPersonOrSystemBoundary(attrs []attr, fallback string) {
 	b := db.boundary(attrs, fallback)
 	a, has := arg(attrs, 3)
@@ -415,9 +442,12 @@ func (db *DB) addPersonOrSystemBoundary(attrs []attr, fallback string) {
 	db.open(b)
 }
 
+// addContainerBoundary adds or updates a boundary whose type is "container" when none is
+// given, and opens it, as Pele's addContainerBoundary does.
 func (db *DB) addContainerBoundary(attrs []attr) { db.addPersonOrSystemBoundary(attrs, "container") }
 
-// addDeploymentNode: alias, label, ?type, ?descr, ?sprite, ?tags, $link.
+// addDeploymentNode: alias, label, ?type, ?descr, ?sprite, ?tags, $link. It adds or
+// updates a deployment node and opens it, as Pele's addDeploymentNode does.
 func (db *DB) addDeploymentNode(nodeType string, attrs []attr) {
 	b := db.boundary(attrs, "node")
 	a, has := arg(attrs, 3)
@@ -430,6 +460,8 @@ func (db *DB) addDeploymentNode(nodeType string, attrs []attr) {
 	db.open(b)
 }
 
+// popBoundaryParseStack makes the boundary that was current before the last one opened
+// current again, or the top level when none is open, as Pele's popBoundaryParseStack does.
 func (db *DB) popBoundaryParseStack() {
 	if n := len(db.stack); n > 0 {
 		db.current = db.stack[n-1]
@@ -439,7 +471,8 @@ func (db *DB) popBoundaryParseStack() {
 	}
 }
 
-// addRel: from, to, label, ?techn, ?descr, ?sprite, ?tags, $link.
+// addRel: from, to, label, ?techn, ?descr, ?sprite, ?tags, $link. It adds a relation, or
+// updates the one already between the same two aliases, as Pele's addRel does.
 func (db *DB) addRel(typ string, attrs []attr) {
 	if len(attrs) < 3 {
 		return
@@ -497,7 +530,8 @@ func (db *DB) getC4Shape(alias string) *Element {
 }
 
 // updateElStyle: elementName, ?bgColor, ?fontColor, ?borderColor, ?shadowing, ?shape,
-// ?sprite, ?techn, ?legendText, ?legendSprite.
+// ?sprite, ?techn, ?legendText, ?legendSprite. It restyles a shape or a boundary, as Pele's
+// updateElStyle does.
 func (db *DB) updateElStyle(attrs []attr) {
 	if attrs[0].named {
 		return
@@ -512,7 +546,8 @@ func (db *DB) updateElStyle(attrs []attr) {
 	}
 }
 
-// updateRelStyle: from, to, ?textColor, ?lineColor, ?offsetX, ?offsetY.
+// updateRelStyle: from, to, ?textColor, ?lineColor, ?offsetX, ?offsetY. It restyles the
+// relation between two aliases, as Pele's updateRelStyle does.
 func (db *DB) updateRelStyle(attrs []attr) {
 	from, _ := arg(attrs, 0)
 	to, hasTo := arg(attrs, 1)
@@ -542,7 +577,8 @@ func (db *DB) updateRelStyle(attrs []attr) {
 }
 
 // updateLayoutConfig: ?c4ShapeInRow, ?c4BoundaryInRow. As in Mermaid, the slot decides which
-// one a value sets, not its name.
+// one a value sets, not its name. It sets how many shapes and boundaries go in a row, as
+// Pele's updateLayoutConfig does.
 func (db *DB) updateLayoutConfig(attrs []attr) {
 	count := func(i int) float64 {
 		a, has := arg(attrs, i)

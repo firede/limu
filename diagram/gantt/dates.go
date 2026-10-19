@@ -35,10 +35,10 @@ type unit string
 // zone does the date arithmetic of a chart in its time zone.
 type zone struct{ jsdate.Zone }
 
-// numStr is JavaScript's String() of a number.
+// numStr is JavaScript's String() of a number, which Pele calls throughout dates.ts and axis.ts.
 func numStr(v float64) string { return chars.NumberString(v) }
 
-// pad is dates.ts's pad: String(value), with zeros before it to length.
+// pad is Pele's pad: String(value), with zeros before it to length.
 func pad(value float64, length int) string {
 	s := numStr(value)
 	if n := chars.Len16(s); n < length {
@@ -47,7 +47,7 @@ func pad(value float64, length int) string {
 	return s
 }
 
-// ordinal is dates.ts's ordinal.
+// ordinal is Pele's ordinal: n with its English ordinal suffix, as Do writes a day.
 func ordinal(n float64) string {
 	s := [...]string{"th", "st", "nd", "rd"}
 	v := math.Mod(n, 100)
@@ -60,7 +60,7 @@ func ordinal(n float64) string {
 	return numStr(n) + suffix
 }
 
-// utcOffset is dates.ts's utcOffset: minutes ahead of UTC, rounded to a quarter of an hour.
+// utcOffset is Pele's utcOffset: minutes ahead of UTC, rounded to a quarter of an hour.
 func (z zone) utcOffset(date float64) float64 {
 	offset := -jsmath.Round(z.TimezoneOffset(date)/15) * 15
 	if offset == 0 {
@@ -69,7 +69,7 @@ func (z zone) utcOffset(date float64) float64 {
 	return offset
 }
 
-// offsetString is dates.ts's zone: the UTC offset as +hh:mm.
+// offsetString is Pele's zone: the UTC offset as +hh:mm.
 func (z zone) offsetString(date float64) string {
 	offset := z.utcOffset(date)
 	minutes := math.Abs(offset)
@@ -80,7 +80,7 @@ func (z zone) offsetString(date float64) string {
 	return sign + pad(math.Floor(minutes/60), 2) + ":" + pad(math.Mod(minutes, 60), 2)
 }
 
-// isoWeekday is dates.ts's isoWeekday: getDay() || 7.
+// isoWeekday is Pele's isoWeekday: getDay() || 7.
 func (z zone) isoWeekday(date float64) float64 {
 	d := z.Day(date)
 	if d == 0 || math.IsNaN(d) {
@@ -89,19 +89,19 @@ func (z zone) isoWeekday(date float64) float64 {
 	return d
 }
 
-// addDays is dates.ts's addDays.
+// addDays is Pele's addDays: the date days later on the calendar, at the same time of day.
 func (z zone) addDays(date, days float64) float64 {
 	return z.SetDate(date, z.Date(date)+days)
 }
 
-// daysInMonth is dates.ts's daysInMonth.
+// daysInMonth is Pele's daysInMonth: the number of days in the month of date.
 func (z zone) daysInMonth(date float64) float64 {
 	last := z.New(z.FullYear(date), z.Month(date)+1, 0, 0, 0, 0, 0)
 	last = z.SetHours(last, 23, 59, 59, 999)
 	return z.Date(last)
 }
 
-// setCalendar is dates.ts's setCalendar: it sets the month or the year with apply, keeping
+// setCalendar is Pele's setCalendar: it sets the month or the year with apply, keeping
 // the day of the month unless the new month is shorter.
 func (z zone) setCalendar(date float64, apply func(d float64) float64) float64 {
 	next := z.SetDate(date, 1)
@@ -109,7 +109,8 @@ func (z zone) setCalendar(date float64, apply func(d float64) float64) float64 {
 	return z.SetDate(next, min(z.Date(date), z.daysInMonth(next)))
 }
 
-// add is dates.ts's add.
+// add is Pele's add: the date amount units later, months and years by the calendar, days
+// and weeks rounded to whole days, and smaller units by the clock.
 func (z zone) add(date, amount float64, u unit) float64 {
 	switch u {
 	case "M":
@@ -130,12 +131,12 @@ func (z zone) add(date, amount float64, u unit) float64 {
 	return jsdate.TimeClip(date + amount)
 }
 
-// weekThursday is dates.ts's weekThursday.
+// weekThursday is Pele's weekThursday: the Thursday of the ISO week date is in.
 func (z zone) weekThursday(date float64) float64 {
 	return z.addDays(date, 4-z.isoWeekday(date))
 }
 
-// isoWeek is dates.ts's isoWeek.
+// isoWeek is Pele's isoWeek: the number of the ISO week date is in.
 func (z zone) isoWeek(date float64) float64 {
 	thursday := z.weekThursday(date)
 	jan1 := z.New(z.FullYear(thursday), 0, 1, 0, 0, 0, 0)
@@ -159,7 +160,8 @@ func (z zone) isoWeek(date float64) float64 {
 
 const defaultFormat = "YYYY-MM-DDTHH:mm:ssZ"
 
-// bracketAt is the length of `\[([^\]]+)]` at byte i of s, or 0.
+// bracketAt is the length of `\[([^\]]+)]` at byte i of s, or 0: the first alternative of
+// Pele's RE_ADVANCED and RE_FORMAT, and its RE_LITERAL.
 func bracketAt(s string, i int) int {
 	if s[i] != '[' {
 		return 0
@@ -171,7 +173,8 @@ func bracketAt(s string, i int) int {
 	return j + 2
 }
 
-// run is the number of bytes of c at i of s, up to most.
+// run is the number of bytes of c at i of s, up to most. Pele has no such function; it is a
+// helper of the regular expressions written out here.
 func run(s string, i int, c byte, most int) int {
 	n := 0
 	for n < most && i+n < len(s) && s[i+n] == c {
@@ -182,6 +185,7 @@ func run(s string, i int, c byte, most int) int {
 
 // advancedAt is the length of a match of
 // /\[([^\]]+)]|Q|wo|ww|w|WW|W|zzz|z|gggg|GGGG|Do|X|x|k{1,2}|S/ at i, or 0.
+// It is Pele's RE_ADVANCED, written out by hand.
 func advancedAt(s string, i int) int {
 	if n := bracketAt(s, i); n > 0 {
 		return n
@@ -203,7 +207,7 @@ func advancedAt(s string, i int) int {
 
 // formatAt is the length of a match of
 // /\[([^\]]+)]|YYYY|YY|M{1,4}|D{1,2}|d{1,4}|H{1,2}|h{1,2}|a|A|m{1,2}|s{1,2}|Z{1,2}|SSS/ at
-// i, or 0.
+// i, or 0. It is Pele's RE_FORMAT, written out by hand.
 func formatAt(s string, i int) int {
 	if n := bracketAt(s, i); n > 0 {
 		return n
@@ -230,7 +234,8 @@ func formatAt(s string, i int) int {
 }
 
 // replaceAll is a global replace with a regular expression whose matches at is: each match,
-// leftmost first, is replaced with what repl gives for it.
+// leftmost first, is replaced with what repl gives for it. It is String.prototype.replace
+// with a global regular expression and a function, as Pele's format and compile call it.
 func replaceAll(s string, at func(s string, i int) int, repl func(match string) string) string {
 	var b strings.Builder
 	b.Grow(len(s))
@@ -256,7 +261,7 @@ func replaceAll(s string, at func(s string, i int) int, repl func(match string) 
 	return b.String()
 }
 
-// format is dates.ts's format. It reports false for the week-of-year and time zone name
+// format is Pele's format. It reports false for the week-of-year and time zone name
 // tokens, which need dayjs plugins Mermaid does not load and so fail there.
 func (z zone) format(date float64, template string) (string, bool) {
 	if !jsdate.Valid(date) {
@@ -364,7 +369,7 @@ func (z zone) format(date float64, template string) (string, bool) {
 	}), true
 }
 
-// orZero is x || or: or in place of 0 or NaN.
+// orZero is x || or: or in place of 0 or NaN, as Pele writes `|| 12`, `|| 7` and `|| 24`.
 func orZero(x, or float64) float64 {
 	if x == 0 || math.IsNaN(x) {
 		return or
@@ -372,7 +377,8 @@ func orZero(x, or float64) float64 {
 	return x
 }
 
-// sliceLast16 is s.slice(-n) for a string of ASCII.
+// sliceLast16 is s.slice(-n) for a string of ASCII, as Pele's format takes the last two
+// digits of a year for YY.
 func sliceLast16(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -380,7 +386,7 @@ func sliceLast16(s string, n int) string {
 	return s[len(s)-n:]
 }
 
-// isoDate is dates.ts's isoDate: the date as YYYY-MM-DD.
+// isoDate is Pele's isoDate: the date as YYYY-MM-DD.
 func (z zone) isoDate(date float64) string {
 	year, month, day := z.FullYear(date), z.Month(date)+1, z.Date(date)
 	var b strings.Builder
@@ -417,12 +423,14 @@ type opt struct {
 	set bool
 }
 
+// some is a number that is set, as Pele's readers assign a field of Fields.
 func some(v float64) opt { return opt{v, true} }
 
-// truthy is the field's truth in JavaScript: set, and neither 0 nor NaN.
+// truthy is the field's truth in JavaScript: set, and neither 0 nor NaN, as Pele's loose tests
+// a field.
 func (o opt) truthy() bool { return o.set && o.v != 0 && !math.IsNaN(o.v) }
 
-// or is the field || d.
+// or is the field || d, as Pele's loose defaults a field.
 func (o opt) or(d float64) float64 {
 	if o.truthy() {
 		return o.v
@@ -430,14 +438,16 @@ func (o opt) or(d float64) float64 {
 	return d
 }
 
-// A matcher finds a match of one of dates.ts's MATCH_ patterns in s, as exec does: the
+// A matcher finds a match of one of Pele's MATCH_ patterns in s, as exec does: the
 // first place it matches at, and the match.
 type matcher func(s []uint16) (match []uint16, ok bool)
 
+// isDigit16 reports whether code unit c is matched by \d, as Pele's MATCH_ patterns use it.
 func isDigit16(c uint16) bool { return c >= '0' && c <= '9' }
 
 // search is an unanchored search for a pattern that matches at i with the length at gives,
-// or -1.
+// or -1. It is RegExp.prototype.exec of a pattern without the y or g flag, as Pele's loose
+// executes its MATCH_ patterns.
 func search(s []uint16, at func(s []uint16, i int) int) ([]uint16, bool) {
 	for i := 0; i < len(s); i++ {
 		if n := at(s, i); n >= 0 {
@@ -447,7 +457,7 @@ func search(s []uint16, at func(s []uint16, i int) int) ([]uint16, bool) {
 	return nil, false
 }
 
-// digits matches \d{n}.
+// digits matches \d{n}: Pele's MATCH_1, MATCH_2, MATCH_3 and MATCH_4.
 func digits(n int) matcher {
 	return func(s []uint16) ([]uint16, bool) {
 		return search(s, func(s []uint16, i int) int {
@@ -461,7 +471,7 @@ func digits(n int) matcher {
 	}
 }
 
-// oneOrTwo matches \d\d?.
+// oneOrTwo matches \d\d?, Pele's MATCH_1_TO_2.
 func oneOrTwo(s []uint16) ([]uint16, bool) {
 	return search(s, func(s []uint16, i int) int {
 		if !isDigit16(s[i]) {
@@ -474,7 +484,7 @@ func oneOrTwo(s []uint16) ([]uint16, bool) {
 	})
 }
 
-// signed matches [+-]?\d+.
+// signed matches [+-]?\d+, Pele's MATCH_SIGNED.
 func signed(s []uint16) ([]uint16, bool) {
 	return search(s, func(s []uint16, i int) int {
 		j := i
@@ -492,7 +502,7 @@ func signed(s []uint16) ([]uint16, bool) {
 	})
 }
 
-// offsetMatch matches [+-]\d\d:?(\d\d)?|Z.
+// offsetMatch matches [+-]\d\d:?(\d\d)?|Z, Pele's MATCH_OFFSET.
 func offsetMatch(s []uint16) ([]uint16, bool) {
 	return search(s, func(s []uint16, i int) int {
 		if (s[i] == '+' || s[i] == '-') && i+2 < len(s) && isDigit16(s[i+1]) && isDigit16(s[i+2]) {
@@ -512,7 +522,7 @@ func offsetMatch(s []uint16) ([]uint16, bool) {
 	})
 }
 
-// isWordUnit is [^-_:/,()\s\d].
+// isWordUnit is [^-_:/,()\s\d], the class of Pele's MATCH_WORD.
 func isWordUnit(c uint16) bool {
 	switch c {
 	case '-', '_', ':', '/', ',', '(', ')':
@@ -521,7 +531,7 @@ func isWordUnit(c uint16) bool {
 	return !isDigit16(c) && !chars.IsSpace(int(c))
 }
 
-// word matches \d*[^-_:/,()\s\d]+.
+// word matches \d*[^-_:/,()\s\d]+, Pele's MATCH_WORD.
 func word(s []uint16) ([]uint16, bool) {
 	return search(s, func(s []uint16, i int) int {
 		j := i
@@ -548,8 +558,11 @@ type step struct {
 	read    reader
 }
 
+// number is JavaScript's Number() of a string, as Pele's readers take +input.
 func number(s string) float64 { return chars.Number(s) }
 
+// field is Pele's field: a reader that stores the number its input is in one field, which
+// set names.
 func field(set func(f *fields, v float64)) reader {
 	return func(f *fields, input string) bool {
 		set(f, number(input))
@@ -557,6 +570,8 @@ func field(set func(f *fields, v float64)) reader {
 	}
 }
 
+// readOffset is Pele's readOffset: it reads a UTC offset, Z or [+-]hh[:mm], as the minutes
+// to add to the time to reach UTC.
 func readOffset(f *fields, input string) bool {
 	if input == "Z" {
 		f.offset = some(0)
@@ -591,6 +606,8 @@ func readOffset(f *fields, input string) bool {
 	return true
 }
 
+// monthName is Pele's monthName: a reader of a month by its name in names, which fails for
+// a name not among them.
 func monthName(names []string) reader {
 	return func(f *fields, input string) bool {
 		index := -1
@@ -656,8 +673,8 @@ var readers = map[string]step{
 	"ZZ":   {match: offsetMatch, read: readOffset},
 }
 
-// readOrdinal reads Do. dayjs keeps the digits as a string here, so even "0" counts as a day
-// having been given.
+// readOrdinal reads Do, as the reader of Pele's READERS for Do does. dayjs keeps the digits
+// as a string here, so even "0" counts as a day having been given.
 func readOrdinal(f *fields, input string) bool {
 	i := strings.IndexFunc(input, func(r rune) bool { return r >= '0' && r <= '9' })
 	if i < 0 {
@@ -677,7 +694,7 @@ func readOrdinal(f *fields, input string) bool {
 	return true
 }
 
-// tokenAt is the length of a match of RE_TOKENS,
+// tokenAt is the length of a match of Pele's RE_TOKENS,
 // /(\[[^[]*\])|([-_:/.,()\s]+)|(A|a|Q|YYYY|YY?|ww?|MM?M?M?|Do|DD?|hh?|HH?|mm?|ss?|S{1,3}|z|ZZ?)/,
 // at byte i of s, or 0.
 func tokenAt(s string, i int) int {
@@ -726,7 +743,7 @@ func tokenAt(s string, i int) int {
 	return 0
 }
 
-// compile is dates.ts's compile: the steps of a format, or false when dayjs cannot parse with
+// compile is Pele's compile: the steps of a format, or false when dayjs cannot parse with
 // it.
 func compile(template string) ([]step, bool) {
 	// dayjs expands localized tokens through a locale table the English locale does not have,
@@ -758,10 +775,11 @@ func compile(template string) ([]step, bool) {
 	return steps, true
 }
 
-// literalAt is the length of /\[[^\]]+]/ at i, or 0.
+// literalAt is the length of /\[[^\]]+]/ at i, or 0: Pele's RE_LITERAL.
 func literalAt(s string, i int) int { return bracketAt(s, i) }
 
-// indexUnits is the first index of sub in s, by code units, or -1.
+// indexUnits is the first index of sub in s, by code units, or -1, as String.prototype.replace
+// with a string finds what Pele's loose drops.
 func indexUnits(s, sub []uint16) int {
 	if len(sub) == 0 {
 		return 0
@@ -781,7 +799,7 @@ func indexUnits(s, sub []uint16) int {
 	return -1
 }
 
-// loose is dates.ts's loose: the date input reads as in template, unchecked.
+// loose is Pele's loose: the date input reads as in template, unchecked.
 func (z zone) loose(input, template string, now float64) (float64, bool) {
 	if template == "x" || template == "X" {
 		scale := 1.0
@@ -855,8 +873,8 @@ func (z zone) loose(input, template string, now float64) (float64, bool) {
 	return z.New(year, month, day, hours, minutes, seconds, ms), true
 }
 
-// parseStrict parses the way dayjs(input, format, true) does. now supplies the fields the
-// format leaves out.
+// parseStrict parses the way dayjs(input, format, true) does, as Pele's parseStrict does. now
+// supplies the fields the format leaves out.
 func (z zone) parseStrict(input, template string, now float64) (float64, bool) {
 	date, ok := z.loose(input, template, now)
 	if !ok || !jsdate.Valid(date) {

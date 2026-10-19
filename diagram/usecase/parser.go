@@ -114,10 +114,14 @@ type pendingJSON struct {
 // parseFailure carries an error out of the parser, which Pele throws.
 type parseFailure struct{ err *diagram.Error }
 
+// image is the text of token k as the source has it, as Pele's image gives it.
 func (ps *parser) image(k int) string { return ps.src[ps.starts[k]:ps.ends[k]] }
 
+// span is where token k runs in the source, as Pele's span gives it.
 func (ps *parser) span(k int) Span { return Span{ps.starts[k], ps.ends[k]} }
 
+// fail stops the parse with a syntax error at the current token, as Pele's fail throws one;
+// the range in the message is in UTF-16 code units, as JavaScript counts it.
 func (ps *parser) fail(detail string) {
 	line, column := lineColumn(ps.src, ps.starts[ps.p])
 	panic(parseFailure{&diagram.Error{
@@ -129,10 +133,14 @@ func (ps *parser) fail(detail string) {
 	}})
 }
 
+// mismatch fails as Chevrotain does when the current token is not of the one type expected,
+// as Pele's mismatch does.
 func (ps *parser) mismatch(name string) {
 	ps.fail("Expecting token of type --> " + name + " <-- but found --> '" + ps.image(ps.p) + "' <--")
 }
 
+// expect takes the current token if it is of the given type and fails otherwise, giving the
+// index of the token taken, as Pele's expect does.
 func (ps *parser) expect(typ int) int {
 	if ps.types[ps.p] != typ {
 		ps.mismatch(tokenNames[typ])
@@ -142,7 +150,7 @@ func (ps *parser) expect(typ int) int {
 }
 
 // noAlternative fails as Chevrotain does when no alternative fits: with every token sequence
-// that would have been accepted.
+// that would have been accepted, as Pele's noAlternative does.
 func (ps *parser) noAlternative(expected string) {
 	var b strings.Builder
 	for i, sequence := range strings.Split(expected, "|") {
@@ -181,10 +189,16 @@ func statementSequences() string {
 	return strings.Join(all, "|")
 }
 
+// isWordToken reports whether a token type is in the WORD category, a keyword or IDENTIFIER,
+// as Pele's isWord does; it has another name here because the lexer has an isWord of its own.
 func isWordToken(t int) bool { return t >= tUSECASE && t <= tIDENTIFIER }
 
+// isLabelText reports whether a token type may be part of an unquoted label, as Pele's
+// isLabelText does.
 func isLabelText(t int) bool { return t >= tUSECASE && t <= tLABEL_SYMBOL }
 
+// lineEnd notes where the statement ends and takes the line break after it, or fails unless
+// the text ends there, as Pele's lineEnd does.
 func (ps *parser) lineEnd() {
 	ps.lastEnd = ps.ends[ps.p-1]
 	if ps.types[ps.p] == tNEWLINE {
@@ -194,7 +208,8 @@ func (ps *parser) lineEnd() {
 	}
 }
 
-// content is the text of a name or string token, without its quotes.
+// content is the text of a name or string token, without its quotes, as Pele's content gives
+// it.
 func (ps *parser) content(k int) Span {
 	trim := 0
 	switch ps.types[k] {
@@ -206,6 +221,8 @@ func (ps *parser) content(k int) Span {
 	return Span{ps.starts[k] + trim, ps.ends[k] - trim}
 }
 
+// tokenLabel is the label a name or string token gives, Markdown for a Markdown string, as
+// Pele's tokenLabel makes it.
 func (ps *parser) tokenLabel(k int) draftLabel {
 	at := ps.content(k)
 	typ := LabelText
@@ -216,7 +233,7 @@ func (ps *parser) tokenLabel(k int) draftLabel {
 }
 
 // generatedID is the id made from a label: each UTF-16 code unit that is not a word
-// character becomes an underscore, as label.replace(/\W/g, '_') does.
+// character becomes an underscore, as label.replace(/\W/g, '_') does in Pele's generatedId.
 func generatedID(label string) string {
 	var b strings.Builder
 	for i := 0; i < len(label); {
@@ -235,7 +252,7 @@ func generatedID(label string) string {
 }
 
 // label reads a label: a string, or unquoted text that runs to the next delimiter and is
-// taken from the source as written.
+// taken from the source as written, as Pele's label does.
 func (ps *parser) label() draftLabel {
 	typ := ps.types[ps.p]
 	if typ == tPLAIN_STRING || typ == tMARKDOWN_STRING {
@@ -253,8 +270,11 @@ func (ps *parser) label() draftLabel {
 	return draftLabel{text: ps.src[at[0]:at[1]], typ: LabelText, span: at}
 }
 
+// isKey reports whether a token type may be a metadata key, as Pele's isKey does.
 func isKey(t int) bool { return t == tIDENTIFIER || t == tPLAIN_STRING }
 
+// property reads one `key: value` of metadata, whose value is a name, a string or a boolean,
+// as Pele's property does.
 func (ps *parser) property() draftProperty {
 	key := ps.p
 	if !isKey(ps.types[ps.p]) {
@@ -291,7 +311,7 @@ func (ps *parser) property() draftProperty {
 // separatorAhead reports whether another property follows. A comma or line breaks before the
 // closing brace do not count, but Chevrotain looks only three tokens ahead, so a comma and two
 // line breaks, or three line breaks, are taken for a separator and the brace after them is
-// then an error.
+// then an error. It is Pele's separatorAhead.
 func (ps *parser) separatorAhead() bool {
 	a, b, c := ps.types[ps.p], ps.types[ps.p+1], ps.types[ps.p+2]
 	if a == tCOMMA {
@@ -303,6 +323,7 @@ func (ps *parser) separatorAhead() bool {
 	return b == tCOMMA || isKey(b) || b == tNEWLINE && (c == tNEWLINE || c == tCOMMA || isKey(c))
 }
 
+// metadata reads a block of metadata, `@{ key: value, … }`, as Pele's metadata does.
 func (ps *parser) metadata() []draftProperty {
 	ps.expect(tMETADATA_START)
 	properties := []draftProperty{}
@@ -338,6 +359,8 @@ func (ps *parser) metadata() []draftProperty {
 	return properties
 }
 
+// occurrences are where the properties of a block of metadata are, as Pele's occurrences
+// gives them.
 func occurrences(properties []draftProperty) []MetadataOccurrence {
 	out := make([]MetadataOccurrence, len(properties))
 	for i, p := range properties {
@@ -346,6 +369,8 @@ func occurrences(properties []draftProperty) []MetadataOccurrence {
 	return out
 }
 
+// classSuffix reads the classes after `:::`, separated by commas, adding them and their
+// spans to classes and spans, as Pele's classSuffix does.
 func (ps *parser) classSuffix(classes *[]string, spans *[]Span) {
 	for {
 		ps.p++
@@ -359,7 +384,7 @@ func (ps *parser) classSuffix(classes *[]string, spans *[]Span) {
 }
 
 // name reads an id with an optional label in parentheses or brackets, or a string that stands
-// for both.
+// for both, as Pele's name does.
 func (ps *parser) name(brackets bool) *item {
 	k := ps.p
 	typ := ps.types[ps.p]
@@ -392,6 +417,9 @@ func (ps *parser) name(brackets bool) *item {
 	return it
 }
 
+// element reads an element as a statement mentions it: its name, then any metadata,
+// stereotype and classes, as Pele's element does. An actor's name takes no label in
+// brackets, and gives it no shape.
 func (ps *parser) element(actor bool) *item {
 	first := ps.p
 	it := ps.name(!actor)
@@ -417,6 +445,8 @@ func (ps *parser) element(actor bool) *item {
 	return it
 }
 
+// draft is the draft of an element a statement declares, inside the boundary being read, as
+// Pele's draft makes it.
 func (ps *parser) draft(it *item, kind string) *draftElement {
 	return &draftElement{
 		named:      named{id: it.id, label: it.label, span: it.span, generated: it.generated},
@@ -429,6 +459,8 @@ func (ps *parser) draft(it *item, kind string) *draftElement {
 	}
 }
 
+// endpointOf is an end of a relationship as the draft of the relationship holds it, as
+// Pele's endpoint makes it.
 func endpointOf(it *item, declares bool) draftEndpoint {
 	return draftEndpoint{
 		named:    named{id: it.id, label: it.label, span: it.span, generated: it.generated},
@@ -437,6 +469,8 @@ func endpointOf(it *item, declares bool) draftEndpoint {
 	}
 }
 
+// occurrence is where an element's mention and its parts are in the source, as Pele's
+// occurrence gives it.
 func occurrence(it *item, defines bool) NodeOccurrence {
 	labelSpan := it.label.span
 	out := NodeOccurrence{ID: it.id, Span: it.nodeSpan, IDSpan: it.span, LabelSpan: &labelSpan, Defines: defines}
@@ -451,7 +485,7 @@ func occurrence(it *item, defines bool) NodeOccurrence {
 }
 
 // labeledRight reports whether a label and then one of the operators that can close it come
-// next.
+// next, as Pele's labeledRight does.
 func (ps *parser) labeledRight(closers uint8) bool {
 	if t := ps.types[ps.p]; t < tUSECASE || t > tMARKDOWN_STRING {
 		return false
@@ -468,7 +502,7 @@ func (ps *parser) labeledRight(closers uint8) bool {
 }
 
 // minimumLength is the ranks a relationship's operator asks for: each dash beyond the second
-// asks for one more between the two ends.
+// asks for one more between the two ends, as Pele's minimumLength counts them.
 func (ps *parser) minimumLength(k int) int {
 	dashes := ps.ends[k] - ps.starts[k]
 	if ps.types[k] != tMARKERLESS_SOLID {
@@ -477,6 +511,8 @@ func (ps *parser) minimumLength(k int) int {
 	return max(1, dashes-1)
 }
 
+// relationTail reads what follows the source of a relationship: an optional `id@`, the
+// operator, with any label inside it, and the target, as Pele's relationTail does.
 func (ps *parser) relationTail() *tail {
 	first := ps.p
 	tl := &tail{typ: "association", arrowType: SolidArrow, minlen: 1}
@@ -563,6 +599,9 @@ func (ps *parser) relationTail() *tail {
 	return tl
 }
 
+// relationship drafts a relationship from its source and its tail, and the target if the
+// tail declares it, and gives the statement that holds them, as Pele's relationship does. An
+// edge without an id of its own is numbered in the order edges are read.
 func (ps *parser) relationship(source *item, declaration bool, tl *tail, nodes []NodeOccurrence) *Statement {
 	target := tl.target
 	if target.explicit {
@@ -596,7 +635,7 @@ func (ps *parser) relationship(source *item, declaration bool, tl *tail, nodes [
 }
 
 // actors reads `actor A, B`, which declares several actors; at the top level `actor A --> B`
-// declares one and relates it.
+// declares one and relates it, as Pele's actors does.
 func (ps *parser) actors(top bool) *Statement {
 	ps.p++
 	items := []*item{ps.element(true)}
@@ -623,6 +662,8 @@ func (ps *parser) actors(top bool) *Statement {
 	return &Statement{Kind: "node", Nodes: nodes}
 }
 
+// entity reads a statement that starts with a name: a use case it declares, or, at the top
+// level, a relationship from it, as Pele's entity does.
 func (ps *parser) entity(top bool) *Statement {
 	source := ps.element(false)
 	var tl *tail
@@ -646,6 +687,8 @@ func (ps *parser) entity(top bool) *Statement {
 	return &Statement{Kind: "node", Nodes: nodes}
 }
 
+// boundary reads a system boundary and the statements inside it up to its `end`, as Pele's
+// boundary does.
 func (ps *parser) boundary() *Statement {
 	ps.p++
 	named := ps.name(true)
@@ -681,10 +724,13 @@ func (ps *parser) boundary() *Statement {
 	return out
 }
 
+// namedOf is the name, label and span of an item, which Pele's boundary copies field by
+// field.
 func namedOf(it *item) named {
 	return named{id: it.id, label: it.label, span: it.span, generated: it.generated}
 }
 
+// style reads one CSS declaration of a classDef or style statement, as Pele's style does.
 func (ps *parser) style() string {
 	first := ps.p
 	typ := ps.types[ps.p]
@@ -712,6 +758,7 @@ func (ps *parser) style() string {
 	return strings.ReplaceAll(ps.src[ps.starts[first]:ps.ends[ps.p-1]], "\\,", ",")
 }
 
+// styles reads CSS declarations separated by commas, as Pele's styles does.
 func (ps *parser) styles() []string {
 	out := []string{ps.style()}
 	for ps.types[ps.p] == tCOMMA {
@@ -721,6 +768,8 @@ func (ps *parser) styles() []string {
 	return out
 }
 
+// identifiers reads identifiers separated by commas, giving their token indexes, as Pele's
+// identifiers does.
 func (ps *parser) identifiers() []int {
 	out := []int{ps.expect(tIDENTIFIER)}
 	for ps.types[ps.p] == tCOMMA {
@@ -730,11 +779,15 @@ func (ps *parser) identifiers() []int {
 	return out
 }
 
+// reference is the occurrence of an element a statement names by token k, as Pele's
+// reference gives it.
 func (ps *parser) reference(k int) NodeOccurrence {
 	at := ps.content(k)
 	return NodeOccurrence{ID: ps.image(k), Span: at, IDSpan: at}
 }
 
+// topStatement reads a statement at the top level of the diagram, as Pele's topStatement
+// does.
 func (ps *parser) topStatement() *Statement {
 	k := ps.p
 	typ := ps.types[ps.p]
@@ -863,6 +916,8 @@ func (ps *parser) topStatement() *Statement {
 	return out
 }
 
+// line reads a line, at the top level or inside a boundary: a blank line, a comment or a
+// statement, which then spans to the end of its last token, as Pele's line does.
 func (ps *parser) line(top bool) *Statement {
 	k := ps.p
 	typ := ps.types[ps.p]

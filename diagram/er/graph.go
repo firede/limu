@@ -50,6 +50,8 @@ func BuildGraph(db *DB) *Graph {
 	g := &Graph{}
 	subgraphs := db.Subgraphs
 
+	// compiled is the styles of the classes named, each trimmed, the text styles of each
+	// after its styles, as the compiled of Pele's buildErGraph gives them.
 	compiled := func(classNames []string) []string {
 		out := []string{}
 		for _, name := range classNames {

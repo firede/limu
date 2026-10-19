@@ -56,6 +56,8 @@ func LayoutVariant(db *DB, config diagram.Config, o *layout.Options, v *Variant)
 	if o == nil {
 		o = &layout.Options{}
 	}
+	// fitted lays the flowchart out, down if down, and tightly where loosely does not fit, as
+	// Pele's fitted does.
 	fitted := func(down bool) *scene.Scene {
 		return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, v, down, tight) })
 	}
@@ -66,6 +68,7 @@ func LayoutVariant(db *DB, config diagram.Config, o *layout.Options, v *Variant)
 }
 
 // numberOption is a number of a flowchart's config, if it is one above 0, at most 2000.
+// It is Pele's numberOption.
 func numberOption(section diagram.Config, key string, fallback float64) float64 {
 	if v, ok := section[key].(float64); ok && v > 0 {
 		return min(v, 2000)
@@ -74,6 +77,7 @@ func numberOption(section diagram.Config, key string, fallback float64) float64 
 }
 
 // assetSize is the size an image or icon is given, if it is a sensible one.
+// It is Pele's assetSize.
 func assetSize(v *float64, fallback float64) float64 {
 	if v != nil && *v > 0 && *v <= 4000 {
 		return *v
@@ -132,6 +136,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		wrapWidth = min(wrapWidth, 100)
 		groupMax = max(80, common.TitleRoom(o)/2)
 	}
+	// labelOf lays out a label with the flowchart's measurer and icons, the call to layoutLabel
+	// that Pele's draw makes for each label.
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
@@ -228,6 +234,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 	if down {
 		rootDir = layout.TB
 	}
+	// flowsSideways reports whether the nodes about node i run across, by the direction of the
+	// nearest group that sets one, as Pele's flowsSideways does.
 	flowsSideways := func(i int) bool {
 		var dir layout.Dir
 		for p, hops := cnodes[i].Parent, 0; p >= 0 && dir == "" && hops < 10000; p, hops = cnodes[p].Parent, hops+1 {
@@ -337,6 +345,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 	if variant != nil {
 		sc.Type = variant.Type
 	}
+	// node is the box of node i that the drawing helpers take; Pele hands them the CNode
+	// itself.
 	node := func(i int) draw.Node {
 		c := &cnodes[i]
 		return draw.Node{X: c.X, Y: c.Y, W: c.W, H: c.H, Group: c.IsGroup}
@@ -556,6 +566,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 var edgeClassNoise = strings.NewReplacer("edge-thickness-normal", "", "edge-pattern-solid", "", "flowchart-link", "")
 
 // trimDefault takes /^default\s?/ off a node's classes: the class every node has.
+// Pele's draw does it with replace.
 func trimDefault(classes string) string {
 	rest, ok := strings.CutPrefix(classes, "default")
 	if !ok {
@@ -567,6 +578,8 @@ func trimDefault(classes string) string {
 	return rest
 }
 
+// hasClass reports whether name is among classes, the / internal-link(?: |$)/ test of
+// Pele's draw.
 func hasClass(classes []string, name string) bool {
 	for _, c := range classes {
 		if c == name {

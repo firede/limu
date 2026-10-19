@@ -71,18 +71,23 @@ type DB struct {
 	Warn func(message string)
 }
 
+// newDB is an empty chart, as Pele's GanttDb constructor makes one, its weekend starting on
+// Saturday.
 func newDB() *DB {
 	return &DB{Weekend: "saturday", Links: map[string]string{}, byID: map[string]*Task{}}
 }
 
+// setDateFormat is Pele's setDateFormat: it sets the format task dates are written in.
 func (db *DB) setDateFormat(txt string) { db.DateFormat = txt }
 
+// setAccTitle is Pele's setAccTitle: the accessible title, without the white space that
+// starts it.
 func (db *DB) setAccTitle(txt string) {
 	db.AccTitle, db.HasAccTitle = chars.TrimStart(txt), true
 }
 
 // setAccDescription drops the white space that starts each line after the first, as
-// replace(/\n\s+/g, '\n') does.
+// replace(/\n\s+/g, '\n') does in Pele's setAccDescription.
 func (db *DB) setAccDescription(txt string) {
 	var b strings.Builder
 	for i := 0; i < len(txt); {
@@ -99,6 +104,7 @@ func (db *DB) setAccDescription(txt string) {
 	db.AccDescr, db.HasAccDescr = b.String(), true
 }
 
+// addSection is Pele's addSection: it starts a section, which the tasks after it are in.
 func (db *DB) addSection(txt string) {
 	db.currentSection = txt
 	db.Sections = append(db.Sections, txt)
@@ -125,7 +131,8 @@ func mergeTokens(existing []string, txt string) []string {
 	return out
 }
 
-// isTag reports which tag a field is, as /^\s*(active|done|crit|milestone|vert)\s*$/.
+// isTag reports which tag a field is, as /^\s*(active|done|crit|milestone|vert)\s*$/, Pele's
+// RE_TAG, reads it.
 func isTag(field string) string {
 	switch t := chars.Trim(field); t {
 	case "active", "done", "crit", "milestone", "vert":
@@ -135,6 +142,9 @@ func isTag(field string) string {
 	return ""
 }
 
+// addTask is Pele's addTask: it adds a task, its tags read from the start of its data and the
+// rest of the data kept raw, to be scheduled later. A task with no fields or too many is an
+// error.
 func (db *DB) addTask(descr, dataStr string) error {
 	data := strings.Split(strings.TrimPrefix(dataStr, ":"), ",")
 	task := &Task{
@@ -196,6 +206,8 @@ func (db *DB) addTask(descr, dataStr string) error {
 	return nil
 }
 
+// setLink is Pele's setLink: it gives each existing task of ids, a comma-separated list, the
+// link made safe, and marks them clickable.
 func (db *DB) setLink(ids, link string) {
 	href := url.SafeURL(link)
 	for _, id := range strings.Split(ids, ",") {
@@ -210,7 +222,7 @@ func (db *DB) setLink(ids, link string) {
 }
 
 // setClass marks tasks with a class. Callbacks are recognized and never run; the task is only
-// marked clickable, as in Mermaid.
+// marked clickable, as in Mermaid. It is Pele's setClass, which Pele's setClickEvent calls.
 func (db *DB) setClass(ids, className string) {
 	for _, id := range strings.Split(ids, ",") {
 		if t, ok := db.byID[id]; ok {
@@ -276,7 +288,7 @@ func (db *DB) Schedule(now time.Time, loc *time.Location) error {
 	return err
 }
 
-// numericFormat is RE_NUMERIC_FORMAT, /^[YMDHhmsSZXx\-/.:, T]*$/.
+// numericFormat is Pele's RE_NUMERIC_FORMAT, /^[YMDHhmsSZXx\-/.:, T]*$/.
 func numericFormat(s string) bool {
 	for i := 0; i < len(s); i++ {
 		if !strings.ContainsRune("YMDHhmsSZXx-/.:, T", rune(s[i])) {
@@ -286,6 +298,7 @@ func numericFormat(s string) bool {
 	return true
 }
 
+// isDayName reports whether t is a weekday's name in lower case, as Pele's DAY_NAMES has it.
 func isDayName(t string) bool {
 	for _, w := range weekdays {
 		if strings.ToLower(w) == t {
@@ -325,6 +338,7 @@ func (db *DB) isInvalidDate(date float64) (bool, error) {
 	return weekday || listed(db.excludeSet), nil
 }
 
+// spend is Pele's spend: it counts units of work, which are an error past workLimit.
 func (db *DB) spend(units float64) error {
 	db.work += units
 	if db.work > workLimit {
@@ -333,6 +347,7 @@ func (db *DB) spend(units float64) error {
 	return nil
 }
 
+// parse is Pele's parse: str read strictly as in template, with what it costs spent.
 func (db *DB) parse(str, template string) (float64, bool, error) {
 	if err := db.spend(float64((chars.Len16(template) + 1) * (chars.Len16(str) + 1))); err != nil {
 		return 0, false, err
@@ -341,14 +356,18 @@ func (db *DB) parse(str, template string) (float64, bool, error) {
 	return d, ok, nil
 }
 
+// today is Pele's today: the start of the day it is now.
 func (db *DB) today() float64 { return db.zone.startOfDay(db.now) }
 
+// warn is Pele's warn: it tells Warn the message, made only when there is a Warn to tell.
 func (db *DB) warn(message func() string) {
 	if db.Warn != nil {
 		db.Warn(message())
 	}
 }
 
+// compileTasks is Pele's compileTasks: one pass that schedules every task, reporting whether
+// each was scheduled.
 func (db *DB) compileTasks() (bool, error) {
 	all := true
 	for _, t := range db.Tasks {
@@ -360,6 +379,8 @@ func (db *DB) compileTasks() (bool, error) {
 	return all, nil
 }
 
+// compileTask is Pele's compileTask: it gives a task its start and end where it can, a task
+// with no start starting where the one before it ends.
 func (db *DB) compileTask(task *Task) error {
 	if !task.Raw.HasStart {
 		// Mermaid fails with a TypeError when the first task has no start. It starts today
@@ -402,6 +423,8 @@ func (db *DB) compileTask(task *Task) error {
 	return db.checkTaskDates(task)
 }
 
+// references is Pele's references: the tasks a list of ids after keyword names, warning of
+// the ids no task has.
 func (db *DB) references(keyword, list string) []*Task {
 	var found []*Task
 	var unknown []string
@@ -423,10 +446,11 @@ func (db *DB) references(keyword, list string) []*Task {
 	return found
 }
 
-// isRefChar is [\d\w- ].
+// isRefChar is [\d\w- ], the class of Pele's RE_AFTER and RE_UNTIL.
 func isRefChar(c byte) bool { return chars.IsWord(int(c)) || c == '-' || c == ' ' }
 
-// matchRef is /^keyword\s+([\d\w- ]+)/: the ids it refers to, and whether it matched.
+// matchRef is /^keyword\s+([\d\w- ]+)/: the ids it refers to, and whether it matched. It is
+// Pele's RE_AFTER and RE_UNTIL, written out with the backtracking they do.
 func matchRef(s, keyword string) (string, bool) {
 	if !strings.HasPrefix(s, keyword) {
 		return "", false
@@ -464,6 +488,7 @@ func matchRef(s, keyword string) (string, bool) {
 	return "", false
 }
 
+// isDigits reports whether s is a run of digits, as Pele's RE_DIGITS, /^\d+$/, tests it.
 func isDigits(s string) bool {
 	if s == "" {
 		return false
@@ -476,10 +501,15 @@ func isDigits(s string) bool {
 	return true
 }
 
+// invalidDate is the error of a date that cannot be read, as Pele's getStartDate and checked
+// throw it.
 func invalidDate(str string) error {
 	return diagram.NewError("Invalid date:"+str, diagram.Semantic, "gantt")
 }
 
+// getStartDate is Pele's getStartDate, with its checked inlined: the start a task's raw start
+// gives, from a time value, the latest end of the tasks it comes after, the chart's format
+// or, failing that, the JavaScript date parser. An undefined start is one not known yet.
 func (db *DB) getStartDate(raw string) (moment, error) {
 	str := trim(raw)
 	template := trim(db.DateFormat)
@@ -522,6 +552,8 @@ func (db *DB) getStartDate(raw string) (moment, error) {
 	return at(date), nil
 }
 
+// getEndDate is Pele's getEndDate: the end a task's raw end gives, from the earliest start of
+// the tasks it runs until, a date in the chart's format, or a duration after start.
 func (db *DB) getEndDate(start moment, raw string) (moment, error) {
 	str := trim(raw)
 
@@ -589,7 +621,8 @@ func parseDuration(str string) (float64, unit) {
 	return math.NaN(), "ms"
 }
 
-// checkTaskDates pushes the end of a task out by one day for every excluded day it covers.
+// checkTaskDates pushes the end of a task out by one day for every excluded day it covers, as
+// Pele's checkTaskDates does.
 func (db *DB) checkTaskDates(task *Task) error {
 	if len(db.Excludes) == 0 || task.ManualEndTime {
 		return nil

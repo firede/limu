@@ -27,6 +27,7 @@ func Parse(source string, config diagram.Config, title string, lineOffset int, l
 }
 
 // ParsePrepared parses a prepared agent flow.
+// It reads the source with its comments, as Pele's agentflow diagram has keepComments.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
 	return Parse(p.Source(true), p.Config, p.Title, p.LineOffset, p.Limits)
 }
