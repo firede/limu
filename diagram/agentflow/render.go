@@ -86,6 +86,7 @@ type view struct {
 }
 
 // slot is the palette slot of a flow, collapsed or not: its own, or the one past the kinds.
+// It is Pele's node.colorIndex ?? KIND_SLOT.size, in its draw.
 func slot(n *GraphNode) int {
 	if n.ColorIndex >= 0 {
 		return n.ColorIndex
@@ -215,6 +216,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		}
 		return dir
 	}
+	// flowsSideways reports whether the level a node sits in runs across, as Pele's
+	// flowsSideways does.
 	flowsSideways := func(i int) bool {
 		dir := flowOf(i)
 		return dir == layout.LR || dir == layout.RL
@@ -240,6 +243,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			d++
 		}
 	}
+	// contains reports whether node i is inside group, at any depth, as Pele's contains does.
 	contains := func(group, i int) bool {
 		j := i
 		for d := depth[i]; d > depth[group] && j >= 0; d-- {
@@ -356,6 +360,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		if out {
 			first = end
 		}
+		// toward is the straight route between the node and the side of its flow, as Pele's
+		// toward gives it.
 		toward := func(side int) []float64 {
 			upright := side&1 == 0
 			sign := 1.0
@@ -376,6 +382,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			}
 			return []float64{bx, by, axis, nx, ny, axis}
 		}
+		// blocked reports whether another node that is not a flow lies across route r, as
+		// Pele's blocked does.
 		blocked := func(r []float64) bool {
 			for k := range cnodes {
 				c := &cnodes[k]
@@ -519,6 +527,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		nodes = append(nodes, marks...)
 	}
 
+	// put adds an edge and its label, as Pele's put draws them; route, which Pele does not
+	// have, is the route the edge was laid out along.
 	put := func(edge *GraphEdge, label *text.Label, path draw.EdgePath, route []float64, x, y float64) {
 		var author style.Author
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
@@ -615,6 +625,7 @@ func dot(p *scene.Path, x, y, dx, dy float64) *scene.Path {
 var edgeClassNoise = strings.NewReplacer("edge-thickness-normal", "", "edge-pattern-solid", "", "flowchart-link", "")
 
 // trimDefault takes /^default\s?/ off a node's classes: the class every node has.
+// It is the replace of /^default\s?/ on node.cssClasses in Pele's draw.
 func trimDefault(classes string) string {
 	rest, ok := strings.CutPrefix(classes, "default")
 	if !ok {
@@ -626,6 +637,8 @@ func trimDefault(classes string) string {
 	return rest
 }
 
+// hasClass reports whether name is one of classes, the test Pele's draw makes for
+// internal-link with / internal-link(?: |$)/ on the joined class names.
 func hasClass(classes []string, name string) bool {
 	for _, c := range classes {
 		if c == name {
