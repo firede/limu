@@ -1,5 +1,8 @@
 // Package layout holds what is shared by the layouts of diagrams: the options that change
-// where things are. A change of them lays a diagram out again; a change of style does not.
+// where things are, and the layouts that more than one diagram places its things with, as
+// Pele's src/layout does: the layered layout of a graph (Layered), the compound one of a
+// graph with groups (Compound), and the lanes of a swimlane diagram (Lanes). A change of the
+// options lays a diagram out again; a change of style does not.
 package layout
 
 import (
@@ -8,7 +11,11 @@ import (
 	"github.com/firede/limu/text"
 )
 
-// Routing is how edges run between the things they join.
+// Routing is how edges run between the things they join. It is a setting of the diagrams on
+// the layered layout that take Pele's curve setting: flowcharts, swimlane, state and agent
+// flow diagrams. Auto leaves them to the text's curve, and Orthogonal and Straight take the
+// place of the step and linear curves. The other diagrams route their edges as Pele does and
+// pay it no heed.
 type Routing uint8
 
 const (
@@ -42,8 +49,11 @@ type Options struct {
 	NoLinks, NoImages         bool
 	LinkSchemes, ImageSchemes []string
 	// Snap rounds where things are to whole multiples of it, for a backend that draws on a
-	// grid of pixels. 0 leaves them as they fall.
-	Snap    float64
+	// grid of pixels. 0 leaves them as they fall. limu.Layout and Diagram.Layout snap the
+	// scene; a diagram package's own Layout leaves it to its caller, who snaps the scene
+	// with Scene.Snap.
+	Snap float64
+	// Routing is how edges run, in the diagrams that take Pele's curve setting.
 	Routing Routing
 
 	// Now is the time a diagram that places things in time takes as the present: where a
