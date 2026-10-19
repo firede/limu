@@ -117,6 +117,30 @@ func TestRenderOverrides(t *testing.T) {
 	}
 }
 
+// A part painted Shade is filled with the background, or a tint of a fill its author set,
+// and not stroked.
+func TestRenderShade(t *testing.T) {
+	stripe := scene.Part{Box: scene.Rect{X: 0, Y: 10, W: 50, H: 10}, Paint: scene.Shade}
+	item := func(author style.Style) scene.Item {
+		return scene.Item{
+			Kind: scene.Node, Role: "er.entity", Box: scene.Rect{W: 50, H: 30},
+			Parts: []scene.Part{{Box: scene.Rect{W: 50, H: 30}}, stripe},
+			Style: style.Style{Fill: style.Surface, Stroke: style.Border}, Author: author,
+		}
+	}
+	sc := &scene.Scene{Width: 50, Height: 30, FontSize: 16, Items: []scene.Item{item(style.Style{})}}
+	if got := Render(sc, nil); !strings.Contains(got, `height="10" fill="var(--limu-bg,#ffffff)" stroke="none"/>`) {
+		t.Errorf("no stripe of the background:\n%s", got)
+	}
+	sc.Items[0] = item(style.Style{Fill: style.Of(style.Hex("#ff9966"))})
+	if got := Render(sc, nil); !strings.Contains(got, `fill="color-mix(in srgb,var(--limu-bg,#ffffff) 60%,#ff9966)" stroke="none"/>`) {
+		t.Errorf("no tint of the author's fill:\n%s", got)
+	}
+	if got := Render(sc, &Options{Literal: true}); !strings.Contains(got, `fill="#ffd6c2" stroke="none"/>`) {
+		t.Errorf("no tint of the author's fill, written as a color:\n%s", got)
+	}
+}
+
 func TestRenderDraw(t *testing.T) {
 	got := Render(sample(), &Options{Draw: func(w *Writer, it *scene.Item, s style.Style, next func()) {
 		if it.Shape != "diam" {
