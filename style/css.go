@@ -19,7 +19,8 @@ type Author struct {
 // Declarations reads Mermaid's style declarations, as "fill:#f9f" and "stroke-width:4px",
 // as Pele's resolveStyle does: later ones win, !important is ignored, and a value that could
 // reach outside the diagram is dropped. Of the properties, fill, stroke, color, the widths,
-// dashes, opacities and rx or ry are kept, and the font's weight, style and size.
+// dashes, caps and joins, opacities and rx or ry are kept, and the font's weight, style and
+// size.
 func Declarations(decls []string) Author {
 	var a Author
 	fill, stroke := 1.0, 1.0
@@ -55,6 +56,14 @@ func Declarations(decls []string) Author {
 			}
 		case "stroke-dasharray":
 			a.Style.Dash = dashes(value)
+		case "stroke-linecap":
+			if c, ok := keyword(value, caps); ok {
+				a.Style.Cap = Cap(c)
+			}
+		case "stroke-linejoin":
+			if j, ok := keyword(value, joins); ok {
+				a.Style.Join = Join(j)
+			}
 		case "rx", "ry":
 			if f, ok := length(value); ok && f >= 0 {
 				a.Style.Radius = N(f)
@@ -100,6 +109,26 @@ func LineDeclared(decls []string) bool {
 		}
 	}
 	return false
+}
+
+// The keywords of stroke-linecap and stroke-linejoin, by the Cap or Join each is. Pele
+// passes the properties through to the browser, which takes these, initial for the
+// property's initial value, and inherit or unset for what the element would inherit, which
+// is what an unset style takes from under it here. It takes no others: SVG 2's miter-clip
+// and arcs are not drawn by browsers, and a value they do not take is dropped.
+var (
+	caps  = map[string]uint8{"butt": uint8(CapButt), "round": uint8(CapRound), "square": uint8(CapSquare), "initial": uint8(CapButt), "inherit": 0, "unset": 0}
+	joins = map[string]uint8{"miter": uint8(JoinMiter), "round": uint8(JoinRound), "bevel": uint8(JoinBevel), "initial": uint8(JoinMiter), "inherit": 0, "unset": 0}
+)
+
+// keyword reads a keyword of CSS, in either case of its ASCII letters, from those given.
+func keyword(value string, of map[string]uint8) (uint8, bool) {
+	for k, v := range of {
+		if len(k) == len(value) && asciiFold(k, value) {
+			return v, true
+		}
+	}
+	return 0, false
 }
 
 // paint is a paint of a color, None for none, or unset for one it cannot read.

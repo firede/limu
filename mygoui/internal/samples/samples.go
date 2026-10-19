@@ -37,7 +37,7 @@ func Flowchart(m text.Measurer) *scene.Scene {
 				Kind: scene.Edge, Role: "flowchart.edge", ID: "L_A_B_0",
 				Parts: []scene.Part{{Path: edge, Paint: scene.StrokeOnly}},
 				Ends:  [2]scene.Marker{{}, {Type: "arrow_point", At: scene.Point{X: 100, Y: 120}, DY: 1}},
-				Style: style.Style{Stroke: style.Line, Fill: style.None},
+				Style: style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound},
 			},
 			{
 				Kind: scene.Text, Role: "flowchart.edge-label",
@@ -120,7 +120,7 @@ func Features(m text.Measurer) *scene.Scene {
 				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(90, 100).CubeTo(90, 150, 180, 120, 180, 163), Paint: scene.StrokeOnly}},
 				Route: []scene.Point{{X: 90, Y: 100}, {X: 180, Y: 163}},
 				Ends:  [2]scene.Marker{{}, {Type: "arrow_point", At: scene.Point{X: 180, Y: 170}, DY: 1}},
-				Style: style.Style{Stroke: style.Line, Fill: style.None},
+				Style: style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound},
 			},
 			{
 				Kind: scene.Node, Role: "test.node", ID: "opaque",
@@ -149,6 +149,19 @@ func Features(m text.Measurer) *scene.Scene {
 				Parts: []scene.Part{{Path: new(scene.Path).Polygon(370, 130, 420, 165, 370, 200, 320, 165)}},
 				Label: label(m, "Mine", 14), At: scene.Point{X: 370, Y: 165},
 				Style: style.Style{Fill: style.Surface, Stroke: style.Border},
+			},
+			{
+				Kind: scene.Mark, Role: "test.joins", ID: "joins",
+				Parts: []scene.Part{
+					{Path: new(scene.Path).MoveTo(320, 236).LineTo(340, 216).LineTo(360, 236), Paint: scene.StrokeOnly},
+					{Path: new(scene.Path).MoveTo(380, 236).LineTo(400, 216).LineTo(420, 236).MoveTo(410, 210).LineTo(410, 210), Paint: scene.StrokeOnly},
+				},
+				Style: style.Style{Stroke: style.Accent, StrokeWidth: style.N(4), Cap: style.CapSquare, Join: style.JoinBevel},
+			},
+			{
+				Kind: scene.Mark, Role: "test.joins", ID: "round",
+				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(170, 296).LineTo(190, 268).LineTo(240, 292), Paint: scene.StrokeOnly}},
+				Style: style.Style{Stroke: style.Accent, StrokeWidth: style.N(4), Cap: style.CapRound, Join: style.JoinMiter},
 			},
 			{
 				Kind: scene.Mark, Role: "test.guide",

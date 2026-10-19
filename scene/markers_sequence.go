@@ -1,5 +1,7 @@
 package scene
 
+import "github.com/firede/limu/style"
+
 // The heads of sequence diagrams' messages that are not flowcharts', as Pele's sequence
 // render draws them: an open head of two strokes, and half heads, a solid triangle or a
 // single stroke, on one side of the line. A half head's side is named as seen along the way
@@ -17,6 +19,8 @@ const (
 )
 
 func init() {
+	// Pele turns the corner of an open head round.
+	markerJoins["sequence.open"] = style.JoinRound
 	markers["sequence.open"] = markerKind{0, func(m Marker) []Part {
 		x, y, dx, dy, nx, ny := m.frame()
 		bx, by := x-float64(dx*seqHead), y-float64(dy*seqHead)

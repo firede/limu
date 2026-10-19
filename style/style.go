@@ -134,6 +134,63 @@ func (d Dash) Pattern() []float64 { return d.v }
 // Set reports whether the dash was set.
 func (d Dash) Set() bool { return d.set }
 
+// A Cap is how the ends of a stroked line are drawn, as SVG's stroke-linecap: the ends of a
+// line and of each of its dashes. The zero Cap is unset, and takes what is under it; a line
+// nothing sets one for ends flat, as SVG's do.
+type Cap uint8
+
+const (
+	CapButt   Cap = iota + 1 // flat, at the end
+	CapRound                 // a half circle about the end
+	CapSquare                // flat, half the line's width past the end
+)
+
+// Set reports whether the cap was set.
+func (c Cap) Set() bool { return c != 0 }
+
+// String is the cap's name in SVG and CSS, "butt", "round" or "square", or "" when unset.
+func (c Cap) String() string {
+	switch c {
+	case CapButt:
+		return "butt"
+	case CapRound:
+		return "round"
+	case CapSquare:
+		return "square"
+	}
+	return ""
+}
+
+// A Join is how a stroked line turns its corners, as SVG's stroke-linejoin. The zero Join is
+// unset, and takes what is under it; a line nothing sets one for turns its corners mitred,
+// as SVG's do.
+type Join uint8
+
+const (
+	// JoinMiter turns a corner in a point where the line's sides meet, or bevelled where
+	// SVG's miter limit of 4 would: where the point is more than four times half the line's
+	// width from the corner.
+	JoinMiter Join = iota + 1
+	JoinRound      // an arc about the corner
+	JoinBevel      // straight across, from one side's end to the other's
+)
+
+// Set reports whether the join was set.
+func (j Join) Set() bool { return j != 0 }
+
+// String is the join's name in SVG and CSS, "miter", "round" or "bevel", or "" when unset.
+func (j Join) String() string {
+	switch j {
+	case JoinMiter:
+		return "miter"
+	case JoinRound:
+		return "round"
+	case JoinBevel:
+		return "bevel"
+	}
+	return ""
+}
+
 // A Style is how a part is painted. What it leaves unset comes from under it.
 type Style struct {
 	Fill        Paint
@@ -142,7 +199,9 @@ type Style struct {
 	StrokeWidth Num
 	Radius      Num // of the corners of a box that takes the theme's
 	Dash        Dash
-	Opacity     Num // of the whole part
+	Cap         Cap  // of the ends of lines and of their dashes
+	Join        Join // of the corners of lines and outlines
+	Opacity     Num  // of the whole part
 	// Halo is drawn about the letters of the part's text, HaloWidth wide, so that lines
 	// under the text stop short of it: the title of a group an edge runs through.
 	Halo      Paint
@@ -168,6 +227,12 @@ func (s Style) Over(base Style) Style {
 	}
 	if !s.Dash.set {
 		s.Dash = base.Dash
+	}
+	if !s.Cap.Set() {
+		s.Cap = base.Cap
+	}
+	if !s.Join.Set() {
+		s.Join = base.Join
 	}
 	if !s.Opacity.set {
 		s.Opacity = base.Opacity
@@ -232,6 +297,8 @@ type Resolved struct {
 	StrokeWidth        float64
 	Radius             float64
 	Dash               []float64 // none for a solid line
+	Cap                Cap       // CapButt when nothing set it, as SVG's initial value
+	Join               Join      // JoinMiter when nothing set it, as SVG's initial value
 	Opacity            float64
 	Halo               Color // alpha 0 draws none
 	HaloWidth          float64
@@ -241,6 +308,12 @@ type Resolved struct {
 func (l *Look) Resolve(role string, own, author Style) Resolved {
 	s := l.Cascade(role, own, author)
 	th := l.ThemeOrDefault()
+	if !s.Cap.Set() {
+		s.Cap = CapButt
+	}
+	if !s.Join.Set() {
+		s.Join = JoinMiter
+	}
 	return Resolved{
 		Fill:        s.Fill.Color(th),
 		Stroke:      s.Stroke.Color(th),
@@ -250,6 +323,8 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 		StrokeWidth: s.StrokeWidth.v,
 		Radius:      s.Radius.v,
 		Dash:        s.Dash.v,
+		Cap:         s.Cap,
+		Join:        s.Join,
 		Opacity:     s.Opacity.Or(1),
 		Halo:        s.Halo.Color(th),
 		HaloWidth:   s.HaloWidth.Or(0),

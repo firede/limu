@@ -1,5 +1,7 @@
 package scene
 
+import "github.com/firede/limu/style"
+
 // MarkerSize is the length of an arrowhead.
 const MarkerSize = 8
 
@@ -36,6 +38,10 @@ var markers = map[MarkerType]markerKind{
 	}},
 }
 
+// markerJoins are the joins of the types of marker whose outlines Pele strokes with joins of
+// their own, by name; a diagram adds its own with its markers.
+var markerJoins = map[MarkerType]style.Join{}
+
 // frame is where a marker's tip is, the way it points, and the normal to that, a quarter
 // turn to the left of it.
 func (m Marker) frame() (x, y, dx, dy, nx, ny float64) {
@@ -44,6 +50,12 @@ func (m Marker) frame() (x, y, dx, dy, nx, ny float64) {
 
 // Trim is how far an edge stops short of its end to leave room for a marker of the type.
 func (t MarkerType) Trim() float64 { return markers[t].trim }
+
+// Join is how a marker of the type turns the corners of its outline when they are stroked,
+// over whatever the edge's style says, as Pele sets it on the marker itself; unset, the
+// marker's corners are the edge's. Its ends are the edge's, as Pele's take theirs from the
+// group the edges are drawn in.
+func (t MarkerType) Join() style.Join { return markerJoins[t] }
 
 // Outline is the marker's shape, as Pele draws it: parts painted in the color of the edge's
 // line. FillOnly fills a part in it and FillAndStroke strokes it too; StrokeOnly strokes it

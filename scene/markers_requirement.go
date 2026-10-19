@@ -1,5 +1,7 @@
 package scene
 
+import "github.com/firede/limu/style"
+
 // The markers of requirement diagrams, as Pele's src/diagrams/requirement/render.ts draws
 // them: both stroked in the color of the edge's line, filled with nothing.
 const (
@@ -28,7 +30,8 @@ func init() {
 		}
 	}}
 	// An open arrowhead with its tip at the end of the edge, as Pele's arrowMarker draws it.
-	// The edge runs on to the tip.
+	// The edge runs on to the tip. Pele turns its corner round.
+	markerJoins["requirement.arrow"] = style.JoinRound
 	markers["requirement.arrow"] = markerKind{0, func(m Marker) []Part {
 		x, y, dx, dy, _, _ := m.frame()
 		bx, by := x-float64(dx*requirementArrowLength), y-float64(dy*requirementArrowLength)

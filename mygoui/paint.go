@@ -4,9 +4,9 @@
 //
 // It draws what the svg package writes, as MyGo draws it: the parts of each item, filled
 // and stroked, the markers at the ends of edges, and labels, in the style the look settles
-// for each. MyGo strokes paths with round joins and caps, where SVG has mitred joins and
-// flat caps; dashes are shortened by the width of the line so that, with their caps, they
-// are as long as SVG draws them.
+// for each. Lines end and turn their corners as the style's Cap and Join say, as SVG's
+// stroke-linecap and stroke-linejoin do: MyGo strokes paths only with round ends and
+// corners, so a line with others is drawn by filling its outline.
 package mygoui
 
 import (
@@ -158,7 +158,7 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 			p.fill(part.Path, fill)
 		}
 		if stroke.A > 0 {
-			p.stroke(part.Path, stroke, s.StrokeWidth, s.Dash)
+			p.stroke(part.Path, stroke, penOf(s, s.Dash))
 		}
 	}
 }
@@ -174,7 +174,9 @@ func shade(bg, fill style.Color, tint bool) style.Color {
 }
 
 // box draws a box of an outline. MyGo strokes a box inside its edge, where SVG strokes it
-// about its edge: the box stroked is grown by half the stroke's width.
+// about its edge: the box stroked is grown by half the stroke's width. A box with square
+// corners is stroked mitred, or with round joins with its outer corners rounded by half the
+// stroke's width; one with bevelled corners, or dashed, is stroked as a path.
 func (p *Painter) box(b scene.Rect, radius float64, fill, stroke ui.Color, s style.Resolved) {
 	if b.W < 0 || b.H < 0 {
 		return
@@ -186,26 +188,33 @@ func (p *Painter) box(b scene.Rect, radius float64, fill, stroke ui.Color, s sty
 	if stroke.A == 0 || !(s.StrokeWidth > 0) {
 		return
 	}
-	if len(s.Dash) > 0 {
-		p.stroke(new(scene.Path).RoundRect(b, radius), stroke, s.StrokeWidth, s.Dash)
+	if len(s.Dash) > 0 || radius == 0 && s.Join == style.JoinBevel {
+		p.stroke(new(scene.Path).RoundRect(b, radius), stroke, penOf(s, s.Dash))
 		return
 	}
 	w := s.StrokeWidth
 	r := 0.0
 	if radius > 0 {
 		r = radius + w/2
+	} else if s.Join == style.JoinRound {
+		r = w / 2
 	}
 	p.Painter.Stroke(p.Rect(scene.Rect{X: b.X - w/2, Y: b.Y - w/2, W: b.W + w, H: b.H + w}), stroke, p.Len(r), p.Len(w))
 }
 
 // Ends draws the markers at the ends of an edge, in the color of its stroke, each part as
-// scene.Marker.Outline says.
+// scene.Marker.Outline says, solid, with the edge's caps and with its corners turned as
+// the marker's type says or else as the edge's are.
 func (p *Painter) Ends(it *scene.Item, s style.Resolved) {
 	c := Color(s.Stroke, s.Opacity)
 	if c.A == 0 {
 		return
 	}
 	for _, m := range it.Ends {
+		pn := penOf(s, nil)
+		if j := m.Type.Join(); j.Set() {
+			pn.join = j
+		}
 		for _, part := range m.Outline() {
 			path := part.Path
 			if path == nil {
@@ -216,12 +225,12 @@ func (p *Painter) Ends(it *scene.Item, s style.Resolved) {
 				p.fill(path, c)
 			case scene.FillAndStroke:
 				p.fill(path, c)
-				p.stroke(path, c, s.StrokeWidth, nil)
+				p.stroke(path, c, pn)
 			case scene.StrokeOnly:
-				p.stroke(path, c, s.StrokeWidth, nil)
+				p.stroke(path, c, pn)
 			case scene.Hollow:
 				p.fill(path, Color(s.Bg, s.Opacity))
-				p.stroke(path, c, s.StrokeWidth, nil)
+				p.stroke(path, c, pn)
 			}
 		}
 	}
@@ -253,29 +262,33 @@ func (p *Painter) fill(sp *scene.Path, c ui.Color) {
 		p.FillPath(p.Path(sp), c)
 		return
 	}
-	p.fillTiles(sp.Flatten(p.tolerance()), c)
+	p.fillTiles(sp.Flatten(p.tolerance()), c, maxMask)
 }
 
-// stroke strokes a path of the scene width units wide, in dashes when dash has any.
-func (p *Painter) stroke(sp *scene.Path, c ui.Color, width float64, dash []float64) {
-	if c.A == 0 || !(width > 0) {
+// stroke strokes a path of the scene with a pen. MyGo strokes it when its ends and corners
+// are round, which are all MyGo draws; with others, its outline is filled.
+func (p *Painter) stroke(sp *scene.Path, c ui.Color, pn pen) {
+	if c.A == 0 || !(pn.width > 0) {
 		return
 	}
-	w := p.Len(width)
+	if pn.cap != style.CapRound || pn.join != style.JoinRound {
+		lines := sp.Flatten(p.tolerance())
+		if len(pn.dash) > 0 {
+			lines = scene.Dash(lines, pn.dash, 0)
+		}
+		p.strokeOutline(lines, c, pn)
+		return
+	}
+	w := p.Len(pn.width)
 	size := p.across(sp.Bounds(), w)
 	large := size >= maxMask
-	if len(dash) == 0 && !large && (size <= piece || c.A < 255) {
+	if len(pn.dash) == 0 && !large && (size <= piece || c.A < 255) {
 		p.StrokePath(p.Path(sp), w, c)
 		return
 	}
 	lines := sp.Flatten(p.tolerance())
-	if len(dash) > 0 {
-		lines = scene.Dash(lines, dash, 0)
-		// Round caps reach half the width past each end of a dash, where SVG's flat ones
-		// stop at it.
-		for i := range lines {
-			lines[i].Points = shorten(lines[i].Points, width/2)
-		}
+	if len(pn.dash) > 0 {
+		lines = scene.Dash(lines, pn.dash, 0)
 	}
 	// Translucent pieces would show darker where their caps overlap: they are cut only
 	// when they must be.
@@ -284,42 +297,6 @@ func (p *Painter) stroke(sp *scene.Path, c ui.Color, width float64, dash []float
 		most = piece
 	}
 	p.strokeLines(lines, w, c, max(most/p.Scale()-w-2, 8), large)
-}
-
-// shorten takes d off each end of an open polyline, or leaves its middle when it is no
-// longer than 2d.
-func shorten(pts []scene.Point, d float64) []scene.Point {
-	total := 0.0
-	for i := 1; i < len(pts); i++ {
-		total += math.Hypot(pts[i].X-pts[i-1].X, pts[i].Y-pts[i-1].Y)
-	}
-	if total <= 2*d {
-		m := at(pts, total/2)
-		return []scene.Point{m, m}
-	}
-	out := []scene.Point{at(pts, d)}
-	run := 0.0
-	for i := 1; i < len(pts)-1; i++ {
-		run += math.Hypot(pts[i].X-pts[i-1].X, pts[i].Y-pts[i-1].Y)
-		if run > d && run < total-d {
-			out = append(out, pts[i])
-		}
-	}
-	return append(out, at(pts, total-d))
-}
-
-// at is the point along an open polyline at a distance from its start.
-func at(pts []scene.Point, d float64) scene.Point {
-	for i := 1; i < len(pts); i++ {
-		a, b := pts[i-1], pts[i]
-		l := math.Hypot(b.X-a.X, b.Y-a.Y)
-		if d <= l && l > 0 {
-			k := d / l
-			return scene.Point{X: a.X + (b.X-a.X)*k, Y: a.Y + (b.Y-a.Y)*k}
-		}
-		d -= l
-	}
-	return pts[len(pts)-1]
 }
 
 // strokeLines strokes polylines of the scene w DIPs wide, in pieces no more than limit DIPs
@@ -377,10 +354,12 @@ func (p *Painter) strokeLines(lines []scene.Polyline, w float32, c ui.Color, lim
 	flush()
 }
 
-// fillTiles fills polygons of the scene too large for a mask, where the painter shows, a
-// tile at a time: each polygon is clipped to the tile, which keeps how many times it winds
-// about each point inside it, and so what a fill with the non-zero rule covers.
-func (p *Painter) fillTiles(polys []scene.Polyline, c ui.Color) {
+// fillTiles fills polygons of the scene, where the painter shows, a tile of tile device
+// pixels at a time: each polygon is clipped to the tile, which keeps how many times it winds
+// about each point inside it, and so what a fill with the non-zero rule covers. The tiles'
+// sides are on the edges of device pixels, so that where two meet neither covers a part of
+// a pixel the other covers too, and no seam shows.
+func (p *Painter) fillTiles(polys []scene.Polyline, c ui.Color, tile int) {
 	var dips [][][2]float32
 	x0, y0 := float32(math.Inf(1)), float32(math.Inf(1))
 	x1, y1 := float32(math.Inf(-1)), float32(math.Inf(-1))
@@ -397,11 +376,13 @@ func (p *Painter) fillTiles(polys []scene.Polyline, c ui.Color) {
 	v := p.Visible()
 	x0, y0 = max(x0, v.X-1), max(y0, v.Y-1)
 	x1, y1 = min(x1, v.X+v.W+1), min(y1, v.Y+v.H+1)
-	tile := maxMask/p.Scale() - 4
+	s := p.Scale()
+	// The tiles, in device pixels, from the pixel the first is in.
+	px0, py0 := int(math.Floor(float64(x0*s))), int(math.Floor(float64(y0*s)))
 	var path ui.Path
-	for ty := y0; ty < y1; ty += tile {
-		for tx := x0; tx < x1; tx += tile {
-			r := ui.Rect{X: tx, Y: ty, W: min(tile, x1-tx), H: min(tile, y1-ty)}
+	for ty := py0; float32(ty) < y1*s; ty += tile {
+		for tx := px0; float32(tx) < x1*s; tx += tile {
+			r := ui.Rect{X: float32(tx) / s, Y: float32(ty) / s, W: float32(tile) / s, H: float32(tile) / s}
 			path.Reset()
 			for _, poly := range dips {
 				clipped := clipPolygon(poly, r)
