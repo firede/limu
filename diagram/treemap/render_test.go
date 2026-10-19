@@ -80,6 +80,16 @@ func textView(s style.Style) string {
 	return fmt.Sprintf("%+v", style.Style{Text: s.Text, Opacity: s.Opacity})
 }
 
+// author writes what view takes of an author's style: as "author=" and the view, or as
+// "css=", as Pele writes no style, where the view is that of no style. A line of Pele's with
+// no style is so read as it is, and the oracle keeps only the lines with one in full.
+func author(view func(style.Style) string, s style.Style) string {
+	if v := view(s); v != view(style.Style{}) {
+		return "author=" + v
+	}
+	return "css="
+}
+
 // authorLine is a line of the fixture with the style Pele writes, "css=", read as limu reads
 // declarations, "author=": on a shape as it is, and on a text with its fill, which is the
 // color the author gave, read as that color.
@@ -99,18 +109,18 @@ func authorLine(line string) string {
 		return line
 	}
 	decls := strings.Split(css, ";")
-	var view string
+	var field string
 	if strings.HasPrefix(line, "section ") || strings.HasPrefix(line, "leaf ") {
-		view = shapeView(style.Declarations(decls).Style)
+		field = author(shapeView, style.Declarations(decls).Style)
 	} else {
 		for i, d := range decls {
 			if strings.HasPrefix(d, "fill:") {
 				decls[i] = "color:" + d[len("fill:"):]
 			}
 		}
-		view = textView(style.Declarations(decls).Style)
+		field = author(textView, style.Declarations(decls).Style)
 	}
-	return line[:at] + " author=" + view + line[end:]
+	return line[:at] + " " + field + line[end:]
 }
 
 // series are the colors Pele's seriesColor gives, as its SVG writes them.
@@ -176,7 +186,7 @@ func sceneLines(sc *scene.Scene) []string {
 		}
 		for _, line := range l.Lines {
 			at := prefix + "t " + pt(it.At.X, y) + " " + size + " " + anchors[it.Align] + " " + textPaints[it.Style.Text] + " " +
-				weight + " author=" + textView(it.Author) + " "
+				weight + " " + author(textView, it.Author) + " "
 			if len(line) == 0 {
 				lines = append(lines, at+" ")
 			}
@@ -205,9 +215,9 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Parts[0].Rounded {
 				rounded = "r"
 			}
-			lines = append(lines, fmt.Sprintf("%s %s [%s] %s,%s %s %s %s %s author=%s", kind, pelesvg.ID(it.ID), strings.Join(it.Class, " "),
+			lines = append(lines, fmt.Sprintf("%s %s [%s] %s,%s %s %s %s %s %s", kind, pelesvg.ID(it.ID), strings.Join(it.Class, " "),
 				pt(r.X, r.Y), pt(r.W, r.H), rounded, fillName(pelesvg.OwnFill(it)), strokeName(it.Style.Stroke), pelesvg.CapJoin(it),
-				shapeView(it.Author)))
+				author(shapeView, it.Author)))
 			weight := "-"
 			if it.Label != nil && len(it.Label.Lines) > 0 && it.Label.Lines[0][0].Face&text.Bold != 0 {
 				weight = "var(--_hw)"

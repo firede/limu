@@ -137,5 +137,5 @@ export default async function ({ pele, src, write, random }) {
   while (drawn < 5000) each(next());
   // The test reads the style Pele writes, css=, as limu reads declarations, so the lines with
   // one are kept in full.
-  write('diagram/treemap/testdata/pele/render.json', { cases: out }, { keep: (line) => line.includes(' css=') });
+  write('diagram/treemap/testdata/pele/render.json', { cases: out }, { keep: (line) => / css=[^ ]/.test(line) });
 }

@@ -138,6 +138,16 @@ func without(decls []string, prop string) []string {
 // view is a style as the test compares it.
 func view(s style.Style) string { return fmt.Sprintf("%+v", s) }
 
+// author writes the style an author gave a text: as "author=" and its view, or as "css=", as
+// Pele writes no style, where the author gave none. A text of Pele's with no style is so read
+// as it is, and the oracle keeps only the texts with one in full.
+func author(s style.Style) string {
+	if v := view(s); v != view(style.Style{}) {
+		return "author=" + v
+	}
+	return "css="
+}
+
 // peleLine is a line of the fixture with the style Pele writes on an element read as what a
 // browser draws: of a circle, its fill and stroke from the author's style or Pele's
 // attributes, each at the opacity the author's style or Pele's attributes give, under the
@@ -195,7 +205,7 @@ func peleLine(line string) string {
 			}
 		}
 		s := style.Declarations(decls).Style
-		return strings.Join(head[:n-1], " ") + " author=" + view(style.Style{Text: s.Text, Opacity: s.Opacity}) + line[bar:]
+		return strings.Join(head[:n-1], " ") + " " + author(style.Style{Text: s.Text, Opacity: s.Opacity}) + line[bar:]
 	}
 	return line
 }
@@ -324,7 +334,7 @@ func sceneLines(sc *scene.Scene) []string {
 			content = append(content, s)
 		}
 		lines = append(lines, kind+" "+id+" t "+pt(it.At.X, y)+" "+textPaints[it.Style.Text]+" "+num(l.Size)+" "+weight+" "+italic+
-			" author="+view(it.Author)+" | "+strings.Join(content, " | "))
+			" "+author(it.Author)+" | "+strings.Join(content, " | "))
 	}
 	for i := range sc.Items {
 		it := &sc.Items[i]

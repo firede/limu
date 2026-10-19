@@ -222,7 +222,11 @@ export default async function ({ src, pele, write, random }) {
     const s = next();
     if (s.length <= 3000) each(s);
   }
-  // The test reads the style Pele writes, css=, as limu reads declarations, so the lines with
-  // one are kept in full.
-  write('diagram/c4/testdata/pele/render.json', { cases: out }, { keep: (line) => line.includes(' css=') });
+  // The test reads the style Pele writes, css= and all that follows it on the line, as limu
+  // reads declarations, so the lines with one are kept in full.
+  const keep = (line) => {
+    const at = line.indexOf(' css=');
+    return at >= 0 && at + ' css='.length < line.length;
+  };
+  write('diagram/c4/testdata/pele/render.json', { cases: out }, { keep });
 }

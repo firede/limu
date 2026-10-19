@@ -90,8 +90,13 @@ func readCSS(line string) string {
 	return line[:m[0]] + " css=" + colors(style.Declarations(decls).Style.Fill, style.Declarations(decls).Style.Stroke)
 }
 
-// colors is an author's fill and stroke as the test writes them.
+// colors is an author's fill and stroke as the test writes them, and nothing where the author
+// set neither, as Pele writes no style. A line of Pele's with no style is so read as it is,
+// and the oracle keeps only the lines with one in full.
 func colors(fill, stroke style.Paint) string {
+	if !fill.Set() && !stroke.Set() {
+		return ""
+	}
 	paint := func(p style.Paint) string {
 		switch {
 		case !p.Set():

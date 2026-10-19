@@ -78,6 +78,16 @@ func TestLayoutMatchesPele(t *testing.T) {
 	}
 }
 
+// author writes an author's style: as "author=" and the style, or as "css=", as Pele writes
+// no style, where the author set none. A line of Pele's with no style is so read as it is, and
+// the oracle keeps only the lines with one in full.
+func author(s style.Style) string {
+	if v := fmt.Sprintf("%+v", s); v != fmt.Sprintf("%+v", style.Style{}) {
+		return "author=" + v
+	}
+	return "css="
+}
+
 // authorLine is a line of the fixture with the style Pele writes, "css=", read as limu reads
 // declarations, "author=". A band's own style holds the fill opacity of the group Pele draws it in.
 func authorLine(line string) string {
@@ -95,8 +105,7 @@ func authorLine(line string) string {
 	if err != nil {
 		return line
 	}
-	s := style.Declarations(strings.Split(css, ";")).Style
-	return line[:at] + " author=" + fmt.Sprintf("%+v", s) + line[end:]
+	return line[:at] + " " + author(style.Declarations(strings.Split(css, ";")).Style) + line[end:]
 }
 
 // series are the colors Pele's seriesColor gives, as its SVG writes them.
@@ -157,7 +166,6 @@ func sceneLines(sc *scene.Scene) []string {
 		lines = append(lines, "title "+pt(it.At.X, y)+" "+size+" | "+strings.Join(content, " | "))
 		items = items[1:]
 	}
-	author := func(it *scene.Item) string { return "author=" + fmt.Sprintf("%+v", it.Author) }
 	lines = append(lines, "links 0.4")
 	labelsLine := "labels " + n(jsmath.Round(float64(sc.FontSize*0.875)))
 	labelled := false
@@ -175,7 +183,7 @@ func sceneLines(sc *scene.Scene) []string {
 				}
 				d = append(d, s)
 			})
-			lines = append(lines, "link "+pelesvg.ID(it.ID)+" "+strings.Join(d, " ")+" "+paintName(pelesvg.OwnFill(it), 0.4)+" "+author(it)+
+			lines = append(lines, "link "+pelesvg.ID(it.ID)+" "+strings.Join(d, " ")+" "+paintName(pelesvg.OwnFill(it), 0.4)+" "+author(it.Author)+
 				" "+pelesvg.CapJoin(it)+" | "+pelesvg.ID(it.Tooltip))
 		case RoleNode:
 			r := it.Parts[0].Box
@@ -189,7 +197,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			bars[it.ID] = r.X
 			lines = append(lines, "node "+pelesvg.ID(it.ID)+" "+pt(r.X, r.Y)+","+pt(r.W, r.H)+" "+radius+" "+
-				paintName(it.Style.Fill, 1)+" "+stroke+" "+author(it)+" "+pelesvg.CapJoin(it))
+				paintName(it.Style.Fill, 1)+" "+stroke+" "+author(it.Author)+" "+pelesvg.CapJoin(it))
 		case RoleLabel:
 			if !labelled {
 				labelled = true
