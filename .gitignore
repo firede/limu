@@ -1,3 +1,6 @@
 # Test binaries and profiles.
 *.test
 *.out
+
+# Worktrees and settings of local tools.
+.claude/

@@ -5,7 +5,8 @@
 set -eu
 cd "$(dirname "$0")/.."
 go vet ./...
-unformatted=$(gofmt -l .)
+# The files of the repository, not those of worktrees kept inside it.
+unformatted=$(git ls-files -z '*.go' | xargs -0 gofmt -l)
 if [ -n "$unformatted" ]; then
 	echo "not formatted with gofmt:"
 	echo "$unformatted"
