@@ -58,7 +58,7 @@ ignores its parts.
 ### What the other diagrams need of it
 
 Before the scene was settled, the drawing of two diagrams unlike flowcharts was checked
-against it:
+against it; the charts were drawn in it since. They take these items:
 
 | Pele draws | As items |
 |---|---|
@@ -71,9 +71,18 @@ against it:
 | sequence: a rect block, a box of participants | `Group`, `sequence.rect` or `sequence.box`, a box filled in the theme's alternate surface, at half its opacity unless the author gave a fill |
 | sequence: an autonumber | `Node`, `sequence.number`, a rounded box, its label in the background's color |
 | sequence: a destroyed participant's cross | `Mark`, `sequence.destroy` |
-| pie: a slice | `Mark`, `pie.slice`, a path with an arc, filled with `style.Series(i)` |
-| pie: a slice's percentage, the legend's text | `Text`, the legend's aligned at its start |
-| pie: a legend's swatch | `Mark`, a box filled with the slice's series |
+| pie: a slice | `Mark`, `pie.slice`, a path of arcs, filled with `style.Series(i)` |
+| pie: a slice's percentage | `Text`, `pie.slice-label`, in the background's color on the slice, the text's outside it |
+| a chart's legend entry (pie, XY, radar) | `Node`, its swatch a part, a box of radius 2, and its label |
+| XY: a series | `Mark`, `xychart.bars` (a box per bar) or `xychart.line` (its path, its dots `FillOnly` parts) |
+| a chart's turned axis title (XY, quadrant) | `Text`, `Rotate` −90 |
+| radar: the graticule, the spokes | `Mark`, `radar.graticule` (a ring per part) and `radar.axes` |
+| radar: a curve | `Mark`, `radar.curve`, filled `Series(i)` at 0.2, with round joins |
+| quadrant: a quadrant, a point | `Node`, `quadrant.quadrant`; `Mark`, `quadrant.point`, a circle, its label a `Text` item |
+| sankey: a node, a band | `Node`, `sankey.node`; `Mark`, `sankey.link`, filled at 0.4 |
+| sankey: a label, its value in another color | two `Text` items, `sankey.label` and `sankey.value`, placed by the measure of the whole |
+| treemap: a section, a leaf | `Group`, `treemap.section`, tinted at 0.12; `Node`, `treemap.leaf`; a value a `Text` item |
+| venn: a set, an overlap with a style | `Mark`, `venn.set`, a circle at 0.2; `Mark`, `venn.overlap`, an outline of arcs |
 
 The scene needed two things for them that flowcharts do not: labels aligned at their start
 or end (`Align`, which journey, kanban, packet, railroad, requirement and treemap diagrams
@@ -172,5 +181,5 @@ commit they were written from.
 | M1 | flowcharts from text to pixels: the parser, the layered and compound layouts, the shapes; a backend for MyGo's native UI; a look in the Platinum style in mygo-platinum | done |
 | M2 | the diagrams on the layered layout: state, class, entity relationship, requirement, use case, agent flow, swimlane | done |
 | M3 | sequence, gantt, timeline, journey, git graph, packet, kanban | done |
-| M4 | the charts: pie, xy, quadrant, radar, sankey, treemap, venn | |
+| M4 | the charts: pie, xy, quadrant, radar, sankey, treemap, venn | done |
 | M5 | the rest: mindmap, architecture, C4, block, wardley, railroad, ishikawa, cynefin, event modeling, tree view, info | |
