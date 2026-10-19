@@ -316,23 +316,23 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 		return e.Dst != item
 	}
 
-	build := func(l *level, sized bool) ([]LNode, []LEdge, []int) {
+	build := func(l *level, sized bool) ([]lNode, []lEdge, []int) {
 		vertical := l.dir == TB || l.dir == BT
 		start := startSide(l.dir)
-		lnodes := make([]LNode, 0, len(l.items)+len(l.ports))
-		ledges := make([]LEdge, 0, len(l.edges)+len(l.ports))
+		lnodes := make([]lNode, 0, len(l.items)+len(l.ports))
+		ledges := make([]lEdge, 0, len(l.edges)+len(l.ports))
 		for i, item := range l.items {
 			local[item] = i
 			node := &nodes[item]
-			var ln LNode
+			var ln lNode
 			if sized {
 				if vertical {
-					ln = NewLNode(node.W, node.H, KindNode)
+					ln = newLNode(node.W, node.H, kindNode)
 				} else {
-					ln = NewLNode(node.H, node.W, KindNode)
+					ln = newLNode(node.H, node.W, kindNode)
 				}
 			} else {
-				ln = NewLNode(0, 0, KindNode)
+				ln = newLNode(0, 0, kindNode)
 			}
 			if node.IsGroup {
 				ln.Span = math.Min(node.Span, ln.W-float64(2*node.PadX))
@@ -356,7 +356,7 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 		}
 		for _, le := range l.edges {
 			e := &edges[le.e]
-			edge := NewLEdge(local[le.a], local[le.b], e.Minlen, 0, 0)
+			edge := newLEdge(local[le.a], local[le.b], e.Minlen, 0, 0)
 			if sized {
 				if vertical {
 					edge.LabelW, edge.LabelH = e.LabelW, e.LabelH
@@ -374,19 +374,19 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 		for i, port := range l.ports {
 			if port.side == start || port.side == opposite(start) {
 				d := len(lnodes)
-				kind := KindEndPort
+				kind := kindEndPort
 				if port.side == start {
-					kind = KindStartPort
+					kind = kindStartPort
 				}
-				lnodes = append(lnodes, NewLNode(0, 0, kind))
+				lnodes = append(lnodes, newLNode(0, 0, kind))
 				dummies[i] = d
-				var edge LEdge
+				var edge lEdge
 				if port.out {
-					edge = NewLEdge(local[port.inner], d, 1, 0, 0)
+					edge = newLEdge(local[port.inner], d, 1, 0, 0)
 					edge.TailDx = offset(port.inner, port.e, true)
 					edge.TailFixed = held(port.inner, port.e, true)
 				} else {
-					edge = NewLEdge(d, local[port.inner], 1, 0, 0)
+					edge = newLEdge(d, local[port.inner], 1, 0, 0)
 					edge.HeadDx = offset(port.inner, port.e, false)
 					edge.HeadFixed = held(port.inner, port.e, false)
 				}
@@ -421,8 +421,8 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 			continue
 		}
 		lnodes, ledges, _ := build(l, false)
-		Orient(lnodes, ledges)
-		Rank(lnodes, ledges, 1)
+		orient(lnodes, ledges)
+		rank(lnodes, ledges, 1)
 		start := startSide(l.dir)
 		for i, le := range l.edges {
 			e := &edges[le.e]
@@ -455,7 +455,7 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 		vertical := l.dir == TB || l.dir == BT
 		flip := l.dir == BT || l.dir == RL
 		lnodes, ledges, dummies := build(l, true)
-		size := Layered(lnodes, ledges, opt)
+		size := layered(lnodes, ledges, opt)
 		contentW, contentH := size.Height, size.Width
 		if vertical {
 			contentW, contentH = size.Width, size.Height

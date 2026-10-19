@@ -67,7 +67,7 @@ type peleLayered struct {
 	Nodes []struct {
 		W    num  `json:"w"`
 		H    num  `json:"h"`
-		Kind Kind `json:"kind"`
+		Kind kind `json:"kind"`
 		Pin  num  `json:"pin"`
 		Span num  `json:"span"`
 	} `json:"nodes"`
@@ -239,16 +239,16 @@ func TestHypotMatchesV8(t *testing.T) {
 	}
 }
 
-func layeredInput(c *peleLayered) ([]LNode, []LEdge) {
-	nodes := make([]LNode, len(c.Nodes))
+func layeredInput(c *peleLayered) ([]lNode, []lEdge) {
+	nodes := make([]lNode, len(c.Nodes))
 	for i, n := range c.Nodes {
-		nodes[i] = NewLNode(float64(n.W), float64(n.H), n.Kind)
+		nodes[i] = newLNode(float64(n.W), float64(n.H), n.Kind)
 		nodes[i].Pin = float64(n.Pin)
 		nodes[i].Span = float64(n.Span)
 	}
-	edges := make([]LEdge, len(c.Edges))
+	edges := make([]lEdge, len(c.Edges))
 	for i, e := range c.Edges {
-		edges[i] = NewLEdge(e.Tail, e.Head, float64(e.Minlen), float64(e.LabelW), float64(e.LabelH))
+		edges[i] = newLEdge(e.Tail, e.Head, float64(e.Minlen), float64(e.LabelW), float64(e.LabelH))
 		edges[i].TailDx = float64(e.TailDx)
 		edges[i].HeadDx = float64(e.HeadDx)
 		edges[i].TailFixed = e.TailFixed
@@ -265,7 +265,7 @@ func TestLayeredMatchesPele(t *testing.T) {
 	for i := range cases {
 		c := &cases[i]
 		nodes, edges := layeredInput(c)
-		got := Layered(nodes, edges, c.Opt.options())
+		got := layered(nodes, edges, c.Opt.options())
 		var d diff
 		d.num("width", got.Width, c.Out.Result.Width)
 		d.num("height", got.Height, c.Out.Result.Height)
@@ -356,13 +356,13 @@ func TestCompoundMatchesPele(t *testing.T) {
 func BenchmarkLayered(b *testing.B) {
 	nodes, edges := benchGraph(500)
 	opt := LayeredOptions{NodeSep: 40, EdgeSep: 16, RankSep: 48, PortSep: 20, HeadRoom: 7}
-	ns := make([]LNode, len(nodes))
-	es := make([]LEdge, len(edges))
+	ns := make([]lNode, len(nodes))
+	es := make([]lEdge, len(edges))
 	b.ReportAllocs()
 	for b.Loop() {
 		copy(ns, nodes)
 		copy(es, edges)
-		Layered(ns, es, opt)
+		layered(ns, es, opt)
 	}
 }
 
@@ -402,26 +402,26 @@ func BenchmarkCompound(b *testing.B) {
 	}
 }
 
-func benchGraph(count int) ([]LNode, []LEdge) {
+func benchGraph(count int) ([]lNode, []lEdge) {
 	s := uint32(500)
 	next := func() float64 {
 		s = s*1664525 + 1013904223
 		return float64(s) / (1 << 32)
 	}
-	nodes := make([]LNode, count)
+	nodes := make([]lNode, count)
 	for i := range nodes {
 		w := 40 + next()*160
-		nodes[i] = NewLNode(w, 30+next()*40, KindNode)
+		nodes[i] = newLNode(w, 30+next()*40, kindNode)
 		nodes[i].Span = w - 10
 	}
-	var edges []LEdge
+	var edges []lEdge
 	for k := 0; k < count*3/2; k++ {
 		tail := int(next() * float64(count))
 		head := int(next() * float64(count-1))
 		if head >= tail {
 			head++
 		}
-		e := NewLEdge(tail, head, 1, 0, 0)
+		e := newLEdge(tail, head, 1, 0, 0)
 		if next() < 0.2 {
 			e.LabelW, e.LabelH = 20+next()*80, 23
 		}

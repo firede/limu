@@ -442,9 +442,9 @@ func pastLabels(g *graph, xs []float64, firstDummy, span []int, clear float64, o
 		others := false
 		for i := layerStart[r]; i < layerStart[r+1]; i++ {
 			kind := KIND[order[i]]
-			if kind == KindLabel {
+			if kind == kindLabel {
 				labels = true
-			} else if kind != KindDummy {
+			} else if kind != kindDummy {
 				others = true
 			}
 		}
@@ -461,7 +461,7 @@ func pastLabels(g *graph, xs []float64, firstDummy, span []int, clear float64, o
 			continue
 		}
 		for d, end := d0, d0+span[ei]-1; d < end; d++ {
-			if KIND[d] != KindDummy || !labelled[RANK[d]] {
+			if KIND[d] != kindDummy || !labelled[RANK[d]] {
 				continue
 			}
 			// The points on either side that the edge is held at, past any bends already left out.
@@ -483,7 +483,7 @@ func pastLabels(g *graph, xs []float64, firstDummy, span []int, clear float64, o
 			r := RANK[d]
 			for i := layerStart[r]; free && i < layerStart[r+1]; i++ {
 				label := order[i]
-				if KIND[label] == KindLabel && xs[label]+W[label]/2 > lo && xs[label]-W[label]/2 < hi {
+				if KIND[label] == kindLabel && xs[label]+W[label]/2 > lo && xs[label]-W[label]/2 < hi {
 					free = false
 				}
 			}

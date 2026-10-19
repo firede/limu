@@ -12,7 +12,7 @@ import (
 // between each pair, the edges that leave side by side move closer together, since they have no
 // arrowheads to keep apart. With less room still, neighbours that run the same way share a
 // place, which keeps an arrowhead apart from an edge that leaves beside it.
-func sideEnds(g *graph, v, side int, span float64, kinds []End, ids *[]int, room *[]float64) float64 {
+func sideEnds(g *graph, v, side int, span float64, kinds []end, ids *[]int, room *[]float64) float64 {
 	start, list, other := g.predStart, g.predE, g.EF
 	if side != 0 {
 		start, list, other = g.succStart, g.succE, g.ET
@@ -80,12 +80,12 @@ func sideEnds(g *graph, v, side int, span float64, kinds []End, ids *[]int, room
 
 // spread gives the edges that meet one side of a node places of their own along it, around
 // its middle, as Pele's spread does.
-func spread(g *graph, nodes []LNode, EFK, ETK []End) {
+func spread(g *graph, nodes []lNode, EFK, ETK []end) {
 	var ids []int
 	var room []float64
 	for v := 0; v < g.real; v++ {
 		span := math.Min(nodes[v].Span, g.W[v])
-		if span <= 0 || nodes[v].Kind != KindNode {
+		if span <= 0 || nodes[v].Kind != kindNode {
 			continue
 		}
 		for side := 0; side < 2; side++ {
@@ -118,7 +118,7 @@ func follow(g *graph, empty []bool, e, side int) int {
 		if side == 0 {
 			u = g.EF[e]
 		}
-		if g.KIND[u] != KindDummy || !empty[g.RANK[u]] {
+		if g.KIND[u] != kindDummy || !empty[g.RANK[u]] {
 			break
 		}
 		if side == 0 {
@@ -133,7 +133,7 @@ func follow(g *graph, empty []bool, e, side int) int {
 // freeEnds counts, as Pele's freeEnds does, how many ends that may move along it each node has
 // on the side its edges arrive at, and on the other. An end that has a side to itself keeps to
 // the middle; ends that share one cannot all be there, so those may move.
-func freeEnds(g *graph, EFK, ETK []End) [2][]int {
+func freeEnds(g *graph, EFK, ETK []end) [2][]int {
 	free := [2][]int{make([]int, g.n), make([]int, g.n)}
 	for e := range g.EF {
 		if ETK[e] != endHeld {
@@ -163,14 +163,14 @@ func Ease(across, along float64) float64 {
 // ranks that hold nothing else are left to straighten. An edge with no one line that all of
 // its labels and bends have room on has each brought into line with the nearest point above or
 // below that is held in place.
-func alignLabels(g *graph, nodes []LNode, xs []float64, free [2][]int, opt LayeredOptions, empty []bool) {
+func alignLabels(g *graph, nodes []lNode, xs []float64, free [2][]int, opt LayeredOptions, empty []bool) {
 	sep := opt.EdgeSep
 	real, maxRank, KIND, RANK, W := g.real, g.maxRank, g.KIND, g.RANK, g.W
 	EF, ET, EFD, ETD := g.EF, g.ET, g.EFD, g.ETD
 	succStart, succE, predStart, predE := g.succStart, g.succE, g.predStart, g.predE
 	layerStart, order, pos := g.layerStart, g.order, g.pos
 	placed := func(v int) bool {
-		return KIND[v] == KindLabel || (KIND[v] == KindDummy && !(empty != nil && empty[RANK[v]]))
+		return KIND[v] == kindLabel || (KIND[v] == kindDummy && !(empty != nil && empty[RANK[v]]))
 	}
 	// Where segment e ends on the way up (side 0) or down, and how many ends share that side of
 	// the node there: none for a point that is not on a node.
@@ -182,7 +182,7 @@ func alignLabels(g *graph, nodes []LNode, xs []float64, free [2][]int, opt Layer
 		} else {
 			x = xs[u] + ETD[e]
 		}
-		if u < real && nodes[u].Kind == KindNode {
+		if u < real && nodes[u].Kind == kindNode {
 			return x, free[1-side][u]
 		}
 		return x, 0
@@ -194,7 +194,7 @@ func alignLabels(g *graph, nodes []LNode, xs []float64, free [2][]int, opt Layer
 		i := s + pos[v]
 		clear := func(other int) float64 {
 			var gap float64
-			if KIND[other] == KindNode {
+			if KIND[other] == kindNode {
 				gap = opt.NodeSep/2 + sep/2
 			} else if KIND[other] == KIND[v] {
 				gap = sep
@@ -292,7 +292,7 @@ func alignLabels(g *graph, nodes []LNode, xs []float64, free [2][]int, opt Layer
 // its edge runs to, where its side is long enough, and an end with a side to itself stays in
 // the middle. On a group, the ends keep clear of the points where other edges pass through its
 // border.
-func settle(g *graph, nodes []LNode, xs []float64, EFK, ETK []End, free [2][]int, empty []bool) {
+func settle(g *graph, nodes []lNode, xs []float64, EFK, ETK []end, free [2][]int, empty []bool) {
 	real, W := g.real, g.W
 	EF, ET, EFD, ETD := g.EF, g.ET, g.EFD, g.ETD
 	succStart, succE, predStart, predE, pos := g.succStart, g.succE, g.predStart, g.predE, g.pos
@@ -329,7 +329,7 @@ func settle(g *graph, nodes []LNode, xs []float64, EFK, ETK []End, free [2][]int
 		if side == 0 {
 			otherKinds = EFK
 		}
-		if u < real && nodes[u].Kind == KindNode && otherKinds[e] != endHeld && free[1-side][u] >= 2 {
+		if u < real && nodes[u].Kind == kindNode && otherKinds[e] != endHeld && free[1-side][u] >= 2 {
 			width = math.Max(0, math.Min(nodes[u].Span, W[u]))
 			if width > 0 {
 				middle = xs[u]
@@ -354,7 +354,7 @@ func settle(g *graph, nodes []LNode, xs []float64, EFK, ETK []End, free [2][]int
 		moved = false
 		for v := 0; v < real; v++ {
 			span := math.Min(nodes[v].Span, W[v])
-			if span <= 0 || nodes[v].Kind != KindNode {
+			if span <= 0 || nodes[v].Kind != kindNode {
 				continue
 			}
 			for side := 0; side < 2; side++ {
@@ -466,7 +466,7 @@ func settle(g *graph, nodes []LNode, xs []float64, EFK, ETK []End, free [2][]int
 func snap(g *graph, xs []float64, empty []bool, opt LayeredOptions) {
 	n, KIND, RANK, EF, ET, EFD, ETD := g.n, g.KIND, g.RANK, g.EF, g.ET, g.EFD, g.ETD
 	layerStart, order, pos := g.layerStart, g.order, g.pos
-	passed := func(u int) bool { return empty != nil && KIND[u] == KindDummy && empty[RANK[u]] }
+	passed := func(u int) bool { return empty != nil && KIND[u] == kindDummy && empty[RANK[u]] }
 	// Each edge from one point that is held in place to the next, past the bends in ranks that
 	// hold nothing else.
 	var a, b []int
@@ -580,7 +580,7 @@ func emptyRanks(g *graph) []bool {
 	for r := 1; r < g.maxRank; r++ {
 		only := g.layerStart[r+1] > g.layerStart[r]
 		for i := g.layerStart[r]; only && i < g.layerStart[r+1]; i++ {
-			if g.KIND[g.order[i]] != KindDummy {
+			if g.KIND[g.order[i]] != kindDummy {
 				only = false
 			}
 		}

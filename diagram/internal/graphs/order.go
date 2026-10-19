@@ -7,7 +7,7 @@ import (
 // reduceCrossings orders the nodes of each rank so that edges cross as little as they can, as
 // Pele's reduceCrossings does: sweeps up and down that sort each rank by the mean place of its
 // nodes' neighbours, keeping the order with the fewest crossings.
-func reduceCrossings(g *graph, nodes []LNode) {
+func reduceCrossings(g *graph, nodes []lNode) {
 	n, real, maxRank, W := g.n, g.real, g.maxRank, g.W
 	EF, ET, EFD, ETD := g.EF, g.ET, g.EFD, g.ETD
 	succStart, succE, predStart, predE := g.succStart, g.succE, g.predStart, g.predE

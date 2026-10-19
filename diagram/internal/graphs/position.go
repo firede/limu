@@ -7,7 +7,7 @@ import "math"
 // passes through, and needs no more than a bend.
 func halfRoom(g *graph, opt LayeredOptions, v int) float64 {
 	sep := opt.EdgeSep
-	if g.KIND[v] == KindNode {
+	if g.KIND[v] == kindNode {
 		sep = opt.NodeSep
 	}
 	return g.W[v]/2 + sep/2
