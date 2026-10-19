@@ -1,0 +1,3 @@
+# Test binaries and profiles.
+*.test
+*.out
