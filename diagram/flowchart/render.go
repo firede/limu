@@ -374,9 +374,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		c := &cnodes[i]
 		n := v.node
 		x, y := c.X, c.Y
-		classes := classNames(trimDefault(n.CSSClasses))
+		classes, tags := common.Clickable(classNames(trimDefault(n.CSSClasses)))
 		if c.IsGroup && variant != nil && variant.DrawGroup != nil && c.Parent < 0 {
-			clusters = append(clusters, variant.DrawGroup(c, &v.label, v.author, classes, n.ID, rootDir))
+			lane := variant.DrawGroup(c, &v.label, v.author, classes, n.ID, rootDir)
+			lane.Tags = tags
+			clusters = append(clusters, lane)
 			continue
 		}
 		if c.IsGroup {
@@ -384,7 +386,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			titleY := y - c.H/2 + 8 + v.label.Height/2
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
 			cluster := scene.Item{
-				Kind: scene.Group, Role: "flowchart.cluster", ID: n.ID, Class: classes, Box: box,
+				Kind: scene.Group, Role: "flowchart.cluster", ID: n.ID, Class: classes, Tags: tags, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
 				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
@@ -413,7 +415,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 
 		w, h := v.w, v.h
 		it := scene.Item{
-			Kind: scene.Node, Role: "flowchart.node", Shape: scene.Shape(v.shape), ID: n.ID, Class: classes,
+			Kind: scene.Node, Role: "flowchart.node", Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Tags: tags,
 			Box:    scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
 			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
 			Author: v.author.Style,

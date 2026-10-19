@@ -830,8 +830,9 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 		})
 		at += tinyHeight
 	}
+	classes, tags := common.Clickable(classNames(trimDefault(cls.CSSClasses)))
 	it := scene.Item{
-		Kind: scene.Node, Role: "class.class", Shape: "classBox", ID: cls.ID, Class: classNames(trimDefault(cls.CSSClasses)),
+		Kind: scene.Node, Role: "class.class", Shape: "classBox", ID: cls.ID, Class: classes, Tags: tags,
 		Box: box, Parts: parts,
 		Label: &v.label, At: scene.Point{X: x, Y: y + (at+first-titlePad)/2},
 		Style:   style.Style{Fill: style.Surface, Stroke: style.Border},

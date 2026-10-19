@@ -57,9 +57,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
-		if i := firstDiff(got, c.Lines); i >= 0 {
+		want := pelesvg.TagsLast(c.Lines, "clickable")
+		if i := firstDiff(got, want); i >= 0 {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, at(got, i), at(c.Lines, i))
+				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, at(got, i), at(want, i))
 			}
 		}
 	}
@@ -106,7 +107,7 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := 0; i < len(sc.Items); i++ {
 		it := &sc.Items[i]
 		id := peleID(it.ID)
-		classes := strings.Join(it.Class, " ")
+		classes := pelesvg.Classes(it)
 		kind, _ := strings.CutPrefix(string(it.Role), "agentflow.")
 		switch kind {
 		case "title":

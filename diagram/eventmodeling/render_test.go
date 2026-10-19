@@ -271,8 +271,8 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 		case "eventmodeling.ui", "eventmodeling.command", "eventmodeling.event", "eventmodeling.readmodel", "eventmodeling.processor":
 			s := "node " + it.ID + " " + strings.TrimPrefix(string(it.Role), "eventmodeling.")
-			if len(it.Class) > 0 {
-				s += " " + strings.Join(it.Class, " ")
+			if len(it.Tags) > 0 {
+				s += " " + strings.Join(it.Tags, " ")
 			}
 			lines = append(lines, s)
 			for k := range it.Parts {

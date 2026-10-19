@@ -453,14 +453,14 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		c := &cnodes[i]
 		n := v.node
 		x, y := c.X, c.Y
-		classes := classNames(trimDefault(n.CSSClasses))
+		classes, tags := common.Clickable(classNames(trimDefault(n.CSSClasses)))
 		if c.IsGroup {
 			titleX := draw.ClusterTitleX(node(i), v.label.Width, crossings, groupPad)
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
 			own := tint(slot(n), 0.06, v.filled)
 			own.Text = style.Muted
 			cluster := scene.Item{
-				Kind: scene.Group, Role: "agentflow.flow", ID: n.ID, Class: classes, Box: box,
+				Kind: scene.Group, Role: "agentflow.flow", ID: n.ID, Class: classes, Tags: tags, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
 				Style:  own,
 				Author: v.author.Style,
@@ -476,7 +476,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		w, h := v.w, v.h
 		box := scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h}
 		it := scene.Item{
-			Kind: scene.Node, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Box: box,
+			Kind: scene.Node, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Tags: tags, Box: box,
 			Author: v.author.Style,
 			Label:  &v.label, At: scene.Point{X: x, Y: y + v.dy},
 			Tooltip: n.Tooltip,

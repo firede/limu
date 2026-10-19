@@ -55,10 +55,21 @@ type Item struct {
 	Role  Role
 	Shape Shape
 	ID    string // the id the diagram's text gave it, if any
-	// Class is the classes the diagram's text gives the part, as classDef does, or a gantt
-	// task's tags, and those a diagram sorts its parts into, as a gantt chart's sections.
-	// The svg backend writes them as the element's classes, for a host's CSS.
+	// Class is the classes the diagram's author gave the item, by name: with class statements
+	// and classDef's default, with :::name, or in a list of classes where the diagram takes
+	// one, as a kanban card or a tree view's entry does. A class's style is already in Author.
 	Class []string
+	// Tags are what the diagram says the item is beyond its role, which Pele writes among the
+	// classes of what it draws: a C4 element's kind ("person", "system_db"…) and "external",
+	// a C4 relation's kind ("rel", "birel"…) and a deployment node's ("node", "nodeL",
+	// "nodeR"); a gantt task's state ("done", "active", "crit", "milestone", "unscheduled");
+	// the branch a gantt section or a mindmap's node or edge is in ("section-0"…); a wardley
+	// component's sourcing ("build", "buy", "outsource", "market"); "reset" on an event
+	// modeling frame that resets; and "clickable", which Mermaid gives what has a click.
+	//
+	// The svg backend writes the tags and then the classes as the element's classes, for a
+	// host's CSS.
+	Tags []string
 
 	// Box is where the item is: the box of its shape, for a node or a group; for an edge, the
 	// box its path lies in, the control points of its curves included, and for a mark, of

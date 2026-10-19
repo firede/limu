@@ -242,6 +242,10 @@ func (w *Writer) Item(it *scene.Item, st style.Style) {
 		b.WriteString(" limu-shape-")
 		w.Text(string(it.Shape))
 	}
+	for _, c := range it.Tags {
+		b.WriteByte(' ')
+		w.Text(c)
+	}
 	for _, c := range it.Class {
 		b.WriteByte(' ')
 		w.Text(c)

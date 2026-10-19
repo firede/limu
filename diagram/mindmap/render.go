@@ -77,7 +77,7 @@ func outline(shape string, cx, cy, w, h float64) []scene.Part {
 // are stroked in and its nodes outlined in and filled with at 22%. A node with no shape of its
 // own is plain text where its branch ends, and text in a pill, a stadium, where the branch
 // goes on from it. The root is in the theme's surface and border. Every item of a branch has
-// the class "section-" and its section, as Pele's group about the branch has.
+// the tag "section-" and its section, as Pele's group about the branch has that class.
 //
 // A node's icon is a Picture of it, beside its text, when the host can draw it
 // (layout.Options.Icons); one it cannot draw takes no room.
@@ -371,7 +371,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 				route = []scene.Point{{X: x1, Y: y1}, {X: x2, Y: y2}}
 			}
 			edges = append(edges, scene.Item{
-				Kind: scene.Edge, Role: RoleEdge, Class: []string{branchClass},
+				Kind: scene.Edge, Role: RoleEdge, Tags: []string{branchClass},
 				Box:   path.Bounds(),
 				Parts: []scene.Part{{Path: path, Paint: scene.StrokeOnly}},
 				Route: route,
@@ -394,7 +394,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 			it.Style = style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg}
 			it.Class = classNames(node.Class)
 		} else {
-			it.Class = append([]string{branchClass}, classNames(node.Class)...)
+			it.Tags, it.Class = []string{branchClass}, classNames(node.Class)
 		}
 		switch {
 		case shape != "":

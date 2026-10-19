@@ -226,7 +226,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if len(it.Parts) != 1 || it.Parts[0].Box != r || it.Style.Stroke != style.None {
 				lines = append(lines, "band not one box")
 			}
-			index := strings.TrimPrefix(strings.Join(it.Class, " "), "section-")
+			index := strings.TrimPrefix(strings.Join(it.Tags, " "), "section-")
 			lines = append(lines, fmt.Sprintf("band %s %s,%s %s -", index, pt(r.X, r.Y), pt(r.W, r.H), paintName(pelesvg.OwnFill(it))))
 		case "gantt.excluded":
 			r := it.Box
@@ -253,7 +253,7 @@ func sceneLines(sc *scene.Scene) []string {
 				paths(it.Parts[1].Path, paintName(pelesvg.OwnFill(it))+" - "+pen(it))
 			}
 		case "gantt.task":
-			lines = append(lines, fmt.Sprintf("task %s [%s]", peleID(it.ID), strings.Join(it.Class, " ")))
+			lines = append(lines, fmt.Sprintf("task %s [%s]", peleID(it.ID), strings.Join(it.Tags, " ")))
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
 			}

@@ -159,9 +159,9 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 		it := &sc.Items[i]
 		// Pele draws each first-level branch in a group of its own, its links first.
 		if it.Role == RoleEdge || it.Role == RoleNode {
-			s, err := strconv.Atoi(strings.TrimPrefix(it.Class[0], "section-"))
+			s, err := strconv.Atoi(strings.TrimPrefix(it.Tags[0], "section-"))
 			if err != nil {
-				t.Errorf("item %d has no section: %v", i, it.Class)
+				t.Errorf("item %d has no section: %v", i, it.Tags)
 			}
 			if s != section || it.Role == RoleEdge && i > 0 && sc.Items[i-1].Role == RoleNode {
 				lines = append(lines, "branch "+strconv.Itoa(s))
@@ -194,8 +194,6 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 			classes := it.Class
 			if it.Role == RoleRoot {
 				root = " root"
-			} else {
-				classes = classes[1:]
 			}
 			b := it.Box
 			lines = append(lines, fmt.Sprintf("node %s %s%s [%s] %s,%s", pelesvg.ID(it.ID), shape, root, strings.Join(classes, " "), pt(b.X, b.Y), pt(b.W, b.H)))

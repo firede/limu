@@ -270,7 +270,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 			taken = append(taken, r.ex-arrow, r.ey-arrow, r.ex+arrow, r.ey+arrow)
 		}
 		it := scene.Item{
-			Kind: scene.Edge, Role: RoleRel, ID: rel.From + "-" + rel.To, Class: []string{rel.Type},
+			Kind: scene.Edge, Role: RoleRel, ID: rel.From + "-" + rel.To, Tags: []string{rel.Type},
 			Box:   r.path.Bounds(),
 			Parts: []scene.Part{{Path: r.path, Paint: scene.StrokeOnly}},
 			// A line ends round, as Pele draws it in the group of edges, which sets round
@@ -435,7 +435,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		}
 		if b.NodeType != "" {
 			it.Role = RoleDeployment
-			it.Class = []string{b.NodeType}
+			it.Tags = []string{b.NodeType}
 			it.Style.Dash = style.Dash{}
 		}
 		clusters = append(clusters, it)
@@ -502,12 +502,12 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 				own.Dash = style.Dashes(4, 3)
 			}
 			href := link(shape.Link, o)
-			class := []string{shape.Kind}
+			tags := []string{shape.Kind}
 			if external {
-				class = append(class, "external")
+				tags = append(tags, "external")
 			}
 			it := scene.Item{
-				Kind: scene.Node, Role: RoleElement, Shape: scene.Shape(form), ID: shape.Alias, Class: class,
+				Kind: scene.Node, Role: RoleElement, Shape: scene.Shape(form), ID: shape.Alias, Tags: tags,
 				Box:    scene.Rect{X: nx - w/2, Y: ny - h/2, W: w, H: h},
 				Parts:  draw.Outline(form, nx, ny, w, h),
 				Style:  own,

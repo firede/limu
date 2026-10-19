@@ -181,6 +181,16 @@ func TestRenderFillOpacity(t *testing.T) {
 	}
 }
 
+// An item's tags and then its classes are written as the element's classes.
+func TestRenderTagsAndClasses(t *testing.T) {
+	sc := &scene.Scene{Width: 10, Height: 10, Items: []scene.Item{{
+		Kind: scene.Node, Role: "c4.element", Tags: []string{"person", "external"}, Class: []string{"mine"},
+	}}}
+	if got := Render(sc, nil); !strings.Contains(got, `class="limu-node limu-c4-element person external mine"`) {
+		t.Errorf("classes not written:\n%s", got)
+	}
+}
+
 // icons is an IconMarkup that has every icon, a circle.
 func icons(string) string { return `<circle cx="12" cy="12" r="10"/>` }
 
