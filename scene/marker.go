@@ -16,20 +16,21 @@ type markerKind struct {
 var markers = map[MarkerType]markerKind{
 	"arrow_point": {MarkerSize - 1, func(m Marker) []Part {
 		x, y, dx, dy, nx, ny := m.frame()
-		bx, by := x-dx*MarkerSize, y-dy*MarkerSize
+		bx, by := x-float64(dx*MarkerSize), y-float64(dy*MarkerSize)
 		half := MarkerSize * 0.42
-		return []Part{{Path: new(Path).Polygon(x, y, bx+nx*half, by+ny*half, bx-nx*half, by-ny*half), Paint: FillOnly}}
+		lx, ly := float64(nx*half), float64(ny*half)
+		return []Part{{Path: new(Path).Polygon(x, y, bx+lx, by+ly, bx-lx, by-ly), Paint: FillOnly}}
 	}},
 	"arrow_circle": {MarkerSize, func(m Marker) []Part {
 		x, y, dx, dy, _, _ := m.frame()
-		return []Part{{Path: new(Path).Ellipse(x-dx*4, y-dy*4, 3.5, 3.5), Paint: FillOnly}}
+		return []Part{{Path: new(Path).Ellipse(x-float64(dx*4), y-float64(dy*4), 3.5, 3.5), Paint: FillOnly}}
 	}},
 	"arrow_cross": {4, func(m Marker) []Part {
 		x, y, dx, dy, nx, ny := m.frame()
-		cx, cy := x-dx*4, y-dy*4
+		cx, cy := x-float64(dx*4), y-float64(dy*4)
 		const a = 3.5
-		ux, uy := (dx+nx)*a, (dy+ny)*a
-		vx, vy := (dx-nx)*a, (dy-ny)*a
+		ux, uy := float64((dx+nx)*a), float64((dy+ny)*a)
+		vx, vy := float64((dx-nx)*a), float64((dy-ny)*a)
 		p := new(Path).MoveTo(cx-ux, cy-uy).LineTo(cx+ux, cy+uy).MoveTo(cx-vx, cy-vy).LineTo(cx+vx, cy+vy)
 		return []Part{{Path: p, Paint: StrokeOnly}}
 	}},

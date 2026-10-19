@@ -3,6 +3,8 @@ package style
 import (
 	"strconv"
 	"strings"
+
+	"github.com/firede/limu/internal/chars"
 )
 
 // Author is what a diagram's author set in its text, with classDef and style lines, in the
@@ -71,10 +73,9 @@ func Declarations(decls []string) Author {
 	if stroke < 1 {
 		a.Style.Stroke = a.Style.Stroke.Alpha(stroke)
 	}
-	n, err := strconv.ParseFloat(weight, 64)
-	a.Bold = weight == "bold" || weight == "bolder" || err == nil && n >= 600
+	a.Bold = weight == "bold" || weight == "bolder" || chars.Number(weight) >= 600
 	a.Italic = fontStyle == "italic"
-	if px, ok := length(fontSize); ok && px > 0 && px <= 200 && !strings.HasSuffix(fontSize, "%") {
+	if px, ok := fontPixels(fontSize); ok && px > 0 && px <= 200 {
 		a.FontSize = px
 	}
 	return a
@@ -101,6 +102,23 @@ func fraction(value string, was float64) float64 {
 		return was
 	}
 	return max(0, min(1, f))
+}
+
+// fontPixels reads a font size as Pele's resolveStyle does: one that /^[\d.]+(px)?$/ takes,
+// read with parseFloat, which stops at a second point.
+func fontPixels(value string) (float64, bool) {
+	body := strings.TrimSuffix(value, "px")
+	if body == "" || strings.TrimLeft(body, "0123456789.") != "" {
+		return 0, false
+	}
+	end := strings.IndexByte(body, '.')
+	if end >= 0 {
+		if next := strings.IndexByte(body[end+1:], '.'); next >= 0 {
+			body = body[:end+1+next]
+		}
+	}
+	f, err := strconv.ParseFloat(body, 64)
+	return f, err == nil
 }
 
 // length reads a number of pixels, with or without px.

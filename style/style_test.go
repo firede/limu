@@ -73,6 +73,24 @@ func TestDeclarations(t *testing.T) {
 	}
 }
 
+// Font sizes and weights are read as Pele's resolveStyle reads them, with JavaScript's
+// /^[\d.]+(px)?$/, parseFloat and Number.
+func TestDeclarationsFont(t *testing.T) {
+	for size, want := range map[string]float64{
+		"12px": 12, "12": 12, ".5": 0.5, "1.2.3": 1.2, "3.": 3, "1e2": 0, "+5": 0, "5pxpx": 0, "50%": 0,
+		".": 0, "px": 0, "0": 0, "201": 0, "200px": 200, "12 px": 0,
+	} {
+		if got := Declarations([]string{"font-size:" + size}).FontSize; got != want {
+			t.Errorf("font-size:%s = %v, want %v", size, got, want)
+		}
+	}
+	for weight, want := range map[string]bool{"bold": true, "600": true, " 700 ": true, "0x258": true, "599": false, "6e2": true, "x": false} {
+		if got := Declarations([]string{"font-weight:" + weight}).Bold; got != want {
+			t.Errorf("font-weight:%s bold %v, want %v", weight, got, want)
+		}
+	}
+}
+
 func TestDeclarationsDropUnsafe(t *testing.T) {
 	a := Declarations([]string{"fill:url(#x)", "stroke:  url (x)", "color:red;x", "fill-opacity", ":red", "font-weight:500"})
 	if a.Style.Fill.Set() || a.Style.Stroke.Set() || a.Style.Text.Set() || a.Bold {
