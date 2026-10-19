@@ -17,9 +17,11 @@ export async function resolve(spec, ctx, next) {
 // them whole; the suite rounds them as num would once it is done with them. While it is set,
 // classMarker also writes what it draws a marker from, so that the marker can be drawn again
 // where a group moves it, and a kanban board's textBlock writes, in place of each line of
-// text, where the line starts or ends and what is in it, as the scene holds a label; and a
+// text, where the line starts or ends and what is in it, as the scene holds a label; a
 // pie's percentages write, as data-y, where they are before Pele adds the shift to their
-// baseline, as the scene holds a label about its middle.
+// baseline, as the scene holds a label about its middle; and a radar chart's labelSvg writes,
+// before each label, the point it is centered on, its size and the text of its lines, as the
+// scene holds them.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -31,6 +33,7 @@ const TEXT_BLOCK = 'function textBlock(';
 const PIE_OUTSIDE = 'outside += `<text x="${num(x)}"';
 const PIE_INSIDE = 'labels += `<text x="${num(Math.sin(mid) * r)}"';
 const dataY = (y) => `<text\${(globalThis as any).limuExactNumbers ? \` data-y="\${${y}}"\` : ''}`;
+const RADAR_IMPORT = "import { escText, labelSvg, num } from '../../svg/builder.js';";
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -75,6 +78,20 @@ function textBlock(label: Label, x: number, y: number, attrs: string, icons: Ico
     let source = String(loaded.source);
     source = patch(url, source, PIE_OUTSIDE, PIE_OUTSIDE.replace('<text', dataY('y')));
     source = patch(url, source, PIE_INSIDE, PIE_INSIDE.replace('<text', dataY('-Math.cos(mid) * r')));
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/radar/render.ts')) {
+    const loaded = await next(url, ctx);
+    const source =
+      patch(url, String(loaded.source), RADAR_IMPORT, RADAR_IMPORT.replace('labelSvg', 'labelSvg as labelSvgPele')) +
+      `
+function labelSvg(label: Label, cx: number, cy: number, attrs: string): string {
+  const s = labelSvgPele(label, cx, cy, attrs);
+  if (!(globalThis as any).limuExactNumbers || s === '') return s;
+  const lines = label.lines.map((line) => line.map((span) => span.text).join(''));
+  return \`<limu-label x="\${cx}" y="\${cy}" w="\${label.width}" h="\${label.height}" lines="\${encodeURIComponent(JSON.stringify(lines))}"/>\` + s;
+}
+`;
     return { ...loaded, source, shortCircuit: true };
   }
   if (url.endsWith('.json')) {
