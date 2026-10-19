@@ -73,10 +73,9 @@ func TestDeclarations(t *testing.T) {
 	}
 }
 
-// Font sizes and weights are read as Pele's resolveStyle reads them, with JavaScript's
-// /^[\d.]+(px)?$/, parseFloat and Number.
 // Caps and joins are read as the browser takes what Pele passes through: a keyword in
-// either case, the last one it takes winning; inherit leaves them to what is under them.
+// either case. Pele keeps only the last value of each, so one the browser drops, or inherit,
+// leaves them to what is under them.
 func TestDeclarationsCapJoin(t *testing.T) {
 	for _, c := range []struct {
 		decls []string
@@ -87,7 +86,7 @@ func TestDeclarationsCapJoin(t *testing.T) {
 		{[]string{"stroke-linecap: SQUARE !important", "stroke-linejoin:Miter"}, CapSquare, JoinMiter},
 		{[]string{"stroke-linecap:round", "stroke-linecap:initial", "stroke-linejoin:initial"}, CapButt, JoinMiter},
 		{[]string{"stroke-linecap:round", "stroke-linecap:inherit", "stroke-linejoin:round", "stroke-linejoin:unset"}, 0, 0},
-		{[]string{"stroke-linecap:round", "stroke-linecap:flat", "stroke-linejoin:round", "stroke-linejoin:miter-clip"}, CapRound, JoinRound},
+		{[]string{"stroke-linecap:round", "stroke-linecap:flat", "stroke-linejoin:round", "stroke-linejoin:miter-clip"}, 0, 0},
 		{[]string{"stroke-linecap:ſquare", "stroke-linejoin:arcs"}, 0, 0},
 	} {
 		s := Declarations(c.decls).Style
@@ -120,6 +119,8 @@ func TestCapJoin(t *testing.T) {
 	}
 }
 
+// Font sizes and weights are read as Pele's resolveStyle reads them, with JavaScript's
+// /^[\d.]+(px)?$/, parseFloat and Number.
 func TestDeclarationsFont(t *testing.T) {
 	for size, want := range map[string]float64{
 		"12px": 12, "12": 12, ".5": 0.5, "1.2.3": 1.2, "3.": 3, "1e2": 0, "+5": 0, "5pxpx": 0, "50%": 0,
