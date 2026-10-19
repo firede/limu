@@ -5,7 +5,9 @@
 // and parsed as Pele's parse does it, after the preprocessing every diagram goes through.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { arrayIn, docs, fileLiterals, lone, picker } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/sankey/oracle.test.ts, and some for the preparation of the
 // text and the reading of numbers.
@@ -84,33 +86,6 @@ export const WRITTEN = [
   'sanKey-beta\na,b,1',
 ];
 
-// Every diagram source that appears as a string literal in a file of Pele's tests, as its
-// loadCorpus finds them.
-function literals(file, keyword) {
-  const out = [];
-  const src = readFileSync(file, 'utf8');
-  for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-    const raw = m[1] ?? m[2] ?? m[3];
-    if (!keyword.test(raw)) continue;
-    try {
-      out.push(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-    } catch {
-      continue;
-    }
-  }
-  return out;
-}
-
-// An array literal of a test's source, evaluated with the names given.
-function arrayIn(file, start, names = {}, close = '\n];') {
-  const src = readFileSync(file, 'utf8');
-  const from = src.indexOf(start);
-  if (from < 0) throw new Error(`no ${start} in ${file}`);
-  const open = from + start.length;
-  const end = src.indexOf(close, open);
-  return new Function(...Object.keys(names), 'return [' + src.slice(open, end) + '\n];')(...Object.values(names));
-}
-
 // Pele's hostile templates, tests/render/sankey-security.test.ts, with each of its payloads.
 export function hostile(pele) {
   const payloads = arrayIn(join(pele, 'tests/support/inert.ts'), 'export const PAYLOADS = [');
@@ -127,9 +102,9 @@ export function hostile(pele) {
 // The corpus the suites start from: documentation, specs, Pele's tests and the cases above.
 export function corpus(pele, cleanupComments) {
   const out = new Set();
-  for (const s of JSON.parse(readFileSync(join(pele, 'tests/corpus/sankey-docs.json'), 'utf8'))) out.add(s);
+  for (const s of docs(pele, 'sankey')) out.add(s);
   for (const file of ['tests/compat/sankey/sankey.spec.ts', 'tests/render/sankey.test.ts', 'tests/sankey/layout.test.ts', 'tests/render/max-width.test.ts']) {
-    for (const s of literals(join(pele, file), /sankey/i)) out.add(s);
+    for (const s of fileLiterals(join(pele, file), /sankey/i)) out.add(s);
   }
   const csv = energy(pele);
   for (const head of ['sankey-beta\n\n ', 'sankey\n\n ']) {
@@ -143,7 +118,7 @@ export function corpus(pele, cleanupComments) {
 
 // Diagrams of random rows, most of which get through the grammar.
 export function rowDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const names = ['a', 'b', 'c', 'Coal', 'Gas', '"x y"', '"a, b"', '"q ""q"""', ' pad ', 'Losses', '"é"', 'n1', 'n2', 'n3', '#35;', '&amp;'];
   const amounts = ['1', '2.5', '0', '-1', '.5', '100', '1e3', 'x', '"7"', ' 3 ', '0.001', '12345.678', 'NaN', '1e400', '-0'];
   return () => {

@@ -406,7 +406,7 @@ func draw(model *Model, config diagram.Config, o *layout.Options, tight bool) *s
 	if w := option(config, "strokeWidth", 0, 20); w > 0 {
 		stroke = style.N(w)
 	}
-	const pad = common.Padding
+	pad := o.Pad()
 	arc := m.arc
 
 	room := 4000.0

@@ -2,7 +2,9 @@
 // buildClassGraph makes of it: the sources of Pele's tests and Mermaid's specs and
 // documentation, Pele's tour of the grammar, cases written here, and those sources mutated at
 // random. Members are also read on their own, from random text, as Pele's tests read them.
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/class/oracle.test.ts, and more of what reaches past the grammar:
 // entities, Unicode, generics, styles.

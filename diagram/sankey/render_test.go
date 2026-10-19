@@ -1,7 +1,6 @@
 package sankey
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -36,12 +35,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 5000 {
@@ -88,7 +83,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 }
 
 // authorLine is a line of the fixture with the style Pele writes, "css=", read as limu reads
-// declarations, "author=", a band's fill at the opacity of the group it is in.
+// declarations, "author=". A band's own style holds the fill opacity of the group Pele draws it in.
 func authorLine(line string) string {
 	at := strings.Index(line, " css=")
 	if at < 0 {
@@ -105,9 +100,6 @@ func authorLine(line string) string {
 		return line
 	}
 	s := style.Declarations(strings.Split(css, ";")).Style
-	if strings.HasPrefix(line, "link ") && s.Fill.Visible() {
-		s.Fill = s.Fill.Alpha(0.4)
-	}
 	return line[:at] + " author=" + fmt.Sprintf("%+v", s) + line[end:]
 }
 
@@ -187,7 +179,7 @@ func sceneLines(sc *scene.Scene) []string {
 				}
 				d = append(d, s)
 			})
-			lines = append(lines, "link "+pelesvg.ID(it.ID)+" "+strings.Join(d, " ")+" "+paintName(it.Style.Fill, 0.4)+" "+author(it)+
+			lines = append(lines, "link "+pelesvg.ID(it.ID)+" "+strings.Join(d, " ")+" "+paintName(pelesvg.OwnFill(it), 0.4)+" "+author(it)+
 				" "+pelesvg.CapJoin(it)+" | "+pelesvg.ID(it.Tooltip))
 		case RoleNode:
 			r := it.Parts[0].Box

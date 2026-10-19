@@ -1,7 +1,6 @@
 package state
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -29,12 +28,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 2500 {
@@ -53,7 +48,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
-		if i := firstDiff(got, c.Lines); i >= 0 {
+		if i := fixture.FirstDiff(got, c.Lines); i >= 0 {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, at(got, i), at(c.Lines, i))
 			}
@@ -62,15 +57,6 @@ func TestLayoutMatchesPele(t *testing.T) {
 	if failed > 0 {
 		t.Errorf("%d of %d differ", failed, len(p.Cases))
 	}
-}
-
-func firstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
 }
 
 func at(lines []string, i int) string {
@@ -172,7 +158,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 		case RoleEdgeLabel:
 			lines = append(lines, "label "+id)
-			rect("rect", it.Parts[0].Box, 0, 0, "3")
+			rect("rect", it.Box, 0, 0, "3")
 			label(it.Label, it.At.X, it.At.Y)
 		case RoleDescription:
 			if it.Label != nil && len(it.Label.Lines) > 0 {
@@ -281,12 +267,8 @@ func peleMarker(m scene.Marker) string {
 
 // Every diagram of the corpus lays out with each routing, and the svg backend draws it.
 func TestRoutingAndDrawing(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	for k, c := range p.Cases {

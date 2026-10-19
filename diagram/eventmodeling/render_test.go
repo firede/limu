@@ -1,7 +1,6 @@
 package eventmodeling
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -33,12 +32,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
@@ -231,7 +226,7 @@ func sceneLines(sc *scene.Scene) []string {
 		if part.Rounded {
 			radius = "r"
 		}
-		fill, opacity, stroke := it.Style.Fill, "-", paintName(it.Style.Stroke)
+		fill, opacity, stroke := pelesvg.OwnFill(it), "-", paintName(it.Style.Stroke)
 		switch part.Paint {
 		case scene.Shade:
 			fill, stroke = style.Bg, "-"
@@ -271,8 +266,8 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 		case "eventmodeling.ui", "eventmodeling.command", "eventmodeling.event", "eventmodeling.readmodel", "eventmodeling.processor":
 			s := "node " + it.ID + " " + strings.TrimPrefix(string(it.Role), "eventmodeling.")
-			if len(it.Class) > 0 {
-				s += " " + strings.Join(it.Class, " ")
+			if len(it.Tags) > 0 {
+				s += " " + strings.Join(it.Tags, " ")
 			}
 			lines = append(lines, s)
 			for k := range it.Parts {

@@ -26,7 +26,7 @@ func actorKind(typ string) string {
 }
 
 // isFigure reports whether a kind is a figure, which stands above its label; the other kinds
-// hold the label inside.
+// hold the label inside. It is Pele's isFigure.
 func isFigure(kind string) bool {
 	switch kind {
 	case "actor", "boundary", "control", "entity", "database":
@@ -59,7 +59,8 @@ func actorSize(kind string, label *text.Label, minW, minH, paddingX float64) (w,
 	return w, h
 }
 
-// circle is a circle as Pele's <circle> draws it.
+// circle is a circle as Pele's <circle> draws it. Pele writes the element inline in its
+// figure; the function is limu's own.
 func circle(cx, cy, r float64, paint scene.Painting) scene.Part {
 	return scene.Part{Path: new(scene.Path).Ellipse(cx, cy, r, r), Paint: paint}
 }

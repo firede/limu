@@ -1,7 +1,9 @@
 // Requirement diagrams parsed as Pele parses them, from text to tokens and RequirementDb, and
 // the graph buildRequirementGraph makes of it: the sources of Pele's tests and Mermaid's
 // specs and documentation, cases written here, and those sources mutated at random.
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { lone, picker } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/requirement/oracle.test.ts, and more of what reaches past the
 // grammar: Unicode, entities, front matter.
@@ -182,7 +184,7 @@ export const WRITTEN = [
 // A diagram of a few requirements and elements joined at random, for the routes of edges,
 // their ends set apart on the sides of boxes, self-loops and markers.
 export function generated(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const kinds = ['requirement', 'functionalRequirement', 'interfaceRequirement', 'performanceRequirement', 'physicalRequirement', 'designConstraint'];
   const words = ['load', 'the system shall respond', 'x', 'within two seconds of a request', '**fast**', '_safe_', 'a<br>b', 'REQ'];
   const relations = ['contains', 'copies', 'derives', 'satisfies', 'verifies', 'refines', 'traces'];

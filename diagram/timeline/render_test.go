@@ -1,7 +1,6 @@
 package timeline
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -30,12 +29,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
@@ -103,9 +98,9 @@ func partPaint(it *scene.Item, part *scene.Part) string {
 	case scene.StrokeOnly:
 		s = "none " + paintName(it.Style.Stroke)
 	case scene.FillOnly:
-		s = paintName(it.Style.Fill) + " -"
+		s = paintName(pelesvg.OwnFill(it)) + " -"
 	default:
-		s = paintName(it.Style.Fill) + " " + paintName(it.Style.Stroke)
+		s = paintName(pelesvg.OwnFill(it)) + " " + paintName(it.Style.Stroke)
 	}
 	if w, ok := it.Style.StrokeWidth.Get(); ok {
 		s += " w" + pelesvg.Num(w)

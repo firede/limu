@@ -9,7 +9,6 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
-	"github.com/firede/limu/internal/yaml"
 )
 
 // The fixture is what Pele makes of the same cases; ./scripts/oracle.sh writes it. The tokens
@@ -63,9 +62,6 @@ func (o object) opt(key, value string) {
 	}
 }
 
-// enc is a number as the oracle writes it.
-func enc(f float64) any { return yaml.Encode(f, false) }
-
 func dumpTokens(src string) []any {
 	t := tokenize(src)
 	out := []any{}
@@ -86,7 +82,7 @@ func dumpModel(m *Model) object {
 	}
 	links := []any{}
 	for _, l := range m.Links {
-		links = append(links, []any{m.Nodes[l.Source].Index, m.Nodes[l.Target].Index, enc(l.Value)})
+		links = append(links, []any{m.Nodes[l.Source].Index, m.Nodes[l.Target].Index, fixture.Number(l.Value)})
 	}
 	o["nodes"], o["links"] = nodes, links
 	return o
@@ -143,14 +139,10 @@ func check(t *testing.T, what, src string, m *Model, err error, want peleResult)
 }
 
 func TestParseMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/sankey.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/sankey.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 7000 {

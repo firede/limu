@@ -29,11 +29,13 @@ docs/design.md first: it says what each stage owns and why style is kept out of 
   parameter converts it there, as `jsmath.Round` does, so that a product passed in stays
   apart.
 - Every ported stage is checked against Pele. A suite in `internal/oracle/suites` (a module
-  whose default export is given helpers to import Pele's sources, read cases from
-  `internal/oracle/cases` and write fixtures) writes what Pele makes of the cases;
+  whose default export is given helpers to import Pele's sources and write fixtures) writes
+  what Pele makes of its cases, which it holds or builds itself, or, for the first suites,
+  reads from `internal/oracle/cases`; what suites share is in `internal/oracle/lib`, and
+  what the oracle patches into Pele's sources is in the table of `internal/oracle/hooks.mjs`.
   `./scripts/oracle.sh <pele> [suite…]` runs suites, and the package's tests compare with
-  the fixture in its `testdata/pele`. Compare numbers exactly; a difference in the last bit
-  is a difference in the port.
+  the fixture in its `testdata/pele`, read with `fixture.Load`. Compare numbers exactly; a
+  difference in the last bit is a difference in the port.
 - Matching Pele to the last bit is how the port is checked, not what limu is for. Go as
   far as porting the function JavaScript calls, as `internal/jsmath` ports V8's sine; don't
   write code that has no use but to match a platform's library to the last bit, as one

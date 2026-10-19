@@ -167,14 +167,10 @@ func result(t *testing.T, src string, tokens, wantDB, wantGraph any, wantErr map
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/requirement.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/requirement.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Cases

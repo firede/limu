@@ -488,7 +488,7 @@ var shapes = map[string]*shapeDef{
 				if i%2 == 0 {
 					k = 1
 				}
-				pts = append(pts, math.Cos(angle)*(w/2)*k, math.Sin(angle)*(h/2)*k)
+				pts = append(pts, jsmath.Cos(angle)*(w/2)*k, jsmath.Sin(angle)*(h/2)*k)
 			}
 			d.poly(scene.FillAndStroke, pts...)
 		},
@@ -780,8 +780,10 @@ func (d *drawing) pen() *pen { return &pen{d: d, p: new(scene.Path)} }
 
 // A pen follows SVG's path commands in the shape's frame: where it is, where the figure
 // began, and the control point of the last quadratic curve, which T reflects. It takes
-// each number to hundredths, as Pele writes it, so that an arc whose radii barely reach
-// across it is the arc Pele draws: the turn of such an arc follows the last decimal.
+// each number it is given to hundredths, as Pele writes it, so that an arc whose radii
+// barely reach across it is the arc Pele draws: the turn of such an arc follows the last
+// decimal. Where a command is relative, or reflects a control point, the point is worked
+// out from those as SVG reads them, and is not taken to hundredths again.
 type pen struct {
 	d            *drawing
 	p            *scene.Path
@@ -802,16 +804,18 @@ func (p *pen) M(x, y float64) *pen {
 	return p.at(x, y)
 }
 
-func (p *pen) L(x, y float64) *pen {
-	x, y = r2(x), r2(y)
+func (p *pen) L(x, y float64) *pen { return p.lineTo(r2(x), r2(y)) }
+
+func (p *pen) H(x float64) *pen      { return p.lineTo(r2(x), p.y) }
+func (p *pen) V(y float64) *pen      { return p.lineTo(p.x, r2(y)) }
+func (p *pen) l(dx, dy float64) *pen { return p.lineTo(p.x+r2(dx), p.y+r2(dy)) }
+func (p *pen) h(dx float64) *pen     { return p.lineTo(p.x+r2(dx), p.y) }
+
+// lineTo is a line to x, y, which are as SVG reads them.
+func (p *pen) lineTo(x, y float64) *pen {
 	p.p.LineTo(p.d.cx+x, p.d.cy+y)
 	return p.at(x, y)
 }
-
-func (p *pen) H(x float64) *pen      { return p.L(x, p.y) }
-func (p *pen) V(y float64) *pen      { return p.L(p.x, y) }
-func (p *pen) l(dx, dy float64) *pen { return p.L(p.x+r2(dx), p.y+r2(dy)) }
-func (p *pen) h(dx float64) *pen     { return p.L(p.x+r2(dx), p.y) }
 
 func (p *pen) A(rx, ry float64, large, sweep bool, x, y float64) *pen {
 	x, y = r2(x), r2(y)
@@ -819,16 +823,10 @@ func (p *pen) A(rx, ry float64, large, sweep bool, x, y float64) *pen {
 	return p.at(x, y)
 }
 
-func (p *pen) Q(cx, cy, x, y float64) *pen {
-	cx, cy, x, y = r2(cx), r2(cy), r2(x), r2(y)
-	p.p.QuadTo(p.d.cx+cx, p.d.cy+cy, p.d.cx+x, p.d.cy+y)
-	p.at(x, y)
-	p.qx, p.qy, p.quad = cx, cy, true
-	return p
-}
+func (p *pen) Q(cx, cy, x, y float64) *pen { return p.quadTo(r2(cx), r2(cy), r2(x), r2(y)) }
 
 func (p *pen) q(dcx, dcy, dx, dy float64) *pen {
-	return p.Q(p.x+r2(dcx), p.y+r2(dcy), p.x+r2(dx), p.y+r2(dy))
+	return p.quadTo(p.x+r2(dcx), p.y+r2(dcy), p.x+r2(dx), p.y+r2(dy))
 }
 
 // t is SVG's t: a quadratic curve by dx, dy whose control point is the last one's
@@ -838,7 +836,15 @@ func (p *pen) t(dx, dy float64) *pen {
 	if p.quad {
 		cx, cy = 2*p.x-p.qx, 2*p.y-p.qy
 	}
-	return p.Q(cx, cy, p.x+r2(dx), p.y+r2(dy))
+	return p.quadTo(cx, cy, p.x+r2(dx), p.y+r2(dy))
+}
+
+// quadTo is a quadratic curve to x, y about cx, cy, which are as SVG reads them.
+func (p *pen) quadTo(cx, cy, x, y float64) *pen {
+	p.p.QuadTo(p.d.cx+cx, p.d.cy+cy, p.d.cx+x, p.d.cy+y)
+	p.at(x, y)
+	p.qx, p.qy, p.quad = cx, cy, true
+	return p
 }
 
 func (p *pen) Z() *pen {

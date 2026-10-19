@@ -193,15 +193,23 @@ func (j Join) String() string {
 
 // A Style is how a part is painted. What it leaves unset comes from under it.
 type Style struct {
-	Fill        Paint
-	Stroke      Paint // outlines and lines, and the markers at their ends
-	Text        Paint
-	StrokeWidth Num
-	Radius      Num // of the corners of a box that takes the theme's
-	Dash        Dash
-	Cap         Cap  // of the ends of lines and of their dashes
-	Join        Join // of the corners of lines and outlines
-	Opacity     Num  // of the whole part
+	Fill   Paint
+	Stroke Paint // outlines and lines, and the markers at their ends
+	Text   Paint
+	// FillOpacity and StrokeOpacity are the opacities the fill and the stroke are drawn at,
+	// from 0 to 1, as SVG's fill-opacity and stroke-opacity: apart from the paints, so that
+	// each is laid over what is under it on its own, as CSS cascades them. A fill the author
+	// sets over a part the diagram draws at an opacity is drawn at that opacity. They do not
+	// reach the part's text, and markers are filled in the stroke's color without its
+	// opacity and stroked with it, as Pele draws them.
+	FillOpacity   Num
+	StrokeOpacity Num
+	StrokeWidth   Num
+	Radius        Num // of the corners of a box that takes the theme's
+	Dash          Dash
+	Cap           Cap  // of the ends of lines and of their dashes
+	Join          Join // of the corners of lines and outlines
+	Opacity       Num  // of the whole part
 	// Halo is drawn about the letters of the part's text, HaloWidth wide, so that lines
 	// under the text stop short of it: the title of a group an edge runs through.
 	Halo      Paint
@@ -218,6 +226,12 @@ func (s Style) Over(base Style) Style {
 	}
 	if !s.Text.Set() {
 		s.Text = base.Text
+	}
+	if !s.FillOpacity.set {
+		s.FillOpacity = base.FillOpacity
+	}
+	if !s.StrokeOpacity.set {
+		s.StrokeOpacity = base.StrokeOpacity
 	}
 	if !s.StrokeWidth.set {
 		s.StrokeWidth = base.StrokeWidth
@@ -291,17 +305,21 @@ func (l *Look) ThemeOrDefault() *Theme {
 
 // Resolved is a style with its colors and measures settled, ready to draw.
 type Resolved struct {
-	Fill, Stroke, Text Color // alpha 0 draws nothing
-	Line               Color // the theme's color of lines, for parts painted solid
-	Bg                 Color // the theme's background, for parts painted hollow
-	StrokeWidth        float64
-	Radius             float64
-	Dash               []float64 // none for a solid line
-	Cap                Cap       // CapButt when nothing set it, as SVG's initial value
-	Join               Join      // JoinMiter when nothing set it, as SVG's initial value
-	Opacity            float64
-	Halo               Color // alpha 0 draws none
-	HaloWidth          float64
+	// Fill and Stroke are at the style's fill and stroke opacities; alpha 0 draws nothing.
+	Fill, Stroke, Text Color
+	// Marker is the stroke's color without the stroke opacity, which markers are filled
+	// with, as Pele fills them in the color of the line alone.
+	Marker      Color
+	Line        Color // the theme's color of lines, for parts painted solid
+	Bg          Color // the theme's background, for parts painted hollow
+	StrokeWidth float64
+	Radius      float64
+	Dash        []float64 // none for a solid line
+	Cap         Cap       // CapButt when nothing set it, as SVG's initial value
+	Join        Join      // JoinMiter when nothing set it, as SVG's initial value
+	Opacity     float64
+	Halo        Color // alpha 0 draws none
+	HaloWidth   float64
 }
 
 // Resolve settles a part's style in the look.
@@ -314,10 +332,12 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 	if !s.Join.Set() {
 		s.Join = JoinMiter
 	}
+	stroke := s.Stroke.Color(th)
 	return Resolved{
-		Fill:        s.Fill.Color(th),
-		Stroke:      s.Stroke.Color(th),
+		Fill:        at(s.Fill.Color(th), s.FillOpacity),
+		Stroke:      at(stroke, s.StrokeOpacity),
 		Text:        s.Text.Color(th),
+		Marker:      stroke,
 		Line:        th.Line,
 		Bg:          th.Bg,
 		StrokeWidth: s.StrokeWidth.v,
@@ -329,4 +349,12 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 		Halo:        s.Halo.Color(th),
 		HaloWidth:   s.HaloWidth.Or(0),
 	}
+}
+
+// at is c at an opacity, when one is set: its alpha times the opacity, kept from 0 to 1.
+func at(c Color, opacity Num) Color {
+	if k, ok := opacity.Get(); ok && k < 1 {
+		c.A = uint8(float64(c.A)*max(k, 0) + 0.5)
+	}
+	return c
 }

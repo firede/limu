@@ -35,7 +35,6 @@ const (
 	noWrap      float64 = 1e6
 	portGap     float64 = 18
 	portMargin  float64 = 14
-	padding     float64 = 8
 	// markerLength is how far a marker reaches back along its line from the box it touches,
 	// Pele's MARKER_LENGTH.
 	markerLength float64 = 18
@@ -55,6 +54,7 @@ const (
 	RoleAttributeComment  scene.Role = "er.attribute-comment"
 )
 
+// cellRoles are the roles of the four cells of an attribute's row, in their order.
 var cellRoles = [4]scene.Role{RoleAttributeType, RoleAttributeName, RoleAttributeKeys, RoleAttributeComment}
 
 // Layout lays out a parsed ER diagram as a scene, as Pele's renderEr draws it: in its own
@@ -123,10 +123,13 @@ func cellText(raw string) string {
 // lay lays the diagram out once, as Pele's draw does. turned lays out a diagram that runs
 // across as one that runs down.
 func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
+	padding := o.Pad()
 	graph := BuildGraph(db)
 	size := o.Size()
 	smallSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
+	// labelOf lays out a label with the diagram's measurer and icons, as each call of Pele's
+	// layoutLabel in draw does.
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
@@ -172,7 +175,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 
 	// horizontal is whether the level node i is laid out in runs across: its nearest
 	// subgraph's direction that sets one, or the diagram's. Subgraphs can name each other as
-	// members, so the walk up is bounded.
+	// members, so the walk up is bounded. It is the horizontal of Pele's draw.
 	horizontal := func(i int) bool {
 		at := i
 		for steps := 0; steps < len(graph.Nodes); steps++ {
@@ -389,6 +392,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		Title:    db.AccTitle,
 		Desc:     db.AccDescr,
 	}
+	// node is cnode i as the drawing helpers take it, where Pele's draw hands them the cnode
+	// itself.
 	node := func(i int) draw.Node {
 		c := &cnodes[i]
 		return draw.Node{X: c.X, Y: c.Y, W: c.W, H: c.H, Group: c.IsGroup}
@@ -423,7 +428,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			cluster := scene.Item{
 				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
 			}
 			if !v.label.Empty() {
@@ -544,6 +549,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if edge.Pattern == "dashed" {
 			own.Dash = style.Dashes(4, 3)
 		}
+		if len(route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			route = path.Corners()
+		}
 		edges = append(edges, scene.Item{
 			Kind: scene.Edge, Role: RoleRelationship, ID: edge.ID,
 			Box:   path.Bounds(),
@@ -663,6 +672,8 @@ func straighten(route []float64) []float64 {
 	out := append([]float64(nil), route[:min(3, len(route))]...)
 	for k := 3; k < len(route); k += 3 {
 		prev := len(out) - 3
+		// flat reports whether point k lies on a straight run along axis between the last
+		// point kept and the next, as the flat of Pele's straighten does.
 		flat := func(axis int) bool {
 			return math.Abs(out[prev+axis]-route[k+axis]) < 0.01 && math.Abs(route[k+axis]-route[k+3+axis]) < 0.01
 		}
@@ -688,6 +699,8 @@ type end struct {
 func spreadEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
 	sides := map[int][]*end{}
 	var order []int
+	// add files the end of a route at index at under the side of node's box it lies on, with
+	// where the next point lies along that side, as the add of Pele's spreadEnds does.
 	add := func(node int, route []float64, at, next int) {
 		c := &cnodes[node]
 		dx := route[at] - c.X
@@ -769,6 +782,8 @@ func inset(route []float64, at int, v *view, c *layout.CNode) {
 	}
 }
 
+// hasClass reports whether name is among the classes, as the test / internal-link(?: |$)/ of
+// Pele's draw finds it in the string of them.
 func hasClass(classes []string, name string) bool {
 	return slices.Contains(classes, name)
 }

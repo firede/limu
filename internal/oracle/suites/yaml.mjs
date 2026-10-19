@@ -1,5 +1,6 @@
 // Pele's YAML reader, on what Mermaid feeds it and on YAML made at random.
-import { enc, lone } from './parse.mjs';
+import { enc } from '../lib/value.mjs';
+import { lone } from '../lib/corpus.mjs';
 
 const WRITTEN = [
   // Pele's own cases, tests/util/yaml.test.ts.

@@ -166,8 +166,19 @@ func (p *Path) ArcTo(rx, ry, rot float64, large, sweep bool, x, y float64) *Path
 	} else if sweep && dt < 0 {
 		dt += 2 * math.Pi
 	}
-	// At most a quarter turn a curve.
-	n := int(math.Ceil(math.Abs(dt) / (math.Pi / 2)))
+	if math.IsNaN(cx) || math.IsInf(cx, 0) || math.IsNaN(cy) || math.IsInf(cy, 0) ||
+		math.IsNaN(t1) || !(math.Abs(dt) <= 2*math.Pi) || dt == 0 {
+		// Radii or ends that are not finite numbers place no ellipse, and an arc of no turn
+		// is a line; the path still reaches its end.
+		return p.LineTo(x, y)
+	}
+	// At most a quarter turn a curve. A turn of a quarter, or of a half, comes out of the
+	// conversion a little over it as often as not: a quarter, as of a rounded corner, to a part
+	// in 10^12 or less, and a half, whose center the conversion finds from the square root of a
+	// difference near 0, to a part in 10^6 where its radius is small beside its coordinates. A
+	// turn within a part in 10^4 of a whole number of quarters is that many curves, each a
+	// little over a quarter at most, which strays from the ellipse no more than a quarter does.
+	n := max(1, int(math.Ceil(math.Abs(dt)/(math.Pi/2)-1e-4)))
 	step := dt / float64(n)
 	k := 4.0 / 3 * math.Tan(step/4)
 	point := func(t float64) (float64, float64, float64, float64) {
@@ -201,4 +212,15 @@ func (p *Path) Bounds() Rect {
 		x0, y0, x1, y1 = min(x0, x), min(y0, y), max(x1, x), max(y1, y)
 	}
 	return Rect{x0, y0, x1 - x0, y1 - y0}
+}
+
+// Corners are the path's points and the control points of its curves, in order: the line
+// its curves are drawn about, which runs straight between them. It is the route of an edge
+// whose layout gives it none, as a self-loop: the curve out of its node and back.
+func (p *Path) Corners() []Point {
+	out := make([]Point, 0, len(p.Args)/2)
+	for i := 0; i+1 < len(p.Args); i += 2 {
+		out = append(out, Point{p.Args[i], p.Args[i+1]})
+	}
+	return out
 }

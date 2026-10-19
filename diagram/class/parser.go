@@ -5,6 +5,7 @@ import (
 	"github.com/firede/limu/internal/chars"
 )
 
+// tokenSet is the set of the tokens ts, as the Uint8Arrays of Pele's parser mark them.
 func tokenSet(ts ...token) (set [t_PUNCTUATION + 1]bool) {
 	for _, t := range ts {
 		set[t] = true
@@ -12,6 +13,7 @@ func tokenSet(ts ...token) (set [t_PUNCTUATION + 1]bool) {
 	return
 }
 
+// alphaNumTokens and stylePartTokens are Pele's ALPHANUM and STYLE_PART.
 var (
 	alphaNumTokens  = tokenSet(t_UNICODE_TEXT, t_ALPHA, t_MINUS)
 	stylePartTokens = tokenSet(t_ALPHA, t_COLON, t_BRKT, t_STYLE, t_PCT, t_LABEL)
@@ -28,6 +30,7 @@ var endType = func() (t [t_PUNCTUATION + 1]int) {
 	return
 }()
 
+// nameTokens are the tokens a name may start with, as an error names them: Pele's NAME_TOKENS.
 const nameTokens = "'UNICODE_TEXT', 'NUM', 'ALPHA', 'MINUS', 'BQUOTE_STR'"
 
 // frame is an open namespace: its id, and the classes and notes declared in it. Pele's Frame.
@@ -65,17 +68,23 @@ func ParseInto(src string, db *DB) (err error) {
 	return nil
 }
 
+// typ is the kind of the token at i: types[i] in Pele's parseClassDiagram.
 func (p *parser) typ() token { return p.toks[p.i].typ }
 
+// typAt is the kind of the token at an index, as Pele's parseClassDiagram reads types[i + 1] to
+// look one token ahead.
 func (p *parser) typAt(i int) token { return p.toks[i].typ }
 
-// next is the text of the token at i, and steps past it.
+// next is the text of the token at i, and steps past it: texts[i++] in Pele's
+// parseClassDiagram.
 func (p *parser) next() string {
 	s := p.toks[p.i].text
 	p.i++
 	return s
 }
 
+// fail stops the parse with a syntax error at the token at i, which expected names, as the
+// fail of Pele's parseClassDiagram does.
 func (p *parser) fail(expected string) {
 	t := p.toks[p.i]
 	if t.typ == t_ERROR {
@@ -84,6 +93,8 @@ func (p *parser) fail(expected string) {
 	panic(parseError{diagram.SyntaxError("class", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 }
 
+// expect is the text of the token at i, which must be of kind typ, and steps past it, as the
+// expect of Pele's parseClassDiagram does.
 func (p *parser) expect(typ token) string {
 	if p.typ() != typ {
 		p.fail("'" + tokenNames[typ] + "'")
@@ -91,6 +102,8 @@ func (p *parser) expect(typ token) string {
 	return p.next()
 }
 
+// alphaNum is the text of a word, a letter or a minus at i, and steps past it, as the alphaNum
+// of Pele's parseClassDiagram does.
 func (p *parser) alphaNum() string {
 	if !alphaNumTokens[p.typ()] {
 		p.fail("'UNICODE_TEXT', 'NUM', 'ALPHA', 'MINUS'")
@@ -99,7 +112,7 @@ func (p *parser) alphaNum() string {
 }
 
 // name reads a class's name: words joined by dots, or a name in backticks, and a generic
-// type after it if generic.
+// type after it if generic. It is the name of Pele's parseClassDiagram.
 func (p *parser) name(generic bool) string {
 	out := ""
 	for {
@@ -125,6 +138,8 @@ func (p *parser) name(generic bool) string {
 	return out
 }
 
+// classLabel reads a label in brackets, `["label"]`, as the classLabel of Pele's
+// parseClassDiagram does.
 func (p *parser) classLabel() string {
 	p.i++
 	label := p.expect(t_STR)
@@ -133,7 +148,8 @@ func (p *parser) classLabel() string {
 }
 
 // members reads the members of a class's body. The grammar collects them last to first and
-// addMembers turns them back, so here they are in the order written.
+// addMembers turns them back, so here they are in the order written. It is the members of
+// Pele's parseClassDiagram.
 func (p *parser) members() []string {
 	if p.typ() != t_MEMBER {
 		p.fail("'STRUCT_STOP', 'MEMBER'")
@@ -146,6 +162,9 @@ func (p *parser) members() []string {
 	return list
 }
 
+// classStatement reads a class statement, with its label, CSS class, annotation and body
+// where it has them, and gives the class's name, as the classStatement of Pele's
+// parseClassDiagram does.
 func (p *parser) classStatement() string {
 	p.i++
 	id := p.name(true)
@@ -186,6 +205,8 @@ func (p *parser) classStatement() string {
 	return id
 }
 
+// noteStatement reads a note, on its own or for a class, and gives its id, as the
+// noteStatement of Pele's parseClassDiagram does.
 func (p *parser) noteStatement() string {
 	if p.typ() == t_NOTE {
 		p.i++
@@ -196,7 +217,8 @@ func (p *parser) noteStatement() string {
 	return p.db.addNote(p.expect(t_STR), id)
 }
 
-// namespaceStatement reads namespaces, which nest, with a stack of open ones.
+// namespaceStatement reads namespaces, which nest, with a stack of open ones, as the
+// namespaceStatement of Pele's parseClassDiagram does.
 func (p *parser) namespaceStatement() {
 	var open []*frame
 	for {
@@ -254,6 +276,8 @@ func (p *parser) namespaceStatement() {
 	}
 }
 
+// relationEnd reads the marker at an end of a relation, or NoEnd where there is none, as the
+// relationEnd of Pele's parseClassDiagram does.
 func (p *parser) relationEnd() End {
 	t := endType[p.typ()]
 	if t == 0 {
@@ -263,6 +287,9 @@ func (p *parser) relationEnd() End {
 	return End(t - 1)
 }
 
+// classOrRelation reads a statement that starts with a class's name: a member given after a
+// colon, a relation, or the name alone, as the classOrRelation of Pele's parseClassDiagram
+// does.
 func (p *parser) classOrRelation() {
 	id1 := p.name(true)
 	t := p.typ()
@@ -301,6 +328,8 @@ func (p *parser) classOrRelation() {
 	p.db.addRelation(r)
 }
 
+// styles reads a list of style declarations, separated by commas, as the styles of Pele's
+// parseClassDiagram does.
 func (p *parser) styles() []string {
 	var out []string
 	for {
@@ -319,12 +348,16 @@ func (p *parser) styles() []string {
 	}
 }
 
+// tooltip reads a tooltip where there is one, for the classes of id, as the tooltip of Pele's
+// parseClassDiagram does.
 func (p *parser) tooltip(id string) {
 	if p.typ() == t_STR {
 		p.db.setTooltip(id, p.next())
 	}
 }
 
+// linkStatement reads the link of the classes of id, with its tooltip and target where it has
+// them, as the linkStatement of Pele's parseClassDiagram does.
 func (p *parser) linkStatement(id string) {
 	href := p.expect(t_STR)
 	tip, hasTip := "", false
@@ -341,6 +374,8 @@ func (p *parser) linkStatement(id string) {
 	}
 }
 
+// statement reads one statement, as the statement of Pele's parseClassDiagram does. A
+// direction is set on the DB itself, where Pele calls setDirection.
 func (p *parser) statement() {
 	t := p.typ()
 	switch t {
@@ -431,6 +466,8 @@ func (p *parser) statement() {
 		"'CSSCLASS', 'ALPHA', 'MINUS', 'BQUOTE_STR'")
 }
 
+// diagram reads the whole text, its header and its statements: the body of Pele's
+// parseClassDiagram after its closures.
 func (p *parser) diagram() {
 	// Mermaid's grammar also accepts statements with no `classDiagram` line before them.
 	header := p.typ() == t_CLASS_DIAGRAM

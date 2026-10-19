@@ -1,7 +1,6 @@
 package gantt
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -34,12 +33,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
@@ -226,8 +221,8 @@ func sceneLines(sc *scene.Scene) []string {
 			if len(it.Parts) != 1 || it.Parts[0].Box != r || it.Style.Stroke != style.None {
 				lines = append(lines, "band not one box")
 			}
-			index := strings.TrimPrefix(strings.Join(it.Class, " "), "section-")
-			lines = append(lines, fmt.Sprintf("band %s %s,%s %s -", index, pt(r.X, r.Y), pt(r.W, r.H), paintName(it.Style.Fill)))
+			index := strings.TrimPrefix(strings.Join(it.Tags, " "), "section-")
+			lines = append(lines, fmt.Sprintf("band %s %s,%s %s -", index, pt(r.X, r.Y), pt(r.W, r.H), paintName(pelesvg.OwnFill(it))))
 		case RoleExcluded:
 			r := it.Box
 			if len(it.Parts) != 1 || it.Parts[0].Box != r || it.Style.Fill != style.SurfaceAlt {
@@ -250,14 +245,14 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			paths(it.Parts[0].Path, "none "+paintName(it.Style.Stroke)+" "+pen(it))
 			if len(it.Parts) > 1 {
-				paths(it.Parts[1].Path, paintName(it.Style.Fill)+" - "+pen(it))
+				paths(it.Parts[1].Path, paintName(pelesvg.OwnFill(it))+" - "+pen(it))
 			}
 		case RoleTask:
-			lines = append(lines, fmt.Sprintf("task %s [%s]", peleID(it.ID), strings.Join(it.Class, " ")))
+			lines = append(lines, fmt.Sprintf("task %s [%s]", peleID(it.ID), strings.Join(it.Tags, " ")))
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
 			}
-			paint := paintName(it.Style.Fill) + " " + paintName(it.Style.Stroke)
+			paint := paintName(pelesvg.OwnFill(it)) + " " + paintName(it.Style.Stroke)
 			for _, part := range it.Parts {
 				if part.Path != nil {
 					paths(part.Path, paint+" "+pen(it))

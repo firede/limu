@@ -69,7 +69,7 @@ func outline(shape string, cx, cy, w, h float64) []scene.Part {
 // are stroked in and its nodes outlined in and filled with at 22%. A node with no shape of its
 // own is plain text where its branch ends, and text in a pill, a stadium, where the branch
 // goes on from it. The root is in the theme's surface and border. Every item of a branch has
-// the class "section-" and its section, as Pele's group about the branch has.
+// the tag "section-" and its section, as Pele's group about the branch has that class.
 //
 // A node's icon is a Picture of it, beside its text, when the host can draw it
 // (layout.Options.Icons); one it cannot draw takes no room.
@@ -85,7 +85,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.Scene {
 	size := o.Size()
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	conf, _ := config["mindmap"].(diagram.Config)
 	wrap := 200.0
 	if v, ok := conf["maxNodeWidth"].(float64); ok && v > 0 {
@@ -363,7 +363,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 				route = []scene.Point{{X: x1, Y: y1}, {X: x2, Y: y2}}
 			}
 			edges = append(edges, scene.Item{
-				Kind: scene.Edge, Role: RoleEdge, Class: []string{branchClass},
+				Kind: scene.Edge, Role: RoleEdge, Tags: []string{branchClass},
 				Box:   path.Bounds(),
 				Parts: []scene.Part{{Path: path, Paint: scene.StrokeOnly}},
 				Route: route,
@@ -379,14 +379,14 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 			// Every node off the root is filled with a tint of its branch's color and
 			// outlined in it, whether its shape was given in the source or is the pill of a
 			// node that branches. The root is neutral.
-			Style: style.Style{Fill: color.Alpha(tint), Stroke: color, Text: style.Fg},
+			Style: style.Style{Fill: color, FillOpacity: style.N(tint), Stroke: color, Text: style.Fg},
 		}
 		if i == 0 {
 			it.Role = RoleRoot
 			it.Style = style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg}
 			it.Class = common.ClassNames(node.Class)
 		} else {
-			it.Class = append([]string{branchClass}, common.ClassNames(node.Class)...)
+			it.Tags, it.Class = []string{branchClass}, common.ClassNames(node.Class)
 		}
 		switch {
 		case shape != "":

@@ -125,7 +125,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 	small := jsmath.Round(size * 0.875)
 	tiny := jsmath.Round(size * 0.75)
 	measure := o.Measure()
-	const pad = float64(common.Padding)
+	pad := o.Pad()
 	tasks := m.Tasks
 	n := len(tasks)
 
@@ -395,7 +395,7 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()
-	const pad = float64(common.Padding)
+	pad := o.Pad()
 	maxWidth := o.MaxWidth
 	if !(maxWidth > 0) {
 		maxWidth = 320

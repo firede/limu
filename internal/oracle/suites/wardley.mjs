@@ -3,9 +3,9 @@
 // makes of the tree with the title the text's front matter gives. The cases are Mermaid's
 // documentation and specs, the inputs of Pele's own tests, cases written here, random maps,
 // and all of those mutated at random.
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/wardley/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -232,36 +232,15 @@ export const WRITTEN = [
   'not a map',
 ];
 
-// Strings in the sources of a folder of Pele's tests that hold the keyword, as Pele's
-// loadCorpus collects them, from files whose names match.
-function testStrings(pele, dir, files) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/wardley-beta/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
-
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests, its
 // seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/wardley-docs.json'), 'utf8'));
   return [
     ...new Set([
-      ...docs,
-      ...testStrings(pele, 'tests/compat/wardley', /\.spec\.[jt]s$/),
-      ...testStrings(pele, 'tests/wardley', /\.test\.[jt]s$/),
-      ...testStrings(pele, 'tests/render', /^wardley.*\.test\.ts$/),
+      ...docs(pele, 'wardley'),
+      ...testStrings(pele, 'tests/compat/wardley', /\.spec\.[jt]s$/, /wardley-beta/),
+      ...testStrings(pele, 'tests/wardley', /\.test\.[jt]s$/, /wardley-beta/),
+      ...testStrings(pele, 'tests/render', /^wardley.*\.test\.ts$/, /wardley-beta/),
       ...SEEDS,
       ...WRITTEN,
     ]),
@@ -322,7 +301,7 @@ const STAGES = ['Genesis', 'Custom Built', 'Product', 'Commodity', 'Concept', 'E
 
 // Random Wardley maps, most of them well formed, with random configuration.
 export function randomMaps(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const frac = () => (chance(0.1) ? pick(['0.0', '1.0', '0.5', '0.99', '0.01']) : (rnd() * 0.98 + 0.01).toFixed(chance(0.7) ? 2 : 3));
   const pct = () => (chance(0.5) ? frac() : (rnd() * 99 + 0.5).toFixed(1));

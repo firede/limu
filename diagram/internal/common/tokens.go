@@ -72,7 +72,7 @@ func Prepare(types []TokenType) *Table {
 
 // Tokenize splits src into tokens with the types of a table, as Pele's tokenize does. Text
 // no type matches is a lexical error of the diagram type named.
-func Tokenize(src string, table *Table, typ string) (*Tokens, error) {
+func Tokenize(src string, table *Table, typ diagram.Type) (*Tokens, error) {
 	types := table.Types
 	out := &Tokens{Src: src}
 	dead := make([]bool, len(types))
@@ -575,7 +575,7 @@ type Reader struct {
 	I       int
 	Tokens  *Tokens
 	Types   []TokenType
-	Diagram string
+	Diagram diagram.Type
 }
 
 // Kind is the kind of the token being read.

@@ -2,7 +2,7 @@
 // values are formatted with: the numbers about powers of ten and halfway between two results
 // of a precision, where rounding differs most easily, numbers of every exponent made from
 // random bits, and those JSON has no words for.
-import { enc } from './parse.mjs';
+import { enc } from '../lib/value.mjs';
 
 export default async function ({ write, random }) {
   const rnd = random(41);

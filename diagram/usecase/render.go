@@ -160,6 +160,8 @@ func attachEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
 	// Pele's Map gives them in.
 	sides := map[int][]end{}
 	var keys []int
+	// add files the end of a route at point at, which leaves toward point next, under the side
+	// of node index it meets, as the add closure of Pele's attachEnds does.
 	add := func(index int, route []float64, at, next int) {
 		c := &cnodes[index]
 		if c.IsGroup {
@@ -399,12 +401,14 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	small := jsmath.Round(size * 0.875)
 	tiny := jsmath.Round(size * 0.8125)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	rootDir := layout.Direction(m.Direction)
 	if turned {
 		rootDir = layout.TB
 	}
 	sideways := rootDir == layout.LR || rootDir == layout.RL
+	// labelOf lays a label out, a plain one handed over as literal makes it, as Pele's text
+	// does.
 	labelOf := func(raw string, markdown bool, size, wrap float64, face text.Face) text.Label {
 		if raw != "" && !markdown {
 			raw = literal(raw)
@@ -651,7 +655,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			it := scene.Item{
 				Kind: scene.Group, Role: RoleSystem, Shape: "rect", ID: n.ID, Class: common.ClassNames(strings.Join(boundaryClasses[n.ID], " ")),
 				Box:    scene.Rect{X: left, Y: top, W: c.W, H: c.H},
-				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
 			}
 			if n.BoundaryType == "package" {
@@ -884,6 +888,10 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		}
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
+		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
 		}
 		edges = append(edges, it)
 		if label.Width > 0 {

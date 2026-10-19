@@ -8,7 +8,6 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/fixture"
-	"github.com/firede/limu/internal/yaml"
 )
 
 // The fixture is what Pele makes of the same cases; ./scripts/oracle.sh writes it: the tokens
@@ -29,9 +28,6 @@ type peleCase struct {
 	Model  map[string]any `json:"model"`
 	Error  map[string]any `json:"error"`
 }
-
-// enc is a number as the oracle writes it.
-func enc(f float64) any { return yaml.Encode(f, false) }
 
 // dumpNode writes a node of the model as the oracle does.
 func dumpNode(n *Node) []any {
@@ -56,7 +52,7 @@ func dumpNode(n *Node) []any {
 	case Optional:
 		return []any{"opt", dumpNode(n.Kids[0])}
 	}
-	return []any{"rep", enc(n.Min), enc(n.Max), dumpNode(n.Kids[0])}
+	return []any{"rep", fixture.Number(n.Min), fixture.Number(n.Max), dumpNode(n.Kids[0])}
 }
 
 func dumpModel(m *Model) map[string]any {
@@ -320,14 +316,10 @@ func compare(t *testing.T, what, src string, got, want any) bool {
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/railroad.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/railroad.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Cases

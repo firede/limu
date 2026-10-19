@@ -3,29 +3,25 @@
 //
 // Pele draws a tree view with no groups that move what is in them, so its numbers are where
 // the scene has them. Pele's SVG is drawn here with its numbers written out in full, as the
-// oracle's hooks have num() write them while limuExactNumbers is set; the hooks also have each
-// label write, in place of its text, the point the scene holds it at and all that is in it,
-// and each name and description written in one line the middle of its row. The lines hold
-// every number in full, as String() writes it, so that a difference in the last bit shows.
+// oracle's hooks have num() write them while limuExactNumbers is set; the hooks also write
+// each label, the point the scene holds it at and all that is in it, which stands here in
+// place of Pele's drawing of it, and as the y of each name and description written in one
+// line the middle of its row. The lines hold every number in full, as String() writes it, so
+// that a difference in the last bit shows.
 //
 // A label of one line of plain text is written as its text and its style; any other with the
 // size, the widths and the spans of its lines. An icon Pele draws itself is written by the
 // name of its glyph, one the host draws by the name the host was given.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n, pt, readHead } from '../lib/svg.mjs';
+import { readLabel, withoutPele } from '../lib/limu.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './treeview.mjs';
 
 // The icons the host has, in the cases drawn with icons: one of Pele's own among them, which
 // the host's then takes the place of.
 export const ICONS = ['logos:react', 'mdi:home', 'material:typescript', 'mermaid-treeview:folder', 'fa:fa-car', 'p:x', 'material:docker'];
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (v) => String(Number(v));
-const pt = (x, y) => `${n(x)},${n(y)}`;
 // The control characters Pele's esc drops.
 const clean = (s) => s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+/g, '');
 
@@ -61,20 +57,11 @@ function steps(d) {
 
 // The lines of a tree view's SVG, drawn with its numbers in full.
 export function readSvg(svg, glyphs) {
+  svg = withoutPele(svg);
   const lines = [];
-  const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`);
-  let body = svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>'));
-  const title = /^<title id="[^"]*">([^<]*)<\/title>/.exec(body);
-  if (title) {
-    lines.push(`acc-title ${unescape(title[1])}`);
-    body = body.slice(title[0].length);
-  }
-  const desc = /^<desc id="[^"]*">([^<]*)<\/desc>/.exec(body);
-  if (desc) {
-    lines.push(`acc-desc ${unescape(desc[1])}`);
-    body = body.slice(desc[0].length);
-  }
+  const { open: head, body: all, acc } = readHead(svg);
+  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`, ...acc);
+  const body = all.slice(0, all.lastIndexOf('</svg>'));
   // What a label is written with before its place: its anchor, class, fill, weight and style.
   const look = (anchor, attrs) =>
     [anchor, attr(attrs, 'class') ?? '-', attr(attrs, 'fill') ?? '-', attr(attrs, 'font-weight') ? 'b' : '-', attr(attrs, 'font-style') === 'italic' ? 'i' : '-'].join(' ');
@@ -141,16 +128,15 @@ export function readSvg(svg, glyphs) {
         break;
       }
       case 'limu-label': {
-        const attrs = decodeURIComponent(attr(whole, 'attrs'));
-        const d = JSON.parse(decodeURIComponent(attr(whole, 'data')));
-        const at = `${look(attr(whole, 'anchor'), attrs)} ${pt(attr(whole, 'x'), attr(whole, 'y'))}`;
-        if (d.lines.length === 1 && d.lines[0].length === 1 && d.lines[0][0][0] === null) {
-          const [, text, style] = d.lines[0][0];
+        const l = readLabel(whole);
+        const at = `${look(l.align, l.attrs)} ${pt(l.x, l.y)}`;
+        if (l.lines.length === 1 && l.lines[0].length === 1 && l.lines[0][0].icon === undefined) {
+          const { text, style } = l.lines[0][0];
           lines.push(`label ${at} | ${style}:${clean(text)}`);
           break;
         }
-        const spans = d.lines.map((line) => line.map(([icon, text, style, width]) => (icon !== null ? `i:${icon}:${n(width)}` : `t:${style}:${text}:${n(width)}`)).join('|'));
-        lines.push(`label ${at} ${n(d.size)},${n(d.lineHeight)},${n(d.width)},${n(d.height)} | ${d.widths.map(n).join(',')} | ${spans.join(' / ')}`);
+        const spans = l.lines.map((line) => line.map((s) => (s.icon !== undefined ? `i:${s.icon}:${n(s.width)}` : `t:${s.style}:${s.text}:${n(s.width)}`)).join('|'));
+        lines.push(`label ${at} ${n(l.size)},${n(l.lineHeight)},${n(l.width)},${n(l.height)} | ${l.widths.map(n).join(',')} | ${spans.join(' / ')}`);
         break;
       }
       case 'tspan':

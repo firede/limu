@@ -3,9 +3,10 @@
 // filled with its payloads, cases written here, those mutated at random, outlines built at
 // random, and random strings of tokens. Each case is tokenized and parsed as the raw text,
 // and parsed as Pele's parse does it, after the preprocessing every diagram goes through.
-import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { arrayIn, docs, fileLiterals, lone, picker, testFiles } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/ishikawa/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -109,32 +110,6 @@ export const WRITTEN = [
   '',
 ];
 
-// The literals of a test file that hold the keyword, as Pele's loadCorpus finds them.
-function literals(file, keyword) {
-  const out = [];
-  const src = readFileSync(file, 'utf8');
-  for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-    const raw = m[1] ?? m[2] ?? m[3];
-    if (!keyword.test(raw)) continue;
-    try {
-      out.push(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-    } catch {
-      continue;
-    }
-  }
-  return out;
-}
-
-// An array literal of a test's source, evaluated with the names given.
-function arrayIn(file, start, names = {}) {
-  const src = readFileSync(file, 'utf8');
-  const from = src.indexOf(start);
-  if (from < 0) throw new Error(`no ${start} in ${file}`);
-  const open = from + start.length;
-  const end = src.indexOf('\n];', open);
-  return new Function(...Object.keys(names), 'return [' + src.slice(open, end) + '\n];')(...Object.values(names));
-}
-
 // Pele's hostile templates, tests/render/ishikawa-security.test.ts, filled with its payloads.
 export function hostileCorpus(pele) {
   const payloads = arrayIn(join(pele, 'tests/support/inert.ts'), 'export const PAYLOADS = [');
@@ -147,11 +122,10 @@ export function hostileCorpus(pele) {
 // The corpus the suites start from: documentation, specs, Pele's tests and the cases above.
 export function corpus(pele) {
   const out = new Set();
-  const dir = join(pele, 'tests/compat/ishikawa');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f))) for (const s of literals(join(dir, file), /ishikawa/i)) out.add(s);
-  for (const s of JSON.parse(readFileSync(join(pele, 'tests/corpus/ishikawa-docs.json'), 'utf8'))) out.add(s);
+  for (const file of testFiles(pele, 'tests/compat/ishikawa', /\.spec\.[jt]s$/)) for (const s of fileLiterals(file, /ishikawa/i)) out.add(s);
+  for (const s of docs(pele, 'ishikawa')) out.add(s);
   for (const file of ['tests/render/ishikawa.test.ts', 'tests/render/ishikawa-security.test.ts']) {
-    for (const s of literals(join(pele, file), /ishikawa/i)) out.add(s);
+    for (const s of fileLiterals(join(pele, file), /ishikawa/i)) out.add(s);
   }
   for (const s of SEEDS) out.add(s);
   for (const s of WRITTEN) out.add(s);
@@ -170,7 +144,7 @@ const TITLES = ['Why photos blur', 'T', 'A title wider than the diagram it names
 // Outlines built at random: an effect, categories and causes to a random depth, with blank
 // lines, comments and the indentation of each level chosen at random.
 export function outlines(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   return () => {
     let s = '';

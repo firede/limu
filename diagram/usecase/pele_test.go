@@ -337,14 +337,10 @@ func check(t *testing.T, what, src string, m *Model, err error, want peleResult)
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/usecase.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/usecase.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Cases

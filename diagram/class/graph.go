@@ -39,8 +39,11 @@ type Graph struct {
 	Edges []*GraphEdge
 }
 
+// markerNames are the markers of the ends of a relation, by End: Pele's MARKERS.
 var markerNames = [...]string{"aggregation", "extension", "composition", "dependency", "lollipop"}
 
+// marker is the name of the marker at an end of a relation, "none" for NoEnd, as Pele's
+// marker gives it.
 func marker(e End) string {
 	if e >= 0 && int(e) < len(markerNames) {
 		return markerNames[e]
@@ -58,6 +61,8 @@ func BuildGraph(db *DB, hierarchical bool) *Graph {
 	interfaceAt := map[string]int{}
 
 	declared := map[string]string{}
+	// declaredAncestor is the nearest namespace the text declares that id is, or is in, or ""
+	// for none, as the declaredAncestor of Pele's buildClassGraph finds it.
 	declaredAncestor := func(id string) string {
 		if hierarchical || id == "" {
 			return id
@@ -86,6 +91,8 @@ func BuildGraph(db *DB, hierarchical bool) *Graph {
 		}
 		return found
 	}
+	// group is the index among the nodes of the namespace of id, or -1, as the group of Pele's
+	// buildClassGraph gives it.
 	group := func(id string) int {
 		if id == "" {
 			return -1
@@ -173,6 +180,7 @@ func BuildGraph(db *DB, hierarchical bool) *Graph {
 	return g
 }
 
+// index is the index m holds for id, or -1: the `get(id) ?? -1` of Pele's buildClassGraph.
 func index(m map[string]int, id string) int {
 	if i, ok := m[id]; ok {
 		return i

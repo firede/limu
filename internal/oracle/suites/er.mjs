@@ -2,7 +2,9 @@
 // buildErGraph makes of it: the sources of Pele's tests and Mermaid's specs and
 // documentation, cases written here, those sources mutated at random, and random strings of
 // tokens.
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/er/oracle.test.ts.
 export const FRAGMENTS = [

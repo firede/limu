@@ -32,12 +32,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
@@ -96,7 +92,7 @@ func paintName(p style.Paint) string {
 // with the width of the stroke where it is not the theme's, its ends and corners, and whether
 // the author set a fill.
 func partPaint(it *scene.Item, paint scene.Painting) string {
-	fill, stroke := paintName(it.Style.Fill), paintName(it.Style.Stroke)
+	fill, stroke := paintName(pelesvg.OwnFill(it)), paintName(it.Style.Stroke)
 	switch paint {
 	case scene.StrokeOnly:
 		fill = "none"

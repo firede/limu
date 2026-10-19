@@ -8,7 +8,6 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/fixture"
-	"github.com/firede/limu/internal/yaml"
 )
 
 // The fixture is what Pele makes of the same cases; ./scripts/oracle.sh writes it: the tokens
@@ -29,15 +28,12 @@ type peleCase struct {
 	Error  map[string]any `json:"error"`
 }
 
-// enc is a number as the oracle writes it.
-func enc(f float64) any { return yaml.Encode(f, false) }
-
 // encOpt is a number Pele may leave undefined.
 func encOpt(f float64, has bool) any {
 	if !has {
 		return map[string]any{"$": "undefined"}
 	}
-	return enc(f)
+	return fixture.Number(f)
 }
 
 func encStr(s string, has bool) any {
@@ -65,11 +61,11 @@ func dumpModel(m *Model) map[string]any {
 	for _, row := range m.Rows {
 		blocks := []any{}
 		for _, b := range row {
-			blocks = append(blocks, []any{enc(b.Start), enc(b.End), enc(b.Bits), b.Label})
+			blocks = append(blocks, []any{fixture.Number(b.Start), fixture.Number(b.End), fixture.Number(b.Bits), b.Label})
 		}
 		rows = append(rows, blocks)
 	}
-	out := map[string]any{"bitsPerRow": enc(m.BitsPerRow), "rows": rows}
+	out := map[string]any{"bitsPerRow": fixture.Number(m.BitsPerRow), "rows": rows}
 	for k, v := range map[string]string{"title": m.Title, "accTitle": m.AccTitle, "accDescr": m.AccDescr} {
 		if v != "" {
 			out[k] = v
@@ -131,14 +127,10 @@ func compare(t *testing.T, what, src string, got, want any) bool {
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/packet.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/packet.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Cases

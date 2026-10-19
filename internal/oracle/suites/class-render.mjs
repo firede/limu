@@ -7,8 +7,11 @@
 // have num() write them while limuExactNumbers is set; each number is moved by the groups it is
 // in, one move after the other from the innermost out, as the scene's are, and then written to
 // two decimals as Pele writes them. The markers are drawn again where the title moves them,
-// from their tips and directions, which classMarker writes beside them while the flag is set.
-import { lone, mutator } from './parse.mjs';
+// from their tips and directions, which classMarker writes before them while the flag is set.
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, capJoin } from '../lib/svg.mjs';
+import { readMarker } from '../lib/limu.mjs';
 import { WRITTEN } from './class.mjs';
 
 // The fragments mutations splice in, for text that parses and still draws something odd.
@@ -80,49 +83,16 @@ const HEADS = [
   '---\nconfig:\n  class:\n    nodeSpacing: 90\n    rankSpacing: 20\n---\n',
 ];
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 const TAG = /<(\/?)([A-Za-z][\w-]*)([^>]*?)(\/?)>/g;
 
-// How a browser ends and turns a stroke: the keywords it takes of stroke-linecap and
-// stroke-linejoin, initial for the initial value and inherit or unset for the parent's.
-const CAPS = { butt: 'butt', round: 'round', square: 'square', initial: 'butt', inherit: null, unset: null };
-const JOINS = { miter: 'miter', round: 'round', bevel: 'bevel', initial: 'miter', inherit: null, unset: null };
-// What an element sets of a stroke property, from the keywords given: a declaration in its
-// style attribute, the last the browser takes, over its attribute of that name; null for the
-// parent's, undefined for none.
-function sets(tag, prop, values) {
-  let v;
-  for (const decl of (attr(tag, 'style') ?? '').split(';')) {
-    const at = decl.indexOf(':');
-    if (at < 0 || decl.slice(0, at).trim().toLowerCase() !== prop) continue;
-    const k = decl.slice(at + 1).trim().toLowerCase();
-    if (Object.hasOwn(values, k)) v = values[k];
-  }
-  if (v !== undefined) return v;
-  const a = attr(tag, prop);
-  return a !== undefined && Object.hasOwn(values, a) ? values[a] : undefined;
-}
-// How an element's stroke ends and turns, as "cap/join", taking from the elements it is in,
-// innermost first, what it does not set.
-function pen(tag, outer) {
-  const get = (prop, values, initial) => {
-    for (const t of [tag, ...outer]) {
-      const v = sets(t, prop, values);
-      if (v) return v;
-    }
-    return initial;
-  };
-  return `${get('stroke-linecap', CAPS, 'butt')}/${get('stroke-linejoin', JOINS, 'miter')}`;
-}
+// How an element's stroke ends and turns, as "cap/join", as lib/svg.mjs's capJoin settles
+// them from it and the elements it is in, given innermost first.
+const pen = (tag, outer) => capJoin([...outer].reverse().concat([tag]), '/');
 const NUMBER = /[MLHVCQZ]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi;
 
 // The lines of a class diagram's SVG, drawn with numbers in full; num writes them as Pele does,
-// and redraw draws a marker again from what data-m says of it, at a tip moved by dx, dy.
+// and redraw draws a marker again from what the hooks write before it, at a tip moved by dx,
+// dy.
 export function readSvg(svg, num, redraw) {
   const lines = [];
   // The open elements, each with the group it makes, if any, and where that group moves what
@@ -184,9 +154,11 @@ export function readSvg(svg, num, redraw) {
   const penOf = (tag) => pen(tag, open.map((e) => e.tag ?? '').reverse());
   // Where a text's lines, and the runs in them, are drawn: each x and y in it.
   const at = (s) => [...s.matchAll(/ x="([^"]*)" y="([^"]*)"/g)].map((m) => pt(m[1], m[2])).join(' ');
-  const marker = (tag) => {
-    const [type, x, y, dx, dy] = attr(tag, 'data-m').split(' ');
-    const again = redraw(type, move(Number(x), 0), move(Number(y), 1), Number(dx), Number(dy));
+  // The marker the hooks wrote last, which the next element drawn as a marker is.
+  let written;
+  const marker = () => {
+    const { type, x, y, dx, dy } = written;
+    const again = redraw(type, move(x, 0), move(y, 1), dx, dy);
     const t = /<(path|circle)([^>]*)>/.exec(again);
     const fill = attr(t[2], 'fill');
     const paint = fill === undefined ? 'stroke' : attr(t[2], 'stroke') === 'none' ? 'fill' : 'fill+stroke';
@@ -204,6 +176,10 @@ export function readSvg(svg, num, redraw) {
     const selfClosing = m[4] === '/';
     if (closing) {
       while (open.length > 0 && open.pop().name !== name);
+      continue;
+    }
+    if (name === 'limu-marker') {
+      written = readMarker(whole);
       continue;
     }
     const cls = attr(rest, 'class') ?? '';
@@ -269,7 +245,7 @@ export function readSvg(svg, num, redraw) {
       else if (k.kind === 'class') lines.push(`rect ${box(rest)} ${penOf(rest)}`);
     } else if ((name === 'path' || name === 'circle') && k) {
       if (cls === 'pele-marker') {
-        lines.push(`${marker(rest)} ${penOf(rest)}`);
+        lines.push(`${marker()} ${penOf(rest)}`);
       } else if (k.kind === 'edge') {
         const dash = attr(rest, 'stroke-dasharray');
         const flag = dash === '6 4' ? ' dashed' : dash === '2 4' ? ' dotted' : '';

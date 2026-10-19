@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -32,12 +31,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
@@ -62,7 +57,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		if i := firstDiff(got, c.Lines); i >= 0 {
+		if i := fixture.FirstDiff(got, c.Lines); i >= 0 {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i, lineAt(got, i), lineAt(c.Lines, i))
 			}
@@ -100,15 +95,6 @@ func loneSurrogate(s string) bool {
 		return true
 	}
 	return false
-}
-
-func firstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
 }
 
 func lineAt(lines []string, i int) string {
@@ -152,11 +138,11 @@ func partPaint(it *scene.Item, part *scene.Part, corners bool) string {
 	case scene.StrokeOnly:
 		s = "none " + stroke
 	case scene.FillOnly:
-		return name(it.Style.Fill) + " -"
+		return name(pelesvg.OwnFill(it)) + " -"
 	case scene.Hollow:
 		s = "var(--_bg) " + stroke
 	default:
-		s = name(it.Style.Fill) + " " + stroke
+		s = name(pelesvg.OwnFill(it)) + " " + stroke
 	}
 	if stroke != "-" && stroke != "none" {
 		s += ends(it, 0, corners)
@@ -333,7 +319,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 		case RoleEdgeLabel:
 			r := it.Box
-			if it.Parts[0].Box != r {
+			if pelesvg.D(it.Parts[0].Path) != pelesvg.D(new(scene.Path).RoundRect(r, 3)) {
 				lines = append(lines, "patch not the label's box")
 			}
 			lines = append(lines, "label "+id+" "+pt(r.X, r.Y)+","+pt(r.W, r.H))

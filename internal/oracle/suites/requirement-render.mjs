@@ -1,15 +1,11 @@
 // Requirement diagrams drawn end to end: what Pele's render draws, read back out of its SVG as
 // one line per thing drawn, in the order drawn, with numbers as the SVG writes them. limu's
 // test writes the same lines from its scene.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, capJoin } from '../lib/svg.mjs';
 import { FRAGMENTS, WRITTEN, corpus, generated } from './requirement.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 const box = (s) => `${attr(s, 'x')},${attr(s, 'y')},${attr(s, 'width')},${attr(s, 'height')}`;
 
 // A text element as one line: its class, its font's size, weight and slant and its anchor,
@@ -31,37 +27,9 @@ const span = (open, text) => {
 
 const TAG = /<(\/?)([\w:-]+)((?:[^>"]|"[^"]*")*?)(\/?)>|([^<]+)/g;
 
-// How a browser ends and turns a stroke: the keywords it takes of stroke-linecap and
-// stroke-linejoin, initial for the initial value and inherit or unset for the parent's.
-const CAPS = { butt: 'butt', round: 'round', square: 'square', initial: 'butt', inherit: null, unset: null };
-const JOINS = { miter: 'miter', round: 'round', bevel: 'bevel', initial: 'miter', inherit: null, unset: null };
-// What an element sets of a stroke property, from the keywords given: a declaration in its
-// style attribute, the last the browser takes, over its attribute of that name; null for the
-// parent's, undefined for none.
-function sets(tag, prop, values) {
-  let v;
-  for (const decl of (attr(tag, 'style') ?? '').split(';')) {
-    const at = decl.indexOf(':');
-    if (at < 0 || decl.slice(0, at).trim().toLowerCase() !== prop) continue;
-    const k = decl.slice(at + 1).trim().toLowerCase();
-    if (Object.hasOwn(values, k)) v = values[k];
-  }
-  if (v !== undefined) return v;
-  const a = attr(tag, prop);
-  return a !== undefined && Object.hasOwn(values, a) ? values[a] : undefined;
-}
-// How an element's stroke ends and turns, as "cap/join", taking from the elements it is in,
-// innermost first, what it does not set.
-function pen(tag, outer) {
-  const get = (prop, values, initial) => {
-    for (const t of [tag, ...outer]) {
-      const v = sets(t, prop, values);
-      if (v) return v;
-    }
-    return initial;
-  };
-  return `${get('stroke-linecap', CAPS, 'butt')}/${get('stroke-linejoin', JOINS, 'miter')}`;
-}
+// How an element's stroke ends and turns, as "cap/join", as lib/svg.mjs's capJoin settles
+// them from it and the elements it is in, given innermost first.
+const pen = (tag, outer) => capJoin([...outer].reverse().concat([tag]), '/');
 
 // The lines of a requirement diagram's SVG. A rect, path or circle ends with how it ends and
 // turns its lines.

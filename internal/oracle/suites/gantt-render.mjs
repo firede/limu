@@ -5,39 +5,22 @@
 // Pele's SVG is drawn here with its numbers written out in full, as the oracle's hooks have num()
 // write them while limuExactNumbers is set; a gantt chart moves nothing inside groups, so each
 // number is read and written to two decimals as Pele writes it.
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, stroke } from '../lib/svg.mjs';
 import { FRAGMENTS, NOWS, ZONES, corpus, statementDiagrams } from './gantt.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 // How a shape is painted: its fill, with its opacity, and its stroke.
 const paint = (s) => {
   const opacity = attr(s, 'fill-opacity');
   return `${attr(s, 'fill') ?? '-'}${opacity ? '/' + opacity : ''} ${attr(s, 'stroke') ?? '-'}`;
 };
 
-// How a path's stroke ends and turns its corners, "-" for SVG's initial ones, as the browser
-// settles them: from the author's style Pele writes on the path, where it gives a keyword the
-// browser takes, else from the path's own attribute. No group a path is in sets either.
-const pen = (s) => {
-  const css = new Map();
-  for (const decl of (attr(s, 'style') ?? '').split(';')) {
-    const at = decl.indexOf(':');
-    if (at > 0) css.set(decl.slice(0, at).trim(), decl.slice(at + 1).trim().toLowerCase());
-  }
-  const one = (prop, keywords, initial) => {
-    const v = css.get(prop);
-    if (keywords.includes(v)) return v;
-    if (v === 'initial') return initial;
-    if (v === 'inherit' || v === 'unset') return '-';
-    return attr(s, prop) ?? '-';
-  };
-  return `${one('stroke-linecap', ['butt', 'round', 'square'], 'butt')} ${one('stroke-linejoin', ['miter', 'round', 'bevel'], 'miter')}`;
-};
+// How a path's stroke ends and turns its corners, "-" for what it inherits, as lib/svg.mjs's
+// stroke settles them from the path's attributes and the author's style Pele writes on it. No
+// group a path is in sets either.
+const pen = (s) => `${stroke('stroke-linecap', [s], '-')} ${stroke('stroke-linejoin', [s], '-')}`;
 
 function reader(num) {
   const pt = (x, y) => `${num(Number(x))},${num(Number(y))}`;

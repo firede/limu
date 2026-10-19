@@ -48,6 +48,7 @@ var atEnd = [...]token{
 	t_EOF_IN_STRUCT,
 }
 
+// directionNames are the directions Pele's RE_DIRECTION matches, in its order.
 var directionNames = [4]string{"TB", "BT", "RL", "LR"}
 
 // lexer is Pele's tokenize, its closures as methods.
@@ -70,17 +71,21 @@ func tokenize(src string) []tok {
 	return l.run()
 }
 
+// emit adds a token of the source from s to e, and reads on from e, as the emit of Pele's
+// tokenize does. It reports true, so that a match can return it.
 func (l *lexer) emit(typ token, s, e int) bool {
 	l.toks = append(l.toks, tok{typ, l.src[s:e], s})
 	l.p = e
 	return true
 }
 
+// push enters state s, keeping the one it leaves, as the push of Pele's tokenize does.
 func (l *lexer) push(s int) {
 	l.stack = append(l.stack, l.state)
 	l.state = s
 }
 
+// pop goes back to the state kept last, if any, as the pop of Pele's tokenize does.
 func (l *lexer) pop() {
 	if len(l.stack) > 0 {
 		l.state = l.stack[len(l.stack)-1]
@@ -88,17 +93,21 @@ func (l *lexer) pop() {
 	}
 }
 
-// unit is the code unit JavaScript reads at byte i, or -1 past the end.
+// unit is the code unit JavaScript reads at byte i, or -1 past the end: the charCodeAt Pele's
+// tokenize calls.
 func (l *lexer) unit(i int) int { return chars.Unit(l.src, i) }
 
-// kw reports whether word starts at p and no word character follows it.
+// kw reports whether word starts at p and no word character follows it, as the kw of Pele's
+// tokenize does.
 func (l *lexer) kw(word string) bool {
 	return strings.HasPrefix(l.src[l.p:], word) && !chars.IsWord(l.unit(l.p+len(word)))
 }
 
+// skipWs is the end of the run of white space from q, as the skipWs of Pele's tokenize gives
+// it.
 func (l *lexer) skipWs(q int) int { return chars.SpaceRun(l.src, q) }
 
-// until is where the next ch is from p, or the end.
+// until is where the next ch is from p, or the end, as the until of Pele's tokenize gives it.
 func (l *lexer) until(ch byte) int {
 	if e := strings.IndexByte(l.src[l.p:], ch); e >= 0 {
 		return l.p + e
@@ -107,7 +116,7 @@ func (l *lexer) until(ch byte) int {
 }
 
 // space reads a run of white space: a NEWLINE up to its last line feed, and the rest is
-// skipped. leaves leaves the state before the NEWLINE.
+// skipped. leaves leaves the state before the NEWLINE. It is the space of Pele's tokenize.
 func (l *lexer) space(leaves bool) {
 	q := l.p
 	k := -1
@@ -132,7 +141,7 @@ func (l *lexer) space(leaves bool) {
 }
 
 // keyword reads the keywords that every state recognizes, even inside generics and backtick
-// names.
+// names, as the keyword of Pele's tokenize does.
 func (l *lexer) keyword(c int) bool {
 	p := l.p
 	switch c {
@@ -173,7 +182,8 @@ func (l *lexer) keyword(c int) bool {
 	return false
 }
 
-// common reads what the states that read statements share.
+// common reads what the states that read statements share, as the common of Pele's tokenize
+// does.
 func (l *lexer) common(c, size int) bool {
 	if l.keyword(c) {
 		return true
@@ -264,7 +274,8 @@ func (l *lexer) common(c, size int) bool {
 
 // directionEnd matches /.*direction\s+<name>[^\n]*/y at q, on a line that ends at lineEnd:
 // the last `direction` on the line that is followed by white space and the name, and the
-// rest of the text up to a line feed. It is -1 where none matches.
+// rest of the text up to a line feed. It is -1 where none matches. It reads one of Pele's
+// RE_DIRECTION by hand.
 func directionEnd(s string, q, lineEnd int, name string) int {
 	for x := lineEnd - 1; x >= q; x-- {
 		if s[x] != 'd' || !strings.HasPrefix(s[x:], "direction") {
@@ -282,7 +293,8 @@ func directionEnd(s string, q, lineEnd int, name string) int {
 	return -1
 }
 
-// direction reads a direction statement that starts anywhere on the line.
+// direction reads a direction statement that starts anywhere on the line, as the direction
+// of Pele's tokenize does.
 func (l *lexer) direction() bool {
 	if l.dirNext == -1 || l.p < l.dirFailed {
 		return false
@@ -321,6 +333,7 @@ func (l *lexer) direction() bool {
 	return false
 }
 
+// initial reads a token in the INITIAL state, as the initial of Pele's tokenize does.
 func (l *lexer) initial(c, size int) bool {
 	if l.direction() {
 		return true
@@ -402,6 +415,8 @@ func (l *lexer) initial(c, size int) bool {
 	return l.common(c, size) || c == 58 && l.emit(t_COLON, p, p+1)
 }
 
+// run reads tokens until the end of the source or one that cannot be read: the loop of Pele's
+// tokenize, which reads each state's tokens.
 func (l *lexer) run() []tok {
 	for {
 		if l.p >= l.n {

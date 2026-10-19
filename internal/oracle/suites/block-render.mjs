@@ -11,19 +11,11 @@
 // have each label of a block diagram write the point it is centered on, its size and its
 // spans, and each block the size it is drawn at, which its shape is drawn from: the shapes
 // themselves are drawShape's, which the draw suite checks.
-import { lone, mutator } from './parse.mjs';
-import { capJoin } from './render.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { attr, TRANSLATE, n, pt, capJoin } from '../lib/svg.mjs';
+import { readLabel } from '../lib/limu.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './block.mjs';
-
-// Pele's escapes in attribute values, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (s) => String(Number(s));
-const pt = (x, y) => `${n(x)},${n(y)}`;
-const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
 // The last opacity an element's style attribute gives a property, as a browser takes it over
 // the element's attribute: a number, or a percentage, clamped to [0, 1].
@@ -76,15 +68,12 @@ function path(d, dx = 0, dy = 0) {
 function label(s, dx, dy) {
   const at = s.indexOf('<limu-label ');
   if (at < 0) return undefined;
-  const tag = s.slice(at, s.indexOf('/>', at));
+  const l = readLabel(s.slice(at, s.indexOf('/>', at) + 2));
   const text = s.slice(s.indexOf('<text', at), s.indexOf('>', s.indexOf('<text', at)));
-  const lines = JSON.parse(decodeURIComponent(attr(tag, 'lines')));
-  const spans = lines
-    .map((line) => line.map(([t, style, icon, w]) => (icon !== null ? `i:${icon}:${n(w)}` : `${style}:${t}:${n(w)}`)).join(' '))
+  const spans = l.lines
+    .map((line) => line.map((p) => (p.icon !== undefined ? `i:${p.icon}:${n(p.width)}` : `${p.style}:${p.text}:${n(p.width)}`)).join(' '))
     .join(' | ');
-  const x = Number(attr(tag, 'x'));
-  const y = Number(attr(tag, 'y'));
-  return `t ${dx === undefined ? pt(x, y) : pt(dx + x, dy + y)} ${pt(attr(tag, 'w'), attr(tag, 'h'))} ${attr(text, 'fill') ?? '-'} | ${spans}`;
+  return `t ${dx === undefined ? pt(l.x, l.y) : pt(dx + l.x, dy + l.y)} ${pt(l.width, l.height)} ${attr(text, 'fill') ?? '-'} | ${spans}`;
 }
 
 const GROUP = /<g class="pele-(cluster|edge|edge-label|node)[ "]/g;

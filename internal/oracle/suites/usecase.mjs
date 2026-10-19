@@ -3,9 +3,10 @@
 // tests, cases written here, those sources mutated at random, diagrams built from random
 // statements, and random strings of tokens. Each case is parsed as Pele's parse does it, after
 // the preprocessing every diagram goes through, and as the parser alone reads the raw text.
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { readFileSync } from 'node:fs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testFiles, testStrings, unquote, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/usecase/oracle.test.ts.
 export const FRAGMENTS = [
@@ -213,39 +214,17 @@ export const WRITTEN = [
 
 // The sources in Mermaid's specs as Pele ports them, as Pele's tests collect them.
 function specSources(pele) {
-  const out = new Set();
-  const evaluate = (raw) => {
-    try {
-      return new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')();
-    } catch {
-      return undefined;
-    }
-  };
   // loadCorpus('usecase', /usecase-beta/).
-  const dir = join(pele, 'tests/compat/usecase');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f))) {
-    const src = readFileSync(join(dir, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/usecase-beta/.test(raw)) continue;
-      const text = evaluate(raw);
-      if (text !== undefined) out.add(text);
-    }
-  }
-  // specCorpus().
+  const out = new Set(testStrings(pele, 'tests/compat/usecase', /\.spec\.[jt]s$/, /usecase-beta/));
+  // specCorpus(): the literals in backquotes or single quotes, none of which holds ${.
   for (const sub of ['tests/compat/usecase', 'tests/compat/usecase-parser']) {
-    for (const file of readdirSync(join(pele, sub)).filter((f) => f.endsWith('.spec.ts'))) {
-      const src = readFileSync(join(pele, sub, file), 'utf8');
+    for (const file of testFiles(pele, sub, /\.spec\.ts$/)) {
+      const src = readFileSync(file, 'utf8');
       for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'/g)) {
         const raw = m[1] ?? m[2];
         if (raw.includes('${') || raw.includes('./') || !/\W/.test(raw)) continue;
-        let text;
-        try {
-          text = new Function('return `' + raw.replace(/`/g, '\\`') + '`')();
-        } catch {
-          continue;
-        }
-        if (text.length > 2000) continue;
+        const text = unquote(raw);
+        if (text === undefined || text.length > 2000) continue;
         out.add(/^\s*usecase-beta/.test(text) ? text : 'usecase-beta\n' + text);
       }
     }
@@ -255,14 +234,13 @@ function specSources(pele) {
 
 // The corpus the suites start from: documentation, specs, Pele's seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/usecase-docs.json'), 'utf8'));
-  return [...new Set([...docs, ...specSources(pele), ...SEEDS, ...REJECTED, ...WRITTEN])].filter((s) => !lone(s));
+  return [...new Set([...docs(pele, 'usecase'), ...specSources(pele), ...SEEDS, ...REJECTED, ...WRITTEN])].filter((s) => !lone(s));
 }
 
 // Diagrams of whole statements over a handful of ids, which mostly get through the grammar and
 // then agree or clash in every way the model builder resolves, as Pele's test builds them.
 export function statementDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const id = () => pick(['A', 'B', 'C', 'D', 'e', 'f', 'S', 'P', 'A_b', '__proto__']);
   const text = () => pick(['A', 'A b', 'B', 'x y', 'A-b', '']);
   const arrow = () =>
@@ -316,7 +294,7 @@ export function statementDiagrams(rnd) {
 // boundary, note, table and relationship, with labels of all lengths, styles that change the
 // size of text, and the settings of front matter.
 export function drawableDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const labels = ['Customer', 'Place order', 'Pay', 'A', 'x', 'Check the stock before shipping', 'Ä Ö ü', '日本語のラベル', '😀 smile',
     'a #35; b #quot;c#quot;', 'x < y & z', 'Refund an order that was paid twice by mistake and needs care', 'Log in', 'Admin'];

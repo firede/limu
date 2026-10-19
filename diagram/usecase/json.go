@@ -20,7 +20,8 @@ type KeyOrder struct {
 	m *ordered[*[]string]
 }
 
-// Pointers are the pointers of the objects, in order.
+// Pointers are the pointers of the objects, in order, as iterating Pele's propertyOrder Map
+// gives them.
 func (k *KeyOrder) Pointers() []string {
 	var out []string
 	k.m.each(func(p string, _ *[]string) bool {
@@ -30,7 +31,8 @@ func (k *KeyOrder) Pointers() []string {
 	return out
 }
 
-// Keys are the keys of the object at pointer, in the order they were written.
+// Keys are the keys of the object at pointer, in the order they were written, as
+// propertyOrder.get(pointer) gives them in Pele's flattenJsonRows.
 func (k *KeyOrder) Keys(pointer string) ([]string, bool) {
 	keys, ok := k.m.get(pointer)
 	if !ok {
@@ -54,6 +56,8 @@ type walkFrame struct {
 	index  int
 }
 
+// escapePointer escapes a key for a JSON Pointer, ~ as ~0 and / as ~1, as Pele's propertyOrder
+// and flattenJsonRows do in line.
 func escapePointer(key string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
 }
@@ -99,6 +103,8 @@ func propertyOrder(text []uint16) (order *ordered[*[]string], failed *walkError)
 			at++
 		}
 	}
+	// readString reads a string at the cursor, giving its value if decode is set, as the
+	// readString closure of Pele's propertyOrder does.
 	readString := func(decode bool) string {
 		at++
 		var value []uint16
@@ -155,6 +161,7 @@ func propertyOrder(text []uint16) (order *ordered[*[]string], failed *walkError)
 		}
 		panic(walkError{at})
 	}
+	// literal reads true, false or null, as the literal closure of Pele's propertyOrder does.
 	literal := func(word string) {
 		for k := 0; k < len(word); k++ {
 			if code(at+k) != int(word[k]) {
@@ -163,6 +170,7 @@ func propertyOrder(text []uint16) (order *ordered[*[]string], failed *walkError)
 		}
 		at += len(word)
 	}
+	// number reads a number, as the number closure of Pele's propertyOrder does.
 	number := func() {
 		if code(at) == '-' {
 			at++
@@ -326,10 +334,12 @@ func locationAt(text []uint16, offset float64, line, column int) (int, int) {
 	return line, column
 }
 
+// isWordByte reports whether \w matches byte b, for the \b of the patterns of Pele's
+// locationFromMessage.
 func isWordByte(b byte) bool { return chars.IsWord(int(b)) }
 
 // boundedDigits is the run of digits that starts at byte i of s, with its end, if a word
-// boundary follows it: the (\d+)\b of a regular expression.
+// boundary follows it: the (\d+)\b of the patterns of Pele's locationFromMessage.
 func boundedDigits(s string, i int) (string, int) {
 	j := i
 	for j < len(s) && chars.IsDigit(int(s[j])) {
@@ -341,7 +351,9 @@ func boundedDigits(s string, i int) (string, int) {
 	return s[i:j], j
 }
 
-// findWord is the first place in s where word starts after a word boundary.
+// findWord calls fn with the end of each place in s, from from on, where word starts after a
+// word boundary, until fn reports a match: the search for the \bposition and \bline of the
+// patterns of Pele's locationFromMessage.
 func findWord(s, word string, from int, fn func(at int) bool) bool {
 	for k := from; k <= len(s)-len(word); k++ {
 		if strings.HasPrefix(s[k:], word) && (k == 0 || !isWordByte(s[k-1])) && fn(k+len(word)) {
@@ -351,7 +363,7 @@ func findWord(s, word string, from int, fn func(at int) bool) bool {
 	return false
 }
 
-// parseNumber is parseInt of a run of decimal digits.
+// parseNumber is parseInt of a run of decimal digits, as Pele's locationFromMessage reads one.
 func parseNumber(digits string) float64 {
 	f, err := strconv.ParseFloat(digits, 64)
 	if err != nil && !math.IsInf(f, 0) {
@@ -412,7 +424,8 @@ func locationFromMessage(message string, text []uint16, line, column int) (int, 
 	return 0, 0, false
 }
 
-// boundedDigitsLoose is a run of digits from i, which a space follows in the pattern.
+// boundedDigitsLoose is a run of digits from i, which a space follows in the pattern: the
+// (\d+) after `line ` in Pele's locationFromMessage.
 func boundedDigitsLoose(s string, i int) (string, int) {
 	j := i
 	for j < len(s) && chars.IsDigit(int(s[j])) {
@@ -450,6 +463,8 @@ func parseOrderedJSON(text string, origin func() (int, int)) (*Object, *KeyOrder
 	return object, &KeyOrder{order}, nil
 }
 
+// jsonError is a syntax error in the body of a `json` node at a line and column, as Pele's
+// jsonError makes it.
 func jsonError(message string, line, column int) *diagram.Error {
 	return &diagram.Error{
 		Code:    diagram.Syntax,

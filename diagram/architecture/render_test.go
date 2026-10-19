@@ -1,7 +1,6 @@
 package architecture
 
 import (
-	"encoding/json"
 	"math"
 	"slices"
 	"strconv"
@@ -39,12 +38,8 @@ type peleRender struct {
 var hostIcons = []string{"logos:aws-lambda", "mdi:home", "star", "database", "fa:fa-car"}
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
@@ -151,6 +146,10 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 	}
 	rect := func(it *scene.Item, part *scene.Part) {
 		r := part.Box
+		if part.Path != nil {
+			// A label's patch, a path with the item's box.
+			r = it.Box
+		}
 		radius := "-"
 		switch {
 		case part.Rounded:
@@ -159,7 +158,7 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 			radius = "r3"
 		}
 		stroke := paintName(it.Style.Stroke)
-		lines = append(lines, "rect "+pt(r.X, r.Y)+","+pt(r.W, r.H)+" "+radius+" "+paintName(it.Style.Fill)+" "+stroke+" "+pelesvg.CapJoin(it))
+		lines = append(lines, "rect "+pt(r.X, r.Y)+","+pt(r.W, r.H)+" "+radius+" "+paintName(pelesvg.OwnFill(it))+" "+stroke+" "+pelesvg.CapJoin(it))
 	}
 	// The icon of an item: a Picture the host draws, or Pele's glyph, the item after it.
 	icon := func(owner *scene.Item, next *scene.Item) bool {
@@ -248,7 +247,7 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 			// The circle, as Path.Ellipse draws it: from its right end, four quarters.
 			a := it.Parts[0].Path.Args
 			cx, cy := a[6], a[1]
-			lines = append(lines, "circle "+pt(cx, cy)+" "+pelesvg.Num(a[0]-cx)+" "+paintName(it.Style.Fill))
+			lines = append(lines, "circle "+pt(cx, cy)+" "+pelesvg.Num(a[0]-cx)+" "+paintName(pelesvg.OwnFill(it)))
 		default:
 			lines = append(lines, "unknown role "+string(it.Role))
 		}

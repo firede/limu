@@ -3,9 +3,9 @@
 // buildCynefin makes of the tree with the title the text's front matter gives. The cases are
 // Mermaid's documentation and specs, the inputs of Pele's own tests, cases written here,
 // random diagrams, and all of those mutated at random.
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/cynefin/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -164,36 +164,15 @@ export const WRITTEN = [
   'not a diagram',
 ];
 
-// Strings in the sources of a folder of Pele's tests that hold the keyword, as Pele's
-// loadCorpus collects them, from files whose names match.
-function testStrings(pele, dir, files) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/cynefin-beta/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
-
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests, its
 // seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/cynefin-docs.json'), 'utf8'));
   return [
     ...new Set([
-      ...docs,
-      ...testStrings(pele, 'tests/compat/cynefin', /\.spec\.[jt]s$/),
-      ...testStrings(pele, 'tests/cynefin', /\.test\.[jt]s$/),
-      ...testStrings(pele, 'tests/render', /^cynefin.*\.test\.ts$/),
+      ...docs(pele, 'cynefin'),
+      ...testStrings(pele, 'tests/compat/cynefin', /\.spec\.[jt]s$/, /cynefin-beta/),
+      ...testStrings(pele, 'tests/cynefin', /\.test\.[jt]s$/, /cynefin-beta/),
+      ...testStrings(pele, 'tests/render', /^cynefin.*\.test\.ts$/, /cynefin-beta/),
       ...SEEDS,
       ...WRITTEN,
     ]),
@@ -243,7 +222,7 @@ const LABELS = ['Pattern identified', 'Best practice codified', 'Complacency', '
 
 // Random Cynefin diagrams, most of them well formed, with random configuration.
 export function randomDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const names = ['complex', 'complicated', 'clear', 'chaotic', 'confusion'];
   const quote = (s) => (s.includes('"') && !s.includes("'") ? `'${s}'` : `"${s}"`);

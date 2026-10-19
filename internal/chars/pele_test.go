@@ -31,28 +31,11 @@ type peleChars struct {
 
 // number reads a number as the oracle writes it, with {"$n": …} for those JSON has no word for.
 func number(t *testing.T, raw json.RawMessage) float64 {
-	var f float64
-	if json.Unmarshal(raw, &f) == nil {
-		return f
-	}
-	var tagged struct {
-		N string `json:"$n"`
-	}
-	if err := json.Unmarshal(raw, &tagged); err != nil {
+	f, err := fixture.Float(raw)
+	if err != nil {
 		t.Fatal(err)
 	}
-	switch tagged.N {
-	case "NaN":
-		return math.NaN()
-	case "Infinity":
-		return math.Inf(1)
-	case "-Infinity":
-		return math.Inf(-1)
-	case "-0":
-		return math.Copysign(0, -1)
-	}
-	t.Fatalf("number %s", raw)
-	return 0
+	return f
 }
 
 func same(a, b float64) bool {
@@ -60,12 +43,8 @@ func same(a, b float64) bool {
 }
 
 func load(t *testing.T) peleChars {
-	data, err := fixture.Read("testdata/pele/chars.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleChars
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/chars.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p

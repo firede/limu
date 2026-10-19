@@ -1,7 +1,8 @@
-// Flowcharts drawn end to end: what Pele's render draws, read back out of its SVG as one line
-// per thing drawn, in the order drawn, with numbers as the SVG writes them. limu's test writes
-// the same lines from its scene.
-import { mutator } from './parse.mjs';
+// Flowcharts drawn end to end, some with a padding other than Pele's 8: what Pele's render
+// draws, read back out of its SVG as one line per thing drawn, in the order drawn, with
+// numbers as the SVG writes them. limu's test writes the same lines from its scene.
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, tag, capJoin } from '../lib/svg.mjs';
 
 // The fragments mutations splice in, for text that parses and still draws something odd.
 const FRAGMENTS = [
@@ -17,12 +18,6 @@ const FRAGMENTS = [
   'e1@{ curve: linear }', 'e1@{ curve: step }', '中文', '😀', '#quot;', '\nA --> A\n',
 ];
 
-// Pele's escapes in attribute values, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 const box = (s) => `${attr(s, 'x') ?? 0},${attr(s, 'y') ?? 0},${attr(s, 'width')},${attr(s, 'height')}`;
 // Where a label's first line sits: the first x and y in its text.
 const textAt = (s) => {
@@ -31,37 +26,6 @@ const textAt = (s) => {
   const m = / x="([^"]*)" y="([^"]*)"/.exec(s.slice(i));
   return `t ${m[1]},${m[2]}`;
 };
-const tag = (s, name) => {
-  const i = s.indexOf('<' + name + ' ');
-  return i < 0 ? undefined : s.slice(i, s.indexOf('>', i));
-};
-
-// The cap and the join a stroke is drawn with, as the browser settles them from the opening
-// tags of the element and of the groups it is in, outermost first: each takes them from its
-// parent, then from its own attributes, then from the declarations of its style attribute,
-// in turn, of which the browser takes a keyword in either case, initial for SVG's initial
-// value, and inherit or unset for its parent's, and drops any other.
-const KEYWORDS = { 'stroke-linecap': ['butt', 'round', 'square'], 'stroke-linejoin': ['miter', 'round', 'bevel'] };
-export function capJoin(chain) {
-  const settle = (prop) => {
-    let v = KEYWORDS[prop][0];
-    for (const open of chain) {
-      const parent = v;
-      const a = attr(open, prop);
-      if (a !== undefined && KEYWORDS[prop].includes(a.toLowerCase())) v = a.toLowerCase();
-      for (const decl of (attr(open, 'style') ?? '').split(';')) {
-        const at = decl.indexOf(':');
-        if (at < 0 || decl.slice(0, at).trim().toLowerCase() !== prop) continue;
-        const value = decl.slice(at + 1).trim().toLowerCase();
-        if (KEYWORDS[prop].includes(value)) v = value;
-        else if (value === 'initial') v = KEYWORDS[prop][0];
-        else if (value === 'inherit' || value === 'unset') v = parent;
-      }
-    }
-    return v;
-  };
-  return `${settle('stroke-linecap')} ${settle('stroke-linejoin')}`;
-}
 
 const GROUP = /<g class="pele-(cluster|edge|cluster-title|edge-label|node)[ "]/g;
 
@@ -148,22 +112,28 @@ export default async function ({ src, cases, write, random }) {
   });
 
   const out = [];
-  const draw = (source, maxWidth) => {
+  const draw = (source, maxWidth, padding) => {
     let r;
     try {
-      r = render(source, { measurer: metricsMeasurer, maxWidth, outputLimit: Infinity });
+      r = render(source, { measurer: metricsMeasurer, maxWidth, padding, outputLimit: Infinity });
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
       return false;
     }
     if (r.type !== 'flowchart') return false;
-    out.push({ src: source, maxWidth, lines: readSvg(r.svg) });
+    out.push({ src: source, maxWidth, padding, lines: readSvg(r.svg) });
     return true;
   };
+  const PADS = [0, 20, 2.5];
   let drawn = 0;
   const each = (source) => {
-    // Every third one again in a narrow host, which turns or tightens what does not fit.
-    if (draw(source) && drawn++ % 3 === 0) draw(source, 360);
+    if (!draw(source)) return;
+    // Every third one again in a narrow host, which turns or tightens what does not fit, and
+    // every twentieth with a padding other than Pele's 8, some in the narrow host, which
+    // takes the padding from the room for the title and the groups.
+    if (drawn % 3 === 0) draw(source, 360);
+    if (drawn % 20 === 0) draw(source, drawn % 40 === 0 ? undefined : 360, PADS[(drawn / 20) % PADS.length]);
+    drawn++;
   };
   flowcharts.forEach(each);
   const next = mutator(flowcharts, FRAGMENTS, random(11));

@@ -190,7 +190,7 @@ func draw(m *Model, o *layout.Options, down bool) *scene.Scene {
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	if down {
 		return verticalCauses(m, o)
 	}
@@ -369,7 +369,7 @@ func verticalCauses(m *Model, o *layout.Options) *scene.Scene {
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	room := max(140, o.MaxWidth-2*pad)
 	title := text.Layout(m.Title, text.Options{Measurer: measure, Size: size, MaxWidth: common.TitleRoom(o), Face: text.Bold, Icons: o.Icons})
 	var order []entry
@@ -429,7 +429,7 @@ func verticalCauses(m *Model, o *layout.Options) *scene.Scene {
 				rx = 12
 				it.Role = RoleHead
 			}
-			it.Parts = []scene.Part{{Path: new(scene.Path).RoundRect(box, rx), Box: box}}
+			it.Parts = []scene.Part{{Path: new(scene.Path).RoundRect(box, rx)}}
 			it.Style = style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg}
 		}
 		nodes = append(nodes, it)

@@ -1,7 +1,6 @@
 package mindmap
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"slices"
@@ -42,12 +41,8 @@ type peleRender struct {
 var hostIcons = []string{"fa fa-book", "star", "phone", "fa:fa-car", "mdi:home", "fa fa-x"}
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
@@ -159,9 +154,9 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 		it := &sc.Items[i]
 		// Pele draws each first-level branch in a group of its own, its links first.
 		if it.Role == RoleEdge || it.Role == RoleNode {
-			s, err := strconv.Atoi(strings.TrimPrefix(it.Class[0], "section-"))
+			s, err := strconv.Atoi(strings.TrimPrefix(it.Tags[0], "section-"))
 			if err != nil {
-				t.Errorf("item %d has no section: %v", i, it.Class)
+				t.Errorf("item %d has no section: %v", i, it.Tags)
 			}
 			if s != section || it.Role == RoleEdge && i > 0 && sc.Items[i-1].Role == RoleNode {
 				lines = append(lines, "branch "+strconv.Itoa(s))
@@ -194,8 +189,6 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 			classes := it.Class
 			if it.Role == RoleRoot {
 				root = " root"
-			} else {
-				classes = classes[1:]
 			}
 			b := it.Box
 			lines = append(lines, fmt.Sprintf("node %s %s%s [%s] %s,%s", pelesvg.ID(it.ID), shape, root, strings.Join(classes, " "), pt(b.X, b.Y), pt(b.W, b.H)))
@@ -208,7 +201,7 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 				if part.Rounded {
 					r = "r"
 				}
-				lines = append(lines, "part "+r+" "+paintName(it.Style.Fill)+" "+paintName(it.Style.Stroke)+" "+width(it)+" "+pelesvg.CapJoin(it))
+				lines = append(lines, "part "+r+" "+paintName(pelesvg.OwnFill(it))+" "+paintName(it.Style.Stroke)+" "+width(it)+" "+pelesvg.CapJoin(it))
 			}
 			frame := scene.Item{Parts: draw.Outline(string(it.Shape), 0, 0, b.W, b.H)}
 			frame.Move(b.X+b.W/2, b.Y+b.H/2)

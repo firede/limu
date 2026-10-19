@@ -6,30 +6,15 @@
 // write them while limuExactNumbers is set, and compared whole: a difference in the last bit
 // is a difference in the port. The styles an author's classes give are written as Pele writes
 // them on each shape and text, for the test to read as limu reads them.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, stroke } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './treemap.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-// A stroke's ends or corners as a browser takes them on an element: from its style attribute,
-// then from its attribute, as a keyword the browser knows, initial as SVG's initial value, and
-// otherwise what it inherits, which no group of a treemap sets: SVG's initial value.
-const keyword = (name, values, initial) => (e) => {
-  const style = [...(attr(e, 'style') ?? '').matchAll(new RegExp(`(?:^|;)\\s*${name}\\s*:([^;]*)`, 'g'))].pop();
-  for (const v of [style?.[1], attr(e, name)]) {
-    if (v === undefined) continue;
-    const k = v.trim().toLowerCase();
-    if (values.includes(k)) return k;
-    if (k === 'initial' || k === 'inherit' || k === 'unset') return initial;
-  }
-  return initial;
-};
-const linecap = keyword('stroke-linecap', ['butt', 'round', 'square'], 'butt');
-const linejoin = keyword('stroke-linejoin', ['miter', 'round', 'bevel'], 'miter');
+// A stroke's ends or corners as a browser takes them on an element, as lib/svg.mjs's stroke
+// settles them; no group of a treemap sets either.
+const linecap = (e) => stroke('stroke-linecap', [e]);
+const linejoin = (e) => stroke('stroke-linejoin', [e]);
 // The style Pele writes on an element, without the corner radius every rounded box takes.
 const css = (e) => encodeURIComponent((attr(e, 'style') ?? '').replace(/^rx:var\(--_r\);?/, ''));
 
@@ -97,11 +82,11 @@ export default async function ({ pele, src, write, random }) {
   const { metricsMeasurer } = await src('text/measurer.ts');
 
   const out = [];
-  const draw = (source, maxWidth, fontSize) => {
+  const draw = (source, maxWidth, fontSize, padding) => {
     let r;
     globalThis.limuExactNumbers = true;
     try {
-      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, outputLimit: Infinity });
+      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, padding, outputLimit: Infinity });
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
       return false;
@@ -109,11 +94,12 @@ export default async function ({ pele, src, write, random }) {
       globalThis.limuExactNumbers = false;
     }
     if (r.type !== 'treemap') return false;
-    out.push({ src: source, maxWidth, fontSize, lines: readSvg(r.svg) });
+    out.push({ src: source, maxWidth, fontSize, padding, lines: readSvg(r.svg) });
     return true;
   };
   const NARROW = [360, 320, 280, 240, 200, 160, 120, 600, 500, 90];
   const SIZES = [13, 20, 11, 24, 13.5, 9];
+  const PADS = [0, 20, 2.5];
   const seen = new Set();
   let drawn = 0;
   const each = (source) => {
@@ -125,6 +111,9 @@ export default async function ({ pele, src, write, random }) {
     // title, and every fifth in another size of type.
     if (drawn % 3 === 0) draw(source, NARROW[(drawn / 3) % NARROW.length]);
     if (drawn % 5 === 0) draw(source, drawn % 10 === 0 ? undefined : NARROW[(drawn / 5) % NARROW.length], SIZES[(drawn / 5) % SIZES.length]);
+    // Every twentieth with the host's padding, which takes the place of diagramPadding, some
+    // in a narrow host, where it is taken from the treemap's width.
+    if (drawn % 20 === 0) draw(source, drawn % 40 === 0 ? undefined : NARROW[(drawn / 20) % NARROW.length], undefined, PADS[(drawn / 20) % PADS.length]);
     drawn++;
   };
   corpus(pele).forEach(each);

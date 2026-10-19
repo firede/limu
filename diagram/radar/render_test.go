@@ -1,7 +1,6 @@
 package radar
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -29,12 +28,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3500 {
@@ -104,7 +99,7 @@ func sceneLines(sc *scene.Scene) []string {
 	pen := func(it *scene.Item, part *scene.Part) string {
 		fill, opacity := "none", "-"
 		if part.Paint != scene.StrokeOnly {
-			fill, opacity = paintName(it.Style.Fill)
+			fill, opacity = paintName(pelesvg.OwnFill(it))
 		}
 		stroke, _ := paintName(it.Style.Stroke)
 		width := "-"

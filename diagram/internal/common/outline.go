@@ -358,10 +358,10 @@ const stopNames = "'SPACELINE', 'NL', 'EOF'"
 // ParseOutline makes the calls on db that the grammar's actions make, in the same order, and
 // reports errors in the state where the generated parser would, as Pele's parseOutline does.
 func ParseOutline(src string, db OutlineDB, kanban bool) error {
-	typ := "mindmap"
+	typ := diagram.Mindmap
 	data := ""
 	if kanban {
-		typ = "kanban"
+		typ = diagram.Kanban
 		data = ", 'SHAPE_DATA'"
 	}
 	tok := TokenizeOutline(src, kanban)

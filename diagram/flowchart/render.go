@@ -22,7 +22,6 @@ const (
 	rankSep  = 48
 	groupPad = 20
 	loop     = 26
-	padding  = 8
 )
 
 // A Variant is a diagram type that is a flowchart laid out its own way, which may draw its
@@ -55,6 +54,8 @@ func LayoutVariant(db *DB, config diagram.Config, o *layout.Options, v *Variant)
 	if o == nil {
 		o = &layout.Options{}
 	}
+	// fitted lays the flowchart out, down if down, and tightly where loosely does not fit, as
+	// Pele's fitted does.
 	fitted := func(down bool) *scene.Scene {
 		return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, v, down, tight) })
 	}
@@ -65,6 +66,7 @@ func LayoutVariant(db *DB, config diagram.Config, o *layout.Options, v *Variant)
 }
 
 // numberOption is a number of a flowchart's config, if it is one above 0, at most 2000.
+// It is Pele's numberOption.
 func numberOption(section diagram.Config, key string, fallback float64) float64 {
 	if v, ok := section[key].(float64); ok && v > 0 {
 		return min(v, 2000)
@@ -73,6 +75,7 @@ func numberOption(section diagram.Config, key string, fallback float64) float64 
 }
 
 // assetSize is the size an image or icon is given, if it is a sensible one.
+// It is Pele's assetSize.
 func assetSize(v *float64, fallback float64) float64 {
 	if v != nil && *v > 0 && *v <= 4000 {
 		return *v
@@ -94,6 +97,7 @@ type view struct {
 // down lays out a flowchart that runs across as one that runs down; tight sets nodes closer
 // together.
 func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, down, tight bool) *scene.Scene {
+	padding := o.Pad()
 	gpad := float64(groupPad)
 	if tight {
 		gpad = 12
@@ -121,6 +125,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		wrapWidth = min(wrapWidth, 100)
 		groupMax = max(80, common.TitleRoom(o)/2)
 	}
+	// labelOf lays out a label with the flowchart's measurer and icons, the call to layoutLabel
+	// that Pele's draw makes for each label.
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
@@ -217,6 +223,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 	if down {
 		rootDir = layout.TB
 	}
+	// flowsSideways reports whether the nodes about node i run across, by the direction of the
+	// nearest group that sets one, as Pele's flowsSideways does.
 	flowsSideways := func(i int) bool {
 		var dir layout.Dir
 		for p, hops := cnodes[i].Parent, 0; p >= 0 && dir == "" && hops < 10000; p, hops = cnodes[p].Parent, hops+1 {
@@ -326,6 +334,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 	if variant != nil {
 		sc.Type = variant.Type
 	}
+	// node is the box of node i that the drawing helpers take; Pele hands them the CNode
+	// itself.
 	node := func(i int) draw.Node {
 		c := &cnodes[i]
 		return draw.Node{X: c.X, Y: c.Y, W: c.W, H: c.H, Group: c.IsGroup}
@@ -353,9 +363,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		c := &cnodes[i]
 		n := v.node
 		x, y := c.X, c.Y
-		classes := common.ClassNames(common.TrimDefault(n.CSSClasses))
+		classes, tags := common.Clickable(common.ClassNames(common.TrimDefault(n.CSSClasses)))
 		if c.IsGroup && variant != nil && variant.DrawGroup != nil && c.Parent < 0 {
-			clusters = append(clusters, variant.DrawGroup(c, &v.label, v.author, classes, n.ID, rootDir))
+			lane := variant.DrawGroup(c, &v.label, v.author, classes, n.ID, rootDir)
+			lane.Tags = tags
+			clusters = append(clusters, lane)
 			continue
 		}
 		if c.IsGroup {
@@ -363,9 +375,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			titleY := y - c.H/2 + 8 + v.label.Height/2
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
 			cluster := scene.Item{
-				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Box: box,
+				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Tags: tags, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
 			}
 			label := &v.label
@@ -392,7 +404,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 
 		w, h := v.w, v.h
 		it := scene.Item{
-			Kind: scene.Node, Role: RoleNode, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes,
+			Kind: scene.Node, Role: RoleNode, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Tags: tags,
 			Box:    scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
 			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
 			Author: v.author.Style,
@@ -519,6 +531,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			for k := 0; k+1 < len(route); k += 3 {
 				it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
 			}
+			if len(it.Route) == 0 {
+				// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+				it.Route = it.Parts[0].Path.Corners()
+			}
 			edges = append(edges, it)
 		}
 		if label.Width > 0 {
@@ -544,6 +560,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 // The classes Mermaid gives every edge, which say nothing.
 var edgeClassNoise = strings.NewReplacer("edge-thickness-normal", "", "edge-pattern-solid", "", "flowchart-link", "")
 
+// hasClass reports whether name is among classes, the / internal-link(?: |$)/ test of
+// Pele's draw.
 func hasClass(classes []string, name string) bool {
 	for _, c := range classes {
 		if c == name {

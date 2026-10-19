@@ -1,9 +1,8 @@
 // Package common holds what the diagrams share beyond layout and drawing, as Pele's
 // diagrams/common does:
 //
-//   - the room about a diagram (Padding), and fitting a diagram to the width the host has
-//     (Tighten, TurnToFit, FitWidth), with the curve the host's routing asks for
-//     (RoutingCurve);
+//   - fitting a diagram to the width the host has (Tighten, TurnToFit, FitWidth), and the
+//     curve the host's routing asks for (RoutingCurve);
 //   - laying out labels: plain and fitted ones (fit.go), text cut to fit a room and
 //     one-line labels (fittext.go: FitText, Line, LineOf), labels taken literally
 //     (literallabel.go), and a diagram's title (title.go);
@@ -21,9 +20,6 @@ import (
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 )
-
-// Padding is the room about a diagram, as Pele's default padding.
-const Padding = 8
 
 // RoutingCurve is the curve, by Mermaid's name, that the host's routing asks edges to be
 // drawn with: "step" for layout.Orthogonal, "linear" for layout.Straight, and "" for
@@ -98,7 +94,7 @@ func FitWidth(o *layout.Options, natural, least float64, lay func(plot float64, 
 // TitleRoom is the width a title may take before it wraps, as Pele's titleRoom gives it.
 func TitleRoom(o *layout.Options) float64 {
 	if o.MaxWidth > 0 {
-		return max(80, o.MaxWidth-2*Padding)
+		return max(80, o.MaxWidth-2*o.Pad())
 	}
 	return 4000
 }

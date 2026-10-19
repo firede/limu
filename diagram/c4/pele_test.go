@@ -7,7 +7,6 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/internal/fixture"
-	"github.com/firede/limu/internal/yaml"
 )
 
 // The fixture is what Pele makes of the same cases; ./scripts/oracle.sh writes it: the tokens
@@ -27,9 +26,6 @@ type peleCase struct {
 	Model  map[string]any `json:"model"`
 	Error  map[string]any `json:"error"`
 }
-
-// enc is a number as the oracle writes it.
-func enc(f float64) any { return yaml.Encode(f, false) }
 
 var (
 	elementFields = []string{"type", "descr", "techn", "sprite", "tags", "link", "bgColor", "fontColor", "borderColor",
@@ -109,10 +105,10 @@ func dumpModel(db *DB) map[string]any {
 			}
 		}
 		if r.Defined("offsetX") {
-			o["offsetX"] = enc(r.OffsetX)
+			o["offsetX"] = fixture.Number(r.OffsetX)
 		}
 		if r.Defined("offsetY") {
-			o["offsetY"] = enc(r.OffsetY)
+			o["offsetY"] = fixture.Number(r.OffsetY)
 		}
 		if r.Extra != nil {
 			o["extra"] = dumpExtra(r.Extra)
@@ -121,7 +117,7 @@ func dumpModel(db *DB) map[string]any {
 	}
 	out := map[string]any{
 		"c4Type": db.C4Type, "shapes": shapes, "boundaries": boundaries, "rels": rels,
-		"shapeInRow": enc(db.ShapeInRow), "boundaryInRow": enc(db.BoundaryInRow),
+		"shapeInRow": fixture.Number(db.ShapeInRow), "boundaryInRow": fixture.Number(db.BoundaryInRow),
 	}
 	if db.HasTitle {
 		out["title"] = db.Title
@@ -182,14 +178,10 @@ func compare(t *testing.T, what, src string, got, want any) bool {
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/c4.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/c4.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Cases

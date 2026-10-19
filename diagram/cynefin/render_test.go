@@ -1,7 +1,6 @@
 package cynefin
 
 import (
-	"encoding/json"
 	"strconv"
 	"strings"
 	"testing"
@@ -34,12 +33,8 @@ type peleRender struct {
 
 func loadRender(t *testing.T) *peleRender {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return &p
@@ -195,7 +190,7 @@ func sceneLines(sc *scene.Scene) []string {
 	}
 	// What a part is filled and stroked with, the stroke's width, its dash, cap and join.
 	pen := func(it *scene.Item, paint scene.Painting) string {
-		fill, stroke := paintName(it.Style.Fill), paintName(it.Style.Stroke)
+		fill, stroke := paintName(pelesvg.OwnFill(it)), paintName(it.Style.Stroke)
 		switch paint {
 		case scene.StrokeOnly:
 			fill = "none"

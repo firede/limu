@@ -160,6 +160,7 @@ type DB struct {
 }
 
 // NewDB is an empty flowchart.
+// It is the constructor of Pele's FlowDb.
 func NewDB(options Options) *DB {
 	return &DB{
 		nodes:          map[string]*Node{},
@@ -174,12 +175,16 @@ func NewDB(options Options) *DB {
 }
 
 // Node is the node of id, or nil.
+// It is Pele's nodes.get(id).
 func (d *DB) Node(id string) *Node { return d.nodes[id] }
 
 // Class is the class of id, or nil.
+// It is Pele's classes.get(id).
 func (d *DB) Class(id string) *ClassDef { return d.classes[id] }
 
 // Tooltip is the tooltip of the node of id, and whether it has one.
+// It is Pele's tooltips.get(id): Pele keeps the tooltips in a Map, which limu keeps as a
+// list and an index.
 func (d *DB) Tooltip(id string) (string, bool) {
 	i, ok := d.tooltips[id]
 	if !ok {
@@ -189,8 +194,11 @@ func (d *DB) Tooltip(id string) (string, bool) {
 }
 
 // Subgraph is the subgraph of id, or nil.
+// It is Pele's subgraph.
 func (d *DB) Subgraph(id string) *Subgraph { return d.subgraphLookup[id] }
 
+// labelType is a label type as given, if it is one, and "markdown" otherwise, as Pele's
+// labelType gives it.
 func labelType(t string) LabelType {
 	switch t {
 	case "markdown", "string", "text":
@@ -199,6 +207,8 @@ func labelType(t string) LabelType {
 	return LabelMarkdown
 }
 
+// unquote drops the double quotes text starts and ends with, if it has both, as Pele's
+// unquote does.
 func unquote(text string) string {
 	if len(text) >= 2 && text[0] == '"' && text[len(text)-1] == '"' {
 		return text[1 : len(text)-1]
@@ -206,6 +216,8 @@ func unquote(text string) string {
 	return text
 }
 
+// destructStartLink reads the start of an arrow that has a label between its start and its
+// end, its head and its stroke, as Pele's destructStartLink does.
 func destructStartLink(raw string) LinkInfo {
 	str := chars.Trim(raw)
 	typ := "arrow_open"
@@ -232,6 +244,8 @@ func destructStartLink(raw string) LinkInfo {
 	return LinkInfo{Type: typ, Stroke: stroke}
 }
 
+// destructEndLink reads an arrow, or the end of one with a label between, its heads, stroke
+// and length, as Pele's destructEndLink does; Pele's countChar is strings.Count here.
 func destructEndLink(raw string) LinkInfo {
 	str := chars.Trim(raw)
 	line := ""
@@ -276,6 +290,8 @@ func destructEndLink(raw string) LinkInfo {
 	return LinkInfo{Type: typ, Stroke: stroke, Length: length}
 }
 
+// flowError is an error of a flowchart, the PeleError of type flowchart that Pele's FlowDb
+// throws.
 func flowError(message string, code diagram.Code) *diagram.Error {
 	return diagram.NewError(message, code, "flowchart")
 }
@@ -409,6 +425,7 @@ func (d *DB) addVertex(id string, text *Text, typ string, style, classes []strin
 
 // assignProp sets a property as Object.assign does: a __proto__ that the props do not hold
 // already is the prototype's, and setting it to a string does nothing.
+// It is the Object.assign of Pele's addVertex, one property at a time.
 func assignProp(props []Prop, p Prop) []Prop {
 	for i := range props {
 		if props[i].Key == p.Key {
@@ -484,6 +501,7 @@ func (d *DB) addLink(starts, ends []string, info *LinkInfo) error {
 }
 
 // updateLinkInterpolate sets the curve of the edges at positions, or of all with "default".
+// It is Pele's updateLinkInterpolate.
 func (d *DB) updateLinkInterpolate(positions []string, interpolate string) error {
 	for _, pos := range positions {
 		if pos == "default" {
@@ -528,6 +546,8 @@ func (d *DB) updateLink(positions []string, style []string) error {
 	return nil
 }
 
+// hasFill reports whether any of a style's parts sets a fill, the test Pele's updateLink
+// makes with style.some.
 func hasFill(style []string) bool {
 	for _, s := range style {
 		if strings.HasPrefix(s, "fill") {
@@ -537,6 +557,8 @@ func hasFill(style []string) bool {
 	return false
 }
 
+// edgeAt is the edge at a position linkStyle gives, or an error where there is none, as
+// Pele's edgeAt gives it.
 func (d *DB) edgeAt(pos string) (*Edge, error) {
 	n := chars.Number(pos)
 	if n >= 0 && n < float64(len(d.Edges)) && n == float64(int(n)) {
@@ -571,6 +593,7 @@ func (d *DB) addClass(ids string, styles []string) {
 }
 
 // setDirection sets the flowchart's direction, reading Mermaid's arrows for it.
+// It is Pele's setDirection.
 func (d *DB) setDirection(dir string) {
 	s := chars.Trim(dir)
 	if strings.Contains(s, "<") {
@@ -592,6 +615,7 @@ func (d *DB) setDirection(dir string) {
 }
 
 // setClass gives the nodes, edges and subgraphs of ids, separated by commas, a class.
+// It is Pele's setClass.
 func (d *DB) setClass(ids, className string) {
 	for _, id := range strings.Split(ids, ",") {
 		if n := d.nodes[id]; n != nil {
@@ -607,6 +631,7 @@ func (d *DB) setClass(ids, className string) {
 }
 
 // setTooltip gives the nodes of ids a tooltip.
+// It is Pele's setTooltip.
 func (d *DB) setTooltip(ids, tooltip string) {
 	for _, id := range strings.Split(ids, ",") {
 		if i, ok := d.tooltips[id]; ok {
@@ -619,6 +644,7 @@ func (d *DB) setTooltip(ids, tooltip string) {
 }
 
 // setLink makes the nodes of ids links to a URL, checked as Pele's safeUrl checks it.
+// It is Pele's setLink.
 func (d *DB) setLink(ids, link, target string) {
 	u := chars.Trim(link)
 	for _, id := range strings.Split(ids, ",") {
@@ -635,13 +661,16 @@ func (d *DB) setLink(ids, link, target string) {
 
 // setClickEvent marks the nodes of ids clickable. Callbacks are never run, as in Mermaid's
 // strict mode.
+// It is Pele's setClickEvent.
 func (d *DB) setClickEvent(ids string) { d.setClass(ids, "clickable") }
 
 // setAccTitle sets the accessible title, without the white space it starts with.
+// It is Pele's setAccTitle.
 func (d *DB) setAccTitle(text string) { d.AccTitle = chars.TrimStart(text) }
 
 // setAccDescription sets the accessible description, without the white space each of its
 // lines but the first starts with: text.replace(/\n\s+/g, '\n').
+// It is Pele's setAccDescription.
 func (d *DB) setAccDescription(text string) {
 	d.AccDescr = chars.DropIndents(text)
 }
@@ -660,6 +689,7 @@ const (
 	itemDir
 )
 
+// hasSpace reports whether s has white space in it, the /\s/.test of Pele's addSubGraph.
 func hasSpace(s string) bool { return strings.ContainsFunc(s, chars.IsSpaceRune) }
 
 // addSubGraph adds a subgraph of what its body gave, or adds to the one of the same id, as

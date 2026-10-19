@@ -11,38 +11,20 @@ import (
 // The fixture is what V8 makes of Math.log10; ./scripts/oracle.sh writes it, with the
 // numbers JSON has no words for written as the oracle's enc writes them.
 
+// decode reads a number as the oracle's enc writes it.
 func decode(raw json.RawMessage) float64 {
-	var special struct {
-		N string `json:"$n"`
-	}
-	if json.Unmarshal(raw, &special) == nil && special.N != "" {
-		switch special.N {
-		case "NaN":
-			return math.NaN()
-		case "Infinity":
-			return math.Inf(1)
-		case "-Infinity":
-			return math.Inf(-1)
-		case "-0":
-			return math.Copysign(0, -1)
-		}
-	}
-	var f float64
-	if err := json.Unmarshal(raw, &f); err != nil {
+	f, err := fixture.Float(raw)
+	if err != nil {
 		panic(err)
 	}
 	return f
 }
 
 func TestLog10MatchesV8(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/log10.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases [][2]json.RawMessage `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/log10.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	failed := 0
@@ -64,14 +46,10 @@ func TestLog10MatchesV8(t *testing.T) {
 // numbers: each case is a number, the digits given to toFixed and toExponential and what
 // they write, and the precision given to toPrecision and what it writes.
 func TestFormatMatchesV8(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/format.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases [][6]json.RawMessage `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/format.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	str := func(raw json.RawMessage) string {

@@ -1,7 +1,6 @@
 package c4
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -32,12 +31,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
@@ -244,8 +239,8 @@ func sceneLines(sc *scene.Scene) []string {
 				}
 			}
 		case RoleElement:
-			classes := "pele-shape-" + string(it.Shape) + " pele-c4-" + it.Class[0]
-			if len(it.Class) > 1 {
+			classes := "pele-shape-" + string(it.Shape) + " pele-c4-" + it.Tags[0]
+			if len(it.Tags) > 1 {
 				classes += " pele-c4-external"
 			}
 			// The middle, which Pele moves the shape's inside by, is checked through the box
@@ -295,7 +290,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Tooltip != "" {
 				lines = append(lines, "tip "+it.Tooltip)
 			}
-			lines = append(lines, fmt.Sprintf("patch %s %d %s - -", box(it.Parts[0].Box), patchRadius, paintName(it.Style.Fill)))
+			lines = append(lines, fmt.Sprintf("patch %s %d %s - -", box(it.Box), patchRadius, paintName(it.Style.Fill)))
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
 			}

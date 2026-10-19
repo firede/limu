@@ -1,6 +1,9 @@
 package style
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestParseColor(t *testing.T) {
 	for _, c := range []struct {
@@ -50,8 +53,8 @@ func TestDeclarations(t *testing.T) {
 		"fill-opacity:0.5", "rx:10",
 	})
 	th := Default()
-	if c := a.Style.Fill.Color(th); c != (Color{255, 153, 255, 128}) {
-		t.Errorf("fill %v", c)
+	if c := a.Style.Fill.Color(th); c != (Color{255, 153, 255, 255}) || a.Style.FillOpacity != N(0.5) {
+		t.Errorf("fill %v at %v", c, a.Style.FillOpacity)
 	}
 	if c := a.Style.Stroke.Color(th); c != Hex("#333") {
 		t.Errorf("stroke %v", c)
@@ -87,7 +90,7 @@ func TestDeclarationsCapJoin(t *testing.T) {
 		{[]string{"stroke-linecap:round", "stroke-linecap:initial", "stroke-linejoin:initial"}, CapButt, JoinMiter},
 		{[]string{"stroke-linecap:round", "stroke-linecap:inherit", "stroke-linejoin:round", "stroke-linejoin:unset"}, 0, 0},
 		{[]string{"stroke-linecap:round", "stroke-linecap:flat", "stroke-linejoin:round", "stroke-linejoin:miter-clip"}, 0, 0},
-		{[]string{"stroke-linecap:ſquare", "stroke-linejoin:arcs"}, 0, 0},
+		{[]string{"stroke-linecap:\u017fquare", "stroke-linejoin:arcs"}, 0, 0},
 	} {
 		s := Declarations(c.decls).Style
 		if s.Cap != c.cap || s.Join != c.join {
@@ -147,6 +150,45 @@ func TestDeclarationsDropUnsafe(t *testing.T) {
 	}
 }
 
+// Declarations are trimmed and lowered as Pele's resolveStyle does, with JavaScript's trim and
+// toLowerCase, and their values then read as a browser reads CSS, with its white space only
+// and its keywords in either case of their ASCII letters.
+func TestDeclarationsReadAsJavaScript(t *testing.T) {
+	red := Of(Color{255, 0, 0, 255})
+	for decl, want := range map[string]Paint{
+		"fill:\ufeffred":       red, // trim takes off a byte order mark
+		"\u00a0FILL\u3000:red": red,
+		"fill:red\u0085":       {}, // which trim leaves, and a browser does not read
+		"fill:RED":             red,
+		"fill:blac\u212a":      {}, // a Kelvin sign is no k to CSS
+		"fill:rgb (255,0,0)":   {},
+		"fill:rgb(255\n0\f0)":  red,
+		"fill:NONE":            None,
+	} {
+		if got := Declarations([]string{decl}).Style.Fill; got != want {
+			t.Errorf("%q: fill %+v, want %+v", decl, got, want)
+		}
+	}
+	if s := Declarations([]string{"stroke-dasharray:4\t2"}).Style.Dash; !slices.Equal(s.Pattern(), []float64{4, 2}) {
+		t.Errorf("dashes %v", s.Pattern())
+	}
+	// \s in Pele's RE_UNSAFE is JavaScript's; its i flag folds ASCII letters only.
+	if Declarations([]string{"fill:url\u3000(x)"}).Style.Fill.Set() {
+		t.Errorf("kept a url( after an ideographic space")
+	}
+	if ShapeCSS([]string{"rx:javascr\u0130pt:x"}) == "" || ShapeCSS([]string{"rx:JavaScript:x"}) != "" {
+		t.Errorf("folded other than ASCII letters")
+	}
+	for value, want := range map[string]float64{"0.5": 0.5, "50%": 0.5, "150%": 1, "-1": 0} {
+		if got, ok := Declarations([]string{"opacity:" + value}).Style.Opacity.Get(); !ok || got != want {
+			t.Errorf("opacity:%s = %v %v, want %v", value, got, ok, want)
+		}
+	}
+	if _, ok := Declarations([]string{"opacity:0.5px"}).Style.Opacity.Get(); ok {
+		t.Errorf("read an opacity in pixels")
+	}
+}
+
 // A later value of a property that cannot be read leaves it unset, as Pele writes only the
 // last and a browser drops it.
 func TestDeclarationsLastWins(t *testing.T) {
@@ -160,18 +202,46 @@ func TestDeclarationsLastWins(t *testing.T) {
 
 func TestDeclarationsOpacities(t *testing.T) {
 	a := Declarations([]string{"fill-opacity:0.5", "stroke-opacity:150%"})
-	if f, ok := a.FillOpacity.Get(); !ok || f != 0.5 {
+	if f, ok := a.Style.FillOpacity.Get(); !ok || f != 0.5 {
 		t.Errorf("fill-opacity %v %v", f, ok)
 	}
-	if f, ok := a.StrokeOpacity.Get(); !ok || f != 1 {
+	if f, ok := a.Style.StrokeOpacity.Get(); !ok || f != 1 {
 		t.Errorf("stroke-opacity %v %v", f, ok)
 	}
 	a = Declarations([]string{"fill-opacity:0.5", "fill-opacity:x", "stroke-opacity:20%"})
-	if _, ok := a.FillOpacity.Get(); ok {
+	if _, ok := a.Style.FillOpacity.Get(); ok {
 		t.Errorf("kept a fill-opacity the last declaration could not give")
 	}
-	if f, _ := a.StrokeOpacity.Get(); f != 0.2 {
+	if f, _ := a.Style.StrokeOpacity.Get(); f != 0.2 {
 		t.Errorf("stroke-opacity %v", f)
+	}
+	// An opacity alone is kept, with no paint for it to fold into.
+	if a := Declarations([]string{"fill-opacity:0.5"}); a.Style.Fill.Set() || a.Style.FillOpacity != N(0.5) {
+		t.Errorf("fill-opacity alone %+v", a.Style)
+	}
+}
+
+// A fill and its opacity cascade each on their own, as CSS's do: an author's fill over a
+// part the diagram draws at an opacity is drawn at that opacity, and an author's opacity
+// over the diagram's fill draws that fill at it.
+func TestOpacitiesCascade(t *testing.T) {
+	var look *Look
+	red := Of(Color{255, 0, 0, 255})
+	own := Style{Fill: SurfaceAlt, FillOpacity: N(0.5), Stroke: Border}
+	if r := look.Resolve("x", own, Declarations([]string{"fill:red"}).Style); r.Fill != (Color{255, 0, 0, 128}) {
+		t.Errorf("author's fill at the diagram's opacity: %v", r.Fill)
+	}
+	author := Declarations([]string{"fill-opacity:0.25", "stroke-opacity:50%"}).Style
+	r := look.Resolve("x", Style{Fill: Surface, Stroke: red}, author)
+	surface := Default().Surface
+	if r.Fill != (Color{surface.R, surface.G, surface.B, 64}) || r.Stroke != (Color{255, 0, 0, 128}) {
+		t.Errorf("author's opacities over the diagram's paints: %v %v", r.Fill, r.Stroke)
+	}
+	if r.Marker != (Color{255, 0, 0, 255}) {
+		t.Errorf("a marker is filled in %v", r.Marker)
+	}
+	if s := look.Cascade("x", own, author); s.FillOpacity != N(0.25) || s.StrokeOpacity != N(0.5) || s.Fill != SurfaceAlt {
+		t.Errorf("cascade %+v", s)
 	}
 }
 

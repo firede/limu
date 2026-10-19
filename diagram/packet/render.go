@@ -38,7 +38,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.
 	labelSize := jsmath.Round(size * 0.875)
 	bitSize := jsmath.Round(size * 0.625)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 
 	section, _ := config["packet"].(diagram.Config)
 	rowHeight := packetOption(config, "rowHeight", 32, 1, 400)

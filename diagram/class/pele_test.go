@@ -207,12 +207,8 @@ type peleFixture struct {
 
 func loadFixture(t *testing.T) peleFixture {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/class.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleFixture
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/class.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p

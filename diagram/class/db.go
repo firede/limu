@@ -125,7 +125,7 @@ type classSet struct {
 	has  map[*Class]bool
 }
 
-// NewDB is an empty diagram.
+// NewDB is an empty diagram, as Pele's ClassDb is when it is made.
 func NewDB() *DB {
 	return &DB{
 		Direction:    "TB",
@@ -137,20 +137,22 @@ func NewDB() *DB {
 	}
 }
 
-// Class is the class of an id, or nil.
+// Class is the class of an id, or nil: a get of the classes Map of Pele's ClassDb.
 func (db *DB) Class(id string) *Class { return db.classes[id] }
 
-// Namespace is the namespace of an id, or nil.
+// Namespace is the namespace of an id, or nil: a get of the namespaces Map of Pele's ClassDb.
 func (db *DB) Namespace(id string) *Namespace { return db.namespaces[id] }
 
-// StyleClass is the classDef of a name, or nil.
+// StyleClass is the classDef of a name, or nil: a get of the styleClasses Map of Pele's
+// ClassDb.
 func (db *DB) StyleClass(id string) *StyleClass { return db.styleClasses[id] }
 
 // domIDPrefix is the prefix Mermaid looks ids that start with a digit up under, so they never
-// match a class.
+// match a class: Pele's DOM_ID_PREFIX.
 const domIDPrefix = "classId-"
 
-// splitName splits a name such as `List~T~` into the class's name and its generic type.
+// splitName splits a name such as `List~T~` into the class's name and its generic type, as
+// Pele's splitName does.
 func splitName(id string) (className, typ string) {
 	at := strings.IndexByte(id, '~')
 	if at <= 0 {
@@ -163,11 +165,15 @@ func splitName(id string) (className, typ string) {
 	return id[:at], id[at+1 : at+1+end]
 }
 
+// className is the class's name of a name that may carry a generic type: the className of
+// what Pele's splitName gives.
 func className(id string) string {
 	name, _ := splitName(id)
 	return name
 }
 
+// lookupID is the class's name an id given to cssClass or a link is looked up by, with the
+// prefix of domIDPrefix where it starts with a digit, as Pele's lookupId gives it.
 func lookupID(id string) string {
 	if id != "" && chars.IsDigit(int(id[0])) {
 		return className(domIDPrefix + id)
@@ -175,7 +181,8 @@ func lookupID(id string) string {
 	return className(id)
 }
 
-// addClass adds a class of a name that may carry a generic type, unless there is one.
+// addClass adds a class of a name that may carry a generic type, unless there is one, as
+// Pele's addClass does.
 func (db *DB) addClass(id string) {
 	name, typ := splitName(id)
 	if db.classes[name] != nil {
@@ -187,6 +194,8 @@ func (db *DB) addClass(id string) {
 	db.tag(node, "default")
 }
 
+// tag records that a class has a CSS class name, for DefineClass to style it, as Pele's tag
+// does.
 func (db *DB) tag(node *Class, cssClass string) {
 	set := db.withCSSClass[cssClass]
 	if set == nil {
@@ -201,16 +210,17 @@ func (db *DB) tag(node *Class, cssClass string) {
 
 // ensure is the class for a name that may carry a generic type, created if needed. Mermaid
 // throws a TypeError where this creates, as for an annotation on a class not yet declared.
+// It is Pele's ensure.
 func (db *DB) ensure(id string) *Class {
 	db.addClass(id)
 	return db.classes[className(id)]
 }
 
-// setClassLabel sets the label a class is shown with.
+// setClassLabel sets the label a class is shown with, as Pele's setClassLabel does.
 func (db *DB) setClassLabel(id, label string) { db.ensure(id).Label = label }
 
 // addRelation adds a relation, and the classes at its ends. A lollipop end with no marker at
-// the other is an interface of its own.
+// the other is an interface of its own. It is Pele's addRelation.
 func (db *DB) addRelation(r *Relation) {
 	switch {
 	case r.Type1 == Lollipop && r.Type2 == NoEnd:
@@ -230,13 +240,16 @@ func (db *DB) addRelation(r *Relation) {
 	db.Relations = append(db.Relations, r)
 }
 
+// addInterface adds the interface of a lollipop end, labelled label and on the class of
+// classID, and gives its id, as Pele's addInterface does.
 func (db *DB) addInterface(label, classID string) string {
 	id := "interface" + itoa(len(db.Interfaces))
 	db.Interfaces = append(db.Interfaces, &Interface{ID: id, Label: label, ClassID: classID})
 	return id
 }
 
-// addAnnotation adds an annotation, as `interface` of `<<interface>>`, to a class.
+// addAnnotation adds an annotation, as `interface` of `<<interface>>`, to a class, as Pele's
+// addAnnotation does.
 func (db *DB) addAnnotation(class, annotation string) {
 	node := db.ensure(class)
 	node.Annotations = append(node.Annotations, annotation)
@@ -262,14 +275,15 @@ func (db *DB) addMember(class, member string) {
 	}
 }
 
-// addMembers adds the members of a class's body, in order.
+// addMembers adds the members of a class's body, in order, as Pele's addMembers does. Pele's
+// parser gives it them last first, and it turns them back; here they are in order throughout.
 func (db *DB) addMembers(class string, members []string) {
 	for _, m := range members {
 		db.addMember(class, m)
 	}
 }
 
-// addNote adds a note, for a class or "" for none, and gives its id.
+// addNote adds a note, for a class or "" for none, and gives its id, as Pele's addNote does.
 func (db *DB) addNote(text, class string) string {
 	index := len(db.Notes)
 	id := "note" + itoa(index)
@@ -284,7 +298,7 @@ func cleanupLabel(label string) string {
 	return chars.Trim(strings.TrimPrefix(label, ":"))
 }
 
-// setCSSClass adds a class name to each class of a list of ids.
+// setCSSClass adds a class name to each class of a list of ids, as Pele's setCssClass does.
 func (db *DB) setCSSClass(ids, cssClass string) {
 	for _, id := range strings.Split(ids, ",") {
 		node := db.classes[lookupID(id)]
@@ -301,7 +315,7 @@ func (db *DB) setCSSClass(ids, cssClass string) {
 // defineClass defines a class of styles for each of ids, and styles the classes that already
 // have its name. Mermaid tests `cssClasses.includes(id)`, which also matches part of a longer
 // name (a classDef named `def` styles every class, through `default`); Pele compares whole
-// names, and so does this.
+// names, and so does this. It is Pele's defineClass.
 func (db *DB) defineClass(ids, style []string) {
 	for _, id := range ids {
 		sc := db.styleClasses[id]
@@ -330,7 +344,7 @@ func (db *DB) defineClass(ids, style []string) {
 	}
 }
 
-// setTooltip sets the tooltip of each class of a list of ids.
+// setTooltip sets the tooltip of each class of a list of ids, as Pele's setTooltip does.
 func (db *DB) setTooltip(ids, tooltip string) {
 	for _, id := range strings.Split(ids, ",") {
 		if node := db.classes[className(id)]; node != nil {
@@ -340,7 +354,8 @@ func (db *DB) setTooltip(ids, tooltip string) {
 }
 
 // setLink makes each class of a list of ids a link. Entity codes are resolved first, so that
-// what is checked is what a browser would follow. A target not given is _blank.
+// what is checked is what a browser would follow. A target not given is _blank. It is Pele's
+// setLink.
 func (db *DB) setLink(ids, link, target string, hasTarget bool) {
 	u := chars.Trim(text.DecodeEntities(link))
 	for _, id := range strings.Split(ids, ",") {
@@ -361,7 +376,8 @@ func (db *DB) setLink(ids, link, target string, hasTarget bool) {
 }
 
 // setClickEvent marks each class of a list of ids as having a callback. Callbacks are never
-// run; the class is only marked clickable, as in Mermaid's strict mode.
+// run; the class is only marked clickable, as in Mermaid's strict mode. It is Pele's
+// setClickEvent.
 func (db *DB) setClickEvent(ids string) {
 	for _, id := range strings.Split(ids, ",") {
 		if node := db.classes[className(id)]; node != nil {
@@ -371,11 +387,12 @@ func (db *DB) setClickEvent(ids string) {
 	db.setCSSClass(ids, "clickable")
 }
 
-// setAccTitle sets the title for assistive technology.
+// setAccTitle sets the title for assistive technology, as Pele's setAccTitle does.
 func (db *DB) setAccTitle(s string) { db.AccTitle = chars.TrimStart(s) }
 
 // setAccDescription sets the description for assistive technology, with the white space at
-// the start of each of its lines taken out, as /\n\s+/g replaced with a line feed does.
+// the start of each of its lines taken out, as /\n\s+/g replaced with a line feed does. It is
+// Pele's setAccDescription.
 func (db *DB) setAccDescription(s string) {
 	db.AccDescr = chars.DropIndents(s)
 }
@@ -445,14 +462,15 @@ func (db *DB) addNamespace(id, label string) string {
 	}
 }
 
-// popNamespace closes the namespace open.
+// popNamespace closes the namespace open, as Pele's popNamespace does.
 func (db *DB) popNamespace() {
 	if k := len(db.namespaceStack); k > 0 {
 		db.namespaceStack = db.namespaceStack[:k-1]
 	}
 }
 
-// addClassesToNamespace puts classes and notes, by name, in a namespace.
+// addClassesToNamespace puts classes and notes, by name, in a namespace, as Pele's
+// addClassesToNamespace does.
 func (db *DB) addClassesToNamespace(id string, classNames, noteNames []string) {
 	ns := db.namespaces[id]
 	if ns == nil {
@@ -482,7 +500,8 @@ func (db *DB) addClassesToNamespace(id string, classNames, noteNames []string) {
 	}
 }
 
-// setCSSStyle adds style declarations to a class, by its id as written.
+// setCSSStyle adds style declarations to a class, by its id as written, as Pele's setCssStyle
+// does.
 func (db *DB) setCSSStyle(id string, styles []string) {
 	node := db.classes[id]
 	if node == nil {
@@ -493,4 +512,6 @@ func (db *DB) setCSSStyle(id string, styles []string) {
 	}
 }
 
+// itoa writes an int in decimal, as JavaScript writes the count in the ids Pele's addNote and
+// addInterface make.
 func itoa(i int) string { return strconv.Itoa(i) }

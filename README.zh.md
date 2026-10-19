@@ -30,6 +30,17 @@ if err != nil {
 out := svg.Render(sc, nil)
 ```
 
+需要重新排布同一张图的宿主（比如可用宽度变了）只解析一次，解析时可以给出 Pele 的
+`parse` 接受的限制和配置，之后按需排布任意多次，也可以在多个 goroutine 里同时排布：
+
+```go
+d, err := limu.Parse(src, diagram.Options{Config: diagram.Config{"seed": 7.0}})
+if err != nil {
+	return err
+}
+sc, err := d.Layout(&layout.Options{MaxWidth: 480, Padding: new(0.0)})
+```
+
 ## 结构
 
 ```
@@ -38,12 +49,12 @@ out := svg.Render(sc, nil)
 
 | 包 | 作用 |
 |---|---|
-| `limu` | `Layout`：把图表文本变成场景。 |
+| `limu` | `Layout`：把图表文本变成场景；`Parse`：解析一次、排布多次；`Types` 和 `Supports`：能读哪些类型。 |
 | `diagram` | 读取图表的 front matter 和指令，判断类型；每种类型有自己的包负责解析和排布。 |
 | `text` | 通过宿主提供的 `Measurer` 测量文本，并排版标签：分行、换行、强调、图标、实体。`text.Arial` 用一张 Arial 字宽表测量，不需要字体。 |
 | `scene` | 排布好的图表：各个部件、它们的角色和形状、盒子、路径、箭头、标签。 |
 | `style` | 场景的外观，分三级：按 token 取色的主题、按角色的覆盖、后端自己的绘制。 |
-| `layout` | 会改变位置的参数：测量器、字号、对齐网格、边的走线方式，以及甘特图的当前时间和时区。还有分层布局和复合布局。 |
+| `layout` | 会改变位置的参数：测量器、字号、宿主可用宽度、图表四周的留白、对齐网格、边的走线方式，以及甘特图的当前时间和时区。还有分层布局、复合布局和泳道布局。 |
 | `draw` | 各类图表共用的几何：形状轮廓和边的路径。 |
 | `svg` | 把场景画成 SVG，主题写成 CSS 变量。 |
 | `mygoui` | 用 MyGo 的原生 UI 绘制场景，并找出指针下的部件。它是独立的 module，其余部分因此只依赖标准库。 |

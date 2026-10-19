@@ -147,7 +147,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 	size := o.Size()
 	small := jsmath.Round(float64(size * 0.8125))
 	l := labeler{measure: o.Measure(), icons: o.Icons}
-	const pad = common.Padding
+	pad := o.Pad()
 	room := 0.0
 	if tight {
 		width := o.MaxWidth
@@ -161,6 +161,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 	root := order[0]
 
 	minX, minY, maxX, maxY := 0.0, 0.0, root.w, root.h
+	// grow widens the bounds of the drawing to hold a box, as the grow of Pele's draw does.
 	grow := func(x0, y0, x1, y1 float64) {
 		minX = min(minX, x0)
 		minY = min(minY, y0)
@@ -204,6 +205,8 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 	}
 	rels := float64(len(db.Rels))
 	careful := float64(rels*(float64(len(nodes)+len(order))+float64(3*rels))) <= careBudget
+	// covered is how much of a box the taken boxes cover, as the covered of Pele's draw gives
+	// it.
 	covered := func(x0, y0, x1, y1 float64) float64 {
 		area := 0.0
 		for i := 0; i < len(taken); i += 4 {
@@ -217,6 +220,8 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		}
 		return area
 	}
+	// offset is a relation's offset kept within maxOffset, 0 for none, as the offset of Pele's
+	// draw gives it.
 	offset := func(v float64) float64 {
 		if !truthy(v) {
 			return 0
@@ -265,7 +270,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 			taken = append(taken, r.ex-arrow, r.ey-arrow, r.ex+arrow, r.ey+arrow)
 		}
 		it := scene.Item{
-			Kind: scene.Edge, Role: RoleRel, ID: rel.From + "-" + rel.To, Class: []string{rel.Type},
+			Kind: scene.Edge, Role: RoleRel, ID: rel.From + "-" + rel.To, Tags: []string{rel.Type},
 			Box:   r.path.Bounds(),
 			Parts: []scene.Part{{Path: r.path, Paint: scene.StrokeOnly}},
 			// A line ends round, as Pele draws it in the group of edges, which sets round
@@ -275,6 +280,10 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		}
 		for k := 0; k+1 < len(r.points); k += 2 {
 			it.Route = append(it.Route, scene.Point{X: r.points[k], Y: r.points[k+1]})
+		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
 		}
 		if startArrow {
 			it.Ends[0] = scene.Marker{Type: "arrow_point", At: scene.Point{X: r.sx, Y: r.sy}, DX: r.sdx, DY: r.sdy}
@@ -391,7 +400,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		it := scene.Item{
 			Kind: scene.Text, Role: RoleRelLabel, ID: id,
 			Box:     patch,
-			Parts:   []scene.Part{{Path: new(scene.Path).RoundRect(patch, patchRadius), Box: patch, Paint: scene.FillOnly}},
+			Parts:   []scene.Part{{Path: new(scene.Path).RoundRect(patch, patchRadius), Paint: scene.FillOnly}},
 			At:      scene.Point{X: cx, Y: top + label.Height/2},
 			Style:   style.Style{Fill: style.Bg, Stroke: style.None, Text: style.Fg},
 			Author:  style.Style{Text: author.Text},
@@ -430,7 +439,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		}
 		if b.NodeType != "" {
 			it.Role = RoleDeployment
-			it.Class = []string{b.NodeType}
+			it.Tags = []string{b.NodeType}
 			it.Style.Dash = style.Dash{}
 		}
 		clusters = append(clusters, it)
@@ -497,12 +506,12 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 				own.Dash = style.Dashes(4, 3)
 			}
 			href := link(shape.Link, o)
-			class := []string{shape.Kind}
+			tags := []string{shape.Kind}
 			if external {
-				class = append(class, "external")
+				tags = append(tags, "external")
 			}
 			it := scene.Item{
-				Kind: scene.Node, Role: RoleElement, Shape: scene.Shape(form), ID: shape.Alias, Class: class,
+				Kind: scene.Node, Role: RoleElement, Shape: scene.Shape(form), ID: shape.Alias, Tags: tags,
 				Box:    scene.Rect{X: nx - w/2, Y: ny - h/2, W: w, H: h},
 				Parts:  draw.Outline(form, nx, ny, w, h),
 				Style:  own,

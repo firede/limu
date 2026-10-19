@@ -168,12 +168,8 @@ func loadPele(t testing.TB) *peleLayout {
 	if pele != nil {
 		return pele
 	}
-	data, err := fixture.Read("testdata/pele/layout.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleLayout
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/layout.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	pele = &p

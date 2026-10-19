@@ -14,7 +14,9 @@ import (
 // keep the entries of what it holds; only whether the text is JSON, what its keys are and
 // in which order, and the value of a property named class matter to what is drawn.
 
-// parseJSON is JSON.parse: the value, and false where the text is not JSON.
+// parseJSON is JSON.parse: the value, and false where the text is not JSON. Pele's addLinks
+// and addProperties call the platform's JSON.parse; limu has its own, so that keys keep
+// JavaScript's order.
 func parseJSON(text string) (any, bool) {
 	v, message := jsjson.Parse(utf16.Encode([]rune(text)))
 	return v, message == ""
@@ -26,7 +28,8 @@ type Entries struct {
 	Values map[string]any
 }
 
-// Set sets key to v; a key set again keeps its place.
+// Set sets key to v; a key set again keeps its place. It stands for Map.set on the links and
+// properties of Pele's SeqActor.
 func (e *Entries) Set(key string, v any) {
 	if e.Values == nil {
 		e.Values = map[string]any{}
@@ -37,13 +40,15 @@ func (e *Entries) Set(key string, v any) {
 	e.Values[key] = v
 }
 
-// Get is the value of key, and whether it is set.
+// Get is the value of key, and whether it is set. It stands for Map.get on the links and
+// properties of Pele's SeqActor.
 func (e *Entries) Get(key string) (any, bool) {
 	v, ok := e.Values[key]
 	return v, ok
 }
 
-// JSON is the value of key as JSON.stringify writes it.
+// JSON is the value of key as JSON.stringify writes it. Pele has no counterpart; the tests
+// compare it with what Pele's oracle suite writes.
 func (e *Entries) JSON(key string) string { return jsjson.Stringify(e.Values[key]) }
 
 // entriesOf is Pele's entries: a string's characters by index, or an object's or an array's
