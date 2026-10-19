@@ -16,7 +16,8 @@ export async function resolve(spec, ctx, next) {
 // to work with them sets globalThis.limuExactNumbers while Pele draws, and num then writes
 // them whole; the suite rounds them as num would once it is done with them. While it is set,
 // classMarker also writes what it draws a marker from, so that the marker can be drawn again
-// where a group moves it.
+// where a group moves it, and a kanban board's textBlock writes, in place of each line of
+// text, where the line starts or ends and what is in it, as the scene holds a label.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -24,6 +25,7 @@ const patch = (url, source, find, replace) => {
 const NUM = 'export function num(value: number): string {';
 const EXACT = 'if ((globalThis as any).limuExactNumbers)';
 const CLASS_MARKER = 'export function classMarker(';
+const TEXT_BLOCK = 'function textBlock(';
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -40,6 +42,25 @@ export function classMarker(type: EndMarker, x: number, y: number, dx: number, d
   const s = drawMarker(type, x, y, dx, dy, color);
   ${EXACT} return s.replace('class="pele-marker"', \`class="pele-marker" data-m="\${type} \${x} \${y} \${dx} \${dy}"\`);
   return s;
+}
+`;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/kanban/render.ts')) {
+    const loaded = await next(url, ctx);
+    const source =
+      patch(url, String(loaded.source), TEXT_BLOCK, 'function textBlockPele(') +
+      `
+function textBlock(label: Label, x: number, y: number, attrs: string, icons: IconResolver | undefined, end = false): string {
+  if (!(globalThis as any).limuExactNumbers) return textBlockPele(label, x, y, attrs, icons, end);
+  let out = '';
+  for (let i = 0; i < label.lines.length; i++) {
+    const spans = label.lines[i]
+      .map((s) => (s.icon !== undefined ? 'i:' + s.icon + ':' + s.width : 't:' + s.style + ':' + s.text + ':' + s.width))
+      .join('|');
+    out += \`<limu-line x="\${x}" y="\${y + (i + 0.5) * label.lineHeight}" end="\${end ? 1 : 0}" w="\${label.widths[i]}" attrs="\${encodeURIComponent(attrs)}" spans="\${encodeURIComponent(spans)}"/>\`;
+  }
+  return out;
 }
 `;
     return { ...loaded, source, shortCircuit: true };

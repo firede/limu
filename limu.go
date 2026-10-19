@@ -7,6 +7,7 @@ import (
 	"github.com/firede/limu/diagram/er"
 	"github.com/firede/limu/diagram/flowchart"
 	"github.com/firede/limu/diagram/journey"
+	"github.com/firede/limu/diagram/kanban"
 	"github.com/firede/limu/diagram/packet"
 	"github.com/firede/limu/diagram/requirement"
 	"github.com/firede/limu/diagram/state"
@@ -96,6 +97,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = packet.Layout(m, p.Config, o)
+	case diagram.Kanban:
+		m, err := kanban.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = kanban.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
