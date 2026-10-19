@@ -50,7 +50,8 @@ const (
 	head = 26
 )
 
-// cylRy and queueRx are the radii of the caps drawShape gives the two cylinders.
+// cylRy and queueRx are the radii of the caps drawShape gives the two cylinders, as Pele's
+// cylRy and queueRx give them.
 func cylRy(w float64) float64   { return min(12, max(6, w/14)) }
 func queueRx(h float64) float64 { return min(12, h/4) }
 
@@ -147,6 +148,7 @@ func crosses(points []float64, x0, y0, x1, y1 float64) bool {
 	return false
 }
 
+// contains reports whether inner lies wholly within outer, as Pele's contains does.
 func contains(outer, inner *box) bool {
 	return outer.x <= inner.x && outer.y <= inner.y && outer.x+outer.w >= inner.x+inner.w && outer.y+outer.h >= inner.y+inner.h
 }
@@ -253,11 +255,16 @@ type lanes struct {
 	squeezed int
 }
 
+// newLanes makes an empty lanes, as Pele's Lanes is made.
 func newLanes() *lanes { return &lanes{taken: map[*box][]float64{}} }
 
+// free reports whether a stretch, upright or level, at at from a0 to a1, keeps apart from the
+// stretches taken and from the frames of the boundaries, as Pele's free does.
 func (l *lanes) free(upright bool, at, a0, a1 float64) bool {
 	lo := min(a0, a1)
 	hi := max(a0, a1)
+	// isNear reports whether a stretch in list runs closer than gap alongside this one, as
+	// the near of Pele's free does.
 	isNear := func(list []float64, gap float64) bool {
 		for i := 0; i < len(list); i += 3 {
 			if math.Abs(list[i]-at) < gap && list[i+1] < hi && list[i+2] > lo {
@@ -273,6 +280,8 @@ func (l *lanes) free(upright bool, at, a0, a1 float64) bool {
 	return !isNear(lines, near) && !isNear(frames, frameNear)
 }
 
+// crossings counts the stretches taken that a line with corners through points crosses, as
+// Pele's crossings does.
 func (l *lanes) crossings(points []float64) int {
 	count := 0
 	for i := 2; i < len(points); i += 2 {
@@ -297,11 +306,15 @@ func (l *lanes) crossings(points []float64) int {
 	return count
 }
 
+// frame adds the sides of a boundary's box to the frames that lines keep off, as Pele's frame
+// does.
 func (l *lanes) frame(b *box) {
 	l.frames[0] = append(l.frames[0], b.x, b.y, b.y+b.h, b.x+b.w, b.y, b.y+b.h)
 	l.frames[1] = append(l.frames[1], b.y, b.x, b.x+b.w, b.y+b.h, b.x, b.x+b.w)
 }
 
+// take adds the upright and level stretches of a line with corners through points to those
+// taken, as Pele's take does.
 func (l *lanes) take(points []float64) {
 	for i := 2; i < len(points); i += 2 {
 		if points[i] == points[i-2] {
@@ -313,7 +326,8 @@ func (l *lanes) take(points []float64) {
 }
 
 // ports is where on one side of a shape (0 left, 1 right, 2 top, 3 bottom) a line can leave or
-// arrive, between lo and hi: the places clear of the lines already there, nearest want first.
+// arrive, between lo and hi: the places clear of the lines already there, nearest want first,
+// as Pele's ports finds them.
 func (l *lanes) ports(b *box, side int, want, lo, hi float64) []float64 {
 	used := l.taken[b]
 	var out []float64
@@ -342,6 +356,7 @@ func (l *lanes) ports(b *box, side int, want, lo, hi float64) []float64 {
 	return out
 }
 
+// claim marks the place at on a side of a shape as taken by a line, as Pele's claim does.
 func (l *lanes) claim(b *box, side int, at float64) {
 	l.taken[b] = append(l.taken[b], float64(side), at)
 }
@@ -383,8 +398,11 @@ func pathOf(points []float64, startTrim, endTrim float64) *scene.Path {
 }
 
 // truthy is whether JavaScript takes a number as true: it is neither zero nor NaN.
+// It is limu's own, for the places where Pele tests a number so, as in path and offset.
 func truthy(v float64) bool { return v != 0 && !math.IsNaN(v) }
 
+// clearOf reports whether a line with corners through points crosses none of the other
+// shapes but a and b, as Pele's clearOf does.
 func clearOf(points []float64, others []*box, a, b *box) bool {
 	for _, other := range others {
 		if other != a && other != b && crosses(points, other.x, other.y, other.x+other.w, other.y+other.h) {
@@ -467,6 +485,8 @@ func elbow(a, b *box, others []*box, ls *lanes, startTrim, endTrim float64) *rou
 	}
 	var best *candidate
 	accepted := 0
+	// consider keeps a route as the best when it is clear of the other shapes and of the lanes
+	// taken and costs less than the best before, as the consider of Pele's elbow does.
 	consider := func(points []float64, upright bool, sides [2]int) {
 		if !clearOf(points, others, a, b) {
 			return
@@ -492,6 +512,8 @@ func elbow(a, b *box, others []*box, ls *lanes, startTrim, endTrim float64) *rou
 			best = &candidate{points, cost, upright, sides, accepted}
 		}
 	}
+	// changed and mark are limu's own: they tell whether consider took a new best, which
+	// Pele's elbow tells by comparing best with what it was before.
 	changed := func(before int) bool { return best != nil && best.accepted != before }
 	mark := func() int {
 		if best == nil {
@@ -619,11 +641,14 @@ func routeOf(a, b *box, shift float64, others []*box, careful bool, ls *lanes, s
 		ls.squeezed++
 	}
 	if careful && blocked && (upright || sy == ey) {
+		// laneOn is the edge, on the side forward names, of a, b and the shapes the straight
+		// line meets, which a detour runs outside, as the laneOn of Pele's route gives it.
 		laneOn := func(forward bool) float64 {
 			l := math.Inf(1)
 			if forward {
 				l = math.Inf(-1)
 			}
+			// widen moves the edge out past a box, as the widen of Pele's laneOn does.
 			widen := func(bx *box) {
 				edge, size := bx.y, bx.h
 				if upright {
@@ -650,6 +675,9 @@ func routeOf(a, b *box, shift float64, others []*box, careful bool, ls *lanes, s
 		} else {
 			lo, hi = min(a.x, b.x), max(a.x+a.w, b.x+b.w)
 		}
+		// outside reports whether a lane at l on the side forward names has no other shape
+		// beyond it, that is, whether it is outside the drawing, as the outside of Pele's route
+		// does.
 		outside := func(forward bool, l float64) bool {
 			for _, other := range others {
 				if other == a || other == b {
@@ -682,7 +710,7 @@ func routeOf(a, b *box, shift float64, others []*box, careful bool, ls *lanes, s
 		// The route on one side: each end leaves its shape a quarter of the way from the
 		// middle towards the other, clear of the straight lines that meet the middle of that
 		// side and of other routes there. The lane runs a little further out for each route
-		// already along that gap, and never behind a shape.
+		// already along that gap, and never behind a shape. It is the along of Pele's route.
 		along := func(forward bool) way {
 			l := laneOn(forward)
 			sign := -1.0
@@ -708,6 +736,8 @@ func routeOf(a, b *box, shift float64, others []*box, careful bool, ls *lanes, s
 				p0 = ls.ports(a, side, ax+float64(towards*a.w)/4, a.x+8, a.x+a.w-8)[0]
 				p1 = ls.ports(b, side, bx-float64(towards*b.w)/4, b.x+8, b.x+b.w-8)[0]
 			}
+			// pointsAt is the route with its lane at at, as the pointsAt of Pele's along gives
+			// it.
 			pointsAt := func(at float64) []float64 {
 				if upright {
 					x0 := at + float64((ax-at)*min(hit(a, at, p0, ax, p0), 1))
@@ -748,6 +778,8 @@ func routeOf(a, b *box, shift float64, others []*box, careful bool, ls *lanes, s
 			w := along(!natural)
 			other = &w
 		}
+		// cost weighs a way by the lines it crosses and how far out it went, as the cost of
+		// Pele's route does.
 		cost := func(w *way) int { return ls.crossings(w.points)*8 + w.step }
 		forward := natural
 		if back && !out {

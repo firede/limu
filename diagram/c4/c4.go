@@ -21,7 +21,8 @@ func Parse(source, title string) (*DB, error) {
 	return db, nil
 }
 
-// ParsePrepared parses a prepared C4 diagram.
+// ParsePrepared parses a prepared C4 diagram. It is limu's own: it hands Parse the source and
+// the title that Pele's caller hands the parse of its C4 diagram.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
 	return Parse(p.Source(false), p.Title)
 }
