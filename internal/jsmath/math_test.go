@@ -95,3 +95,13 @@ func TestAcosMatchesV8(t *testing.T) {
 	}
 	ac.done(20000)
 }
+
+var percent = 22.505
+
+// A product passed to Round is rounded on its own before Round takes it, as JavaScript
+// rounds it, and not fused with what Round subtracts from it once it is inlined.
+func TestRoundOfAProduct(t *testing.T) {
+	if r := Round(percent * 100); r != 2251 {
+		t.Errorf("Round(22.505*100) = %v, Math.round gives 2251", r)
+	}
+}

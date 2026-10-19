@@ -24,7 +24,10 @@ docs/design.md first: it says what each stage owns and why style is kept out of 
   written out by hand, with the backtracking they would do.
 - Go may fuse `x*y + z` into one multiply-add with a single rounding, and does on arm64;
   JavaScript never does. Where a product is added or subtracted and the result must match
-  Pele to the bit, write the product as `float64(x*y)`, which Go rounds on its own.
+  Pele to the bit, write the product as `float64(x*y)`, which Go rounds on its own. Go
+  fuses across a call it inlines too: a small function that adds to or subtracts from a
+  parameter converts it there, as `jsmath.Round` does, so that a product passed in stays
+  apart.
 - Every ported stage is checked against Pele. A suite in `internal/oracle/suites` (a module
   whose default export is given helpers to import Pele's sources, read cases from
   `internal/oracle/cases` and write fixtures) writes what Pele makes of the cases;
