@@ -8,6 +8,7 @@
 // it, and a difference in the last bit shows. The hooks also have each label written with the
 // point it is centered on, its size and the text of its lines, which is what the scene holds of
 // a label.
+import { readLabel } from '../lib/limu.mjs';
 import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './radar.mjs';
 
@@ -151,10 +152,11 @@ export function readSvg(svg, fontSize) {
         break;
       }
       case 'limu-label': {
-        const text = JSON.parse(decodeURIComponent(attr(whole, 'lines')));
+        const l = readLabel(whole);
+        const text = l.lines.map((line) => line.map((s) => s.text).join(''));
         const size = inherited(whole, 'font-size') ?? String(fontSize ?? 16);
         lines.push(
-          `${what(whole)} label ${at(attr(whole, 'x'), attr(whole, 'y'))} ${pt(attr(whole, 'w'), attr(whole, 'h'))} ` +
+          `${what(whole)} label ${at(l.x, l.y)} ${pt(l.width, l.height)} ` +
             `${inherited(whole, 'fill') ?? '-'} ${size} | ${text.join(' | ')}`
         );
         break;

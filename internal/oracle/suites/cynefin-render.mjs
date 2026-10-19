@@ -12,6 +12,7 @@
 // The fixture also holds the seeded numbers of the boundaries, seededRandom and hashString
 // of a range of seeds and strings, where JavaScript's conversions between doubles and 32-bit
 // integers matter.
+import { readLabel, readMarker } from '../lib/limu.mjs';
 import { lone, mutator } from './parse.mjs';
 import { BASIC, FRAGMENTS, corpus, hostile, randomDiagrams } from './cynefin.mjs';
 
@@ -47,13 +48,12 @@ export function readSvg(svg) {
     return `${fill} ${paint(v.stroke)} ${v['stroke-width'] ?? '-'} ${(v['stroke-dasharray'] ?? '-').replace(/ /g, ',')} ${v['stroke-linecap'] ?? 'butt'} ${v['stroke-linejoin'] ?? 'miter'}`;
   };
   const label = (e) => {
-    const attrs = decodeURIComponent(attr(e, 'attrs'));
-    const own = (name) => new RegExp(`\\s${name}="([^"]*)"`).exec(attrs)?.[1] ?? '-';
-    const d = JSON.parse(decodeURIComponent(attr(e, 'data')));
-    const spans = d.lines
-      .map((line, i) => n(d.widths[i]) + ': ' + line.map((s) => (s[0] !== null ? `i:${s[0]}` : `t:${FACES[s[1] & 3]}:${s[2]}`) + ' ' + n(s[3])).join(' + '))
+    const l = readLabel(e);
+    const own = (name) => new RegExp(`\\s${name}="([^"]*)"`).exec(l.attrs)?.[1] ?? '-';
+    const spans = l.lines
+      .map((line, i) => n(l.widths[i]) + ': ' + line.map((s) => (s.icon !== undefined ? `i:${s.icon}` : `t:${FACES[s.style & 3]}:${s.text}`) + ' ' + n(s.width)).join(' + '))
       .join(' | ');
-    return `label ${own('class')} ${own('font-size')} ${paint(own('fill') === '-' ? undefined : own('fill'))} ${own('font-weight')} ${own('font-style')} ${n(Number(attr(e, 'x')))},${n(Number(attr(e, 'y')))} ${n(d.w)},${n(d.h)} ${n(d.size)} ${n(d.lh)} | ${spans}`;
+    return `label ${own('class')} ${own('font-size')} ${paint(own('fill') === '-' ? undefined : own('fill'))} ${own('font-weight')} ${own('font-style')} ${n(l.x)},${n(l.y)} ${n(l.width)},${n(l.height)} ${n(l.size)} ${n(l.lineHeight)} | ${spans}`;
   };
 
   const tags = /<(\/?)(g|path|rect|svg|limu-label|limu-marker)\b[^>]*>/g;
@@ -89,9 +89,11 @@ export function readSvg(svg) {
       case 'limu-label':
         lines.push(label(e));
         break;
-      case 'limu-marker':
-        lines.push(`marker ${attr(e, 'type')} ${n(Number(attr(e, 'x')))},${n(Number(attr(e, 'y')))} ${n(Number(attr(e, 'dx')))},${n(Number(attr(e, 'dy')))} ${attr(e, 'color')}`);
+      case 'limu-marker': {
+        const k = readMarker(e);
+        lines.push(`marker ${k.type} ${n(k.x)},${n(k.y)} ${n(k.dx)},${n(k.dy)} ${k.color}`);
         break;
+      }
     }
   }
   return lines;

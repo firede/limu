@@ -4,10 +4,12 @@
 // Pele writes the body of a diagram drawn across about a point of its own, where a scene holds
 // where everything is on the page. Pele's SVG is drawn here with its numbers written out in
 // full, as the oracle's hooks have num() write them while limuExactNumbers is set; the hooks
-// also have each label write, in place of its text, the point it is centered on and all that
-// is in it, and each marker its tip and the way it points. A number in the body is moved as
-// limu's layout moves it: the number plus the body's move, in that order. The lines hold every
-// number in full, as String() writes it, so that a difference in the last bit shows.
+// also write each label, the point it is centered on and all that is in it, and each marker,
+// its tip and the way it points, which stand here in place of Pele's drawing of them. A
+// number in the body is moved as limu's layout moves it: the number plus the body's move, in
+// that order. The lines hold every number in full, as String() writes it, so that a
+// difference in the last bit shows.
+import { readLabel, readMarker, withoutPele } from '../lib/limu.mjs';
 import { lone, mutator } from './parse.mjs';
 import { capJoin } from './flowchart-render.mjs';
 import { FRAGMENTS, corpus, hostileCorpus, outlines } from './ishikawa.mjs';
@@ -27,6 +29,7 @@ const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 // The lines of an Ishikawa diagram's SVG, drawn with its numbers in full, in type of size
 // fontSize where nothing sets another.
 export function readSvg(svg, fontSize) {
+  svg = withoutPele(svg);
   const lines = [];
   const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
   lines.push(`size ${n(Number(attr(head, 'width')))},${n(Number(attr(head, 'height')))}`);
@@ -105,20 +108,21 @@ export function readSvg(svg, fontSize) {
         lines.push(`${kind} ${path(attr(e, 'd'))} ${paint(e)} ${pen(e)}`);
         break;
       }
-      case 'limu-marker':
-        lines.push(`marker ${attr(e, 'type')} ${pt(attr(e, 'x'), attr(e, 'y'))} ${n(Number(attr(e, 'dx')))},${n(Number(attr(e, 'dy')))} ${attr(e, 'fill')}`);
+      case 'limu-marker': {
+        const k = readMarker(e);
+        lines.push(`marker ${k.type} ${pt(k.x, k.y)} ${n(k.dx)},${n(k.dy)} ${k.color}`);
         break;
+      }
       case 'limu-label': {
-        const attrs = decodeURIComponent(attr(e, 'attrs'));
-        const fill = /fill="([^"]*)"/.exec(attrs)?.[1] ?? '-';
-        const weight = /font-weight="([^"]*)"/.exec(attrs)?.[1] ?? '-';
-        let size = /font-size="([^"]*)"/.exec(attrs)?.[1];
+        const l = readLabel(e);
+        const fill = /fill="([^"]*)"/.exec(l.attrs)?.[1] ?? '-';
+        const weight = /font-weight="([^"]*)"/.exec(l.attrs)?.[1] ?? '-';
+        let size = /font-size="([^"]*)"/.exec(l.attrs)?.[1];
         for (let k = open.length - 1; k >= 0 && size === undefined; k--) size = open[k].size;
-        const d = JSON.parse(decodeURIComponent(attr(e, 'data')));
-        const spans = d.lines.map((line) => line.map(([icon, text, style, width]) => (icon !== null ? `i:${icon}:${n(width)}` : `${style}:${text}:${n(width)}`)).join(' '));
+        const spans = l.lines.map((line) => line.map((s) => (s.icon !== undefined ? `i:${s.icon}:${n(s.width)}` : `${s.style}:${s.text}:${n(s.width)}`)).join(' '));
         lines.push(
-          `label ${fill} ${weight} ${n(Number(size ?? fontSize))} ${pt(attr(e, 'x'), attr(e, 'y'))} ${n(d.size)},${n(d.lineHeight)},${n(d.width)},${n(d.height)} ` +
-            `| ${d.widths.map(n).join(',')} | ${spans.join(' | ')}`
+          `label ${fill} ${weight} ${n(Number(size ?? fontSize))} ${pt(l.x, l.y)} ${n(l.size)},${n(l.lineHeight)},${n(l.width)},${n(l.height)} ` +
+            `| ${l.widths.map(n).join(',')} | ${spans.join(' | ')}`
         );
         break;
       }

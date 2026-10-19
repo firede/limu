@@ -4,7 +4,9 @@
 // Pele draws its own name and version, where limu draws its own. The oracle's hooks have Pele
 // draw the text limuInfoText gives in their place, each case with one of the texts limu
 // draws, so that the two draw the same. Pele's SVG is drawn with its numbers written out in
-// full, and each label as the point it is centered on and all that is in it.
+// full, and each label as the point it is centered on and all that is in it, in place of
+// Pele's drawing of it.
+import { readLabel, withoutPele } from '../lib/limu.mjs';
 import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, corpus, hostileCorpus, randomDiagrams } from './info.mjs';
 
@@ -21,6 +23,7 @@ const n = (v) => String(v);
 
 // The lines of an info diagram's SVG, drawn with its numbers in full.
 export function readSvg(svg) {
+  svg = withoutPele(svg);
   const lines = [];
   const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
   lines.push(`size ${n(Number(attr(head, 'width')))},${n(Number(attr(head, 'height')))}`);
@@ -41,14 +44,13 @@ export function readSvg(svg) {
       lines.push(`element ${m[1]}`);
       continue;
     }
-    const attrs = decodeURIComponent(attr(e, 'attrs'));
-    const cls = /class="([^"]*)"/.exec(attrs)?.[1];
-    const fill = /fill="([^"]*)"/.exec(attrs)?.[1] ?? '-';
-    const d = JSON.parse(decodeURIComponent(attr(e, 'data')));
-    const spans = d.lines.map((line) => line.map(([icon, text, style, width]) => (icon !== null ? `i:${icon}:${n(width)}` : `t:${style}:${text}:${n(width)}`)).join('|'));
+    const l = readLabel(e);
+    const cls = /class="([^"]*)"/.exec(l.attrs)?.[1];
+    const fill = /fill="([^"]*)"/.exec(l.attrs)?.[1] ?? '-';
+    const spans = l.lines.map((line) => line.map((s) => (s.icon !== undefined ? `i:${s.icon}:${n(s.width)}` : `t:${s.style}:${s.text}:${n(s.width)}`)).join('|'));
     lines.push(
-      `label ${cls} ${fill} ${n(Number(attr(e, 'x')))},${n(Number(attr(e, 'y')))} ${n(d.size)},${n(d.lineHeight)},${n(d.width)},${n(d.height)} ` +
-        `| ${d.widths.map(n).join(',')} | ${spans.join(' / ')}`
+      `label ${cls} ${fill} ${n(l.x)},${n(l.y)} ${n(l.size)},${n(l.lineHeight)},${n(l.width)},${n(l.height)} ` +
+        `| ${l.widths.map(n).join(',')} | ${spans.join(' / ')}`
     );
   }
   return lines;

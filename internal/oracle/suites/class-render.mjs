@@ -7,7 +7,8 @@
 // have num() write them while limuExactNumbers is set; each number is moved by the groups it is
 // in, one move after the other from the innermost out, as the scene's are, and then written to
 // two decimals as Pele writes them. The markers are drawn again where the title moves them,
-// from their tips and directions, which classMarker writes beside them while the flag is set.
+// from their tips and directions, which classMarker writes before them while the flag is set.
+import { readMarker } from '../lib/limu.mjs';
 import { lone, mutator } from './parse.mjs';
 import { WRITTEN } from './class.mjs';
 
@@ -122,7 +123,8 @@ function pen(tag, outer) {
 const NUMBER = /[MLHVCQZ]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi;
 
 // The lines of a class diagram's SVG, drawn with numbers in full; num writes them as Pele does,
-// and redraw draws a marker again from what data-m says of it, at a tip moved by dx, dy.
+// and redraw draws a marker again from what the hooks write before it, at a tip moved by dx,
+// dy.
 export function readSvg(svg, num, redraw) {
   const lines = [];
   // The open elements, each with the group it makes, if any, and where that group moves what
@@ -184,9 +186,11 @@ export function readSvg(svg, num, redraw) {
   const penOf = (tag) => pen(tag, open.map((e) => e.tag ?? '').reverse());
   // Where a text's lines, and the runs in them, are drawn: each x and y in it.
   const at = (s) => [...s.matchAll(/ x="([^"]*)" y="([^"]*)"/g)].map((m) => pt(m[1], m[2])).join(' ');
-  const marker = (tag) => {
-    const [type, x, y, dx, dy] = attr(tag, 'data-m').split(' ');
-    const again = redraw(type, move(Number(x), 0), move(Number(y), 1), Number(dx), Number(dy));
+  // The marker the hooks wrote last, which the next element drawn as a marker is.
+  let written;
+  const marker = () => {
+    const { type, x, y, dx, dy } = written;
+    const again = redraw(type, move(x, 0), move(y, 1), dx, dy);
     const t = /<(path|circle)([^>]*)>/.exec(again);
     const fill = attr(t[2], 'fill');
     const paint = fill === undefined ? 'stroke' : attr(t[2], 'stroke') === 'none' ? 'fill' : 'fill+stroke';
@@ -204,6 +208,10 @@ export function readSvg(svg, num, redraw) {
     const selfClosing = m[4] === '/';
     if (closing) {
       while (open.length > 0 && open.pop().name !== name);
+      continue;
+    }
+    if (name === 'limu-marker') {
+      written = readMarker(whole);
       continue;
     }
     const cls = attr(rest, 'class') ?? '';
@@ -269,7 +277,7 @@ export function readSvg(svg, num, redraw) {
       else if (k.kind === 'class') lines.push(`rect ${box(rest)} ${penOf(rest)}`);
     } else if ((name === 'path' || name === 'circle') && k) {
       if (cls === 'pele-marker') {
-        lines.push(`${marker(rest)} ${penOf(rest)}`);
+        lines.push(`${marker()} ${penOf(rest)}`);
       } else if (k.kind === 'edge') {
         const dash = attr(rest, 'stroke-dasharray');
         const flag = dash === '6 4' ? ' dashed' : dash === '2 4' ? ' dotted' : '';

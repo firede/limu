@@ -4,11 +4,12 @@
 // Pele writes the map about a point of its own, and the inside of a node about the node, where
 // a scene holds where everything is on the page. Pele's SVG is drawn here with its numbers
 // written out in full, as the oracle's hooks have num() write them while limuExactNumbers is
-// set; the hooks also have each label write, in place of its text, the point it is drawn about
-// and all that is in it, and each node its size and its top. A number inside groups is moved as
-// limu's layout moves it: by the innermost group's move first, then by each one out from it.
-// The lines hold every number in full, as String() writes it, so that a difference in the last
-// bit shows.
+// set; the hooks also write each label, the point it is drawn about and all that is in it,
+// which stands here in place of Pele's drawing of it, and each node's size and top. A number
+// inside groups is moved as limu's layout moves it: by the innermost group's move first, then
+// by each one out from it. The lines hold every number in full, as String() writes it, so
+// that a difference in the last bit shows.
+import { readLabel, withoutPele } from '../lib/limu.mjs';
 import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, corpus, hostileCorpus, maps } from './mindmap.mjs';
 
@@ -26,6 +27,7 @@ const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
 // The lines of a mindmap's SVG, drawn with its numbers in full.
 export function readSvg(svg) {
+  svg = withoutPele(svg);
   const lines = [];
   const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
   lines.push(`size ${n(Number(attr(head, 'width')))},${n(Number(attr(head, 'height')))}`);
@@ -130,14 +132,13 @@ export function readSvg(svg) {
         lines.push(`icon ${attr(e, 'data-icon')} ${pt(attr(e, 'x'), attr(e, 'y'))},${n(Number(attr(e, 'width')))},${n(Number(attr(e, 'height')))}`);
         break;
       case 'limu-label': {
-        const attrs = decodeURIComponent(attr(e, 'attrs'));
-        const cls = /class="([^"]*)"/.exec(attrs)?.[1];
-        const fill = /fill="([^"]*)"/.exec(attrs)?.[1] ?? '-';
-        const d = JSON.parse(decodeURIComponent(attr(e, 'data')));
-        const spans = d.lines.map((line) => line.map(([icon, text, style, width]) => (icon !== null ? `i:${icon}:${n(width)}` : `t:${style}:${text}:${n(width)}`)).join('|'));
+        const l = readLabel(e);
+        const cls = /class="([^"]*)"/.exec(l.attrs)?.[1];
+        const fill = /fill="([^"]*)"/.exec(l.attrs)?.[1] ?? '-';
+        const spans = l.lines.map((line) => line.map((s) => (s.icon !== undefined ? `i:${s.icon}:${n(s.width)}` : `t:${s.style}:${s.text}:${n(s.width)}`)).join('|'));
         lines.push(
-          `label ${cls} ${fill} ${attr(e, 'align')} ${pt(attr(e, 'x'), attr(e, 'y'))} ${n(d.size)},${n(d.lineHeight)},${n(d.width)},${n(d.height)} ` +
-            `| ${d.widths.map(n).join(',')} | ${spans.join(' / ')}`
+          `label ${cls} ${fill} ${l.align} ${pt(l.x, l.y)} ${n(l.size)},${n(l.lineHeight)},${n(l.width)},${n(l.height)} ` +
+            `| ${l.widths.map(n).join(',')} | ${spans.join(' / ')}`
         );
         break;
       }

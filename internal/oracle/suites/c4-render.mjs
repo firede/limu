@@ -14,6 +14,7 @@
 //
 // The author's colors are written as the style attribute Pele gives an element, after css=;
 // the test reads them with limu's reader of declarations before it compares.
+import { readLabel, readMarker } from '../lib/limu.mjs';
 import { lone, mutator, peleError } from './parse.mjs';
 import { FRAGMENTS, corpus, drawableDiagrams, statementDiagrams } from './c4.mjs';
 
@@ -90,12 +91,13 @@ export function readSvg(svg) {
     }
     return out.join(' ');
   };
-  // A label written before its text: where it is drawn about, its size, the size of its type
-  // and its lines, each as its spans' faces and texts.
-  const label = (kind, e) => {
-    const spans = JSON.parse(decodeURIComponent(attr(e, 'lines')));
-    const text = spans.map((line) => line.join('+')).join(' | ');
-    return `${kind} ${pt(attr(e, 'x'), attr(e, 'y'))} ${n(attr(e, 'w'))},${n(attr(e, 'h'))} ${n(attr(e, 's'))} | ${text}`;
+  // A label written before its text: whether it is centered or starts where it is drawn
+  // about, that point, its size, the size of its type and its lines, each as its spans' faces
+  // and texts.
+  const label = (e) => {
+    const l = readLabel(e);
+    const text = l.lines.map((line) => line.map((s) => s.style + ':' + s.text).join('+')).join(' | ');
+    return `${l.align === 'start' ? 'l' : 't'} ${pt(l.x, l.y)} ${n(l.width)},${n(l.height)} ${n(l.size)} | ${text}`;
   };
   let pending;
   const links = [];
@@ -160,14 +162,13 @@ export function readSvg(svg) {
         else if (within('pele-edge')) lines.push(`path ${path(attr(whole, 'd'))}`);
         else lines.push(`${name} outside`);
         break;
-      case 'limu-marker':
-        lines.push(`m ${attr(whole, 'type')} ${pt(attr(whole, 'x'), attr(whole, 'y'))} ${n(attr(whole, 'dx'))},${n(attr(whole, 'dy'))}`);
+      case 'limu-marker': {
+        const k = readMarker(whole);
+        lines.push(`m ${k.type} ${pt(k.x, k.y)} ${n(k.dx)},${n(k.dy)}`);
         break;
+      }
       case 'limu-label':
-        pending = label('t', whole);
-        break;
-      case 'limu-left':
-        pending = label('l', whole);
+        pending = label(whole);
         break;
       case 'text':
         // Each label is read from what was written before it; its first text gives its paint.

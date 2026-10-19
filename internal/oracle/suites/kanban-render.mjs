@@ -4,10 +4,11 @@
 // Pele writes a column's insides about the column, and a card's about the card, where a scene
 // holds where everything is on the page. Pele's SVG is drawn here with its numbers written in
 // full, as the oracle's hooks have num() write them while limuExactNumbers is set, and with
-// each line of a column's or a card's text written as where it starts or ends and what is in
-// it. A number inside groups is moved as limu's layout moves it: the groups' moves are added
-// up from the outermost in, the number is added to their sum, and only then is it written to
-// two decimals as Pele writes it.
+// a column's or a card's text written as where its lines start or end and what is in them, in
+// place of Pele's drawing of it. A number inside groups is moved as limu's layout moves it:
+// the groups' moves are added up from the outermost in, the number is added to their sum, and
+// only then is it written to two decimals as Pele writes it.
+import { readLabel, withoutPele } from '../lib/limu.mjs';
 import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, boards, corpus, hostileCorpus } from './kanban.mjs';
 
@@ -44,7 +45,7 @@ export function readSvg(svg, num) {
   let icon = false;
   const from = svg.indexOf('<g class="pele-cluster');
   if (from < 0) return lines;
-  for (const m of svg.slice(from).matchAll(/<(\/?)(g|rect|path|text|svg|limu-line|a)\b[^>]*>/g)) {
+  for (const m of withoutPele(svg.slice(from)).matchAll(/<(\/?)(g|rect|path|text|svg|limu-label|a)\b[^>]*>/g)) {
     const e = m[0];
     if (m[1]) {
       if (m[2] === 'g' && open.pop()) moves.pop();
@@ -86,13 +87,15 @@ export function readSvg(svg, num) {
       case 'a':
         lines.push(`link ${attr(e, 'href')}`);
         break;
-      case 'limu-line': {
-        const attrs = decodeURIComponent(attr(e, 'attrs'));
-        const cls = /class="([^"]*)"/.exec(attrs)[1];
-        const fill = /fill="([^"]*)"/.exec(attrs)?.[1] ?? '-';
-        lines.push(
-          `line ${cls} ${fill} ${pt(attr(e, 'x'), attr(e, 'y'))} ${attr(e, 'end') === '1' ? 'end' : 'start'} ${attr(e, 'w')} ${decodeURIComponent(attr(e, 'spans'))}`
-        );
+      case 'limu-label': {
+        // Each line of the text, from where it starts or ends at its middle.
+        const l = readLabel(e);
+        const cls = /class="([^"]*)"/.exec(l.attrs)[1];
+        const fill = /fill="([^"]*)"/.exec(l.attrs)?.[1] ?? '-';
+        for (let i = 0; i < l.lines.length; i++) {
+          const spans = l.lines[i].map((s) => (s.icon !== undefined ? 'i:' + s.icon + ':' + s.width : 't:' + s.style + ':' + s.text + ':' + s.width)).join('|');
+          lines.push(`line ${cls} ${fill} ${pt(l.x, l.y + (i + 0.5) * l.lineHeight)} ${l.align} ${l.widths[i]} ${spans}`);
+        }
         break;
       }
     }
