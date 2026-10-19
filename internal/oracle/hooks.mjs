@@ -23,7 +23,10 @@ export async function resolve(spec, ctx, next) {
 // label, the point it is centered on, its size and the text of its lines; and a sankey
 // diagram's labels write the middle of their line as y, with an m before it; and an
 // architecture diagram's labels write, in place of their text, the point they are centered on
-// and all that is in them, and its markers their tips and the way they point.
+// and all that is in them, and its markers their tips and the way they point. A mindmap's
+// labels write the same, with how their lines are aligned, and its nodes their size and top;
+// an info diagram's labels write the same, and it draws the text limuInfoText gives in place
+// of Pele's name and version.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -38,6 +41,18 @@ const dataY = (y) => `<text\${(globalThis as any).limuExactNumbers ? \` data-y="
 const RADAR_IMPORT = "import { escText, labelSvg, num } from '../../svg/builder.js';";
 const SANKEY_Y = 'y="${num(y + small * 0.35)}"';
 const ARCH_EDGES = "import { edgeLabelSvg, marker, markerTrim } from '../../svg/edges.js';";
+const MINDMAP_LEFT = 'function leftLabel(';
+const MINDMAP_NODE = 'transform="translate(${num(cx)},${num(top + h[i] / 2)})">';
+const INFO_IMPORT = "import { labelSvg } from '../../svg/builder.js';";
+const INFO_TEXT = 'layoutLabel(`Pele v${version}`';
+// A label as a mindmap's and an info diagram's patches write it: the point it is drawn about,
+// how its lines are aligned there, and all that is in it.
+const LIMU_LABEL = `
+function limuLabel(label: Label, x: number, y: number, attrs: string, align: string): string {
+  const lines = label.lines.map((line) => line.map((span) => [span.icon ?? null, span.text, span.style, span.width]));
+  const data = { size: label.size, lineHeight: label.lineHeight, width: label.width, height: label.height, widths: label.widths, lines };
+  return \`<limu-label x="\${x}" y="\${y}" align="\${align}" attrs="\${encodeURIComponent(attrs)}" data="\${encodeURIComponent(JSON.stringify(data))}"/>\`;
+}`;
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -122,6 +137,37 @@ function marker(type: string, x: number, y: number, dx: number, dy: number, colo
   return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" fill="\${color}"/>\`;
 }
 `;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/mindmap/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = patch(url, String(loaded.source), RADAR_IMPORT, RADAR_IMPORT.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, MINDMAP_LEFT, MINDMAP_LEFT.replace('leftLabel', 'leftLabelPele'));
+    source = patch(url, source, MINDMAP_NODE, `${MINDMAP_NODE.slice(0, -1)}\${${EXACT.slice(4, -1)} ? \` data-w="\${w[i]}" data-h="\${h[i]}" data-top="\${top}"\` : ''}>`);
+    source += `${LIMU_LABEL}
+function labelSvg(label: Label, cx: number, cy: number, attrs: string, icons?: IconResolver): string {
+  if (!(globalThis as any).limuExactNumbers) return labelSvgPele(label, cx, cy, attrs, icons);
+  return label.lines.length === 0 ? '' : limuLabel(label, cx, cy, attrs, 'middle');
+}
+function leftLabel(label: Label, left: number, cy: number, icons: RenderOptions['icons']): string {
+  if (!(globalThis as any).limuExactNumbers) return leftLabelPele(label, left, cy, icons);
+  return label.lines.length === 0 ? '' : limuLabel(label, left, cy, ' class="pele-label"', 'start');
+}
+`;
+    if (!source.includes('type IconResolver')) source = `import type { IconResolver } from '../../types.js';\n` + source;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/info/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = patch(url, String(loaded.source), INFO_IMPORT, INFO_IMPORT.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, INFO_TEXT, `layoutLabel((globalThis as any).limuInfoText ?? \`Pele v\${version}\``);
+    source += `${LIMU_LABEL}
+function labelSvg(label: Label, cx: number, cy: number, attrs: string): string {
+  if (!(globalThis as any).limuExactNumbers) return labelSvgPele(label, cx, cy, attrs);
+  return label.lines.length === 0 ? '' : limuLabel(label, cx, cy, attrs, 'middle');
+}
+`;
+    source = `import type { Label } from '../../text/label.js';\n` + source;
     return { ...loaded, source, shortCircuit: true };
   }
   if (url.endsWith('/src/diagrams/sankey/render.ts')) {

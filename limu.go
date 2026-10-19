@@ -11,6 +11,7 @@ import (
 	"github.com/firede/limu/diagram/gitgraph"
 	"github.com/firede/limu/diagram/journey"
 	"github.com/firede/limu/diagram/kanban"
+	"github.com/firede/limu/diagram/mindmap"
 	"github.com/firede/limu/diagram/packet"
 	"github.com/firede/limu/diagram/pie"
 	"github.com/firede/limu/diagram/quadrant"
@@ -186,6 +187,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = architecture.Layout(m, p.Config, o)
+	case diagram.Mindmap:
+		m, err := mindmap.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = mindmap.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
