@@ -563,13 +563,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	}
 
 	// Pele's transitions are smooth; the host may ask for them at right angles, or straight.
-	curve := ""
-	switch o.Routing {
-	case layout.Orthogonal:
-		curve = "step"
-	case layout.Straight:
-		curve = "linear"
-	}
+	curve := common.RoutingCurve(o.Routing)
 	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
 		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
 		EdgeSep:  edgeSep,

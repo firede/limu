@@ -344,11 +344,15 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	if turned {
 		rootDir = layout.TB
 	}
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
 	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: numberOption(config, "nodeSpacing", nodeSep),
-		EdgeSep: edgeSep,
-		RankSep: numberOption(config, "rankSpacing", rankSep),
-		PortSep: 24,
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
+		EdgeSep:  edgeSep,
+		RankSep:  numberOption(config, "rankSpacing", rankSep),
+		PortSep:  24,
 	})
 
 	spreadEnds(cedges, cnodes, views)
@@ -510,7 +514,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			if !direct {
 				stub = markerLength
 			}
-			ep := draw.RoutePath(r, "", stub, stub, draw.OwnReach(stub), draw.OwnReach(stub))
+			ep := draw.RoutePath(r, curve, stub, stub, draw.OwnReach(stub), draw.OwnReach(stub))
 			path = ep.Path
 			if stub > 0 {
 				path = new(scene.Path).MoveTo(ep.SX, ep.SY)

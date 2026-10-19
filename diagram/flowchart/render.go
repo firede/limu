@@ -105,11 +105,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		}
 	}
 	curve, _ := flow["curve"].(string)
-	switch o.Routing {
-	case layout.Orthogonal:
-		curve = "step"
-	case layout.Straight:
-		curve = "linear"
+	if routed := common.RoutingCurve(o.Routing); routed != "" {
+		curve = routed
 	}
 	graph := BuildGraph(db, curve)
 	if variant != nil {

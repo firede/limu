@@ -279,11 +279,15 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		cedges = append(cedges, layout.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: label.Width + 12, LabelH: label.Height + 4})
 	}
 
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
 	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: nodeSep,
-		EdgeSep: edgeSep,
-		RankSep: rankSep,
-		PortSep: 20,
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  nodeSep,
+		EdgeSep:  edgeSep,
+		RankSep:  rankSep,
+		PortSep:  20,
 	})
 
 	spreadEnds(cnodes, cedges, views)
@@ -405,7 +409,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			}
 		} else {
 			route = append([]float64(nil), ce.Route...)
-			path = draw.RoutePath(route, "", startTrim, 0, draw.OwnReach(startTrim), 0)
+			path = draw.RoutePath(route, curve, startTrim, 0, draw.OwnReach(startTrim), 0)
 		}
 		// Pele draws the edges in a group that ends their lines round.
 		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}

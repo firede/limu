@@ -342,12 +342,16 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	if lettered {
 		rs += 16
 	}
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
 	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: numberOption(conf, "nodeSpacing", nodeSep),
-		EdgeSep: edgeSep,
-		RankSep: numberOption(conf, "rankSpacing", rs),
-		PortSep: 20,
-		Apart:   true,
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  numberOption(conf, "nodeSpacing", nodeSep),
+		EdgeSep:  edgeSep,
+		RankSep:  numberOption(conf, "rankSpacing", rs),
+		PortSep:  20,
+		Apart:    true,
 	})
 	node := func(i int) draw.Node {
 		c := &cnodes[i]
@@ -705,7 +709,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 				route[k] += ox
 				route[k+1] += oy
 			}
-			path = draw.RoutePath(route, "", startTrim, endTrim, draw.OwnReach(startTrim), draw.OwnReach(endTrim))
+			path = draw.RoutePath(route, curve, startTrim, endTrim, draw.OwnReach(startTrim), draw.OwnReach(endTrim))
 		}
 		// Pele draws the edges in a group that ends their lines round.
 		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}

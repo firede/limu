@@ -597,11 +597,15 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		cedges = append(cedges, ce)
 	}
 
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
 	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: numberOption(config, "nodeSpacing", nodeSep),
-		EdgeSep: edgeSep,
-		RankSep: numberOption(config, "rankSpacing", rankSep),
-		PortSep: 20,
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
+		EdgeSep:  edgeSep,
+		RankSep:  numberOption(config, "rankSpacing", rankSep),
+		PortSep:  20,
 	})
 
 	title := text.Layout(m.Title, text.Options{Measurer: measure, Size: size, MaxWidth: 4000, Face: text.Bold, Icons: o.Icons})
@@ -853,7 +857,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			route = ce.Route
 			st, et := markerTrim(start), markerTrim(end)
-			path = draw.RoutePath(route, "", st, et, draw.OwnReach(st), draw.OwnReach(et))
+			path = draw.RoutePath(route, curve, st, et, draw.OwnReach(st), draw.OwnReach(et))
 		}
 		// A line ends round, as Pele draws it in the group of edges, which sets round caps.
 		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}

@@ -10,6 +10,19 @@ import (
 // Padding is the room about a diagram, as Pele's default padding.
 const Padding = 8
 
+// RoutingCurve is the curve, by Mermaid's name, that the host's routing asks edges to be
+// drawn with: "step" for layout.Orthogonal, "linear" for layout.Straight, and "" for
+// layout.Auto, which leaves the diagram's own curve. Pele has no such setting; it is limu's.
+func RoutingCurve(r layout.Routing) string {
+	switch r {
+	case layout.Orthogonal:
+		return "step"
+	case layout.Straight:
+		return "linear"
+	}
+	return ""
+}
+
 // RunsAcross reports whether a direction runs across, as Pele's runsAcross does.
 func RunsAcross(dir string) bool { return dir == "LR" || dir == "RL" }
 

@@ -111,13 +111,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
 	// The routing the options ask for, which Pele has no option for, overrides the curves.
-	curve := ""
-	switch o.Routing {
-	case layout.Orthogonal:
-		curve = "step"
-	case layout.Straight:
-		curve = "linear"
-	}
+	curve := common.RoutingCurve(o.Routing)
 
 	index := make(map[string]int, len(graph.Nodes))
 	for i, n := range graph.Nodes {
