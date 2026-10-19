@@ -81,6 +81,27 @@ func Declarations(decls []string) Author {
 	return a
 }
 
+// LineDeclared reports whether declarations set anything of a line: a property of a shape
+// other than its fill and fill opacity, with a value that is not dropped, whether or not it
+// can be read. It is whether the line of Pele's resolveStyle is not empty.
+func LineDeclared(decls []string) bool {
+	for _, decl := range decls {
+		prop, value, ok := strings.Cut(decl, ":")
+		if !ok {
+			continue
+		}
+		switch chars.ToLower(chars.Trim(prop)) {
+		case "stroke", "stroke-width", "stroke-dasharray", "stroke-dashoffset", "stroke-linecap",
+			"stroke-linejoin", "stroke-opacity", "opacity", "rx", "ry":
+			value = chars.Trim(replaceFold(value, "!important", ""))
+			if value != "" && !unsafe(value) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // paint is a paint of a color, None for none, or unset for one it cannot read.
 func paint(value string) Paint {
 	if strings.EqualFold(value, "none") {

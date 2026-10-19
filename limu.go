@@ -6,6 +6,7 @@ import (
 	"github.com/firede/limu/diagram/class"
 	"github.com/firede/limu/diagram/er"
 	"github.com/firede/limu/diagram/flowchart"
+	"github.com/firede/limu/diagram/gantt"
 	"github.com/firede/limu/diagram/requirement"
 	"github.com/firede/limu/diagram/state"
 	"github.com/firede/limu/diagram/swimlane"
@@ -75,6 +76,14 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = usecase.Layout(m, p.Config, o)
+	case diagram.Gantt:
+		db, err := gantt.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		if sc, err = gantt.Layout(db, p.Config, o); err != nil {
+			return nil, err
+		}
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}

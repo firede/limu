@@ -116,6 +116,8 @@ export const WRITTEN = [
   // Past the limit on the work of scheduling, by days and by formats.
   'gantt\ndateFormat YYYY-MM-DD\nexcludes weekends\n' + 'T :2024-01-01, 10950d\n'.repeat(400),
   'gantt\ndateFormat DD.MM.YYYY [' + 'x'.repeat(2000) + ']\nexcludes 01.01.2024\n' + 'T :2024-01-01, 20000d\n'.repeat(60),
+  // Within the limit to schedule, past it to mark the excluded days of.
+  'gantt\ndateFormat [' + 'x'.repeat(30000) + ']\nincludes 2030-01-01\nA :2024-01-01, 1800d\n',
 ];
 
 // The sources in Mermaid's specs as Pele ports them, as Pele's loadCorpus collects them.
