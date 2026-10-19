@@ -62,13 +62,15 @@ against it:
 
 | Pele draws | As items |
 |---|---|
-| sequence: an actor's box, or its figure | `Node`, `sequence.actor`, shape `rect` or `actor`; the figure's head and limbs are parts, the limbs `Line` |
-| sequence: a lifeline | `Mark`, `sequence.lifeline`, one `Line` part, dashed by its style |
-| sequence: a message | `Edge`, `sequence.message`, a straight or looped path, markers of Mermaid's arrow kinds, a label above it |
+| sequence: a participant, at the head of its lifeline and again at its foot | `Node`, `sequence.actor`, its kind its shape (`rect` for a participant); a figure's head and limbs, a database's lid and a queue's end are parts, the lines `StrokeOnly` |
+| sequence: a lifeline | `Mark`, `sequence.lifeline`, one solid path, as Pele 1.6 draws it |
+| sequence: a message | `Edge`, `sequence.message`, a straight or looped path, markers of Mermaid's arrow kinds, the circles of a central connection as `FillOnly` parts; its label a `Text` item, `sequence.message-label` |
 | sequence: an activation | `Mark`, `sequence.activation`, a box |
 | sequence: a note | `Node`, `sequence.note` |
-| sequence: a loop, alt or opt frame | `Group`, `sequence.frame`, its box, its tab and its dashed dividers as parts; its kind and conditions as `Text` items |
-| sequence: an autonumber | `Node`, a circle, its label in the background's color |
+| sequence: a loop, alt or opt frame | `Group`, `sequence.frame`, its box; each dashed divider a `Mark`, `sequence.divider`, since a part takes its dash from its item's style; its tab and kind a `Text` item, `sequence.frame-kind`, with the tab a part; each condition a `Text` item, `sequence.condition` |
+| sequence: a rect block, a box of participants | `Group`, `sequence.rect` or `sequence.box`, a box filled in the theme's alternate surface, at half its opacity unless the author gave a fill |
+| sequence: an autonumber | `Node`, `sequence.number`, a rounded box, its label in the background's color |
+| sequence: a destroyed participant's cross | `Mark`, `sequence.destroy` |
 | pie: a slice | `Mark`, `pie.slice`, a path with an arc, filled with `style.Series(i)` |
 | pie: a slice's percentage, the legend's text | `Text`, the legend's aligned at its start |
 | pie: a legend's swatch | `Mark`, a box filled with the slice's series |

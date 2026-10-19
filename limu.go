@@ -11,6 +11,7 @@ import (
 	"github.com/firede/limu/diagram/kanban"
 	"github.com/firede/limu/diagram/packet"
 	"github.com/firede/limu/diagram/requirement"
+	"github.com/firede/limu/diagram/sequence"
 	"github.com/firede/limu/diagram/state"
 	"github.com/firede/limu/diagram/swimlane"
 	"github.com/firede/limu/diagram/timeline"
@@ -110,6 +111,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = gitgraph.Layout(m, p.Config, o)
+	case diagram.Sequence:
+		db, err := sequence.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = sequence.Layout(db, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
