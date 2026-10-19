@@ -1,8 +1,6 @@
 package timeline
 
 import (
-	"strings"
-
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/internal/chars"
 )
@@ -76,27 +74,8 @@ func (m *Model) setDiagramTitle(text string) { m.Title = text }
 func (m *Model) setAccTitle(text string) { m.AccTitle = chars.TrimStart(text) }
 
 // setAccDescription sets the accessible description, each line break with the white space
-// after it, line breaks included, made one line break, as /\n\s+/g replaced with "\n" does.
-func (m *Model) setAccDescription(text string) {
-	var b strings.Builder
-	for i := 0; i < len(text); {
-		if text[i] != '\n' {
-			b.WriteByte(text[i])
-			i++
-			continue
-		}
-		b.WriteByte('\n')
-		i++
-		for i < len(text) {
-			c, size := chars.UnitAt(text, i)
-			if !chars.IsSpace(c) {
-				break
-			}
-			i += size
-		}
-	}
-	m.AccDescr = b.String()
-}
+// after it, line breaks included, made one line break.
+func (m *Model) setAccDescription(text string) { m.AccDescr = chars.DropIndents(text) }
 
 func (m *Model) setDirection(direction string) { m.Direction = direction }
 

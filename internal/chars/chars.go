@@ -159,6 +159,22 @@ func SpaceRun(s string, i int) int {
 	return i
 }
 
+// DropIndents is s.replace(/\n\s+/g, "\n"), as the diagrams set an accessible description:
+// the white space after each line feed taken off, with the line breaks in it.
+func DropIndents(s string) string {
+	if !strings.Contains(s, "\n") {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		b.WriteByte(s[i])
+		if s[i] == '\n' {
+			i = SpaceRun(s, i+1) - 1
+		}
+	}
+	return b.String()
+}
+
 // ToLower is String.prototype.toLowerCase, as far as the ports compare what it gives with
 // ASCII: Go's simple case mapping agrees with JavaScript's except for U+0130, which
 // JavaScript lowers to an i and a combining dot above, and a capital sigma that ends a word,
