@@ -12,19 +12,27 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/firede/limu"
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/internal/gallery"
+	"github.com/firede/limu/layout"
 	"github.com/firede/limu/style"
 	"github.com/firede/limu/svg"
 )
 
-// gallery is where the examples are kept, with their titles and descriptions: the
-// playground's, as the website and the playground show the same.
-const gallery = "../limumygo/examples/playground/internal/gallery/examples.json"
-
 // fontFamily is what the SVG sets its text in. Layout measures text with text.Arial, so the
 // family is Arial's, or one as wide.
 const fontFamily = "Arial, Helvetica, sans-serif"
+
+// The widths a diagram is drawn at, as Pele's site draws its examples: about the width of the
+// column of a page on a desktop, of a tablet, and of a phone. CSS shows the widest that the
+// figure has room for.
+const wideWidth, mediumWidth, narrowWidth = 640, 480, 320
+
+// now is the present a gantt chart takes, so that a build draws the same SVG whenever it runs.
+var now = time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 
 func main() {
 	log.SetFlags(0)
@@ -43,6 +51,7 @@ func main() {
 	write("src/generated/icon-full.svg", svgFile(64, iconFullSVG()))
 	write("src/generated/mark.json", mustJSON(map[string]string{"mark": markSVG(), "mark16": mark16SVG()}))
 	write("src/generated/limu-theme.css", themeCSS())
+	write("src/generated/home.json", mustJSON(home()))
 
 	types, failed := examples()
 	write("src/generated/examples.json", mustJSON(types))
@@ -66,7 +75,7 @@ func mustJSON(v any) string {
 }
 
 // A galleryType is a type of diagram and its examples, as the gallery keeps them, each with
-// the SVG it is drawn as.
+// the drawing of it.
 type galleryType struct {
 	Type        string           `json:"type"`
 	Title       string           `json:"title"`
@@ -79,44 +88,73 @@ type galleryExample struct {
 	Title    string `json:"title"`
 	Source   string `json:"source"`
 	Featured bool   `json:"featured,omitempty"`
-	SVG      string `json:"svg"`
+	drawing
 }
 
-// examples reads the gallery and draws each example in Kohu, its colors written as the
-// --limu-* variables, so that the page's theme decides them. It reports how many examples
-// limu could not lay out, which it leaves out.
-func examples() ([]galleryType, int) {
-	b, err := os.ReadFile(gallery)
+// A drawing is a diagram drawn at the three widths: Medium and Narrow are left empty where the
+// diagram draws no narrower than at the width above.
+type drawing struct {
+	SVG    string `json:"svg"`
+	Medium string `json:"medium,omitempty"`
+	Narrow string `json:"narrow,omitempty"`
+}
+
+// draw lays a diagram out at the three widths and writes each as SVG, in Kohu, its colors
+// written as the --limu-* variables, so that the page's theme decides them.
+func draw(src string) (drawing, error) {
+	d, err := limu.Parse(src, diagram.Options{})
 	if err != nil {
-		log.Fatal(err)
-	}
-	var g struct{ Types []galleryType }
-	if err := json.Unmarshal(b, &g); err != nil {
-		log.Fatal(err)
+		return drawing{}, err
 	}
 	o := &svg.Options{Look: style.Look{Theme: style.Kohu()}, FontFamily: fontFamily}
+	var out drawing
+	widest := 0.0
+	for i, w := range []float64{wideWidth, mediumWidth, narrowWidth} {
+		sc, err := d.Layout(&layout.Options{MaxWidth: w, Now: now, Location: time.UTC})
+		if err != nil {
+			return drawing{}, err
+		}
+		if i > 0 && sc.Width >= widest {
+			continue
+		}
+		widest = sc.Width
+		switch i {
+		case 0:
+			out.SVG = svg.Render(sc, o)
+		case 1:
+			out.Medium = svg.Render(sc, o)
+		case 2:
+			out.Narrow = svg.Render(sc, o)
+		}
+	}
+	return out, nil
+}
+
+// examples draws each example of limu's gallery. It reports how many examples limu could
+// not lay out, which it leaves out.
+func examples() ([]galleryType, int) {
+	var types []galleryType
 	failed := 0
-	for i := range g.Types {
-		t := &g.Types[i]
-		kept := t.Examples[:0]
+	for _, t := range gallery.All() {
+		gt := galleryType{Type: string(t.Type), Title: t.Title, Description: t.Description, Beta: t.Beta}
 		for _, e := range t.Examples {
-			sc, err := limu.Layout(e.Source, nil)
+			d, err := draw(e.Source)
 			if err != nil {
 				log.Printf("gen: %s, %q: %v", t.Type, e.Title, err)
 				failed++
 				continue
 			}
-			e.SVG = svg.Render(sc, o)
-			kept = append(kept, e)
+			gt.Examples = append(gt.Examples, galleryExample{Title: e.Title, Source: e.Source, Featured: e.Featured, drawing: d})
 		}
-		t.Examples = kept
+		types = append(types, gt)
 	}
-	return g.Types, failed
+	return types, failed
 }
 
 // themeCSS writes Kohu and KohuDark as the --limu-* variables the svg package draws with:
 // Kohu for the page's light theme and KohuDark for its dark one, chosen as base.scss chooses
-// the site's own colors.
+// the site's own colors. An element with data-diagram-theme draws the diagrams in it in
+// Kohu, KohuDark or Default, whatever the page's theme, as the examples' switch sets it.
 func themeCSS() string {
 	vars := func(th *style.Theme) string {
 		var b strings.Builder
@@ -137,10 +175,13 @@ func themeCSS() string {
 		return b.String()
 	}
 	light, dark := vars(style.Kohu()), vars(style.KohuDark())
-	return "/* Written by gen from style.Kohu and style.KohuDark; do not edit. */\n" +
+	return "/* Written by gen from style.Kohu, style.KohuDark and style.Default; do not edit. */\n" +
 		":root {\n" + light + "}\n" +
 		"@media (prefers-color-scheme: dark) {\n  :root:not([data-theme=\"light\"]) {\n" + indent(dark) + "  }\n}\n" +
-		":root[data-theme=\"dark\"] {\n" + dark + "}\n"
+		":root[data-theme=\"dark\"] {\n" + dark + "}\n" +
+		"[data-diagram-theme=\"kohu\"] {\n" + light + "}\n" +
+		"[data-diagram-theme=\"kohu-dark\"] {\n" + dark + "}\n" +
+		"[data-diagram-theme=\"default\"] {\n" + vars(style.Default()) + "}\n"
 }
 
 // indent indents each line of s by two spaces more.

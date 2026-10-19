@@ -23,7 +23,12 @@ before Astro builds it:
   from the numbers in `gen/mark.go`, which docs/website.md describes.
 - `src/generated/limu-theme.css`: `style.Kohu` and `style.KohuDark` as the `--limu-*`
   variables, for the site's light and dark themes.
-- `src/generated/examples.json`: every example of the playground's gallery, drawn as SVG.
+- `src/generated/limu-theme.css` also has Kohu, KohuDark and Default under
+  `[data-diagram-theme]`, for the examples' switch.
+- `src/generated/examples.json`: every example of limu's gallery, `internal/gallery`, drawn as SVG at
+  the three widths the pages show, 640, 480 and 320.
+- `src/generated/home.json`: the home page's picture of where the pipeline branches, drawn
+  the same way.
 
 `src/generated` is not committed; `public` is. `public/icon-180.png` and
 `public/favicon.ico` are drawn from the SVGs by headless Chrome, as Go's standard library

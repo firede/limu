@@ -5,8 +5,8 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/firede/limu"
+	"github.com/firede/limu/internal/gallery"
 	"github.com/firede/limu/limumygo"
-	"github.com/firede/limu/limumygo/examples/playground/internal/gallery"
 	"github.com/firede/limu/scene"
 )
 

@@ -1,0 +1,35 @@
+---
+import DiagramThemeSwitch from '../../components/DiagramThemeSwitch.astro';
+import ExampleCard from '../../components/ExampleCard.astro';
+import DocsLayout from '../../layouts/DocsLayout.astro';
+import { exampleTypeHref, exampleTypes, slug, type ExampleType } from '../../lib/examples';
+
+export const getStaticPaths = () => exampleTypes.map((t, i) => ({
+  params: { type: t.type },
+  props: { t, previous: exampleTypes[i - 1], next: exampleTypes[i + 1] },
+}));
+
+interface Props {
+  t: ExampleType;
+  previous?: ExampleType;
+  next?: ExampleType;
+}
+
+const { t, previous, next } = Astro.props;
+---
+
+<DocsLayout current="examples" title={t.title} description={t.description} markdownPath={`${exampleTypeHref(t.type)}.md`} child={t.title}>
+  <div data-diagram-scope>
+    <DiagramThemeSwitch />
+    {t.beta && <p>{t.title} diagrams are in beta: they are written with -beta, as Mermaid may still change them.</p>}
+    {t.examples.map((example) => <ExampleCard example={example} typeTitle={t.title} id={slug(example.title)} />)}
+  </div>
+  <nav class="example-pager" aria-label="Types of diagram">
+    {previous ? <a class="example-pager-link" href={exampleTypeHref(previous.type)}><span>Previous</span>{previous.title}</a> : <span />}
+    {next && <a class="example-pager-link is-next" href={exampleTypeHref(next.type)}><span>Next</span>{next.title}</a>}
+  </nav>
+</DocsLayout>
+
+<script>
+  import '../../scripts/examples';
+</script>

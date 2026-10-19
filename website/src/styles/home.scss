@@ -1,0 +1,127 @@
+.docs-layout.home-layout {
+  padding-top: 0;
+}
+
+.hero {
+  padding-block: 56px 16px;
+
+  .mark {
+    display: block;
+    // The plume's ink starts about a quarter of the way into its box.
+    margin-left: -22px;
+    color: var(--accent);
+  }
+}
+.lede {
+  margin: 28px 0 0;
+  color: var(--paper);
+  font-size: 1.5rem;
+  font-weight: 450;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.home-section {
+  margin-top: 64px;
+
+  > h2 {
+    scroll-margin-top: 32px;
+    margin: 0 0 16px;
+    color: var(--paper);
+    font-size: var(--font-size-heading);
+    font-weight: 500;
+    letter-spacing: normal;
+  }
+  > p, .home-install > p {
+    margin: 0 0 18px;
+  }
+  .doc-code {
+    margin: 0 0 18px;
+  }
+}
+
+// A picture of the home page, drawn by limu: its name over it, on the page's own colors.
+.home-figure {
+  margin: 24px 0 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  padding: 14px 20px 24px;
+
+  figcaption {
+    margin-bottom: 16px;
+    color: var(--muted);
+    font-size: var(--font-size-small);
+  }
+}
+// The scene, where limu's pipeline branches, in the accent.
+.home-figure-limu [data-id="scene"] {
+  rect {
+    stroke: var(--limu-accent);
+    stroke-width: 2;
+  }
+  text {
+    fill: var(--limu-accent);
+    font-weight: 700;
+  }
+}
+
+.home-tabs {
+  margin-bottom: 20px;
+}
+
+.guide-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.guide-link-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  padding: 16px 18px;
+  transition: border-color 150ms ease, background-color 150ms ease;
+
+  h3 {
+    margin: 0 0 4px;
+    color: var(--paper);
+    font-size: inherit;
+    font-weight: 550;
+    line-height: 1.5;
+  }
+  p {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--font-size-small);
+    line-height: 1.5;
+  }
+  @media (hover: hover) {
+    &:hover {
+      border-color: var(--line-active);
+      background: var(--panel);
+    }
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+@media (max-width: 760px) {
+  .hero {
+    padding-top: 40px;
+
+    .mark {
+      width: 64px;
+      height: 64px;
+      margin-left: -16px;
+    }
+  }
+  .lede {
+    font-size: 1.3rem;
+  }
+  .guide-links {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .home-figure {
+    padding-inline: 12px;
+  }
+}

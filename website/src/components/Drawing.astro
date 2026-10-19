@@ -1,0 +1,24 @@
+---
+import type { Drawing } from '../lib/examples';
+
+interface Props {
+  drawing: Drawing;
+  label: string;
+  class?: string;
+}
+
+const { drawing, label, class: className } = Astro.props;
+const { svg, medium, narrow } = drawing;
+---
+
+{/* Each drawing gives way to the next narrower one where the figure has no room for it;
+    examples.scss says where. */}
+<div class:list={['drawing', className, medium && 'has-medium', narrow && 'has-narrow']} role="img" aria-label={label}>
+  {medium || narrow
+    ? <>
+        <div class="drawing-wide" set:html={svg} />
+        {medium && <div class="drawing-medium" set:html={medium} />}
+        {narrow && <div class="drawing-narrow" set:html={narrow} />}
+      </>
+    : <Fragment set:html={svg} />}
+</div>

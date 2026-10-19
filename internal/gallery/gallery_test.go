@@ -1,13 +1,16 @@
 package gallery
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/firede/limu"
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/layout"
 )
 
-// Every example is of the type it is listed under, and limu lays it out.
+// Every example is of the type it is listed under, and limu lays it out at each width the
+// website draws it at.
 func TestExamplesLayOut(t *testing.T) {
 	for _, typ := range All() {
 		for _, ex := range typ.Examples {
@@ -16,15 +19,22 @@ func TestExamplesLayOut(t *testing.T) {
 				t.Errorf("%s %q: detected as %q, %v", typ.Type, ex.Title, got, err)
 				continue
 			}
-			if _, err := limu.Layout(ex.Source, nil); err != nil {
+			d, err := limu.Parse(ex.Source, diagram.Options{})
+			if err != nil {
 				t.Errorf("%s %q: %v", typ.Type, ex.Title, err)
+				continue
+			}
+			for _, w := range []float64{0, 640, 480, 320} {
+				if _, err := d.Layout(&layout.Options{MaxWidth: w}); err != nil {
+					t.Errorf("%s %q at %v: %v", typ.Type, ex.Title, w, err)
+				}
 			}
 		}
 	}
 }
 
-// Every type limu reads but info has one entry, with a title, a description and a featured
-// example, and its featured examples come first.
+// Every type limu reads but info has one entry, with a title, a description, three to six
+// examples, and one or two featured examples, which come first.
 func TestTypes(t *testing.T) {
 	seen := map[diagram.Type]bool{}
 	for _, typ := range All() {
@@ -34,6 +44,9 @@ func TestTypes(t *testing.T) {
 		seen[typ.Type] = true
 		if typ.Title == "" || typ.Description == "" {
 			t.Errorf("%s: title %q, description %q", typ.Type, typ.Title, typ.Description)
+		}
+		if n := len(typ.Examples); n < 3 || n > 6 {
+			t.Errorf("%s: %d examples", typ.Type, n)
 		}
 		featured, last := 0, true
 		titles := map[string]bool{}
@@ -70,14 +83,28 @@ func TestTypes(t *testing.T) {
 	}
 }
 
-// The types not in beta come first, as on Pele's examples page. gen.mjs sorts each part by
-// title with JavaScript's localeCompare, which this does not repeat.
+// The types not in beta come first, each part by title.
 func TestOrder(t *testing.T) {
 	types := All()
 	for i := 1; i < len(types); i++ {
 		a, b := types[i-1], types[i]
-		if a.Beta && !b.Beta {
-			t.Errorf("%s, in beta, before %s", a.Type, b.Type)
+		if a.Beta && !b.Beta || a.Beta == b.Beta && a.Title > b.Title {
+			t.Errorf("%s before %s", a.Type, b.Type)
+		}
+	}
+}
+
+// placeholder matches the words that stand in for content in syntax's own examples; not
+// "bar", which is a keyword of XY charts.
+var placeholder = regexp.MustCompile(`\b(Label|foo|baz|Lorem|ipsum|Class0\d|id\d|Alice|Bob|John)\b`)
+
+// An example draws something a reader could meet, not a stand-in for it.
+func TestNoPlaceholders(t *testing.T) {
+	for _, typ := range All() {
+		for _, ex := range typ.Examples {
+			if m := placeholder.FindString(ex.Source); m != "" {
+				t.Errorf("%s %q: %q stands in for content", typ.Type, ex.Title, m)
+			}
 		}
 	}
 }

@@ -59,6 +59,11 @@ length:
 A third picture may show `ItemAt` finding the item under the pointer in a MyGo window, as
 what a scene being data gives a native app.
 
+The first picture is drawn by `gen` with the svg package, as two diagrams, the renderer of
+SVG's and limu's, with limu's scene in the accent; the second waits for step 6. After the
+pictures come the code, a switch between MyGo and SVG with MyGo first, cards to the
+examples, the playground, Getting started and Theming, and a paragraph on limu and Pele.
+
 The pictures drawn natively are rendered with `ui.Render`, as limumygo's tests render
 theirs, on a Mac, and committed: MyGo sets text with Pango on Linux, so CI would draw them
 otherwise.
@@ -66,10 +71,26 @@ otherwise.
 ### Examples
 
 `/examples` shows the featured example of each type, and `/examples/<type>` every example
-of a type, from the playground's `examples.json` (32 types). Each diagram is SVG written at
+of a type, from limu's gallery, `internal/gallery`, which the playground shows too. The
+examples are limu's own, three to six of each of the 32 types, one Markdown file for each:
+the first one or two, featured, draw a scene a reader could meet, and the others each show
+another feature of the type in a scene of its own. They are mostly scenes developers know,
+and now and then one of the sea; none stands in for content with "Label", "A" or "Alice".
+They replace the examples of Mermaid's documentation that the playground showed before,
+which stay in limu's tests. Each diagram is SVG written at
 build time, with "Copy source" and "Open in playground" beside it. A switch draws the
 examples in Kohu, KohuDark or Default; as the SVG's colors are the `--limu-*` variables,
-switching lays nothing out again.
+switching lays nothing out again. Until a theme is chosen, the examples follow the page's,
+Kohu in the light and KohuDark in the dark, and a choice is kept as the page's own is.
+
+As on Pele's site, each diagram is laid out at most 640, 480 and 320 wide, and the page
+shows the widest its figure has room for, so that on a phone a diagram that can draw itself
+narrower does rather than shrinking its text. A gantt chart takes 2026-01-15 in UTC as its
+present, so that the build writes the same SVG whenever it runs.
+
+"Open in playground" links to `/playground#source=…`, the source in the fragment encoded as
+a URL's query, as Pele's playground takes it; the playground reads it in step 4. A source
+whose link would pass 32,000 characters is not offered.
 
 ### Playground
 
