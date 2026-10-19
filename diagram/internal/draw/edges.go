@@ -10,9 +10,6 @@ import (
 	"github.com/firede/limu/text"
 )
 
-// arrow is the length of an arrowhead.
-const arrow = scene.MarkerSize
-
 const (
 	// corner is the most a corner is rounded by in a stepped route.
 	corner = 12
