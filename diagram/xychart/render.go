@@ -495,7 +495,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 			axis.MoveTo(left, y).LineTo(left+-leftTick, y)
 		}
 		if leftLabels {
-			labels = append(labels, aligned("xychart.axis-label", mk.label, left-leftTick-6, y, scene.End, style.Muted)...)
+			labels = append(labels, aligned(RoleAxisLabel, mk.label, left-leftTick-6, y, scene.End, style.Muted)...)
 		}
 	}
 	for _, mk := range bottomMarks {
@@ -504,7 +504,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 			axis.MoveTo(at, bottom).LineTo(at, bottom+bottomTick)
 		}
 		if bottomLabels {
-			labels = append(labels, aligned("xychart.axis-label", mk.label, at, bottom+bottomTick+4+mk.label.Height/2, scene.Middle, style.Muted)...)
+			labels = append(labels, aligned(RoleAxisLabel, mk.label, at, bottom+bottomTick+4+mk.label.Height/2, scene.Middle, style.Muted)...)
 		}
 	}
 
@@ -601,12 +601,12 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 				}
 				l := common.Line(s, w, tiny, 0)
 				outside = append(outside, scene.Item{
-					Kind: scene.Text, Role: "xychart.data-label", Label: l, Align: align,
+					Kind: scene.Text, Role: RoleDataLabel, Label: l, Align: align,
 					At: scene.Point{X: tx, Y: ty}, Style: style.Style{Text: style.Fg},
 				})
 			}
 			series = append(series, scene.Item{
-				Kind: scene.Mark, Role: "xychart.bars", ID: plot.Title, Box: bounds, Parts: parts,
+				Kind: scene.Mark, Role: RoleBars, ID: plot.Title, Box: bounds, Parts: parts,
 				Style: style.Style{Fill: color},
 			})
 			continue
@@ -673,9 +673,9 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 			if l.Height > 0 {
 				half := l.Width / 2
 				if horizontal {
-					pointLabels = append(pointLabels, aligned("xychart.point-label", l, cx+10, cy, scene.Start, style.Fg)...)
+					pointLabels = append(pointLabels, aligned(RolePointLabel, l, cx+10, cy, scene.Start, style.Fg)...)
 				} else {
-					pointLabels = append(pointLabels, aligned("xychart.point-label", l, max(min(cx, right-half), left+half), cy-6-l.Height/2, scene.Middle, style.Fg)...)
+					pointLabels = append(pointLabels, aligned(RolePointLabel, l, max(min(cx, right-half), left+half), cy-6-l.Height/2, scene.Middle, style.Fg)...)
 				}
 			}
 		}
@@ -685,7 +685,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 		}
 		parts = append(parts, dots...)
 		it := scene.Item{
-			Kind: scene.Mark, Role: "xychart.line", ID: plot.Title, Parts: parts,
+			Kind: scene.Mark, Role: RoleLine, ID: plot.Title, Parts: parts,
 			Style: style.Style{Fill: color, Stroke: color, StrokeWidth: style.N(2), Cap: style.CapRound, Join: style.JoinRound},
 		}
 		for k, part := range parts {
@@ -702,14 +702,14 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 	if leftTitle.Height > 0 {
 		l := leftTitle
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "xychart.axis-title", Label: &l, Rotate: -90,
+			Kind: scene.Text, Role: RoleAxisTitle, Label: &l, Rotate: -90,
 			At: scene.Point{X: pad + leftTitle.Height/2, Y: top + plotHeight/2}, Style: style.Style{Text: style.Fg},
 		})
 	}
 	if !bottomTitle.Empty() {
 		l := bottomTitle
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "xychart.axis-title", Label: &l,
+			Kind: scene.Text, Role: RoleAxisTitle, Label: &l,
 			At: scene.Point{X: left + plotWidth/2, Y: height - pad - bottomTitle.Height/2}, Style: style.Style{Text: style.Fg},
 		})
 	}
@@ -729,7 +729,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 		y := ly + h/2
 		color := style.Series(e.index)
 		it := scene.Item{
-			Kind: scene.Node, Role: "xychart.legend", ID: plots[e.index].Title,
+			Kind: scene.Node, Role: RoleLegend, ID: plots[e.index].Title,
 			Box: scene.Rect{X: lx, Y: ly, W: swatch + 8 + e.label.Width, H: h},
 			At:  scene.Point{X: lx + swatch + 8 + e.label.Width/2, Y: y},
 		}
@@ -760,13 +760,13 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 	}
 	if !title.Empty() {
 		sc.Items = append(sc.Items, scene.Item{
-			Kind: scene.Text, Role: "xychart.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: width / 2, Y: pad + title.Height/2}, Style: style.Style{Text: style.Fg},
 		})
 	}
 	if len(grid.Ops) > 0 {
 		sc.Items = append(sc.Items, scene.Item{
-			Kind: scene.Mark, Role: "xychart.grid", Box: grid.Bounds(),
+			Kind: scene.Mark, Role: RoleGrid, Box: grid.Bounds(),
 			Parts: []scene.Part{{Path: grid, Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.SurfaceAlt},
 		})
@@ -775,7 +775,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 	sc.Items = append(sc.Items, lines...)
 	if len(axis.Ops) > 0 {
 		sc.Items = append(sc.Items, scene.Item{
-			Kind: scene.Mark, Role: "xychart.axis", Box: axis.Bounds(),
+			Kind: scene.Mark, Role: RoleAxis, Box: axis.Bounds(),
 			Parts: []scene.Part{{Path: axis, Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.Border},
 		})

@@ -82,13 +82,13 @@ func at(lines []string, i int) string {
 
 // nodeKinds are the classes Pele gives a node of each role, less its "pele-".
 var nodeKinds = map[scene.Role]string{
-	"state.state":  "state",
-	"state.start":  "state-start",
-	"state.end":    "state-end",
-	"state.choice": "state-choice",
-	"state.fork":   "state-fork",
-	"state.join":   "state-join",
-	"state.note":   "note",
+	RoleState:  "state",
+	RoleStart:  "state-start",
+	RoleEnd:    "state-end",
+	RoleChoice: "state-choice",
+	RoleFork:   "state-fork",
+	RoleJoin:   "state-join",
+	RoleNote:   "note",
 }
 
 // sceneLines writes a scene as the oracle reads Pele's SVG.
@@ -136,11 +136,11 @@ func sceneLines(sc *scene.Scene) []string {
 		id := peleID(it.ID)
 		classes := strings.Join(it.Class, " ")
 		switch it.Role {
-		case "state.title":
+		case RoleTitle:
 			if it.Label != nil && len(it.Label.Lines) > 0 {
 				lines = append(lines, "title "+textAt(it.Label, it.At.X, it.At.Y))
 			}
-		case "state.composite":
+		case RoleComposite:
 			lines = append(lines, fmt.Sprintf("composite %s [%s]", id, classes))
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
@@ -153,15 +153,15 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "path "+pelesvg.D(part.Path))
 			}
 			label(it.Label, it.At.X, it.At.Y)
-		case "state.divider":
+		case RoleDivider:
 			if p := it.Parts[0]; p.Path != nil {
 				lines = append(lines, "divider "+pelesvg.D(p.Path))
 			} else {
 				rect("divider-rect", p.Box, 0, 0, radius(it))
 			}
-		case "state.transition", "state.note-edge":
+		case RoleTransition, RoleNoteEdge:
 			kind := "transition"
-			if it.Role == "state.note-edge" {
+			if it.Role == RoleNoteEdge {
 				kind = "note-edge"
 			}
 			lines = append(lines, "edge "+id+" "+kind, "path "+pelesvg.D(it.Parts[0].Path), "stroke "+pelesvg.CapJoin(it))
@@ -170,11 +170,11 @@ func sceneLines(sc *scene.Scene) []string {
 					lines = append(lines, "m "+s)
 				}
 			}
-		case "state.edge-label":
+		case RoleEdgeLabel:
 			lines = append(lines, "label "+id)
 			rect("rect", it.Parts[0].Box, 0, 0, "3")
 			label(it.Label, it.At.X, it.At.Y)
-		case "state.description":
+		case RoleDescription:
 			if it.Label != nil && len(it.Label.Lines) > 0 {
 				y := descAt + it.Label.Height/2
 				check("description", it.At.X-cx, 0)
@@ -192,9 +192,9 @@ func sceneLines(sc *scene.Scene) []string {
 			// written as Pele works it out from the node's size; the parts are checked to be
 			// where that puts them.
 			w, h := it.Box.W, it.Box.H
-			described := it.Role == "state.state" && len(it.Parts) == 2
+			described := it.Role == RoleState && len(it.Parts) == 2
 			cx, cy = it.Box.X+w/2, it.Box.Y+h/2
-			if it.Role == "state.note" || it.Role == "state.state" && !described {
+			if it.Role == RoleNote || it.Role == RoleState && !described {
 				cx, cy = it.At.X, it.At.Y
 			}
 			lines = append(lines, fmt.Sprintf("node %s %s [%s] %s", id, kind, classes, pt(cx, cy)))
@@ -211,18 +211,18 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "rect "+pt(-w/2, -h/2)+","+pt(w, h)+" "+radius(it))
 			}
 			switch it.Role {
-			case "state.start", "state.end":
+			case RoleStart, RoleEnd:
 				for _, part := range it.Parts {
 					r := part.Path.Bounds().W / 2
 					checkPath(part.Path, cx, cy, r, 0, 0, r, -r, 0, 0, -r, r, 0)
 					lines = append(lines, "circle "+num(r))
 				}
-			case "state.choice":
+			case RoleChoice:
 				checkPath(it.Parts[0].Path, cx, cy, 0, -h/2, w/2, 0, 0, h/2, -w/2, 0)
 				lines = append(lines, "polygon 0,"+num(-h/2)+" "+num(w/2)+",0 0,"+num(h/2)+" "+num(-w/2)+",0")
-			case "state.fork", "state.join":
+			case RoleFork, RoleJoin:
 				box(it.Parts[0])
-			case "state.note":
+			case RoleNote:
 				checkPath(it.Parts[0].Path, cx, cy, -w/2, -h/2, w/2-fold, -h/2, w/2, fold-h/2, w/2, h/2, -w/2, h/2)
 				checkPath(it.Parts[1].Path, cx, cy, w/2-fold, -h/2, w/2-fold, fold-h/2, w/2, fold-h/2)
 				r, b, f, c := num(w/2), num(h/2), num(w/2-fold), num(fold-h/2)

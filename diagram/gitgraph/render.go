@@ -306,7 +306,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 			grow(px(end+tailLen, c), py(end+tailLen, c), px(end+tailLen, c), py(end+tailLen, c))
 			path := new(scene.Path).MoveTo(px(-labelGap, c), py(-labelGap, c)).LineTo(px(end+tailLen, c), py(end+tailLen, c))
 			items = append(items, scene.Item{
-				Kind: scene.Mark, Role: "gitgraph.lane", ID: m.Lanes[i],
+				Kind: scene.Mark, Role: RoleLane, ID: m.Lanes[i],
 				Box:   path.Bounds(),
 				Parts: []scene.Part{{Path: path, Paint: scene.StrokeOnly}},
 				Style: style.Style{Stroke: color, Dash: style.Dashes(2, 4)},
@@ -315,7 +315,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 				grow(cx-w/2, cy-h/2, cx+w/2, cy+h/2)
 				box := scene.Rect{X: cx - w/2, Y: cy - h/2, W: w, H: h}
 				items = append(items, scene.Item{
-					Kind: scene.Node, Role: "gitgraph.branch", ID: m.Lanes[i],
+					Kind: scene.Node, Role: RoleBranch, ID: m.Lanes[i],
 					Box:   box,
 					Parts: []scene.Part{{Box: box, Rounded: true, Paint: scene.FillOnly}},
 					Label: name, At: scene.Point{X: cx, Y: cy},
@@ -435,7 +435,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 				return scene.Rect{X: cx - w/2 - 2, Y: cy - h/2 + 2, W: w + 4, H: h - 4}
 			}
 			it := scene.Item{
-				Kind: scene.Text, Role: "gitgraph.commit-label", ID: c.ID, Label: l,
+				Kind: scene.Text, Role: RoleCommitLabel, ID: c.ID, Label: l,
 				Style: style.Style{Fill: style.Bg, Stroke: style.None, Text: style.Muted, Radius: style.N(3)},
 			}
 			if rotate {
@@ -498,13 +498,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 			path := new(scene.Path).MoveTo(left, cy).LineTo(left+notch, cy-h/2).LineTo(left+w, cy-h/2).
 				LineTo(left+w, cy+h/2).LineTo(left+notch, cy+h/2).Close()
 			items = append(items, scene.Item{
-				Kind: scene.Node, Role: "gitgraph.tag", ID: c.ID,
+				Kind: scene.Node, Role: RoleTag, ID: c.ID,
 				Box:   scene.Rect{X: left, Y: cy - h/2, W: w, H: h},
 				Parts: []scene.Part{{Path: path, Paint: scene.FillAndStroke}},
 				Label: tag, At: scene.Point{X: left + notch + 4 + tag.Width/2, Y: cy},
 				Style: style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg, Join: style.JoinRound},
 			}, scene.Item{
-				Kind: scene.Mark, Role: "gitgraph.tag-hole", ID: c.ID,
+				Kind: scene.Mark, Role: RoleTagHole, ID: c.ID,
 				Box:   scene.Rect{X: left + notch - 1.5, Y: cy - 1.5, W: 3, H: 3},
 				Parts: []scene.Part{{Path: new(scene.Path).Ellipse(left+notch, cy, 1.5, 1.5), Paint: scene.FillOnly}},
 				Style: style.Style{Fill: style.Border, Stroke: style.None},
@@ -535,7 +535,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 	sc := &scene.Scene{Type: "gitGraph", Width: width, Height: height, FontSize: size, Title: m.AccTitle, Desc: m.AccDescr}
 	if len(title.Lines) > 0 {
 		sc.Items = append(sc.Items, scene.Item{
-			Kind: scene.Text, Role: "gitgraph.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At:    scene.Point{X: width / 2, Y: pad + title.Height/2},
 			Style: style.Style{Text: style.Fg},
 		})
@@ -605,7 +605,7 @@ func (e *edgePath) item(shape string, color style.Paint, dashed bool) scene.Item
 		st.Dash = style.Dashes(4, 3)
 	}
 	return scene.Item{
-		Kind: scene.Edge, Role: "gitgraph.edge", Shape: scene.Shape(shape),
+		Kind: scene.Edge, Role: RoleEdge, Shape: scene.Shape(shape),
 		Box:   path.Bounds(),
 		Parts: []scene.Part{{Path: &path, Paint: scene.StrokeOnly}},
 		Route: e.route,
@@ -619,9 +619,9 @@ func (e *edgePath) item(shape string, color style.Paint, dashed bool) scene.Item
 // of their own: a reverse's cross with round ends and a cherry-pick's stem with a round
 // corner, as Pele draws them. A merge's role is gitgraph.merge whatever type it is drawn as.
 func symbol(c *Commit, typ int, x, y float64, color style.Paint) []scene.Item {
-	role := scene.Role("gitgraph.commit")
+	role := RoleCommit
 	if c.Type == MergeType {
-		role = "gitgraph.merge"
+		role = RoleMerge
 	}
 	shape := shapes[0]
 	if typ >= 0 && typ < len(shapes) {
@@ -658,7 +658,7 @@ func symbol(c *Commit, typ int, x, y float64, color style.Paint) []scene.Item {
 		it.Parts = []scene.Part{dotPart}
 		cross := new(scene.Path).MoveTo(x-3, y-3).LineTo(x-3+6, y-3+6).MoveTo(x-3, y+3).LineTo(x-3+6, y+3-6)
 		return []scene.Item{it, {
-			Kind: scene.Mark, Role: "gitgraph.commit-mark", Shape: "reverse", ID: c.ID,
+			Kind: scene.Mark, Role: RoleCommitMark, Shape: "reverse", ID: c.ID,
 			Box:   cross.Bounds(),
 			Parts: []scene.Part{{Path: cross, Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.Bg, StrokeWidth: style.N(1.5), Cap: style.CapRound},
@@ -667,7 +667,7 @@ func symbol(c *Commit, typ int, x, y float64, color style.Paint) []scene.Item {
 		it.Parts = []scene.Part{dotPart}
 		stem := new(scene.Path).MoveTo(x-2.6, y+1).LineTo(x+0.8, y-4.2).LineTo(x+2.6, y+1)
 		return []scene.Item{it, {
-			Kind: scene.Mark, Role: "gitgraph.commit-mark", Shape: "cherry-pick", ID: c.ID,
+			Kind: scene.Mark, Role: RoleCommitMark, Shape: "cherry-pick", ID: c.ID,
 			Box: scene.Rect{X: x - 2.6 - 1.8, Y: y - 4.2, W: 2*2.6 + 2*1.8, H: 4.2 + 2.2 + 1.8},
 			Parts: []scene.Part{
 				{Path: stem, Paint: scene.StrokeOnly},

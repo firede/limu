@@ -779,7 +779,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		extend(x, x+actW)
 		box := scene.Rect{X: x, Y: start, W: actW, H: bottom - start}
 		activations = append(activations, scene.Item{
-			Kind: scene.Mark, Role: "sequence.activation", ID: c.id, Box: box,
+			Kind: scene.Mark, Role: RoleActivation, ID: c.id, Box: box,
 			Parts: []scene.Part{{Box: box, Rounded: true}},
 			Style: style.Style{Fill: style.Surface, Stroke: style.Border, Radius: style.N(2)},
 		})
@@ -792,7 +792,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		c.lifeEnd = cy
 		p := new(scene.Path).MoveTo(cx-6, cy-6).LineTo(cx+6, cy+6).MoveTo(cx+6, cy-6).LineTo(cx-6, cy+6)
 		destroys = append(destroys, scene.Item{
-			Kind: scene.Mark, Role: "sequence.destroy", ID: c.id, Box: p.Bounds(),
+			Kind: scene.Mark, Role: RoleDestroy, ID: c.id, Box: p.Bounds(),
 			Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.Line, StrokeWidth: style.N(1.5), Cap: style.CapRound},
 		})
@@ -805,7 +805,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			shape = "rect"
 		}
 		it := scene.Item{
-			Kind: scene.Node, Role: "sequence.actor", Shape: shape, ID: c.id,
+			Kind: scene.Node, Role: RoleActor, Shape: shape, ID: c.id,
 			Box:   scene.Rect{X: c.x - c.w/2, Y: top, W: c.w, H: c.h},
 			Parts: parts, At: at,
 			Style: style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg},
@@ -825,7 +825,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		label := text.Layout(chars.NumberString(numbers.index[i]), text.Options{Measurer: measure, Size: tiny})
 		box := scene.Rect{X: cx - w/2, Y: cy - badgeH/2, W: w, H: badgeH}
 		return scene.Item{
-			Kind: scene.Node, Role: "sequence.number", Shape: "rounded", Box: box,
+			Kind: scene.Node, Role: RoleNumber, Shape: "rounded", Box: box,
 			Parts: []scene.Part{{Box: box, Rounded: true}},
 			Label: &label, At: scene.Point{X: cx, Y: cy},
 			Style: style.Style{Fill: style.Line, Stroke: style.None, Text: style.Bg, Radius: style.N(badgeH / 2)},
@@ -863,22 +863,22 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			if f.kind == "rect" {
 				own, author := fillStyle(f.fill, f.fill != "" && writesFill(f.fill))
 				rects = append(rects, scene.Item{
-					Kind: scene.Group, Role: "sequence.rect", Shape: "rect", Box: box,
+					Kind: scene.Group, Role: RoleRect, Shape: "rect", Box: box,
 					Parts: []scene.Part{{Box: box, Rounded: true, Paint: scene.FillOnly}},
 					Style: own, Author: author,
 				})
 			} else {
 				framesOut = append(framesOut, scene.Item{
-					Kind: scene.Group, Role: "sequence.frame", Shape: scene.Shape(f.kind), Box: box,
+					Kind: scene.Group, Role: RoleFrame, Shape: scene.Shape(f.kind), Box: box,
 					Parts: []scene.Part{{Box: box, Rounded: true, Paint: scene.StrokeOnly}},
 					Style: style.Style{Stroke: style.Border},
 				})
-				condition := scene.Item{Kind: scene.Text, Role: "sequence.condition", Style: style.Style{Text: style.Muted}}
+				condition := scene.Item{Kind: scene.Text, Role: RoleCondition, Style: style.Style{Text: style.Muted}}
 				for k, dy := range f.dividerY {
 					label := f.dividerLabels[k]
 					p := new(scene.Path).MoveTo(f.x0, dy).LineTo(f.x1, dy)
 					framesOut = append(framesOut, scene.Item{
-						Kind: scene.Mark, Role: "sequence.divider", Box: p.Bounds(),
+						Kind: scene.Mark, Role: RoleDivider, Box: p.Bounds(),
 						Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}},
 						Style: style.Style{Stroke: style.Border, Dash: style.Dashes(4, 4)},
 					})
@@ -889,7 +889,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 				tab := scene.Rect{X: f.x0, Y: f.top, W: f.tabW, H: tabH}
 				kind := text.Layout(f.kind, text.Options{Measurer: measure, Size: tiny, Face: text.Bold})
 				framesOut = append(framesOut, scene.Item{
-					Kind: scene.Text, Role: "sequence.frame-kind", Shape: scene.Shape(f.kind), Box: tab,
+					Kind: scene.Text, Role: RoleFrameKind, Shape: scene.Shape(f.kind), Box: tab,
 					Parts: []scene.Part{{Box: tab, Rounded: true}},
 					Label: &kind, At: scene.Point{X: f.x0 + f.tabW/2, Y: f.top + tabH/2},
 					Style: style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Muted},
@@ -923,7 +923,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			extend(x, x+v.w)
 			box := scene.Rect{X: x, Y: top, W: v.w, H: h}
 			it := scene.Item{
-				Kind: scene.Node, Role: "sequence.note", Shape: "rect", ID: "i" + m.ID, Box: box,
+				Kind: scene.Node, Role: RoleNote, Shape: "rect", ID: "i" + m.ID, Box: box,
 				Parts: []scene.Part{{Box: box, Rounded: true}},
 				At:    scene.Point{X: x + v.w/2, Y: top + h/2},
 				Style: style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Fg},
@@ -964,7 +964,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			// A message's line and heads end round, as Pele draws them in the group of
 			// edges, which sets round caps.
 			msg := scene.Item{
-				Kind: scene.Edge, Role: "sequence.message", ID: "i" + m.ID,
+				Kind: scene.Edge, Role: RoleMessage, ID: "i" + m.ID,
 				Style: style.Style{Stroke: style.Line, Fill: style.Line, Cap: style.CapRound},
 			}
 			if st.dotted {
@@ -1032,7 +1032,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 				if label.Width > 0 {
 					l := label
 					labels = append(labels, scene.Item{
-						Kind: scene.Text, Role: "sequence.message-label", ID: "i" + m.ID,
+						Kind: scene.Text, Role: RoleMessageLabel, ID: "i" + m.ID,
 						Box:   scene.Rect{X: out + 8, Y: (top+bottom)/2 - l.Height/2, W: l.Width, H: l.Height},
 						Label: &l, At: scene.Point{X: out + 8 + l.Width/2, Y: (top + bottom) / 2},
 						Style: style.Style{Text: style.Fg},
@@ -1124,7 +1124,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 						cx = r - msgPad - label.Width/2
 					}
 					extend(cx-label.Width/2, cx+label.Width/2)
-					it := scene.Item{Kind: scene.Text, Role: "sequence.message-label", ID: "i" + m.ID, Style: style.Style{Text: style.Fg}}
+					it := scene.Item{Kind: scene.Text, Role: RoleMessageLabel, ID: "i" + m.ID, Style: style.Style{Text: style.Fg}}
 					if it, ok := backed(it, label, cx, lineY-4-label.Height/2); ok {
 						labels = append(labels, it)
 					}
@@ -1175,7 +1175,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		if end > c.lifeStart {
 			p := new(scene.Path).MoveTo(c.x, c.lifeStart).LineTo(c.x, end)
 			lifelines = append(lifelines, scene.Item{
-				Kind: scene.Mark, Role: "sequence.lifeline", ID: c.id, Box: p.Bounds(),
+				Kind: scene.Mark, Role: RoleLifeline, ID: c.id, Box: p.Bounds(),
 				Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}},
 				Style: style.Style{Stroke: style.Border},
 			})
@@ -1188,7 +1188,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		own.Stroke, own.Text = style.Border, style.Muted
 		box := scene.Rect{X: x0, Y: 0, W: x1 - x0, H: bottom + boxPad}
 		it := scene.Item{
-			Kind: scene.Group, Role: "sequence.box", Shape: "rect", ID: run.box.Name, Box: box,
+			Kind: scene.Group, Role: RoleBox, Shape: "rect", ID: run.box.Name, Box: box,
 			Parts: []scene.Part{{Box: box, Rounded: true}},
 			At:    scene.Point{X: (x0 + x1) / 2, Y: boxPad/2 + 2 + run.title.Height/2},
 			Style: own, Author: author,
@@ -1218,7 +1218,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		extend(cx-title.Width/2, cx+title.Width/2)
 		minY = -title.Height - 12
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "sequence.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			Box:   scene.Rect{X: cx - title.Width/2, Y: minY, W: title.Width, H: title.Height},
 			At:    scene.Point{X: cx, Y: minY + title.Height/2},
 			Style: style.Style{Text: style.Fg},

@@ -419,7 +419,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 	var titles, clusters, nodes, edges, labels []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "agentflow.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: padding + title.Height/2},
 		})
 	}
@@ -435,7 +435,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			own := tint(slot(n), 0.06)
 			own.Text = style.Muted
 			cluster := scene.Item{
-				Kind: scene.Group, Role: "agentflow.flow", ID: n.ID, Class: classes, Box: box,
+				Kind: scene.Group, Role: RoleFlow, ID: n.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
 				Style:  own,
 				Author: v.author.Style,
@@ -459,7 +459,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		var marks []scene.Item
 		if v.shape == collapsed {
 			s := slot(n)
-			it.Role = "agentflow.collapsed"
+			it.Role = RoleCollapsed
 			it.Parts = []scene.Part{{Box: box, Rounded: true}}
 			it.Style = tint(s, 0.06)
 			// What the author set for lines styles the rule, and fills nothing.
@@ -468,7 +468,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			rule := h/2 - dots - 2
 			mid := rule + (dots+2)/2
 			marks = []scene.Item{{
-				Kind: scene.Mark, Role: "agentflow.collapsed-rule", ID: n.ID,
+				Kind: scene.Mark, Role: RoleCollapsedRule, ID: n.ID,
 				Box: scene.Rect{X: x - w/2 + 10, Y: y + rule, W: w - 20},
 				Parts: []scene.Part{{
 					Path:  new(scene.Path).MoveTo(x+(-w/2+10), y+rule).LineTo(x+(w/2-10), y+rule),
@@ -477,7 +477,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 				Style:  style.Style{Stroke: style.Series(s), Fill: style.None, Dash: style.Dashes(3, 3)},
 				Author: line,
 			}, {
-				Kind: scene.Mark, Role: "agentflow.collapsed-dots", ID: n.ID,
+				Kind: scene.Mark, Role: RoleCollapsedDots, ID: n.ID,
 				Box:   scene.Rect{X: x - 9 - 1.75, Y: y + mid - 1.75, W: 18 + 3.5, H: 3.5},
 				Parts: []scene.Part{{Path: dot(dot(dot(new(scene.Path), x, y, -9, mid), x, y, 0, mid), x, y, 9, mid)}},
 				Style: style.Style{Fill: style.Series(s), Stroke: style.None},
@@ -544,7 +544,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		edges = append(edges, it)
 		if label.Width > 0 {
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: "agentflow.edge-label", ID: edge.ID,
+				Kind: scene.Text, Role: RoleEdgeLabel, ID: edge.ID,
 				Box:    scene.Rect{X: x - (label.Width+8)/2, Y: y - label.Height/2, W: label.Width + 8, H: label.Height},
 				Parts:  []scene.Part{draw.LabelPatch(label, x, y)},
 				Label:  label,

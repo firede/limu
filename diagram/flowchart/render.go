@@ -347,7 +347,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 	var titles, clusters, struck, nodes, edges, labels []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "flowchart.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: padding + title.Height/2},
 		})
 	}
@@ -366,7 +366,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			titleY := y - c.H/2 + 8 + v.label.Height/2
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
 			cluster := scene.Item{
-				Kind: scene.Group, Role: "flowchart.cluster", ID: n.ID, Class: classes, Box: box,
+				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
 				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
@@ -377,7 +377,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 				if draw.TitleCrossed(node(i), label.Width, titleX, crossings) {
 					depth := draw.StruckDepth(func(k int) int { return cnodes[k].Parent }, i)
 					struck = append(struck, scene.Item{
-						Kind: scene.Text, Role: "flowchart.cluster-title", ID: n.ID, Label: label, At: at,
+						Kind: scene.Text, Role: RoleClusterTitle, ID: n.ID, Label: label, At: at,
 						Style: style.Style{
 							Text:      style.Muted,
 							Halo:      style.SurfaceAlt.Alpha(draw.StruckTint(depth) / 100).Over(style.Bg),
@@ -395,7 +395,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 
 		w, h := v.w, v.h
 		it := scene.Item{
-			Kind: scene.Node, Role: "flowchart.node", Shape: scene.Shape(v.shape), ID: n.ID, Class: classes,
+			Kind: scene.Node, Role: RoleNode, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes,
 			Box:    scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
 			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
 			Author: v.author.Style,
@@ -511,7 +511,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 				own.Dash = style.Dashes(3, 4)
 			}
 			it := scene.Item{
-				Kind: scene.Edge, Role: "flowchart.edge", ID: edge.ID,
+				Kind: scene.Edge, Role: RoleEdge, ID: edge.ID,
 				Class:  common.ClassNames(edgeClassNoise.Replace(edge.Classes)),
 				Box:    path.Path.Bounds(),
 				Parts:  []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
@@ -526,7 +526,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		}
 		if label.Width > 0 {
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: "flowchart.edge-label", ID: edge.ID,
+				Kind: scene.Text, Role: RoleEdgeLabel, ID: edge.ID,
 				Box:    scene.Rect{X: ce.LabelX - (label.Width+8)/2, Y: ce.LabelY - label.Height/2, W: label.Width + 8, H: label.Height},
 				Parts:  []scene.Part{draw.LabelPatch(label, ce.LabelX, ce.LabelY)},
 				Label:  label,

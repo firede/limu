@@ -309,7 +309,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	var titles, edges, labels, nodes []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "requirement.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: padding + title.Height/2},
 		})
 	}
@@ -319,9 +319,9 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		x, y := cnodes[i].X, cnodes[i].Y
 		left, top := -v.w/2, -v.h/2
 		box := scene.Rect{X: x + left, Y: y + top, W: v.w, H: v.h}
-		role := scene.Role("requirement.element")
+		role := RoleElement
 		if v.node.Requirement != nil {
-			role = "requirement.requirement"
+			role = RoleRequirement
 		}
 		it := scene.Item{
 			Kind: scene.Node, Role: role, Shape: "rect", ID: v.node.ID,
@@ -333,7 +333,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
 			Author: v.author.Style,
 		}
-		texts := []scene.Item{textItem("requirement.kind", &v.kind, scene.Middle, x, y+(top+padY+v.kind.Height/2), style.Muted, v.author)}
+		texts := []scene.Item{textItem(RoleKind, &v.kind, scene.Middle, x, y+(top+padY+v.kind.Height/2), style.Muted, v.author)}
 		if len(v.rows) > 0 {
 			divider := top + v.headHeight
 			it.Parts = append(it.Parts, scene.Part{
@@ -344,8 +344,8 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			for k := range v.rows {
 				r := &v.rows[k]
 				texts = append(texts,
-					textItem("requirement.field", &r.key, scene.Start, x+(left+padX), y+(at+r.key.Height/2), style.Muted, v.author),
-					textItem("requirement.value", &r.value, scene.Start, x+(left+padX+v.keyWidth+columnGap), y+(at+r.value.Height/2), style.Fg, v.author))
+					textItem(RoleField, &r.key, scene.Start, x+(left+padX), y+(at+r.key.Height/2), style.Muted, v.author),
+					textItem(RoleValue, &r.value, scene.Start, x+(left+padX+v.keyWidth+columnGap), y+(at+r.value.Height/2), style.Fg, v.author))
 				at += r.height + rowGap
 			}
 		}
@@ -413,7 +413,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			own.Dash = style.Dashes(5, 4)
 		}
 		it := scene.Item{
-			Kind: scene.Edge, Role: "requirement.relationship", ID: edge.ID,
+			Kind: scene.Edge, Role: RoleRelationship, ID: edge.ID,
 			Box:   path.Path.Bounds(),
 			Parts: []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 			Ends:  path.Ends(start, end),
@@ -424,7 +424,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		}
 		edges = append(edges, it)
 		labels = append(labels, scene.Item{
-			Kind: scene.Text, Role: "requirement.relationship-label", ID: edge.ID,
+			Kind: scene.Text, Role: RoleRelationshipLabel, ID: edge.ID,
 			Box:   scene.Rect{X: labelX - (label.Width+8)/2, Y: labelY - label.Height/2, W: label.Width + 8, H: label.Height},
 			Parts: []scene.Part{draw.LabelPatch(label, labelX, labelY)},
 			Label: label,

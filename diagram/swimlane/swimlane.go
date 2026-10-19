@@ -2,6 +2,12 @@
 // A swimlane diagram is a flowchart whose top-level subgraphs are lanes: it has the
 // flowchart's syntax and model, and is laid out with layout.Lanes, each lane drawn as a band
 // the length of the diagram with its title in a band at its start.
+//
+// A lane has the role swimlane.lane (RoleLane). Everything else is drawn by the flowchart's
+// layout and keeps the flowchart's roles: flowchart.node, flowchart.edge,
+// flowchart.edge-label, flowchart.cluster and flowchart.cluster-title for a subgraph inside
+// a lane, and flowchart.title. A host that styles flowcharts styles a swimlane diagram's
+// nodes and edges the same way.
 package swimlane
 
 import (
@@ -94,7 +100,7 @@ func drawLane(c *layout.CNode, label *text.Label, author style.Author, classes [
 		at = scene.Point{X: left + c.PadTop/2, Y: c.Y}
 	}
 	it := scene.Item{
-		Kind: scene.Group, Role: "swimlane.lane", ID: id, Class: classes, Box: outline,
+		Kind: scene.Group, Role: RoleLane, ID: id, Class: classes, Box: outline,
 		Parts:  []scene.Part{{Box: outline, Paint: scene.StrokeOnly}, {Box: band}},
 		Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted},
 		Author: author.Style,

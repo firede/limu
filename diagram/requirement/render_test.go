@@ -104,9 +104,9 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := 0; i < len(sc.Items); i++ {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "requirement.title":
+		case RoleTitle:
 			text(it, "pele-title", "", "var(--_tw)", it.At.X, it.At.Y)
-		case "requirement.relationship":
+		case RoleRelationship:
 			kind := "arrow"
 			if it.Ends[0].Type == containsMarker {
 				kind = "contains"
@@ -122,14 +122,14 @@ func sceneLines(sc *scene.Scene) []string {
 					lines = append(lines, "m "+markerPart(part.Path)+" "+pen(it, m.Type))
 				}
 			}
-		case "requirement.relationship-label":
+		case RoleRelationshipLabel:
 			if !labels {
 				lines = append(lines, "labels "+num(it.Label.Size))
 				labels = true
 			}
 			lines = append(lines, "label "+peleText(it.ID), "rect "+box(it.Parts[0].Box, 0, 0)+" "+pen(it, ""))
 			text(it, "-", "", "", it.At.X, it.At.Y)
-		case "requirement.requirement", "requirement.element":
+		case RoleRequirement, RoleElement:
 			// Pele draws a box about its middle, which it moves to with a translate. The scene
 			// places its parts where they end up, so the numbers Pele writes are worked out
 			// here as its render.ts works them out, from the sizes of the box and its texts,
@@ -158,7 +158,7 @@ func sceneLines(sc *scene.Scene) []string {
 			place("name", it.At.X, it.At.Y, 0, nameY)
 			text(it, "pele-label", num(it.Label.Size), "var(--_hw)", 0, nameY)
 			var fields []*scene.Item
-			for i+1 < len(sc.Items) && (sc.Items[i+1].Role == "requirement.field" || sc.Items[i+1].Role == "requirement.value") {
+			for i+1 < len(sc.Items) && (sc.Items[i+1].Role == RoleField || sc.Items[i+1].Role == RoleValue) {
 				i++
 				fields = append(fields, &sc.Items[i])
 			}

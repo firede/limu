@@ -633,7 +633,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	var titles, clusters, edges, labels, nodes []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "usecase.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: pad + title.Height/2},
 		})
 	}
@@ -645,7 +645,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		if v.kind == kindBoundary {
 			left, top := x-c.W/2, y-c.H/2
 			it := scene.Item{
-				Kind: scene.Group, Role: "usecase.system", Shape: "rect", ID: n.ID, Class: common.ClassNames(strings.Join(boundaryClasses[n.ID], " ")),
+				Kind: scene.Group, Role: RoleSystem, Shape: "rect", ID: n.ID, Class: common.ClassNames(strings.Join(boundaryClasses[n.ID], " ")),
 				Box:    scene.Rect{X: left, Y: top, W: c.W, H: c.H},
 				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
@@ -681,7 +681,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		var cells []scene.Item
 		switch v.kind {
 		case kindActor:
-			it.Role = "usecase.actor"
+			it.Role = RoleActor
 			it.Shape = "actor"
 			if n.ActorType != "normal" {
 				it.Shape += scene.Shape("-" + n.ActorType)
@@ -701,14 +701,14 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			if !v.stereotype.Empty() {
 				stereotype = &scene.Item{
-					Kind: scene.Text, Role: "usecase.stereotype", ID: n.ID, Label: &v.stereotype,
+					Kind: scene.Text, Role: RoleStereotype, ID: n.ID, Label: &v.stereotype,
 					At:    scene.Point{X: x, Y: y + (top + figureH + figureGap + v.stereotype.Height/2)},
 					Style: style.Style{Text: style.Muted},
 				}
 			}
 			it.At = scene.Point{X: x, Y: y + (h/2 - v.label.Height/2)}
 		case kindJSON:
-			it.Role = "usecase.json"
+			it.Role = RoleJson
 			it.Shape = "table"
 			x0 := -w / 2
 			ry := -h/2 + v.headH
@@ -723,18 +723,18 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				key, value := &v.rows[k][0], &v.rows[k][1]
 				rowH := max(value.Height, jsmath.Round(small*1.5)) + rowPad
 				cells = append(cells, scene.Item{
-					Kind: scene.Text, Role: "usecase.json-key", ID: n.ID, Label: key,
+					Kind: scene.Text, Role: RoleJsonKey, ID: n.ID, Label: key,
 					At:    scene.Point{X: x + (x0 + cellPad + key.Width/2), Y: y + (ry + rowH/2)},
 					Style: style.Style{Text: style.Muted},
 				})
 				cells = append(cells, leftLabel(value, x, y, x0+v.keyW+cellPad, ry+rowH/2, scene.Item{
-					Kind: scene.Text, Role: "usecase.json-value", ID: n.ID,
+					Kind: scene.Text, Role: RoleJsonValue, ID: n.ID,
 					Author: style.Style{Text: v.author.Style.Text},
 				})...)
 				ry += rowH
 			}
 		default:
-			it.Role = "usecase.usecase"
+			it.Role = RoleUsecase
 			switch {
 			case v.kind == kindEllipse:
 				it.Shape = "ellipse"
@@ -752,7 +752,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 					it.Parts = append(it.Parts, scene.Part{Path: slash, Paint: scene.StrokeOnly})
 				}
 			case n.Shape == "note":
-				it.Role = "usecase.note"
+				it.Role = RoleNote
 				it.Shape = "note"
 				it.Style.Fill = style.SurfaceAlt
 				// Pele turns the corners of the note and of its fold round.
@@ -767,7 +767,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			if !v.stereotype.Empty() {
 				stereotype = &scene.Item{
-					Kind: scene.Text, Role: "usecase.stereotype", ID: n.ID, Label: &v.stereotype,
+					Kind: scene.Text, Role: RoleStereotype, ID: n.ID, Label: &v.stereotype,
 					At:    scene.Point{X: x, Y: y + (-v.label.Height / 2)},
 					Style: style.Style{Text: style.Muted},
 				}
@@ -865,9 +865,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		case edge.Animate:
 			own.Dash = style.Dashes(9, 5)
 		}
-		role := scene.Role("usecase.relation")
+		role := RoleRelation
 		if edge.Internal {
-			role = "usecase.note-link"
+			role = RoleNoteLink
 		}
 		it := scene.Item{
 			Kind: scene.Edge, Role: role, Shape: scene.Shape(edge.RelationshipType), ID: edge.ID,
@@ -889,7 +889,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				own.Text = style.Muted
 			}
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: "usecase.label", ID: edge.ID,
+				Kind: scene.Text, Role: RoleEdgeLabel, ID: edge.ID,
 				Box:    scene.Rect{X: lx - (label.Width+8)/2, Y: ly - label.Height/2, W: label.Width + 8, H: label.Height},
 				Parts:  []scene.Part{draw.LabelPatch(label, lx, ly)},
 				Label:  label,

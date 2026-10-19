@@ -25,9 +25,9 @@ func TestDividerTakesOnlyTheStroke(t *testing.T) {
 	found := false
 	for _, it := range sc.Items {
 		switch it.Role {
-		case "class.class":
+		case RoleClass:
 			stroke = it.Author.Stroke
-		case "class.divider":
+		case RoleDivider:
 			found = true
 			_, width := it.Author.StrokeWidth.Get()
 			if !stroke.Set() || it.Author.Stroke != stroke || it.Author.Fill.Set() || width || it.Author.Dash.Set() {
