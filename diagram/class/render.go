@@ -10,6 +10,7 @@ import (
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
 	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -56,9 +57,6 @@ func numberOption(section diagram.Config, key string, fallback float64) float64 
 	}
 	return fallback
 }
-
-// jsRound is JavaScript's Math.round.
-func jsRound(x float64) float64 { return math.Floor(x + 0.5) }
 
 // A line is a member of a class as it is drawn: Pele's Line.
 type line struct {
@@ -109,9 +107,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	graph := BuildGraph(db, Hierarchical(config))
 	hideEmpty, _ := conf["hideEmptyMembersBox"].(bool)
 	size := o.Size()
-	small := jsRound(float64(size * 0.875))
-	tiny := jsRound(float64(size * 0.8))
-	tinyHeight := jsRound(float64(tiny * 1.4))
+	small := jsmath.Round(float64(size * 0.875))
+	tiny := jsmath.Round(float64(size * 0.8))
+	tinyHeight := jsmath.Round(float64(tiny * 1.4))
 	measure := o.Measure()
 	rootDir := layout.Direction(db.Direction)
 	if turned {
@@ -162,8 +160,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		if author.FontSize > 0 {
 			fontSize = author.FontSize
 		}
-		memberSize := jsRound(float64(fontSize * 0.875))
-		lineHeight := jsRound(float64(memberSize * 1.5))
+		memberSize := jsmath.Round(float64(fontSize * 0.875))
+		lineHeight := jsmath.Round(float64(memberSize * 1.5))
 		// The generic type is escaped so that `<T>` is not read as a tag.
 		generic := ""
 		if cls.Type != "" {
@@ -207,7 +205,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			}
 			return emptySection
 		}
-		titleH := 2*titlePad + float64(len(annotations))*tinyHeight + max(label.Height, jsRound(float64(fontSize*1.5)))
+		titleH := 2*titlePad + float64(len(annotations))*tinyHeight + max(label.Height, jsmath.Round(float64(fontSize*1.5)))
 		attributesH := section(len(attributes))
 		return view{
 			node: node, author: author, label: label,
@@ -789,8 +787,8 @@ func oneLine(s string, width, size, lineHeight float64, face text.Face) text.Lab
 func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.Options) []scene.Item {
 	w, h := v.w, v.h
 	left, top := -w/2, -h/2
-	memberSize := jsRound(float64(v.fontSize * 0.875))
-	lineHeight := jsRound(float64(memberSize * 1.5))
+	memberSize := jsmath.Round(float64(v.fontSize * 0.875))
+	lineHeight := jsmath.Round(float64(memberSize * 1.5))
 	box := scene.Rect{X: x + left, Y: y + top, W: w, H: h}
 	parts := []scene.Part{{Box: box, Rounded: true}}
 	first := top + v.titleH

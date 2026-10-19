@@ -10,6 +10,7 @@ import (
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
 	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -125,7 +126,7 @@ func cellText(raw string) string {
 func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
 	graph := BuildGraph(db)
 	size := o.Size()
-	smallSize := jsRound(float64(size * 0.875))
+	smallSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
@@ -207,7 +208,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if author.Italic {
 			face |= text.Italic
 		}
-		nameSize, rowSize, keySize := size, smallSize, jsRound(float64(size*0.75))
+		nameSize, rowSize, keySize := size, smallSize, jsmath.Round(float64(size*0.75))
 		if author.FontSize > 0 {
 			nameSize, rowSize, keySize = author.FontSize, author.FontSize, author.FontSize
 		}
@@ -257,7 +258,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			c.PadBottom = groupPad
 			c.MinW = max(label.Width+2*groupPad-12, minWidth)
 		} else {
-			nameH := max(label.Height, jsRound(float64(nameSize*1.5)))
+			nameH := max(label.Height, jsmath.Round(float64(nameSize*1.5)))
 			if len(node.Attributes) == 0 {
 				v.w = max(label.Width+2*boxPadX, minW)
 				if below {
@@ -266,7 +267,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 					v.h = max(nameH+2*boxPadY, bands+8)
 				}
 			} else {
-				rowLine := jsRound(float64(rowSize * 1.5))
+				rowLine := jsmath.Round(float64(rowSize * 1.5))
 				var widths [4]float64
 				for _, a := range node.Attributes {
 					cells := [4]text.Label{
@@ -505,7 +506,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			// line.
 			dx := math.Abs(r[len(r)-3] - r[0])
 			dy := math.Abs(r[len(r)-2] - r[1])
-			direct := len(r) == 6 && (dx < 0.01 || dy < 0.01 || jsHypot(dx, dy) <= 3*markerLength)
+			direct := len(r) == 6 && (dx < 0.01 || dy < 0.01 || jsmath.Hypot(dx, dy) <= 3*markerLength)
 			stub := 0.0
 			if !direct {
 				stub = markerLength
@@ -598,7 +599,7 @@ func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.
 		return []scene.Item{it}
 	}
 	it.At.Y = y + (y0 + v.headH/2)
-	rowLine := jsRound(float64(v.rowSize * 1.5))
+	rowLine := jsmath.Round(float64(v.rowSize * 1.5))
 	textStyle := style.Style{Text: v.author.Style.Text, Opacity: v.author.Style.Opacity}
 	var cells []scene.Item
 	top := y0 + v.headH
@@ -750,10 +751,10 @@ func inset(route []float64, at int, v *view, c *layout.CNode) {
 	dx := route[at] - c.X
 	dy := route[at+1] - c.Y
 	if c.W != v.w && math.Abs(math.Abs(dx)-c.W/2) < 0.5 {
-		route[at] -= jsSign(dx) * (c.W - v.w) / 2
+		route[at] -= jsmath.Sign(dx) * (c.W - v.w) / 2
 	}
 	if c.H != v.h && math.Abs(math.Abs(dy)-c.H/2) < 0.5 {
-		route[at+1] -= jsSign(dy) * (c.H - v.h) / 2
+		route[at+1] -= jsmath.Sign(dy) * (c.H - v.h) / 2
 	}
 }
 
@@ -778,50 +779,4 @@ func trimDefault(classes string) string {
 
 func hasClass(classes []string, name string) bool {
 	return slices.Contains(classes, name)
-}
-
-// jsRound is Math.round: halves round up.
-func jsRound(x float64) float64 {
-	r := math.Floor(x)
-	if x-r >= 0.5 {
-		r++
-	}
-	return r
-}
-
-// jsSign is Math.sign.
-func jsSign(x float64) float64 {
-	switch {
-	case x > 0:
-		return 1
-	case x < 0:
-		return -1
-	}
-	return x
-}
-
-// jsHypot is Math.hypot of two numbers as V8 works it out, as draw's is: each is divided by
-// the larger, their squares are summed with Kahan's compensation, and the root is scaled
-// back.
-func jsHypot(a, b float64) float64 {
-	a, b = math.Abs(a), math.Abs(b)
-	if math.IsInf(a, 0) || math.IsInf(b, 0) {
-		return math.Inf(1)
-	}
-	if math.IsNaN(a) || math.IsNaN(b) {
-		return math.NaN()
-	}
-	m := max(a, b)
-	if m == 0 {
-		return 0
-	}
-	var sum, comp float64
-	for _, v := range [2]float64{a, b} {
-		n := v / m
-		summand := float64(n*n) - comp
-		prelim := sum + summand
-		comp = (prelim - sum) - summand
-		sum = prelim
-	}
-	return math.Sqrt(sum) * m
 }

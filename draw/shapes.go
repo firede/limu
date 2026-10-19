@@ -15,6 +15,7 @@ package draw
 import (
 	"math"
 
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/scene"
 )
 
@@ -848,4 +849,4 @@ func (p *pen) Z() *pen {
 func (p *pen) done(paint scene.Painting) { p.d.add(scene.Part{Path: p.p}, paint) }
 
 // r2 is a number to hundredths, as Pele's num writes it.
-func r2(v float64) float64 { return jsRound(float64(v*100)) / 100 }
+func r2(v float64) float64 { return jsmath.Round(float64(v*100)) / 100 }

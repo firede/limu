@@ -1,6 +1,10 @@
 package draw
 
-import "math"
+import (
+	"math"
+
+	"github.com/firede/limu/internal/jsmath"
+)
 
 // Crossings are the x of every route point, by its y rounded: the edges that cross a
 // cluster's top border. It is Pele's Crossings.
@@ -10,7 +14,7 @@ type Crossings map[float64][]float64
 // does.
 func MarkCrossings(c Crossings, route []float64) {
 	for k := 0; k+1 < len(route); k += 3 {
-		key := jsRound(route[k+1])
+		key := jsmath.Round(route[k+1])
 		c[key] = append(c[key], route[k])
 	}
 }
@@ -27,7 +31,7 @@ func ClusterTitleX(c Node, width float64, crossings Crossings, pad float64) floa
 	left := c.X - c.W/2
 	half := width / 2
 	candidates := [3]float64{left + pad - 6 + half, c.X, left + c.W - pad + 6 - half}
-	xs, ok := crossings[jsRound(top)]
+	xs, ok := crossings[jsmath.Round(top)]
 	if !ok {
 		return candidates[0]
 	}
@@ -55,7 +59,7 @@ func TitleCrossed(c Node, width, x float64, crossings Crossings) bool {
 	if !(width > 0) {
 		return false
 	}
-	xs, ok := crossings[jsRound(c.Y-c.H/2)]
+	xs, ok := crossings[jsmath.Round(c.Y-c.H/2)]
 	if !ok {
 		return false
 	}

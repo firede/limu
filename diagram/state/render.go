@@ -8,6 +8,7 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -159,7 +160,7 @@ func classNames(raw string) []string {
 func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
 	graph := db.Graph
 	size := o.Size()
-	small := jsRound(size * 0.875)
+	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()
 	wrapWidth := numberOption(config, "wrappingWidth", 200)
 	const pad = padding
@@ -590,7 +591,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	for _, e := range cedges {
 		route := e.Route
 		for k := 3; k < len(route)-3; k += 3 {
-			key := jsRound(route[k+1])
+			key := jsmath.Round(route[k+1])
 			crossings[key] = append(crossings[key], route[k])
 		}
 	}
@@ -814,7 +815,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			if math.Abs(math.Abs(delta)-extent/2) >= 0.5 {
 				continue
 			}
-			route[at+axis] -= float64(jsSign(delta)*(extent-drawnExtent)) / 2
+			route[at+axis] -= float64(jsmath.Sign(delta)*(extent-drawnExtent)) / 2
 			if isBar && breadth > drawnExtent {
 				route[at+1-axis] = clamp(route[other+1-axis], cross-breadth/2+6, cross+breadth/2-6)
 			}
@@ -861,7 +862,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			}
 			spread := max(min(along-4, float64(8+k*6)), 2)
 			reach := float64(loop + k*8)
-			trim := endType.Trim() / jsOr1(jsHypot(reach, spread))
+			trim := endType.Trim() / jsmath.Or1(jsmath.Hypot(reach, spread))
 			// Offsets are given for a loop on the right and turned a quarter for one below.
 			px := func(dx, dy float64) float64 {
 				if side {
@@ -881,7 +882,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				px(reach*trim, spread+float64(spread*trim)), py(reach*trim, spread+float64(spread*trim)))
 			path = draw.EdgePath{Path: p, EX: px(0, spread), EY: py(0, spread),
 				EDX: px(-reach, -spread) - px(0, 0), EDY: py(-reach, -spread) - py(0, 0)}
-			length := jsOr1(jsHypot(path.EDX, path.EDY))
+			length := jsmath.Or1(jsmath.Hypot(path.EDX, path.EDY))
 			path.EDX /= length
 			path.EDY /= length
 			// Labels stack beyond the outermost loop, in the order of their transitions.
@@ -1038,7 +1039,7 @@ func move(it *scene.Item, dx, dy float64) {
 // titleX picks where a composite's title sits in its title bar so that edges entering from
 // above do not cross it, as Pele's titleX does.
 func titleX(c *layout.CNode, width float64, crossings map[float64][]float64) float64 {
-	xs, ok := crossings[jsRound(c.Y-c.H/2)]
+	xs, ok := crossings[jsmath.Round(c.Y-c.H/2)]
 	if !ok || width == 0 {
 		return c.X
 	}

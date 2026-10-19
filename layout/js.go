@@ -38,30 +38,3 @@ func toInt32(x float64) int {
 	t := math.Mod(math.Trunc(x), 1<<32)
 	return int(int32(uint32(int64(t))))
 }
-
-// hypot is V8's Math.hypot for two numbers, which sums the squares of the two scaled by the
-// larger, with Kahan's compensation, and is not always Go's math.Hypot to the last bit.
-func hypot(a, b float64) float64 {
-	if math.IsInf(a, 0) || math.IsInf(b, 0) {
-		return math.Inf(1)
-	}
-	if math.IsNaN(a) || math.IsNaN(b) {
-		return math.NaN()
-	}
-	a = math.Abs(a)
-	b = math.Abs(b)
-	most := max(a, b)
-	if most == 0 {
-		return 0
-	}
-	sum := 0.0
-	compensation := 0.0
-	for _, v := range [2]float64{a, b} {
-		n := v / most
-		summand := float64(n*n) - compensation
-		preliminary := sum + summand
-		compensation = (preliminary - sum) - summand
-		sum = preliminary
-	}
-	return math.Sqrt(sum) * most
-}

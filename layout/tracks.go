@@ -3,6 +3,8 @@ package layout
 import (
 	"math"
 	"slices"
+
+	"github.com/firede/limu/internal/jsmath"
 )
 
 // assignTracks gives every piece that does not run straight down a track across its gap, and
@@ -217,7 +219,7 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 				dx := line[2*j+2] - line[2*j]
 				dy := line[2*j+3] - line[2*j+1]
 				t := math.Max(0, math.Min(1, (float64((px-line[2*j])*dx)+float64((py-line[2*j+1])*dy))/or(float64(dx*dx)+float64(dy*dy), 1)))
-				d := hypot(px-line[2*j]-float64(t*dx), py-line[2*j+1]-float64(t*dy))
+				d := jsmath.Hypot(px-line[2*j]-float64(t*dx), py-line[2*j+1]-float64(t*dy))
 				if d < least {
 					least = d
 				}

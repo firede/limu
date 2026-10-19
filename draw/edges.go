@@ -1,10 +1,11 @@
 package draw
 
 import (
-	"github.com/firede/limu/layout"
 	"math"
 	"slices"
 
+	"github.com/firede/limu/internal/jsmath"
+	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/text"
 )
@@ -136,12 +137,12 @@ func RoutePath(route []float64, curve string, startTrim, endTrim, startReach, en
 	unit := func(i, j int, axis float64) (float64, float64) {
 		if !straight(max(i, j)) {
 			if axis == 0 {
-				return 0, jsSignOr1(ys[j] - ys[i])
+				return 0, jsmath.SignOr1(ys[j] - ys[i])
 			}
-			return jsSignOr1(xs[j] - xs[i]), 0
+			return jsmath.SignOr1(xs[j] - xs[i]), 0
 		}
 		dx, dy := xs[j]-xs[i], ys[j]-ys[i]
-		l := jsOr1(jsHypot(dx, dy))
+		l := jsmath.Or1(jsmath.Hypot(dx, dy))
 		return dx / l, dy / l
 	}
 	sdx, sdy := unit(0, 1, axes[1])
@@ -209,9 +210,9 @@ func RoutePath(route []float64, curve string, startTrim, endTrim, startReach, en
 			k := float64(math.Abs(run) * layout.Ease(across, run))
 			var ux, uy float64
 			if down {
-				uy = float64(jsSign(run) * k)
+				uy = float64(jsmath.Sign(run) * k)
 			} else {
-				ux = float64(jsSign(run) * k)
+				ux = float64(jsmath.Sign(run) * k)
 			}
 			p.CubeTo(atX+ux, atY+uy, x-ux, y-uy, x, y)
 			atX, atY = x, y
@@ -266,7 +267,7 @@ func LoopPath(cx, cy, w, h float64, k int, sideways bool, base, trim, labelW, la
 	}
 	spread := min(half-4, 8+float64(kf*6))
 	reach := base + float64(kf*8)
-	l := jsOr1(jsHypot(reach, spread))
+	l := jsmath.Or1(jsmath.Hypot(reach, spread))
 	// Local frame: out points away from the node, along runs along its side.
 	at := func(out, along float64) (float64, float64) {
 		if sideways {

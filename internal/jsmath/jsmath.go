@@ -1,11 +1,12 @@
-package state
+// Package jsmath is the arithmetic of JavaScript where Go's differs from it, for code ported
+// from Pele that must come out as Pele's does to the last bit.
+package jsmath
 
 import "math"
 
-// The arithmetic of JavaScript where Go's differs from it.
-
-// jsRound is Math.round: the nearest integer, halves up.
-func jsRound(x float64) float64 {
+// Round is Math.round: the nearest integer, halves up. It is not math.Floor(x+0.5), which
+// rounds 0.49999999999999994 up, as the sum is 1.
+func Round(x float64) float64 {
 	r := math.Floor(x)
 	if x-r >= 0.5 {
 		r++
@@ -13,8 +14,8 @@ func jsRound(x float64) float64 {
 	return r
 }
 
-// jsSign is Math.sign: -1, 1, or x itself when it is zero, of either sign, or NaN.
-func jsSign(x float64) float64 {
+// Sign is Math.sign: -1, 1, or x itself when it is zero, of either sign, or NaN.
+func Sign(x float64) float64 {
 	switch {
 	case x > 0:
 		return 1
@@ -24,18 +25,21 @@ func jsSign(x float64) float64 {
 	return x
 }
 
-// jsOr1 is x || 1.
-func jsOr1(x float64) float64 {
+// Or1 is x || 1.
+func Or1(x float64) float64 {
 	if x == 0 || math.IsNaN(x) {
 		return 1
 	}
 	return x
 }
 
-// jsHypot is Math.hypot of two numbers as V8 works it out, which is not always math.Hypot's
+// SignOr1 is Math.sign(x) || 1.
+func SignOr1(x float64) float64 { return Or1(Sign(x)) }
+
+// Hypot is Math.hypot of two numbers as V8 works it out, which is not always math.Hypot's
 // last bit: each is divided by the larger, their squares are summed with Kahan's
 // compensation, and the root is scaled back.
-func jsHypot(a, b float64) float64 {
+func Hypot(a, b float64) float64 {
 	a, b = math.Abs(a), math.Abs(b)
 	if math.IsInf(a, 0) || math.IsInf(b, 0) {
 		return math.Inf(1)

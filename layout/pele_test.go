@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/internal/fixture"
+	"github.com/firede/limu/internal/jsmath"
 )
 
 // The fixture is what Pele makes of the same graphs; ./scripts/oracle.sh writes it.
@@ -236,8 +237,8 @@ func TestEaseMatchesPele(t *testing.T) {
 
 func TestHypotMatchesV8(t *testing.T) {
 	for _, c := range loadPele(t).Hypot {
-		if got := hypot(float64(c.A), float64(c.B)); !same(got, c.Hypot) {
-			t.Errorf("hypot(%v, %v) = %v, Math.hypot %v", c.A, c.B, got, c.Hypot)
+		if got := jsmath.Hypot(float64(c.A), float64(c.B)); !same(got, c.Hypot) {
+			t.Errorf("jsmath.Hypot(%v, %v) = %v, Math.hypot %v", c.A, c.B, got, c.Hypot)
 		}
 	}
 }

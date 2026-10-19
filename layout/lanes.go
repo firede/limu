@@ -3,6 +3,8 @@ package layout
 import (
 	"math"
 	"slices"
+
+	"github.com/firede/limu/internal/jsmath"
 )
 
 // The lane layout is Pele's layout/lanes.ts: swimlanes. Every top-level group is a lane, a
@@ -233,7 +235,7 @@ func Lanes(nodes []CNode, edges []CEdge, dir Dir, opt LayeredOptions, lanePad fl
 					next++
 					RANK[d] = r
 					// The edge crosses from its first lane to its last one evenly along the way.
-					LANE[d] = LANE[a] + int(mathRound(float64((LANE[b]-LANE[a])*(r-ra))/float64(rb-ra)))
+					LANE[d] = LANE[a] + int(jsmath.Round(float64((LANE[b]-LANE[a])*(r-ra))/float64(rb-ra)))
 					DUMMY[d] = true
 					if r == labelRank {
 						SIZE[d] = e.LabelW
@@ -746,7 +748,7 @@ func Lanes(nodes []CNode, edges []CEdge, dir Dir, opt LayeredOptions, lanePad fl
 					continue
 				}
 				ac, bc, aa, ba := C[a], C[b], amid(a), amid(b)
-				dc, da := jsSign(bc-ac), jsSign(ba-aa)
+				dc, da := jsmath.Sign(bc-ac), jsmath.Sign(ba-aa)
 				attempt := func(pts []float64, margin float64) bool {
 					for p := 2; p < len(pts); p += 2 {
 						if !clear(min(pts[p-2], pts[p])-margin, min(pts[p-1], pts[p+1])-margin,
@@ -850,7 +852,7 @@ func Lanes(nodes []CNode, edges []CEdge, dir Dir, opt LayeredOptions, lanePad fl
 						if math.Abs(ch-ac) < SIZE[a]/2+4 || math.Abs(ch-bc) < SIZE[b]/2+4 {
 							continue
 						}
-						pts := []float64{ac + jsSign(ch-ac)*SIZE[a]/2, aa, ch, aa, ch, ba, bc + jsSign(ch-bc)*SIZE[b]/2, ba}
+						pts := []float64{ac + jsmath.Sign(ch-ac)*SIZE[a]/2, aa, ch, aa, ch, ba, bc + jsmath.Sign(ch-bc)*SIZE[b]/2, ba}
 						cost := float64(float64(meets(px(pts[0], pts[1]), py(pts[0], pts[1]), ei)+meets(px(pts[6], pts[7]), py(pts[6], pts[7]), ei)) * 1e6)
 						for p := 2; p < len(pts); p += 2 {
 							x0, y0 := px(pts[p-2], pts[p-1]), py(pts[p-2], pts[p-1])
@@ -929,24 +931,4 @@ func border(from, to *CNode) (float64, float64) {
 	}
 	scale := min(pick(dx != 0, hw/math.Abs(dx), math.Inf(1)), pick(dy != 0, hh/math.Abs(dy), math.Inf(1)))
 	return from.X + float64(dx*scale), from.Y + float64(dy*scale)
-}
-
-// jsSign is JavaScript's Math.sign: -1, 0 or 1, and NaN for NaN.
-func jsSign(x float64) float64 {
-	switch {
-	case x > 0:
-		return 1
-	case x < 0:
-		return -1
-	}
-	return x
-}
-
-// mathRound is JavaScript's Math.round: the nearest whole number, halves rounded up.
-func mathRound(x float64) float64 {
-	r := math.Floor(x)
-	if x-r >= 0.5 {
-		r++
-	}
-	return r
 }

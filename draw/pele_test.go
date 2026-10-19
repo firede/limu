@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/internal/fixture"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/text"
@@ -282,8 +283,8 @@ func TestTitlesMatchPele(t *testing.T) {
 
 func TestHypotMatchesV8(t *testing.T) {
 	for _, c := range loadPele(t).Hypot {
-		if got := jsHypot(c[0], c[1]); got != c[2] {
-			t.Errorf("jsHypot(%v, %v) = %v, V8 %v", c[0], c[1], got, c[2])
+		if got := jsmath.Hypot(c[0], c[1]); got != c[2] {
+			t.Errorf("jsmath.Hypot(%v, %v) = %v, V8 %v", c[0], c[1], got, c[2])
 		}
 	}
 }

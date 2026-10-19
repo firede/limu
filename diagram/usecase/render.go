@@ -8,6 +8,7 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
@@ -89,40 +90,6 @@ func literal(s string) string {
 		}
 	}
 	return b.String()
-}
-
-// jsRound is Math.round: the nearest integer, halves up.
-func jsRound(x float64) float64 {
-	r := math.Floor(x)
-	if x-r >= 0.5 {
-		r++
-	}
-	return r
-}
-
-// jsHypot is Math.hypot of two numbers as V8 works it out: each is divided by the larger,
-// their squares are summed with Kahan's compensation, and the root is scaled back.
-func jsHypot(a, b float64) float64 {
-	a, b = math.Abs(a), math.Abs(b)
-	if math.IsInf(a, 0) || math.IsInf(b, 0) {
-		return math.Inf(1)
-	}
-	if math.IsNaN(a) || math.IsNaN(b) {
-		return math.NaN()
-	}
-	m := max(a, b)
-	if m == 0 {
-		return 0
-	}
-	var sum, comp float64
-	for _, v := range [2]float64{a, b} {
-		n := v / m
-		summand := float64(n*n) - comp
-		prelim := sum + summand
-		comp = (prelim - sum) - summand
-		sum = prelim
-	}
-	return math.Sqrt(sum) * m
 }
 
 // anchor is the point of a node's outline on one of its four sides (0 top, 1 right, 2
@@ -364,7 +331,7 @@ func figure(v *view, fx, fy float64) (parts []scene.Part, picture *scene.Picture
 // middle, unless edges enter through the top there, and then in the stretch between them
 // that is nearest the middle, or the widest if none has room.
 func titleX(c *layout.CNode, width float64, crossings draw.Crossings) float64 {
-	xs, ok := crossings[jsRound(c.Y-c.H/2)]
+	xs, ok := crossings[jsmath.Round(c.Y-c.H/2)]
 	if width == 0 || !ok {
 		return c.X
 	}
@@ -409,8 +376,8 @@ func titleX(c *layout.CNode, width float64, crossings draw.Crossings) float64 {
 func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
 	graph := BuildGraph(m)
 	size := o.Size()
-	small := jsRound(size * 0.875)
-	tiny := jsRound(size * 0.8125)
+	small := jsmath.Round(size * 0.875)
+	tiny := jsmath.Round(size * 0.8125)
 	measure := o.Measure()
 	const pad = common.Padding
 	rootDir := layout.Direction(m.Direction)
@@ -503,14 +470,14 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				v.rows = append(v.rows, [2]text.Label{key, value})
 				v.keyW = max(v.keyW, key.Width)
 				valueW = max(valueW, value.Width)
-				v.h += max(value.Height, jsRound(small*1.5)) + rowPad
+				v.h += max(value.Height, jsmath.Round(small*1.5)) + rowPad
 			}
 			// The root of an empty object has a value and no key, and then there is no key
 			// column.
 			if v.keyW > 0 {
 				v.keyW += 2 * cellPad
 			}
-			v.headH = max(v.label.Height, jsRound(fontSize*1.5)) + rowPad
+			v.headH = max(v.label.Height, jsmath.Round(fontSize*1.5)) + rowPad
 			rowsW := 0.0
 			if len(v.rows) > 0 {
 				rowsW = v.keyW + valueW + 2*cellPad
@@ -729,7 +696,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			it.At = scene.Point{X: x, Y: y + (-h/2 + v.headH/2)}
 			for k := range v.rows {
 				key, value := &v.rows[k][0], &v.rows[k][1]
-				rowH := max(value.Height, jsRound(small*1.5)) + rowPad
+				rowH := max(value.Height, jsmath.Round(small*1.5)) + rowPad
 				cells = append(cells, scene.Item{
 					Kind: scene.Text, Role: "usecase.json-key", ID: n.ID, Label: key,
 					At:    scene.Point{X: x + (x0 + cellPad + key.Width/2), Y: y + (ry + rowH/2)},
@@ -817,7 +784,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			reach := float64(loop + k*8)
 			ax, ay := anchor(v, c, side, -spread)
 			bx, by := anchor(v, c, side, spread)
-			l := jsHypot(reach, spread)
+			l := jsmath.Hypot(reach, spread)
 			if l == 0 {
 				l = 1
 			}
