@@ -136,6 +136,14 @@ units, `\s` and `trim` with Unicode's spaces, `Math.round`'s halves and V8's `Ma
 (`internal/jsmath`), and products kept apart from the sums they are in, as Go on arm64
 would fuse them into one multiply-add that JavaScript never does.
 
+The charts' trigonometry is V8's too. `jsmath.Sin`, `Cos`, `Atan2`, `Acos` and `Log10` are
+ported from the fdlibm functions in V8's `src/base/ieee754.cc`, with their products fused
+where clang fuses them when it builds Node for arm64; Go's `math` package gives other last
+bits for a good share of inputs, and so does a V8 built without fused multiply-adds, as on
+x86-64. V8's `Math.pow` calls the C library's `pow`, which is not the same on every
+platform; `jsmath.Pow` rounds correctly, as Apple's `pow`, which Node calls on macOS, does
+for every power Pele takes but misses by an ulp in about one result in a thousand.
+
 What the diagrams share beyond layout and drawing is in `diagram/internal/common`, as Pele
 keeps it in `diagrams/common`: the padding about a diagram, fitting it to the host's width,
 reading generic types, and the title above it.
