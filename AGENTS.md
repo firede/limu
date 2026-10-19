@@ -21,10 +21,12 @@ docs/design.md first: it says what each stage owns and why style is kept out of 
   in UTF-16 code units, `\s` and `trim` with Unicode's spaces (`text/js.go`), `Math.round`
   rounding halves up, the order floating-point sums are taken in. Regular expressions are
   written out by hand, with the backtracking they would do.
-- Every ported stage is checked against Pele. Add cases to `internal/oracle/cases`, teach
-  `internal/oracle/run.mjs` to run them, run `./scripts/oracle.sh <pele>`, and compare
-  with the fixture in the package's `testdata/pele`. Compare numbers exactly; a difference
-  in the last bit is a difference in the port.
+- Every ported stage is checked against Pele. A suite in `internal/oracle/suites` (a module
+  whose default export is given helpers to import Pele's sources, read cases from
+  `internal/oracle/cases` and write fixtures) writes what Pele makes of the cases;
+  `./scripts/oracle.sh <pele> [suite…]` runs suites, and the package's tests compare with
+  the fixture in its `testdata/pele`. Compare numbers exactly; a difference in the last bit
+  is a difference in the port.
 - The port follows Pele 1.6.0, commit 44da152. To follow a newer Pele, write the fixtures
   anew from it and port what its diff changed.
 
