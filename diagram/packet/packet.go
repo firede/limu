@@ -9,7 +9,6 @@ package packet
 
 import (
 	"math"
-	"strings"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/internal/chars"
@@ -120,22 +119,9 @@ func buildPacket(tree *ast, config diagram.Config, title string) (*Model, error)
 		m.AccTitle = chars.TrimStart(tree.accTitle)
 	}
 	if tree.accDescr != "" {
-		m.AccDescr = dropIndents(tree.accDescr)
+		m.AccDescr = chars.DropIndents(tree.accDescr)
 	}
 	return m, nil
-}
-
-// dropIndents is s.replace(/\n\s+/g, '\n'): the white space after each line feed taken off,
-// with the line breaks in it.
-func dropIndents(s string) string {
-	var b strings.Builder
-	for i := 0; i < len(s); i++ {
-		b.WriteByte(s[i])
-		if s[i] == '\n' {
-			i = spaceEnd(s, i+1) - 1
-		}
-	}
-	return b.String()
 }
 
 // Parse parses a packet diagram's text, as the parse of Pele's packet diagram does: source is

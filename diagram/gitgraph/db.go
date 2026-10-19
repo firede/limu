@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/internal/chars"
@@ -379,28 +378,7 @@ func Build(ast *AST, config diagram.Config, title string) (m *Model, err error) 
 		m.AccTitle = chars.TrimStart(*ast.AccTitle)
 	}
 	if ast.AccDescr != nil {
-		m.AccDescr = dropIndents(*ast.AccDescr)
+		m.AccDescr = chars.DropIndents(*ast.AccDescr)
 	}
 	return m, nil
-}
-
-// dropIndents is text.replace(/\n\s+/g, '\n'): the white space after each line feed goes,
-// line breaks in it too.
-func dropIndents(text string) string {
-	if !strings.Contains(text, "\n") {
-		return text
-	}
-	var b strings.Builder
-	for i := 0; i < len(text); {
-		if text[i] == '\n' {
-			if e := chars.SpaceRun(text, i+1); e > i+1 {
-				b.WriteByte('\n')
-				i = e
-				continue
-			}
-		}
-		b.WriteByte(text[i])
-		i++
-	}
-	return b.String()
 }

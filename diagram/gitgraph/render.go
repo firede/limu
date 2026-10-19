@@ -108,7 +108,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 		if !showBranches {
 			name = ""
 		}
-		names[i] = plainLabel(name, measure, medium, 4000)
+		names[i] = common.PlainLabel(name, measure, medium, 4000, 0)
 	}
 
 	commits := slices.Clone(m.Commits)
@@ -119,13 +119,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 		labelled := showCommitLabel && c.Type != CherryPick && (c.Type != MergeType || c.CustomID != nil && *c.CustomID)
 		var tags []text.Label
 		for _, tag := range c.Tags {
-			if l := plainLabel(tag, measure, small, 4000); len(l.Lines) > 0 {
+			if l := common.PlainLabel(tag, measure, small, 4000, 0); len(l.Lines) > 0 {
 				tags = append(tags, l)
 			}
 		}
 		v := &view{commit: c, index: len(views), lane: laneOf[c.Branch], tags: tags}
 		if labelled {
-			l := plainLabel(c.ID, measure, small, 4000)
+			l := common.PlainLabel(c.ID, measure, small, 4000, 0)
 			v.label = &l
 		}
 		views = append(views, v)

@@ -1,6 +1,9 @@
 package timeline
 
-import "github.com/firede/limu/internal/chars"
+import (
+	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/internal/chars"
+)
 
 // The types of token, in the order of Pele's T.
 const (
@@ -30,19 +33,17 @@ var tokenNames = [...]string{
 }
 
 // tokenize splits a timeline diagram's text into tokens, as Pele's tokenize does.
-func tokenize(src string) *tokens {
+func tokenize(src string) *common.JisonTokens {
 	n := len(src)
-	out := &tokens{}
+	out := &common.JisonTokens{}
 	p := 0
 	emit := func(typ, e int) {
-		out.types = append(out.types, typ)
-		out.texts = append(out.texts, src[p:e])
-		out.starts = append(out.starts, p)
+		out.Emit(typ, src, p, e)
 		p = e
 	}
 
 	for {
-		p = skipTrivia(src, p)
+		p = common.SkipTrivia(src, p)
 		if p >= n {
 			break
 		}
@@ -55,13 +56,13 @@ func tokenize(src string) *tokens {
 			emit(tNEWLINE, e)
 			continue
 		}
-		if keywordAt(src, p, "timeline") {
+		if common.KeywordAt(src, p, "timeline") {
 			e = p + 8
 			for e < n && (src[e] == 32 || src[e] == 9) {
 				e++
 			}
-			lr := keywordAt(src, e, "lr")
-			if e > p+8 && (lr || keywordAt(src, e, "td")) && !chars.IsWord(chars.Unit(src, e+2)) {
+			lr := common.KeywordAt(src, e, "lr")
+			if e > p+8 && (lr || common.KeywordAt(src, e, "td")) && !chars.IsWord(chars.Unit(src, e+2)) {
 				if lr {
 					emit(tTimelineLR, e+2)
 				} else {
@@ -76,17 +77,17 @@ func tokenize(src string) *tokens {
 		}
 		// `\s` after a keyword also takes a line break, so `title` alone on a line takes the
 		// next line as its text.
-		if keywordAt(src, p, "title") {
+		if common.KeywordAt(src, p, "title") {
 			if s, size := chars.UnitAt(src, p+5); chars.IsSpace(s) && p+5+size < n && src[p+5+size] != 10 {
-				emit(tTitle, lineEnd(src, p+5+size))
+				emit(tTitle, common.LineEnd(src, p+5+size))
 				continue
 			}
 		}
-		if e = accessibility(src, p, out, tAccTitle); e != p {
+		if e = common.Accessibility(src, p, out, tAccTitle); e != p {
 			p = e
 			continue
 		}
-		if keywordAt(src, p, "section") {
+		if common.KeywordAt(src, p, "section") {
 			if s, size := chars.UnitAt(src, p+7); chars.IsSpace(s) {
 				from := p + 7 + size
 				e = from
@@ -126,7 +127,7 @@ func tokenize(src string) *tokens {
 
 	// Jison marks its lexer done when a rule runs on empty input, so an accessibility value
 	// that matches nothing at the very end of the text is followed by no EOF token.
-	if len(out.starts) == 0 || out.starts[len(out.starts)-1] < n {
+	if len(out.Starts) == 0 || out.Starts[len(out.Starts)-1] < n {
 		emit(tEOF, n)
 	}
 	emit(tEND, n)

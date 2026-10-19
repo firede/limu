@@ -4,9 +4,11 @@ import (
 	"strconv"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 )
 
-// The kinds of token, by index in packetTokens, as Pele's T.
+// The kinds of token, by index in packetTokens, as Pele's T, and those of the hidden types
+// after them.
 const (
 	tPacketBeta = iota
 	tPacket
@@ -19,51 +21,31 @@ const (
 	tInt
 	tString
 	tNewline
+	tWhitespace
+	tYAML
 )
 
-// intToken is the table's INT, /0|[1-9][0-9]*(?!\.)/y: a lone 0, or digits not followed by a
-// dot, which gives back the last digit rather than fail when they are.
-var intToken = tokenType{name: "INT", anyFirst: true, match: func(s string, at int) int {
-	switch {
-	case s[at] == '0':
-		return at + 1
-	case s[at] < '1' || s[at] > '9':
-		return -1
-	}
-	end := at + 1
-	for end < len(s) && s[end] >= '0' && s[end] <= '9' {
-		end++
-	}
-	if end < len(s) && s[end] == '.' {
-		if end-1 > at {
-			return end - 1
-		}
-		return -1
-	}
-	return end
-}}
-
 // packetTokens is Pele's PACKET_TOKENS.
-var packetTokens = []tokenType{
-	{name: "packet-beta", literal: "packet-beta"},
-	keyword("packet"),
+var packetTokens = []common.TokenType{
+	{Name: "packet-beta", Literal: "packet-beta"},
+	common.Keyword("packet"),
 	// A front matter block also starts with dashes, so Langium lets it win over a dash.
-	{name: "-", literal: "-", longer: []int{12}},
-	{name: "+", literal: "+"},
-	{name: ":", literal: ":"},
-	accDescrToken,
-	accTitleToken,
-	titleToken,
-	intToken,
-	stringToken,
-	newlineToken,
-	whitespaceToken,
-	yamlToken,
-	directiveToken,
-	commentToken,
+	{Name: "-", Literal: "-", Longer: []int{tYAML}},
+	{Name: "+", Literal: "+"},
+	{Name: ":", Literal: ":"},
+	common.AccDescrToken,
+	common.AccTitleToken,
+	common.TitleToken,
+	common.IntToken,
+	common.StringToken,
+	common.NewlineToken,
+	common.WhitespaceToken,
+	common.YAMLToken,
+	common.DirectiveToken,
+	common.CommentToken,
 }
 
-var packetTable = prepare(packetTokens)
+var packetTable = common.Prepare(packetTokens)
 
 // blockAst is Pele's PacketBlockAst; a number Pele leaves undefined has its Has field unset.
 type blockAst struct {
@@ -88,7 +70,7 @@ func number(digits string) float64 {
 
 // parsePacket parses a packet diagram's text into its tree, as Pele's parsePacket does.
 func parsePacket(src string) (tree *ast, err error) {
-	toks, err := tokenize(src, packetTokens, packetTable, "packet")
+	toks, err := common.Tokenize(src, packetTable, "packet")
 	if err != nil {
 		return nil, err
 	}
@@ -101,56 +83,56 @@ func parsePacket(src string) (tree *ast, err error) {
 			tree, err = nil, de
 		}
 	}()
-	r := &reader{toks: toks, types: packetTokens, typ: "packet"}
+	r := &common.Reader{Tokens: toks, Types: packetTokens, Diagram: "packet"}
 	tree = &ast{}
 
 	endOfLine := func() {
-		if r.kind() == -1 {
+		if r.Kind() == -1 {
 			return
 		}
-		if r.kind() != tNewline {
-			r.fail("a line break or the end of input")
+		if r.Kind() != tNewline {
+			r.Fail("a line break or the end of input")
 		}
-		for r.kind() == tNewline {
-			r.i++
+		for r.Kind() == tNewline {
+			r.I++
 		}
 	}
 
-	for r.kind() == tNewline {
-		r.i++
+	for r.Kind() == tNewline {
+		r.I++
 	}
-	if !r.accept(tPacketBeta) {
-		r.expect(tPacket)
+	if !r.Accept(tPacketBeta) {
+		r.Expect(tPacket)
 	}
-	for r.kind() != -1 {
-		switch r.kind() {
+	for r.Kind() != -1 {
+		switch r.Kind() {
 		case tNewline:
-			r.i++
+			r.I++
 		case tAccDescr:
-			tree.accDescr, tree.hasAccDescr = accDescrValue(r.take()), true
+			tree.accDescr, tree.hasAccDescr = common.AccDescrValue(r.Take()), true
 			endOfLine()
 		case tAccTitle:
-			tree.accTitle, tree.hasAccTitle = accTitleValue(r.take()), true
+			tree.accTitle, tree.hasAccTitle = common.AccTitleValue(r.Take()), true
 			endOfLine()
 		case tTitle:
-			tree.title, tree.hasTitle = titleValue(r.take()), true
+			tree.title, tree.hasTitle = common.TitleValue(r.Take()), true
 			endOfLine()
 		case tInt, tPlus:
 			var block blockAst
-			if r.accept(tPlus) {
-				block.bits, block.hasBits = number(r.expect(tInt)), true
+			if r.Accept(tPlus) {
+				block.bits, block.hasBits = number(r.Expect(tInt)), true
 			} else {
-				block.start, block.hasStart = number(r.take()), true
-				if r.accept(tDash) {
-					block.end, block.hasEnd = number(r.expect(tInt)), true
+				block.start, block.hasStart = number(r.Take()), true
+				if r.Accept(tDash) {
+					block.end, block.hasEnd = number(r.Expect(tInt)), true
 				}
 			}
-			r.expect(tColon)
-			block.label = stringValue(r.expect(tString))
+			r.Expect(tColon)
+			block.label = common.StringValue(r.Expect(tString))
 			tree.blocks = append(tree.blocks, block)
 			endOfLine()
 		default:
-			r.fail("a field, a title, or a line break")
+			r.Fail("a field, a title, or a line break")
 		}
 	}
 	return tree, nil

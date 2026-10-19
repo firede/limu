@@ -61,8 +61,8 @@ func (o object) opt(key, value string) {
 func dumpTokens(src string) []any {
 	t := tokenize(src)
 	out := []any{}
-	for i, typ := range t.types {
-		out = append(out, []any{typ, t.texts[i], chars.Len16(src[:t.starts[i]])})
+	for i, typ := range t.Types {
+		out = append(out, []any{typ, t.Texts[i], chars.Len16(src[:t.Starts[i]])})
 	}
 	return out
 }

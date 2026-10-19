@@ -76,8 +76,8 @@ func strs(s []string) []any {
 func dumpTokens(src string) []any {
 	t := tokenize(src)
 	out := []any{}
-	for i, typ := range t.types {
-		out = append(out, []any{tokenNames[typ], t.texts[i], chars.Len16(src[:t.starts[i]])})
+	for i, typ := range t.Types {
+		out = append(out, []any{tokenNames[typ], t.Texts[i], chars.Len16(src[:t.Starts[i]])})
 	}
 	return out
 }

@@ -4,59 +4,12 @@ import (
 	"strconv"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 )
-
-// reader reads tokens for the parser, Pele's Reader, with Chevrotain's messages on failure.
-// A failure panics with a *diagram.Error, which parseGit recovers.
-type reader struct {
-	t *tokens
-	i int
-}
-
-func (r *reader) kind() int { return r.t.kinds[r.i] }
-
-// kindAt is the kind of token i, or tEnd past the last, as JavaScript reads undefined there.
-func (r *reader) kindAt(i int) int {
-	if i < len(r.t.kinds) {
-		return r.t.kinds[i]
-	}
-	return tEnd
-}
-
-func (r *reader) text(i int) string { return r.t.src[r.t.starts[i]:r.t.ends[i]] }
-
-func (r *reader) take() string {
-	s := r.text(r.i)
-	r.i++
-	return s
-}
-
-func (r *reader) accept(k int) bool {
-	if r.kind() != k {
-		return false
-	}
-	r.i++
-	return true
-}
-
-func (r *reader) expect(k int) string {
-	if r.kind() != k {
-		r.fail("token of type '" + tokenNames[k] + "'")
-	}
-	return r.take()
-}
-
-func (r *reader) fail(expected string) {
-	found := "end of input"
-	if r.kind() != tEnd {
-		found = "`" + r.text(r.i) + "`"
-	}
-	panic(diagram.SyntaxError("gitGraph", r.t.src, r.t.starts[r.i], "Expecting "+expected+" but found "+found+".", false))
-}
 
 // parseGit parses a git graph's text into its tree, as Pele's parseGit does.
 func parseGit(src string) (ast *AST, err error) {
-	t, err := tokenize(src)
+	t, err := common.Tokenize(src, gitTable, "gitGraph")
 	if err != nil {
 		return nil, err
 	}
@@ -69,84 +22,89 @@ func parseGit(src string) (ast *AST, err error) {
 			ast, err = nil, e
 		}
 	}()
-	r := &reader{t: t}
+	r := &common.Reader{Tokens: t, Types: gitTokens, Diagram: "gitGraph"}
 	ast = &AST{Type: "GitGraph", Statements: []Statement{}}
 
 	endOfLine := func() {
-		if r.kind() == tEnd {
+		if r.Kind() == tEnd {
 			return
 		}
-		if r.kind() != tNewline {
-			r.fail("a line break or the end of input")
+		if r.Kind() != tNewline {
+			r.Fail("a line break or the end of input")
 		}
-		for r.kind() == tNewline {
-			r.i++
+		for r.Kind() == tNewline {
+			r.I++
 		}
 	}
 	name := func() string {
-		switch r.kind() {
+		switch r.Kind() {
 		case tReference:
-			return r.take()
+			return r.Take()
 		case tString:
-			return stringValue(r.take())
+			return common.StringValue(r.Take())
 		}
-		r.fail("a branch name")
+		r.Fail("a branch name")
 		return ""
 	}
 	str := func() *string {
-		s := stringValue(r.expect(tString))
+		s := common.StringValue(r.Expect(tString))
 		return &s
 	}
 	commitType := func() *string {
-		if k := r.kind(); k != tNormal && k != tReverse && k != tHighlight {
-			r.fail("NORMAL, REVERSE, or HIGHLIGHT")
+		if k := r.Kind(); k != tNormal && k != tReverse && k != tHighlight {
+			r.Fail("NORMAL, REVERSE, or HIGHLIGHT")
 		}
-		s := r.take()
+		s := r.Take()
 		return &s
 	}
 
-	for r.kind() == tNewline {
-		r.i++
+	for r.Kind() == tNewline {
+		r.I++
 	}
-	if !r.accept(tGitGraphColon) {
-		r.expect(tGitGraph)
-		next := r.kindAt(r.i + 1)
-		if k := r.kind(); (k == tLR || k == tTB || k == tBT) && next == tColon {
+	if !r.Accept(tGitGraphColon) {
+		r.Expect(tGitGraph)
+		// The kind of the token after this one, or tEnd past the last, as JavaScript reads
+		// undefined there.
+		next := tEnd
+		if r.I+1 < len(t.Kinds) {
+			next = t.Kinds[r.I+1]
+		}
+		if k := r.Kind(); (k == tLR || k == tTB || k == tBT) && next == tColon {
 			ast.Type = "Direction"
-			ast.Dir = r.take()
-			r.i++
+			ast.Dir = r.Take()
+			r.I++
 		} else {
-			r.accept(tColon)
+			r.Accept(tColon)
 		}
 	}
 
-	for r.kind() != tEnd {
-		switch r.kind() {
+	for r.Kind() != tEnd {
+		switch r.Kind() {
 		case tNewline:
-			r.i++
+			r.I++
 		case tAccDescr:
-			s := accDescrValue(r.take())
+			s := common.AccDescrValue(r.Take())
 			ast.AccDescr = &s
 			endOfLine()
 		case tAccTitle:
-			s := accTitleValue(r.take())
+			s := common.AccTitleValue(r.Take())
 			ast.AccTitle = &s
 			endOfLine()
 		case tTitle:
-			s := titleValue(r.take())
+			s := common.TitleValue(r.Take())
 			ast.Title = &s
 			endOfLine()
 		case tCommit:
-			r.i++
+			r.I++
 			node := Statement{Kind: "Commit", Tags: []string{}}
 			for {
-				if r.accept(tID) {
+				if r.Accept(tID) {
 					node.ID = str()
-				} else if r.accept(tTag) {
+				} else if r.Accept(tTag) {
 					node.Tags = append(node.Tags, *str())
-				} else if r.accept(tType) {
+				} else if r.Accept(tType) {
 					node.Type = commitType()
-				} else if r.accept(tMsg) || r.kind() == tString {
+				} else if r.Accept(tMsg) || r.Kind() == tString {
 					node.Message = str()
 				} else {
 					break
@@ -155,25 +113,25 @@ func parseGit(src string) (ast *AST, err error) {
 			endOfLine()
 			ast.Statements = append(ast.Statements, node)
 		case tBranch:
-			r.i++
+			r.I++
 			node := Statement{Kind: "Branch", Name: name()}
-			if r.accept(tOrder) {
+			if r.Accept(tOrder) {
 				// parseInt of a run of digits: the nearest number, Infinity past the
 				// largest.
-				v, _ := strconv.ParseFloat(r.expect(tInt), 64)
+				v, _ := strconv.ParseFloat(r.Expect(tInt), 64)
 				node.Order = &v
 			}
 			endOfLine()
 			ast.Statements = append(ast.Statements, node)
 		case tMerge:
-			r.i++
+			r.I++
 			node := Statement{Kind: "Merge", Branch: name(), Tags: []string{}}
 			for {
-				if r.accept(tID) {
+				if r.Accept(tID) {
 					node.ID = str()
-				} else if r.accept(tTag) {
+				} else if r.Accept(tTag) {
 					node.Tags = append(node.Tags, *str())
-				} else if r.accept(tType) {
+				} else if r.Accept(tType) {
 					node.Type = commitType()
 				} else {
 					break
@@ -182,19 +140,19 @@ func parseGit(src string) (ast *AST, err error) {
 			endOfLine()
 			ast.Statements = append(ast.Statements, node)
 		case tCheckout, tSwitch:
-			r.i++
+			r.I++
 			node := Statement{Kind: "Checkout", Branch: name()}
 			endOfLine()
 			ast.Statements = append(ast.Statements, node)
 		case tCherryPick:
-			r.i++
+			r.I++
 			node := Statement{Kind: "CherryPicking", Tags: []string{}}
 			for {
-				if r.accept(tID) {
+				if r.Accept(tID) {
 					node.ID = str()
-				} else if r.accept(tTag) {
+				} else if r.Accept(tTag) {
 					node.Tags = append(node.Tags, *str())
-				} else if r.accept(tParent) {
+				} else if r.Accept(tParent) {
 					node.Parent = str()
 				} else {
 					break
@@ -203,7 +161,7 @@ func parseGit(src string) (ast *AST, err error) {
 			endOfLine()
 			ast.Statements = append(ast.Statements, node)
 		default:
-			r.fail("a statement, a title, or a line break")
+			r.Fail("a statement, a title, or a line break")
 		}
 	}
 	return ast, nil
