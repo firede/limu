@@ -132,22 +132,6 @@ func init() {
 	}
 }
 
-// wordAt reports whether word, written in lower case, is at byte at of src, as Pele's
-// caseless wordAt does: only ASCII letters match in either case. common.KeywordAt folds
-// any character with |32, which would take a carriage return for the dash of x-axis.
-func wordAt(src string, at int, word string) bool {
-	if at+len(word) > len(src) {
-		return false
-	}
-	for k := 0; k < len(word); k++ {
-		c, w := src[at+k], word[k]
-		if c != w && !(w >= 'a' && w <= 'z' && c == w-32) {
-			return false
-		}
-	}
-	return true
-}
-
 // tokenize lexes a quadrant chart, as Pele's tokenize does. It reads by code units where
 // Pele does with charCodeAt: chars.UnitAt reads the one JavaScript would at a byte, and a
 // character above the Basic Multilingual Plane is followed by its low surrogate, which is no
@@ -329,14 +313,14 @@ lexing:
 		}
 
 		lower := c | 32
-		if lower == 't' && wordAt(src, p, "title") && !chars.IsWord(byteAt(p+5)) {
+		if lower == 't' && common.WordAt(src, p, "title") && !chars.IsWord(byteAt(p+5)) {
 			emit(tTitle, p, p+5)
 			push(sTitle)
 			continue
 		}
-		if lower == 'a' && wordAt(src, p, "acc") {
-			descr := wordAt(src, p+3, "descr")
-			if descr || wordAt(src, p+3, "title") {
+		if lower == 'a' && common.WordAt(src, p, "acc") {
+			descr := common.WordAt(src, p+3, "descr")
+			if descr || common.WordAt(src, p+3, "title") {
 				k := run(p + 8)
 				d := byteAt(k)
 				if d == ':' {
@@ -370,9 +354,9 @@ lexing:
 		dl := d | 32
 		typ, end := 0, 0
 		switch {
-		case dl == 'x' && wordAt(src, j, "x-axis"):
+		case dl == 'x' && common.WordAt(src, j, "x-axis"):
 			typ, end = tXAxis, j+6
-		case dl == 'y' && wordAt(src, j, "y-axis"):
+		case dl == 'y' && common.WordAt(src, j, "y-axis"):
 			typ, end = tYAxis, j+6
 		case d == '-':
 			if j < dashFrom || j >= dashTo {
@@ -385,10 +369,10 @@ lexing:
 			if dashTo-j >= 2 && byteAt(dashTo) == '>' {
 				typ, end = tDelimiter, dashTo+1
 			}
-		case dl == 'q' && wordAt(src, j, "quadrant"):
+		case dl == 'q' && common.WordAt(src, j, "quadrant"):
 			if q := byteAt(j + 9); byteAt(j+8) == '-' && q >= '1' && q <= '4' {
 				typ, end = tQuadrant1+q-'1', j+10
-			} else if wordAt(src, j+8, "chart") {
+			} else if common.WordAt(src, j+8, "chart") {
 				typ, end = tQuadrant, j+13
 			}
 		}
@@ -397,7 +381,7 @@ lexing:
 			continue
 		}
 
-		if lower == 'c' && wordAt(src, p, "classdef") && !chars.IsWord(byteAt(p+8)) {
+		if lower == 'c' && common.WordAt(src, p, "classdef") && !chars.IsWord(byteAt(p+8)) {
 			emit(tClassDef, p, p+8)
 			continue
 		}
