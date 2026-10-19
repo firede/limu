@@ -19,6 +19,7 @@ import (
 	"github.com/firede/limu/diagram/timeline"
 	"github.com/firede/limu/diagram/treemap"
 	"github.com/firede/limu/diagram/usecase"
+	"github.com/firede/limu/diagram/venn"
 	"github.com/firede/limu/diagram/xychart"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -149,6 +150,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 		if sc, err = xychart.Layout(m, p.Config, o); err != nil {
 			return nil, err
 		}
+	case diagram.Venn:
+		m, err := venn.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = venn.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
