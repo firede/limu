@@ -177,7 +177,10 @@ const (
 )
 
 // A MarkerType is the kind of marker at an end of an edge, by Mermaid's names:
-// "arrow_point", "arrow_circle", "arrow_cross"… The empty one is no marker.
+// "arrow_point", "arrow_circle", "arrow_cross"… The empty one is no marker: an end Pele
+// draws no marker at has the empty type, whatever name the diagram's model gives it ("none",
+// or "arrow_open" for an open line). Every type but the empty one is in the scene's table
+// of markers, with a trim and an outline.
 type MarkerType string
 
 // A Marker is what an edge has at an end: its kind, where its tip is, and the way it

@@ -36,12 +36,23 @@ type EdgePath struct {
 	EX, EY, EDX, EDY float64
 }
 
-// Ends are markers of the types at the ends of the path.
+// Ends are markers of the types at the ends of the path. The names Pele's models give an end
+// with no marker, "none" and "arrow_open" (the end of an open line), are the empty type, as
+// the scene has it.
 func (e EdgePath) Ends(start, end scene.MarkerType) [2]scene.Marker {
 	return [2]scene.Marker{
-		{Type: start, At: scene.Point{X: e.SX, Y: e.SY}, DX: e.SDX, DY: e.SDY},
-		{Type: end, At: scene.Point{X: e.EX, Y: e.EY}, DX: e.EDX, DY: e.EDY},
+		{Type: drawn(start), At: scene.Point{X: e.SX, Y: e.SY}, DX: e.SDX, DY: e.SDY},
+		{Type: drawn(end), At: scene.Point{X: e.EX, Y: e.EY}, DX: e.EDX, DY: e.EDY},
 	}
+}
+
+// drawn is the type of a marker that is drawn, or the empty type for one of Pele's names for
+// none.
+func drawn(t scene.MarkerType) scene.MarkerType {
+	if t == "none" || t == "arrow_open" {
+		return ""
+	}
+	return t
 }
 
 // A SideReach says how far from each side of each node the edges that meet it start to
