@@ -35,6 +35,8 @@ const miterLimit = 4
 // side going the other way, so that its inside is not filled. Each edge of the stroke is
 // drawn once, so that its antialiasing is exact. Round ends and corners are cut into lines
 // that stray from their arcs by no more than tol.
+// It works around MyGo, as offsetLoop, arc and strokeOutline do, until ui.Painter.StrokePath
+// takes caps, joins, a miter limit and dashes, as egoist/mygo#530 asks.
 func outline(lines []scene.Polyline, hw float64, cap style.Cap, join style.Join, tol float64) []scene.Polyline {
 	var out []scene.Polyline
 	for _, l := range lines {
@@ -87,6 +89,7 @@ func outline(lines []scene.Polyline, hw float64, cap style.Cap, join style.Join,
 // offsetLoop is the side of a closed polyline hw to its left (a segment's normal), turning
 // around each corner as the join says, and around each point that end reports to be an end
 // of the line, where the loop turns straight back, as the cap says.
+// It goes with outline, after egoist/mygo#530.
 func offsetLoop(pts []scene.Point, hw float64, cap style.Cap, join style.Join, end func(k int) bool, tol float64) scene.Polyline {
 	n := len(pts)
 	normal := func(k int) (dx, dy, nx, ny float64) {
@@ -144,6 +147,7 @@ func offsetLoop(pts []scene.Point, hw float64, cap style.Cap, join style.Join, e
 
 // arc adds to pts the points of an arc of radius r about c, from the angle from turning by
 // turn, past its start, cut into lines that stray from it by no more than tol.
+// It goes with outline, after egoist/mygo#530.
 func arc(pts []scene.Point, c scene.Point, r, from, turn, tol float64) []scene.Point {
 	step := 2 * math.Acos(max(1-tol/r, -1))
 	steps := max(int(math.Ceil(math.Abs(turn)/step)), 1)
@@ -156,6 +160,7 @@ func arc(pts []scene.Point, c scene.Point, r, from, turn, tol float64) []scene.P
 
 // strokeOutline strokes polylines of the scene by filling their outline, for the ends and
 // corners MyGo does not draw: it strokes only with round ones.
+// It goes with outline, after egoist/mygo#530.
 func (p *Painter) strokeOutline(lines []scene.Polyline, c ui.Color, pn pen) {
 	polys := outline(lines, pn.width/2, pn.cap, pn.join, p.tolerance()/4)
 	if len(polys) == 0 {
