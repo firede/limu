@@ -258,7 +258,7 @@ export function drawableDiagrams(rnd) {
     if (chance(0.6)) out.push(`  title ${pick(titles)}`);
     if (chance(0.1)) out.push('  accTitle: Acc', '  accDescr: Description');
     const scale = pick([1, 10, 100, 1000, 10000, 0.01, 1e6]);
-    let count = 1 + Math.floor(rnd() * (chance(0.2) ? 40 : 10));
+    let count = 1 + Math.floor(rnd() * (chance(0.15) ? 30 : 10));
     const axis = rnd();
     if (axis < 0.6) {
       const names = Array.from({ length: count }, (_, i) => (chance(0.7) ? pick(categoryNames) : `c${i}`));
