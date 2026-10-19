@@ -21,7 +21,9 @@ export async function resolve(spec, ctx, next) {
 // line starts or ends and what is in it; a pie's percentages write, as data-y, where they are
 // before Pele adds the shift to their baseline; a radar chart's labelSvg writes, before each
 // label, the point it is centered on, its size and the text of its lines; and a sankey
-// diagram's labels write the middle of their line as y, with an m before it.
+// diagram's labels write the middle of their line as y, with an m before it; and a railroad
+// diagram's names of rules and texts of its boxes write as y, with an m before it, the
+// middle of their line before Pele adds the shift to their baseline.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -35,6 +37,8 @@ const PIE_INSIDE = 'labels += `<text x="${num(Math.sin(mid) * r)}"';
 const dataY = (y) => `<text\${(globalThis as any).limuExactNumbers ? \` data-y="\${${y}}"\` : ''}`;
 const RADAR_IMPORT = "import { escText, labelSvg, num } from '../../svg/builder.js';";
 const SANKEY_Y = 'y="${num(y + small * 0.35)}"';
+const RAILROAD_NAME_Y = 'y="${num(top + headHeight / 2 + headSize * 0.35)}"';
+const RAILROAD_TEXT_Y = 'y="${num(y + textShift)}"';
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -98,6 +102,14 @@ function labelSvg(label: Label, cx: number, cy: number, attrs: string): string {
   if (url.endsWith('/src/diagrams/sankey/render.ts')) {
     const loaded = await next(url, ctx);
     const source = patch(url, String(loaded.source), SANKEY_Y, `y="\${${EXACT.slice(4, -1)} ? 'm' + y : num(y + small * 0.35)}"`);
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/railroad/render.ts')) {
+    const loaded = await next(url, ctx);
+    const exact = EXACT.slice(4, -1);
+    let source = String(loaded.source);
+    source = patch(url, source, RAILROAD_NAME_Y, `y="\${${exact} ? 'm' + (top + headHeight / 2) : num(top + headHeight / 2 + headSize * 0.35)}"`);
+    source = patch(url, source, RAILROAD_TEXT_Y, `y="\${${exact} ? 'm' + y : num(y + textShift)}"`);
     return { ...loaded, source, shortCircuit: true };
   }
   if (url.endsWith('.json')) {
