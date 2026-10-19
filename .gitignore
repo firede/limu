@@ -4,3 +4,6 @@
 
 # Worktrees and settings of local tools.
 .claude/
+
+# Notes and handoffs of local work, kept out of the repository.
+local/
