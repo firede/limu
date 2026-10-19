@@ -309,8 +309,8 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 				it.Align = scene.Start
 			}
 		} else if r.text != "" {
-			l := line(r.text, measure, size, face)
-			it.Label = &l
+			l := common.Line(r.text, measure.Width(r.text, size, face), size, face)
+			it.Label = l
 			it.At = scene.Point{X: inset + r.labelX, Y: cy}
 			it.Align = scene.Start
 		}
@@ -326,21 +326,11 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 			description.At = scene.Point{X: inset + r.labelX, Y: top + r.top + paddingY + labelHeight + l.Height/2}
 			sc.Items = append(sc.Items, description)
 		} else if node.Description != "" {
-			l := line(text.DecodeEntities(node.Description), measure, size, text.Italic)
-			description.Label = &l
+			l := common.Line(text.DecodeEntities(node.Description), measure.Width(text.DecodeEntities(node.Description), size, text.Italic), size, text.Italic)
+			description.Label = l
 			description.At = scene.Point{X: inset + descX, Y: cy}
 			sc.Items = append(sc.Items, description)
 		}
 	}
 	return sc
-}
-
-// line is text as one line, as Pele writes a name or a description that is not wrapped.
-func line(s string, measure text.Measurer, size float64, face text.Face) text.Label {
-	w := measure.Width(s, size, face)
-	lh := jsmath.Round(size * text.LineHeight)
-	return text.Label{
-		Lines:  [][]text.Span{{{Text: s, Face: face, Width: w}}},
-		Widths: []float64{w}, Width: w, Height: lh, Size: size, LineHeight: lh,
-	}
 }

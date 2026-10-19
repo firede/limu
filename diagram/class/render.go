@@ -742,9 +742,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 
 	var cardItems []scene.Item
 	for _, c := range cards {
-		l := oneLine(c.text, c.width, tiny, tinyHeight, 0)
+		l := common.LineOf(c.text, c.width, tiny, tinyHeight, 0)
 		cardItems = append(cardItems, scene.Item{
-			Kind: scene.Text, Role: "class.cardinality", Label: &l, At: scene.Point{X: c.x + ox, Y: c.y + oy},
+			Kind: scene.Text, Role: "class.cardinality", Label: l, At: scene.Point{X: c.x + ox, Y: c.y + oy},
 			Style: style.Style{Text: style.Muted},
 		})
 	}
@@ -771,15 +771,6 @@ func classStyle(db *DB, cls *Class) style.Author {
 		}
 	}
 	return style.Declarations(append(decls, cls.Styles...))
-}
-
-// oneLine is a label of one line of plain text, as Pele writes the text of a member, an
-// annotation or a multiplicity: as it is, with no markup read.
-func oneLine(s string, width, size, lineHeight float64, face text.Face) text.Label {
-	return text.Label{
-		Lines:  [][]text.Span{{{Text: s, Face: face, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lineHeight, Size: size, LineHeight: lineHeight,
-	}
 }
 
 // classItems draws a class centered on x, y, as Pele's classSvg does: the box, with its
@@ -810,9 +801,9 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 	at := top + titlePad
 	var annotations []scene.Item
 	for _, a := range v.annotations {
-		l := oneLine(a.text, a.width, tiny, tinyHeight, 0)
+		l := common.LineOf(a.text, a.width, tiny, tinyHeight, 0)
 		annotations = append(annotations, scene.Item{
-			Kind: scene.Text, Role: "class.annotation", ID: cls.ID, Label: &l,
+			Kind: scene.Text, Role: "class.annotation", ID: cls.ID, Label: l,
 			At:    scene.Point{X: x, Y: y + (at + tinyHeight/2)},
 			Style: style.Style{Text: style.Muted},
 		})
@@ -839,9 +830,9 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 			if ln.classifier == "*" {
 				face = text.Italic
 			}
-			l := oneLine(ln.text, ln.width, memberSize, lineHeight, face)
+			l := common.LineOf(ln.text, ln.width, memberSize, lineHeight, face)
 			m := scene.Item{
-				Kind: scene.Text, Role: role, ID: cls.ID, Label: &l,
+				Kind: scene.Text, Role: role, ID: cls.ID, Label: l,
 				At: scene.Point{X: x + (left + padX), Y: y + middle}, Align: scene.Start,
 				Author: style.Style{Text: v.author.Style.Text},
 			}

@@ -108,16 +108,6 @@ func union(a, b scene.Rect) scene.Rect {
 	return scene.Rect{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}
 }
 
-// line is a label of one line of plain text, measured, in a size of type, as Pele writes a
-// bar's value: as it is, with no markup read.
-func line(s string, width, size float64) text.Label {
-	lh := jsmath.Round(size * text.LineHeight)
-	return text.Label{
-		Lines:  [][]text.Span{{{Text: s, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lh, Size: size, LineHeight: lh,
-	}
-}
-
 // Layout lays an XY chart out as a scene, as Pele's renderXyChart draws it: the plot at the
 // width and height the chart's config gives, narrower when the host is, with its axes, the
 // bars and lines of each series over a grid, and a legend at its right. A chart with no
@@ -609,9 +599,9 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 					}
 					ty -= float64(out * (tinyHeight/2 + 2))
 				}
-				l := line(s, w, tiny)
+				l := common.Line(s, w, tiny, 0)
 				outside = append(outside, scene.Item{
-					Kind: scene.Text, Role: "xychart.data-label", Label: &l, Align: align,
+					Kind: scene.Text, Role: "xychart.data-label", Label: l, Align: align,
 					At: scene.Point{X: tx, Y: ty}, Style: style.Style{Text: style.Fg},
 				})
 			}

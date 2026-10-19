@@ -156,16 +156,6 @@ type bar struct {
 	unscheduled bool
 }
 
-// tickText is a tick's label, which Pele writes as plain text centered on its point: one line
-// of one span, as wide as the measurer says.
-func tickText(s string, width, size float64) *text.Label {
-	lh := jsmath.Round(size * text.LineHeight)
-	return &text.Label{
-		Lines:  [][]text.Span{{{Text: s, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lh, Size: size, LineHeight: lh,
-	}
-}
-
 // Layout schedules a parsed gantt chart's tasks and lays the chart out as a scene, as Pele's
 // renderGantt draws it: a row for each task, on a time axis as wide as the chart may be. It
 // schedules in o.Location against o.Now; an error is a *diagram.Error, from scheduling.
@@ -408,7 +398,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		lastLabel = label
 		extent = max(extent, lastRight)
 		tick := scene.Item{
-			Kind: scene.Text, Role: "gantt.tick", Label: tickText(label, width, tickSize),
+			Kind: scene.Text, Role: "gantt.tick", Label: common.Line(label, width, tickSize, 0),
 			At: scene.Point{X: tx, Y: bottomY}, Style: style.Style{Text: style.Muted},
 		}
 		axisBottom = append(axisBottom, tick)
