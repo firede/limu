@@ -381,7 +381,7 @@ export default async function ({ src, pele, write, random }) {
     }
   };
   const diagrams = randomDiagrams(random(21));
-  for (let i = 0; i < 1500; i++) add(diagrams());
+  for (let i = 0; i < 3500; i++) add(diagrams());
   // Mutated text; one in six is cut short, as a row cut off by the end of the text ends on a
   // different error than one cut off by a line break.
   const rnd = random(7);

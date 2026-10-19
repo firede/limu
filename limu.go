@@ -16,6 +16,7 @@ import (
 	"github.com/firede/limu/diagram/state"
 	"github.com/firede/limu/diagram/swimlane"
 	"github.com/firede/limu/diagram/timeline"
+	"github.com/firede/limu/diagram/treemap"
 	"github.com/firede/limu/diagram/usecase"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -118,6 +119,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = sequence.Layout(db, p.Config, o)
+	case diagram.Treemap:
+		m, err := treemap.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = treemap.Layout(m, p.Config, o)
 	case diagram.Gantt:
 		db, err := gantt.ParsePrepared(p)
 		if err != nil {
