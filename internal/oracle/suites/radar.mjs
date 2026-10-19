@@ -201,8 +201,9 @@ const LABELS = [
 ];
 const TITLES = ['T', 'Grades', 'Restaurant Comparison', 'A title much wider than the chart it names, by a long way indeed', '中文'];
 
-// Random radar charts, most of them well formed, with random configuration.
-export function randomDiagrams(rnd) {
+// Random radar charts, most of them well formed, with random configuration. Small ones have
+// fewer axes and curves, for a fixture of what is drawn to stay small.
+export function randomDiagrams(rnd, small = false) {
   const pick = (list) => list[Math.floor(rnd() * list.length)];
   const chance = (p) => rnd() < p;
   const value = () =>
@@ -236,7 +237,7 @@ export function randomDiagrams(rnd) {
     if (chance(0.3)) s += `  title ${pick(TITLES)}\n`;
     if (chance(0.1)) s += '  accTitle: Accessible\n';
     if (chance(0.1)) s += chance(0.5) ? '  accDescr: Described\n' : '  accDescr {\n  one\n   two\n}\n';
-    const count = chance(0.1) ? pick([1, 2, 16, 25]) : 3 + Math.floor(rnd() * 6);
+    const count = chance(0.1) ? pick(small ? [1, 2, 7] : [1, 2, 16, 25]) : 3 + Math.floor(rnd() * (small ? 3 : 6));
     const axes = [];
     for (let i = 0; i < count; i++) axes.push(chance(0.05) ? pick(NAMES) : `${pick(NAMES)}${i}`);
     let line = '  axis ';
@@ -250,7 +251,7 @@ export function randomDiagrams(rnd) {
       line += a + (chance(0.5) ? label() : '');
     });
     s += line + '\n';
-    const curves = chance(0.1) ? Math.floor(rnd() * 12) : 1 + Math.floor(rnd() * 4);
+    const curves = chance(0.1) ? Math.floor(rnd() * (small ? 10 : 12)) : 1 + Math.floor(rnd() * (small ? 2 : 4));
     for (let k = 0; k < curves; k++) {
       s += `  curve c${k}${chance(0.6) ? label() : ''}{`;
       const n = chance(0.05) ? count - 1 : count;

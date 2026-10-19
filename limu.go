@@ -12,6 +12,7 @@ import (
 	"github.com/firede/limu/diagram/kanban"
 	"github.com/firede/limu/diagram/packet"
 	"github.com/firede/limu/diagram/quadrant"
+	"github.com/firede/limu/diagram/radar"
 	"github.com/firede/limu/diagram/requirement"
 	"github.com/firede/limu/diagram/sequence"
 	"github.com/firede/limu/diagram/state"
@@ -109,6 +110,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = quadrant.Layout(m, p.Config, o)
+	case diagram.Radar:
+		m, err := radar.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = radar.Layout(m, p.Config, o)
 	case diagram.Kanban:
 		m, err := kanban.ParsePrepared(p)
 		if err != nil {
