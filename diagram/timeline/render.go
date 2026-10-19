@@ -27,7 +27,6 @@ const (
 	sectionGap  = 8
 	tail        = 12
 	arrow       = scene.MarkerSize
-	pad         = common.Padding
 )
 
 // group is a section and the periods in it, Pele's Group: section is -1 for the periods
@@ -40,6 +39,9 @@ type group struct {
 // Layout lays out a timeline diagram as a scene, as Pele's renderTimeline draws it: across,
 // unless the text asks for it to run down or it runs down to fit the host's width.
 func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
+	if o == nil {
+		o = &layout.Options{}
+	}
 	if m.Direction == "TD" {
 		return lay(m, config, o, true)
 	}
@@ -58,6 +60,7 @@ func roundedBox(x, y, w, h float64, role scene.Role, kind scene.Kind, s style.St
 
 // lay lays out a timeline, across or down, as Pele's draw does.
 func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *scene.Scene {
+	pad := o.Pad()
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()

@@ -28,7 +28,7 @@ type Error struct {
 	Code    Code
 	Message string
 	// Type is the type of the diagram the error is in, where it is known.
-	Type    string
+	Type    Type
 	Line    int
 	Column  int
 	Snippet string
@@ -37,7 +37,7 @@ type Error struct {
 func (e *Error) Error() string { return e.Message }
 
 // NewError is an error with no place.
-func NewError(message string, code Code, typ string) *Error {
+func NewError(message string, code Code, typ Type) *Error {
 	return &Error{Code: code, Message: message, Type: typ}
 }
 
@@ -77,7 +77,7 @@ func Locate(src string, offset int) Location {
 
 // SyntaxError is the error of text that does not parse at byte offset, worded as Jison's
 // parsers word it, as Pele's syntaxError does. A lexical error is text no token starts with.
-func SyntaxError(typ, src string, offset int, detail string, lexical bool) *Error {
+func SyntaxError(typ Type, src string, offset int, detail string, lexical bool) *Error {
 	loc := Locate(src, offset)
 	var message string
 	if lexical {

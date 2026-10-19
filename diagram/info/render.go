@@ -5,7 +5,6 @@ import (
 	"runtime/debug"
 
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
@@ -61,7 +60,7 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 func lay(m *Model, o *layout.Options, name string) *scene.Scene {
 	size := o.Size()
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 
 	title := text.Layout(m.Title, text.Options{Measurer: measure, Size: size, MaxWidth: 4000, Face: text.Bold, Icons: o.Icons})
 	titleHeight := 0.0

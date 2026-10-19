@@ -170,14 +170,15 @@ func tickText(s string, width, size float64) *text.Label {
 
 // Layout schedules a parsed gantt chart's tasks and lays the chart out as a scene, as Pele's
 // renderGantt draws it: a row for each task, on a time axis as wide as the chart may be. It
-// schedules in o.Location against o.Now; an error is a *diagram.Error, from scheduling.
+// schedules a copy of the tasks in o.Location against o.Now, and leaves db as it was; an
+// error is a *diagram.Error, from scheduling.
 func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, error) {
 	if o == nil {
 		o = &layout.Options{}
 	}
 	size := o.Size()
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	now := float64(o.Clock().UnixMilli())
 
 	labelSize := settingOr(config, "fontSize", 4, 72, jsmath.Round(size*0.8125))
@@ -190,6 +191,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	compact := db.DisplayMode == "compact"
 	topAxis := db.TopAxis || flag(config, "topAxis")
 
+	db = db.copied()
 	if err := db.Schedule(o.Clock(), o.Zone()); err != nil {
 		return nil, err
 	}

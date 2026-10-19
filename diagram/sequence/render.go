@@ -318,7 +318,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	small := jsmath.Round(float64(size * 0.875))
 	tiny := jsmath.Round(float64(size * 0.75))
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	inf := math.Inf(1)
 	mirror := conf["mirrorActors"] != false
 	rightAngles := conf["rightAngles"] == true

@@ -93,7 +93,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.Scene {
 	size := o.Size()
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	conf, _ := config["mindmap"].(diagram.Config)
 	wrap := 200.0
 	if v, ok := conf["maxNodeWidth"].(float64); ok && v > 0 {

@@ -141,7 +141,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	line := jsmath.Round(size * 1.5)
 	smallLine := jsmath.Round(small * 1.5)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	conf, _ := config["kanban"].(diagram.Config)
 	ownWidth := 200.0
 	if w, ok := conf["sectionWidth"].(float64); ok && w > 0 {

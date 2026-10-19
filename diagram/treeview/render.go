@@ -91,7 +91,7 @@ func maxWidth(o *layout.Options) float64 {
 func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene.Scene {
 	size := o.Size()
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	icons := Icons(config)
 
 	s := settings(config)

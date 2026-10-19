@@ -1,5 +1,8 @@
 // Package layout holds what is shared by the layouts of diagrams: the options that change
-// where things are. A change of them lays a diagram out again; a change of style does not.
+// where things are, and the layouts that more than one diagram places its things with, as
+// Pele's src/layout does: the layered layout of a graph (Layered), the compound one of a
+// graph with groups (Compound), and the lanes of a swimlane diagram (Lanes). A change of the
+// options lays a diagram out again; a change of style does not.
 package layout
 
 import (
@@ -8,7 +11,11 @@ import (
 	"github.com/firede/limu/text"
 )
 
-// Routing is how edges run between the things they join.
+// Routing is how edges run between the things they join. It is a setting of the diagrams on
+// the layered layout that take Pele's curve setting: flowcharts, swimlane, state and agent
+// flow diagrams. Auto leaves them to the text's curve, and Orthogonal and Straight take the
+// place of the step and linear curves. The other diagrams route their edges as Pele does and
+// pay it no heed.
 type Routing uint8
 
 const (
@@ -41,9 +48,16 @@ type Options struct {
 	// nil is http, https, mailto and tel for links, and http and https for images.
 	NoLinks, NoImages         bool
 	LinkSchemes, ImageSchemes []string
+	// Padding is the room about a diagram, Pele's padding option: nil is Pele's 8, and a
+	// pointer to 0 is none. Set it with new(12.0). A host that wants no room about some
+	// diagram and the default about others tells them apart this way, since 0 is a padding.
+	Padding *float64
 	// Snap rounds where things are to whole multiples of it, for a backend that draws on a
-	// grid of pixels. 0 leaves them as they fall.
-	Snap    float64
+	// grid of pixels. 0 leaves them as they fall. limu.Layout and Diagram.Layout snap the
+	// scene; a diagram package's own Layout leaves it to its caller, who snaps the scene
+	// with Scene.Snap.
+	Snap float64
+	// Routing is how edges run, in the diagrams that take Pele's curve setting.
 	Routing Routing
 
 	// Now is the time a diagram that places things in time takes as the present: where a
@@ -54,6 +68,14 @@ type Options struct {
 	// does in the machine's: the days that tasks start on, the ticks of its axis. nil is
 	// time.Local.
 	Location *time.Location
+}
+
+// Pad is the options' Padding, or 8, as Pele takes options.padding ?? 8.
+func (o *Options) Pad() float64 {
+	if o == nil || o.Padding == nil {
+		return 8
+	}
+	return *o.Padding
 }
 
 // Clock is the options' Now, or time.Now() when it is the zero time.

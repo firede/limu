@@ -33,6 +33,18 @@ if err != nil {
 out := svg.Render(sc, nil)
 ```
 
+A host that lays a diagram out again, as when the width it has changes, parses
+it once, with the limits and configuration Pele's `parse` takes, and lays it out
+as often as it needs, from any goroutine:
+
+```go
+d, err := limu.Parse(src, diagram.Options{Config: diagram.Config{"seed": 7.0}})
+if err != nil {
+	return err
+}
+sc, err := d.Layout(&layout.Options{MaxWidth: 480, Padding: new(0.0)})
+```
+
 ## How it is built
 
 ```
@@ -41,12 +53,12 @@ text ──parse──▶ model ──layout──▶ scene ──backend──�
 
 | Package | What it does |
 |---|---|
-| `limu` | `Layout`: a diagram's text to its scene. |
+| `limu` | `Layout`: a diagram's text to its scene; `Parse`, to lay one diagram out many times; `Types` and `Supports`, the types it reads. |
 | `diagram` | Reads a diagram's front matter and directives, and tells its type; a package for each type parses it and lays it out. |
 | `text` | Measures text, through a `Measurer` the host gives, and lays out labels: lines, wrapping, emphasis, icons, entities. `text.Arial` measures with a table of Arial's advances, with no font at hand. |
 | `scene` | A diagram laid out: items, their roles and shapes, boxes, paths, markers, labels. |
 | `style` | How a scene looks, at three levels: a theme of colors by token, overrides by role, and a backend's drawing of its own. |
-| `layout` | What changes where things are: the measurer, the size of text, a grid to snap to, how edges are routed, the present and the time zone of a gantt chart. The layered and compound layouts. |
+| `layout` | What changes where things are: the measurer, the size of text, the width the host has, the padding about a diagram, a grid to snap to, how edges are routed, the present and the time zone of a gantt chart. The layered, compound and swimlane layouts. |
 | `draw` | The geometry diagrams share: shapes' outlines and edges' paths. |
 | `svg` | Draws a scene as SVG, its theme as CSS variables. |
 | `mygoui` | Draws a scene with MyGo's native UI, and finds the item under the pointer. A module of its own, so that the rest needs only the standard library. |

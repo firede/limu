@@ -18,7 +18,9 @@ import (
 	"github.com/firede/limu/text"
 )
 
-// A Scene is a diagram laid out.
+// A Scene is a diagram laid out. Every number in a scene limu.Layout or Diagram.Layout gives
+// that places or sizes something is finite (see Finite): where Pele would draw NaN, they give
+// an error instead. A diagram package's own Layout makes no such promise.
 type Scene struct {
 	Type          string // the kind of diagram: "flowchart", "sequence"…
 	Width, Height float64
