@@ -205,7 +205,7 @@ func sceneLines(sc *scene.Scene) []string {
 		}
 		shift := float64(l.Size * 0.35)
 		y := it.At.Y - l.Height/2 + l.LineHeight/2 + shift
-		if it.Role == "sequence.frame-kind" || it.Role == "sequence.number" {
+		if it.Role == RoleFrameKind || it.Role == RoleNumber {
 			y = it.At.Y + shift
 		}
 		lines = append(lines, "text "+pt(it.At.X, y)+" "+paintName(it.Style.Text)+" "+content(l))
@@ -286,9 +286,9 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "sequence.title":
+		case RoleTitle:
 			label(it)
-		case "sequence.box":
+		case RoleBox:
 			box := ""
 			if it.ID != "" {
 				box = id(it.ID)
@@ -296,19 +296,19 @@ func sceneLines(sc *scene.Scene) []string {
 			lines = append(lines, "g pele-cluster pele-box"+box)
 			part(it, &it.Parts[0], "")
 			label(it)
-		case "sequence.rect", "sequence.divider":
+		case RoleRect, RoleDivider:
 			part(it, &it.Parts[0], "")
-		case "sequence.lifeline", "sequence.activation", "sequence.destroy":
+		case RoleLifeline, RoleActivation, RoleDestroy:
 			part(it, &it.Parts[0], id(it.ID))
-		case "sequence.frame":
+		case RoleFrame:
 			lines = append(lines, "g pele-frame pele-frame-"+string(it.Shape))
 			part(it, &it.Parts[0], "")
-		case "sequence.condition", "sequence.frame-kind":
+		case RoleCondition, RoleFrameKind:
 			for k := range it.Parts {
 				part(it, &it.Parts[k], "")
 			}
 			label(it)
-		case "sequence.message":
+		case RoleMessage:
 			lines = append(lines, "g pele-edge pele-message"+id(it.ID))
 			part(it, &it.Parts[0], "")
 			for _, m := range it.Ends {
@@ -321,21 +321,21 @@ func sceneLines(sc *scene.Scene) []string {
 			for k := 1; k < len(it.Parts); k++ {
 				part(it, &it.Parts[k], "")
 			}
-		case "sequence.number":
+		case RoleNumber:
 			lines = append(lines, "g pele-sequence-number")
 			part(it, &it.Parts[0], "")
 			label(it)
-		case "sequence.message-label":
+		case RoleMessageLabel:
 			lines = append(lines, "g pele-edge-label"+id(it.ID))
 			for k := range it.Parts {
 				part(it, &it.Parts[k], "")
 			}
 			label(it)
-		case "sequence.note":
+		case RoleNote:
 			lines = append(lines, "g pele-note"+id(it.ID))
 			part(it, &it.Parts[0], "")
 			label(it)
-		case "sequence.actor":
+		case RoleActor:
 			kind := string(it.Shape)
 			if kind == "rect" {
 				kind = "participant"
@@ -344,7 +344,7 @@ func sceneLines(sc *scene.Scene) []string {
 			// A participant drawn at the foot of its lifeline comes before the one at its
 			// head.
 			for k := i + 1; k < len(sc.Items); k++ {
-				if sc.Items[k].Role == "sequence.actor" && sc.Items[k].ID == it.ID {
+				if sc.Items[k].Role == RoleActor && sc.Items[k].ID == it.ID {
 					cls += " pele-actor-footer"
 					break
 				}

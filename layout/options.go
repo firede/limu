@@ -12,10 +12,10 @@ import (
 )
 
 // Routing is how edges run between the things they join. It is a setting of the diagrams on
-// the layered layout that take Pele's curve setting: flowcharts, swimlane, state and agent
-// flow diagrams. Auto leaves them to the text's curve, and Orthogonal and Straight take the
-// place of the step and linear curves. The other diagrams route their edges as Pele does and
-// pay it no heed.
+// the layered layout: flowcharts, swimlane, agent flow, state, class, ER, requirement and use
+// case diagrams. Auto leaves them to the text's curve, or to the curve Pele draws where the
+// text has none, and Orthogonal and Straight take the place of the step and linear curves.
+// The other diagrams route their edges as Pele does and pay it no heed.
 type Routing uint8
 
 const (
@@ -57,7 +57,7 @@ type Options struct {
 	// scene; a diagram package's own Layout leaves it to its caller, who snaps the scene
 	// with Scene.Snap.
 	Snap float64
-	// Routing is how edges run, in the diagrams that take Pele's curve setting.
+	// Routing is how edges run, in the diagrams laid out in ranks.
 	Routing Routing
 
 	// Now is the time a diagram that places things in time takes as the present: where a

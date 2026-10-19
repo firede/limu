@@ -167,25 +167,25 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := 0; i < len(sc.Items); i++ {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "gitgraph.title":
+		case RoleTitle:
 			lines = append(lines, "title")
 			label(it)
-		case "gitgraph.lane":
+		case RoleLane:
 			lines = append(lines, "branch "+peleID(it.ID))
 			shape(it, &it.Parts[0])
-		case "gitgraph.branch":
+		case RoleBranch:
 			shape(it, &it.Parts[0])
 			label(it)
-		case "gitgraph.edge":
+		case RoleEdge:
 			cls := "pele-edge"
 			if it.Shape != "" {
 				cls += " pele-edge-" + string(it.Shape)
 			}
 			lines = append(lines, "edge "+cls)
 			shape(it, &it.Parts[0])
-		case "gitgraph.commit", "gitgraph.merge":
+		case RoleCommit, RoleMerge:
 			cls := "pele-commit pele-commit-" + string(it.Shape)
-			if it.Role == "gitgraph.merge" && it.Shape != "merge" {
+			if it.Role == RoleMerge && it.Shape != "merge" {
 				cls += " pele-commit-merge"
 			}
 			lines = append(lines, "commit "+peleID(it.ID)+" "+cls)
@@ -195,11 +195,11 @@ func sceneLines(sc *scene.Scene) []string {
 			for k := range it.Parts {
 				shape(it, &it.Parts[k])
 			}
-		case "gitgraph.commit-mark", "gitgraph.tag-hole":
+		case RoleCommitMark, RoleTagHole:
 			for k := range it.Parts {
 				shape(it, &it.Parts[k])
 			}
-		case "gitgraph.commit-label":
+		case RoleCommitLabel:
 			lines = append(lines, "label")
 			for k := range it.Parts {
 				shape(it, &it.Parts[k])
@@ -209,11 +209,11 @@ func sceneLines(sc *scene.Scene) []string {
 			} else {
 				label(it)
 			}
-		case "gitgraph.tag":
+		case RoleTag:
 			lines = append(lines, "tag")
 			shape(it, &it.Parts[0])
 			// Pele draws the hole, an item of its own after the tag, before the tag's text.
-			if i+1 < len(sc.Items) && sc.Items[i+1].Role == "gitgraph.tag-hole" {
+			if i+1 < len(sc.Items) && sc.Items[i+1].Role == RoleTagHole {
 				hole := &sc.Items[i+1]
 				shape(hole, &hole.Parts[0])
 				i++

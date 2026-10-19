@@ -61,13 +61,6 @@ type row struct {
 	top, height float64
 }
 
-// classNames are the classes of an entry's :::class, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // Layout lays a tree view out as a scene, as Pele's renderTreeView does: a row to an entry,
 // each indented under its directory, with a guide down from the directory to its entries. A
 // tree wider than the width the host has is laid out tightly, its indents narrower and its
@@ -92,7 +85,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 	size := o.Size()
 	measure := o.Measure()
 	pad := o.Pad()
-	icons := Icons(config)
+	icons := iconConfig(config)
 
 	s := settings(config)
 	paddingX, paddingY := s.paddingX, s.paddingY
@@ -134,7 +127,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 	// Siblings line up: when one entry of a folder has an icon, the others leave room for one.
 	hasIcon := func(list []*Node) bool {
 		for _, child := range list {
-			if NodeIcon(child, icons) != "" {
+			if getNodeIcon(child, icons) != "" {
 				return true
 			}
 		}
@@ -173,7 +166,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 		if node.Type == Directory {
 			face = text.Bold
 		}
-		r := &row{node: node, x: x, icon: NodeIcon(node, icons), text: name, labelX: labelX, tight: tight}
+		r := &row{node: node, x: x, icon: getNodeIcon(node, icons), text: name, labelX: labelX, tight: tight}
 		var width float64
 		if tight {
 			r.label = common.LiteralLabel(name, measure, size, room, face)
@@ -273,7 +266,6 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 		})
 	}
 
-	host := func(name string) bool { return o.Icons != nil && o.Icons(text.DecodeEntities(name)) }
 	for _, r := range rows {
 		node := r.node
 		cy := top + r.cy
@@ -283,7 +275,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 			role, face = RoleDirectory, text.Bold
 		}
 		it := scene.Item{
-			Kind: scene.Node, Role: role, ID: node.Name, Class: classNames(node.CSSClass),
+			Kind: scene.Node, Role: role, ID: node.Name, Class: common.ClassNames(node.CSSClass),
 			Box:   scene.Rect{X: inset + r.x, Y: top + r.top, W: totalWidth - inset - (inset + r.x), H: r.height},
 			Style: style.Style{Text: style.Fg},
 		}
@@ -296,7 +288,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 		var glyph *scene.Item
 		if r.icon != "" {
 			box := scene.Rect{X: inset + r.x, Y: cy - iconSize/2, W: iconSize, H: iconSize}
-			if host(r.icon) {
+			if common.HostIcon(o, r.icon) {
 				it.Picture = &scene.Picture{Icon: text.DecodeEntities(r.icon), Box: box}
 			} else {
 				name, ok := strings.CutPrefix(r.icon, builtinPack+":")
@@ -306,13 +298,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 						name = "folder"
 					}
 				}
-				glyph = &scene.Item{
-					Kind: scene.Mark, Role: RoleIcon, Shape: scene.Shape(name), ID: node.Name,
-					Box:   box,
-					Parts: []scene.Part{{Path: glyphPaths[name].Scaled(box.W/24, box.X, box.Y), Paint: scene.StrokeOnly}},
-					Style: style.Style{Stroke: style.Muted, Fill: style.None, StrokeWidth: style.N(float64(glyphStroke*box.W) / 24),
-						Cap: style.CapRound, Join: style.JoinRound},
-				}
+				glyph = common.Glyph(RoleIcon, name, node.Name, glyphPaths[name], box, style.Muted)
 			}
 		}
 		if r.tight {
@@ -323,8 +309,8 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 				it.Align = scene.Start
 			}
 		} else if r.text != "" {
-			l := line(r.text, measure, size, face)
-			it.Label = &l
+			l := common.Line(r.text, measure.Width(r.text, size, face), size, face)
+			it.Label = l
 			it.At = scene.Point{X: inset + r.labelX, Y: cy}
 			it.Align = scene.Start
 		}
@@ -340,21 +326,11 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 			description.At = scene.Point{X: inset + r.labelX, Y: top + r.top + paddingY + labelHeight + l.Height/2}
 			sc.Items = append(sc.Items, description)
 		} else if node.Description != "" {
-			l := line(text.DecodeEntities(node.Description), measure, size, text.Italic)
-			description.Label = &l
+			l := common.Line(text.DecodeEntities(node.Description), measure.Width(text.DecodeEntities(node.Description), size, text.Italic), size, text.Italic)
+			description.Label = l
 			description.At = scene.Point{X: inset + descX, Y: cy}
 			sc.Items = append(sc.Items, description)
 		}
 	}
 	return sc
-}
-
-// line is text as one line, as Pele writes a name or a description that is not wrapped.
-func line(s string, measure text.Measurer, size float64, face text.Face) text.Label {
-	w := measure.Width(s, size, face)
-	lh := jsmath.Round(size * text.LineHeight)
-	return text.Label{
-		Lines:  [][]text.Span{{{Text: s, Face: face, Width: w}}},
-		Widths: []float64{w}, Width: w, Height: lh, Size: size, LineHeight: lh,
-	}
 }

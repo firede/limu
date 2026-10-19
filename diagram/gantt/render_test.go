@@ -214,28 +214,28 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "gantt.title":
+		case RoleTitle:
 			lines = append(lines, "title "+textAt(it))
-		case "gantt.section":
+		case RoleSection:
 			r := it.Box
 			if len(it.Parts) != 1 || it.Parts[0].Box != r || it.Style.Stroke != style.None {
 				lines = append(lines, "band not one box")
 			}
 			index := strings.TrimPrefix(strings.Join(it.Tags, " "), "section-")
 			lines = append(lines, fmt.Sprintf("band %s %s,%s %s -", index, pt(r.X, r.Y), pt(r.W, r.H), paintName(pelesvg.OwnFill(it))))
-		case "gantt.excluded":
+		case RoleExcluded:
 			r := it.Box
 			if len(it.Parts) != 1 || it.Parts[0].Box != r || it.Style.Fill != style.SurfaceAlt {
 				lines = append(lines, "excluded not one box")
 			}
 			lines = append(lines, "excluded "+pt(r.X, r.Y)+","+pt(r.W, r.H))
-		case "gantt.grid", "gantt.axis":
+		case RoleGrid, RoleAxis:
 			lines = append(lines, strings.TrimPrefix(string(it.Role), "gantt."))
 			paths(it.Parts[0].Path, "- "+paintName(it.Style.Stroke)+" "+pen(it))
-		case "gantt.vert":
+		case RoleVert:
 			lines = append(lines, "vert "+peleID(it.ID))
 			paths(it.Parts[0].Path, "- - "+pen(it))
-		case "gantt.today":
+		case RoleToday:
 			// The author's style of the line, which Pele writes as it is, takes the place of the
 			// triangle.
 			if len(it.Parts) == 1 {
@@ -247,7 +247,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if len(it.Parts) > 1 {
 				paths(it.Parts[1].Path, paintName(pelesvg.OwnFill(it))+" - "+pen(it))
 			}
-		case "gantt.task":
+		case RoleTask:
 			lines = append(lines, fmt.Sprintf("task %s [%s]", peleID(it.ID), strings.Join(it.Tags, " ")))
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
@@ -268,11 +268,11 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Label != nil {
 				lines = append(lines, sized(it))
 			}
-		case "gantt.section-label":
+		case RoleSectionLabel:
 			lines = append(lines, "section "+peleID(it.ID), sized(it))
-		case "gantt.vert-label":
+		case RoleVertLabel:
 			lines = append(lines, "vert-label "+peleID(it.ID), sized(it))
-		case "gantt.tick":
+		case RoleTick:
 			l := it.Label
 			if len(l.Lines) != 1 || len(l.Lines[0]) != 1 || it.Style.Text != style.Muted {
 				lines = append(lines, "tick not one span")

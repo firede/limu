@@ -292,12 +292,12 @@ func (p *parser) entityStatement() []string {
 			classes = p.idList()
 		}
 		attrs := p.block()
-		db.AddEntity(a, alias)
+		db.addEntity(a, alias)
 		if attrs != nil {
-			db.AddAttributes(a, attrs)
+			db.addAttributes(a, attrs)
 		}
 		if classes != nil {
-			db.SetClass([]string{a}, classes)
+			db.setClass([]string{a}, classes)
 		}
 		return []string{a}
 	}
@@ -317,24 +317,24 @@ func (p *parser) entityStatement() []string {
 		}
 		p.expect(t_COLON)
 		label := p.role()
-		db.AddEntity(a, "")
-		db.AddEntity(b, "")
-		db.AddRelationship(a, label, b, spec)
+		db.addEntity(a, "")
+		db.addEntity(b, "")
+		db.addRelationship(a, label, b, spec)
 		if classes != nil {
-			db.SetClass([]string{a}, classes)
+			db.setClass([]string{a}, classes)
 		}
 		if classesB != nil {
-			db.SetClass([]string{b}, classesB)
+			db.setClass([]string{b}, classesB)
 		}
 		return []string{a, b}
 	}
 	attrs := p.block()
-	db.AddEntity(a, "")
+	db.addEntity(a, "")
 	if attrs != nil {
-		db.AddAttributes(a, attrs)
+		db.addAttributes(a, attrs)
 	}
 	if classes != nil {
-		db.SetClass([]string{a}, classes)
+		db.setClass([]string{a}, classes)
 	}
 	return []string{a}
 }
@@ -396,16 +396,16 @@ func (p *parser) parse() {
 		case t_acc_title:
 			p.i++
 			value := chars.Trim(p.expect(t_acc_title_value))
-			db.SetAccTitle(value)
+			db.setAccTitle(value)
 			push(value)
 		case t_acc_descr:
 			p.i++
 			value := chars.Trim(p.expect(t_acc_descr_value))
-			db.SetAccDescription(value)
+			db.setAccDescription(value)
 			push(value)
 		case t_acc_descr_multiline_value:
 			value := chars.Trim(p.next())
-			db.SetAccDescription(value)
+			db.setAccDescription(value)
 			push(value)
 		case t_direction_tb, t_direction_bt, t_direction_rl, t_direction_lr:
 			p.i++
@@ -413,26 +413,26 @@ func (p *parser) parse() {
 			if nested {
 				f.list = append(f.list, docItem{dir: value})
 			} else {
-				db.SetDirection(value)
+				db.setDirection(value)
 			}
 		case t_CLASSDEF:
 			keyword := p.next()
 			ids := p.idList()
 			styles := p.stylesOpt()
 			p.separator()
-			db.AddClass(ids, styles)
+			db.addClass(ids, styles)
 			push(keyword)
 		case t_CLASS:
 			keyword := p.next()
 			ids := p.idList()
-			db.SetClass(ids, p.idList())
+			db.setClass(ids, p.idList())
 			push(keyword)
 		case t_STYLE:
 			keyword := p.next()
 			ids := p.idList()
 			styles := p.stylesOpt()
 			p.separator()
-			db.AddCSSStyles(ids, styles)
+			db.addCSSStyles(ids, styles)
 			push(keyword)
 		default:
 			if !isName(t) {

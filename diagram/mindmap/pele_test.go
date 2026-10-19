@@ -138,7 +138,7 @@ func check(t *testing.T, what, src string, m *Model, err error, want peleResult)
 // tokens writes a source's tokens as the oracle writes Pele's, with offsets in UTF-16 code
 // units.
 func tokens(src string) peleTokens {
-	tok := Tokenize(src)
+	tok := tokenize(src)
 	out := peleTokens{Types: tok.Types, Texts: tok.Texts, Starts: make([]int, len(tok.Starts))}
 	for i, s := range tok.Starts {
 		out.Starts[i] = chars.Len16(src[:s])

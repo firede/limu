@@ -23,6 +23,10 @@ type peleChars struct {
 		Hex json.RawMessage `json:"hex"`
 		Dec json.RawMessage `json:"dec"`
 	} `json:"number"`
+	ToLowerCase []struct {
+		S     string `json:"s"`
+		Lower string `json:"lower"`
+	} `json:"toLowerCase"`
 }
 
 // number reads a number as the oracle writes it, with {"$n": …} for those JSON has no word for.
@@ -57,6 +61,18 @@ func TestUnicodeLettersMatchPele(t *testing.T) {
 	for c := range want {
 		if IsUnicodeLetter(c) != want[c] {
 			t.Errorf("IsUnicodeLetter(%#x) = %v", c, !want[c])
+		}
+	}
+}
+
+func TestToLowerMatchesJavaScript(t *testing.T) {
+	p := load(t)
+	if len(p.ToLowerCase) < 1000 {
+		t.Fatalf("only %d cases", len(p.ToLowerCase))
+	}
+	for _, c := range p.ToLowerCase {
+		if got := ToLower(c.S); got != c.Lower {
+			t.Errorf("ToLower(%q) = %q, JavaScript %q", c.S, got, c.Lower)
 		}
 	}
 }

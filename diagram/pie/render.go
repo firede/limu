@@ -85,16 +85,6 @@ func slice(cx, cy, start, end, outer, inner float64) *scene.Path {
 	return p.ArcTo(inner, inner, 0, large, false, x, y).Close()
 }
 
-// line is a label of one line of plain text, measured, in a size of type, as Pele writes a
-// percentage: as it is, with no markup read.
-func line(s string, width, size float64) text.Label {
-	lh := jsmath.Round(size * text.LineHeight)
-	return text.Label{
-		Lines:  [][]text.Span{{{Text: s, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lh, Size: size, LineHeight: lh,
-	}
-}
-
 // Layout lays a pie chart out as a scene, as Pele's renderPie draws it: the pie, its
 // percentages on the slices, or outside the rim for a slice too thin for its own, and a
 // legend beside, above, below or in the middle of it, as the config says. A pie that does not
@@ -273,16 +263,16 @@ func draw(m *Model, config diagram.Config, o *layout.Options, radius float64, ti
 			}
 			x, y := point(at, rim)
 			placedOutside = append(placedOutside, clearing{x, y, width})
-			l := line(s, width, small)
+			l := common.Line(s, width, small, 0)
 			outsides = append(outsides, scene.Item{
-				Kind: scene.Text, Role: RoleSliceLabel, Label: &l,
+				Kind: scene.Text, Role: RoleSliceLabel, Label: l,
 				At: scene.Point{X: cx + x, Y: cy + y}, Style: style.Style{Text: style.Fg},
 			})
 		} else {
 			x, y := point(mid, radius*textPosition)
-			l := line(s, measure.Width(s, small, 0), small)
+			l := common.Line(s, measure.Width(s, small, 0), small, 0)
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: RoleSliceLabel, Label: &l,
+				Kind: scene.Text, Role: RoleSliceLabel, Label: l,
 				At: scene.Point{X: cx + x, Y: cy + y}, Style: style.Style{Text: style.Bg},
 			})
 		}

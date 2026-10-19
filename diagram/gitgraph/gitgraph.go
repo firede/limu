@@ -94,10 +94,6 @@ type Model struct {
 	Warnings      []string
 }
 
-// ParseAST parses a git graph's text into its tree, as Pele's parseGit does. An error is a
-// *diagram.Error.
-func ParseAST(src string) (*AST, error) { return parseGit(src) }
-
 // Parse parses a git graph's text, as the parse of Pele's git graph does: source is what
 // diagram.Prepared.Source gives, config the diagram's configuration and title the title its
 // front matter gives, "" for none. An error is a *diagram.Error.
@@ -106,7 +102,7 @@ func Parse(source string, config diagram.Config, title string) (*Model, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Build(ast, config, title)
+	return buildGit(ast, config, title)
 }
 
 // ParsePrepared parses a prepared git graph.

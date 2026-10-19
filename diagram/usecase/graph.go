@@ -129,9 +129,9 @@ func isObjectValue(v any) bool {
 	return false
 }
 
-// FlattenJSONRows is one row for each leaf of a JSON object, depth first in the order the keys
+// flattenJSONRows is one row for each leaf of a JSON object, depth first in the order the keys
 // were written, as Pele's flattenJsonRows makes them. Nesting is kept on a stack of its own.
-func FlattenJSONRows(value *Object, order *KeyOrder) []JSONRow {
+func flattenJSONRows(value *Object, order *KeyOrder) []JSONRow {
 	type entry struct {
 		value         any
 		path, pointer string
@@ -308,7 +308,7 @@ func BuildGraph(m *Model) *Graph {
 			ID: j.ID, Label: j.ID, LabelType: LabelText, Shape: "usecaseJsonTable", Padding: 10,
 			CSSClasses: classList(append([]string{"default", "usecase-json-table"}, j.Classes...)...),
 			CSSStyles:  orEmpty(append([]string(nil), j.Styles...)), CSSCompiledStyles: compiled(j.Classes),
-			JSONRows: FlattenJSONRows(j.Value, j.PropertyOrder),
+			JSONRows: flattenJSONRows(j.Value, j.PropertyOrder),
 		})
 	}
 	for _, b := range m.SystemBoundaries {

@@ -95,16 +95,6 @@ func fillStyle(color any) (style.Style, bool) {
 	return style.Declarations([]string{"fill:" + s}).Style, true
 }
 
-// line is a label of one line of plain text, measured, in a size of type, as Pele writes a
-// node's id and its value: as it is, with no markup read.
-func line(s string, width, size float64) *text.Label {
-	lh := jsmath.Round(float64(size * text.LineHeight))
-	return &text.Label{
-		Lines:  [][]text.Span{{{Text: s, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lh, Size: size, LineHeight: lh,
-	}
-}
-
 // Layout lays a sankey diagram out as a scene, as Pele's renderSankey draws it: the chart at
 // the width and height its config gives, narrower where the host is, with the bands of the
 // links under the bars of the nodes, a label beside each bar, and the title above. A diagram
@@ -235,12 +225,12 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) 
 		// starts where the whole starts, and the value ends where it ends.
 		idItem := scene.Item{
 			Kind: scene.Text, Role: RoleLabel, ID: id, At: scene.Point{X: x, Y: y}, Align: scene.End,
-			Label: line(id, measure.Width(id, small, 0), small),
+			Label: common.Line(id, measure.Width(id, small, 0), small, 0),
 			Style: style.Style{Text: style.Fg, Halo: halo.Halo, HaloWidth: halo.HaloWidth},
 		}
 		valueItem := scene.Item{
 			Kind: scene.Text, Role: RoleValue, ID: id, At: scene.Point{X: x, Y: y}, Align: scene.End,
-			Label: line(value, measure.Width(value, small, 0), small),
+			Label: common.Line(value, measure.Width(value, small, 0), small, 0),
 			Style: style.Style{Text: style.Muted, Halo: halo.Halo, HaloWidth: halo.HaloWidth},
 		}
 		switch {

@@ -36,8 +36,8 @@ var tokenNames = [...]string{
 	"NODE_ID", "NODE_DESCR", "NODE_DEND", "SHAPE_DATA",
 }
 
-// OutlineTokenName is a token as the generated parser prints it, as Pele's tokenName does.
-func OutlineTokenName(typ int, kanban bool) string {
+// outlineTokenName is a token as the generated parser prints it, as Pele's tokenName does.
+func outlineTokenName(typ int, kanban bool) string {
 	if typ == TokKeyword {
 		if kanban {
 			return "KANBAN"
@@ -373,10 +373,10 @@ func ParseOutline(src string, db OutlineDB, kanban bool) error {
 		if t == TokError {
 			return diagram.SyntaxError(typ, src, starts[i], "", true)
 		}
-		return diagram.SyntaxError(typ, src, starts[i], "Expecting "+expected+", got '"+OutlineTokenName(t, kanban)+"'", false)
+		return diagram.SyntaxError(typ, src, starts[i], "Expecting "+expected+", got '"+outlineTokenName(t, kanban)+"'", false)
 	}
 
-	keyword := "'" + OutlineTokenName(TokKeyword, kanban) + "'"
+	keyword := "'" + outlineTokenName(TokKeyword, kanban) + "'"
 	if types[i] == TokSpaceLine {
 		i++
 		for types[i] == TokSpaceLine || types[i] == TokNL {

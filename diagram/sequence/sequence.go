@@ -178,10 +178,10 @@ type DB struct {
 func (db *DB) Actor(id string) *Actor { return db.actorIndex[id] }
 
 // Parse parses a sequence diagram's text, as the parse of Pele's sequence diagram does:
-// source is what diagram.Prepared.Source gives, title the title its front matter gives, ""
-// for none, and config the diagram's configuration, whose wrap and sequence.wrap say
-// whether text wraps. An error is a *diagram.Error.
-func Parse(source, title string, config diagram.Config) (*DB, error) {
+// source is what diagram.Prepared.Source gives, config the diagram's configuration, whose
+// wrap and sequence.wrap say whether text wraps, and title the title its front matter gives,
+// "" for none. An error is a *diagram.Error.
+func Parse(source string, config diagram.Config, title string) (*DB, error) {
 	db := newDB(config)
 	if title != "" {
 		db.Title = title
@@ -195,5 +195,5 @@ func Parse(source, title string, config diagram.Config) (*DB, error) {
 // ParsePrepared parses a prepared sequence diagram. It is limu's own: Pele's core hands its
 // parse the source, the config and the title itself.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Title, p.Config)
+	return Parse(p.Source(false), p.Config, p.Title)
 }

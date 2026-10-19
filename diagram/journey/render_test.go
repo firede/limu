@@ -138,7 +138,7 @@ func sceneLines(sc *scene.Scene) []string {
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
 	down := true
 	for _, it := range sc.Items {
-		if it.Role == "journey.grid" {
+		if it.Role == RoleGrid {
 			down = false
 		}
 	}
@@ -211,15 +211,15 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "journey.title", "journey.scale", "journey.score":
+		case RoleTitle, RoleScale, RoleScore:
 			textAt(it)
-		case "journey.grid":
+		case RoleGrid:
 			path(it, "grid")
-		case "journey.stem":
+		case RoleStem:
 			path(it, "stems")
-		case "journey.line":
+		case RoleLine:
 			path(it, "edge")
-		case "journey.face":
+		case RoleFace:
 			lines = append(lines, "face "+string(it.Shape))
 			for k := range 3 {
 				lines = append(lines, ellipse(it.Parts[k].Path)+" "+partPaint(it, &it.Parts[k]))
@@ -235,13 +235,13 @@ func sceneLines(sc *scene.Scene) []string {
 				s = "path M " + pt(mouth.Args[0], mouth.Args[1]) + " A 6,6,0,0," + sweep + " " + pt(end.X, end.Y)
 			}
 			lines = append(lines, s+" "+partPaint(it, &it.Parts[3])+" "+pen(it))
-		case "journey.section":
+		case RoleSection:
 			if it.Kind == scene.Group {
 				lines = append(lines, "section "+peleText(text.DecodeEntities(it.ID)))
 				box(it)
 			}
 			textAt(it)
-		case "journey.task":
+		case RoleTask:
 			if down {
 				lines = append(lines, "step "+strconv.Itoa(step))
 				step++
@@ -250,8 +250,8 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			box(it)
 			textAt(it)
-		case "journey.actor", "journey.legend":
-			if it.Role == "journey.legend" {
+		case RoleActor, RoleLegend:
+			if it.Role == RoleLegend {
 				lines = append(lines, "legend "+peleText(text.DecodeEntities(it.ID)))
 			}
 			lines = append(lines, ellipse(it.Parts[0].Path)+" "+partPaint(it, &it.Parts[0]))

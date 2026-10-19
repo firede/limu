@@ -3,7 +3,6 @@ package mindmap
 import (
 	"math"
 	"strconv"
-	"strings"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
@@ -52,13 +51,6 @@ const (
 	rowGap = 10
 )
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // outline is a shape w by h drawn about the origin and moved to cx, cy, as Pele draws a node's
 // shape in the node's own frame.
 func outline(shape string, cx, cy, w, h float64) []scene.Part {
@@ -100,7 +92,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 		wrap = min(v, 2000)
 	}
 	glyph := float64(size * 1.25)
-	has := func(name string) bool { return name != "" && o.Icons != nil && o.Icons(text.DecodeEntities(name)) }
+	has := func(name string) bool { return name != "" && common.HostIcon(o, name) }
 
 	nodes := m.Nodes
 	n := len(nodes)
@@ -392,9 +384,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 		if i == 0 {
 			it.Role = RoleRoot
 			it.Style = style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg}
-			it.Class = classNames(node.Class)
+			it.Class = common.ClassNames(node.Class)
 		} else {
-			it.Tags, it.Class = []string{branchClass}, classNames(node.Class)
+			it.Tags, it.Class = []string{branchClass}, common.ClassNames(node.Class)
 		}
 		switch {
 		case shape != "":

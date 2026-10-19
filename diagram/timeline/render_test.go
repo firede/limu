@@ -167,26 +167,26 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "timeline.title":
+		case RoleTitle:
 			lines = append(lines, "title "+textAt(it))
-		case "timeline.axis":
+		case RoleAxis:
 			lines = append(lines, "pele-axis "+subpaths(it.Parts[0].Path)+" "+partPaint(it, &it.Parts[0]))
 			for _, m := range it.Ends {
 				for _, part := range m.Outline() {
 					lines = append(lines, "pele-marker "+subpaths(part.Path)+" "+paintName(it.Style.Stroke)+" none")
 				}
 			}
-		case "timeline.section", "timeline.period":
+		case RoleSection, RolePeriod:
 			lines = append(lines, strings.TrimPrefix(string(it.Role), "timeline.")+" "+xmlText(text.DecodeEntities(it.ID)))
 			box(it)
 			lines = append(lines, textAt(it))
-		case "timeline.event":
+		case RoleEvent:
 			lines = append(lines, "event")
 			box(it)
 			lines = append(lines, textAt(it))
-		case "timeline.connector":
+		case RoleConnector:
 			lines = append(lines, "pele-edge "+subpaths(it.Parts[0].Path)+" "+partPaint(it, &it.Parts[0]))
-		case "timeline.dot":
+		case RoleDot:
 			// The circle, as Path.Ellipse draws it: from its right end, four quarters.
 			var args [][]float64
 			it.Parts[0].Path.Each(func(_ scene.Op, a []float64) { args = append(args, a) })

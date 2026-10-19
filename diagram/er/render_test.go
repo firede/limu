@@ -115,9 +115,12 @@ func sceneLines(sc *scene.Scene) []string {
 					lines = append(lines, "stripe "+box(part.Box)+" rounded")
 				case part.Paint == scene.Shade:
 					lines = append(lines, "stripe "+box(part.Box))
-				case part.Path != nil:
-					lines = append(lines, "divider "+pelesvg.D(part.Path))
 				default:
+					// Pele draws the line under the name, an item of its own after the
+					// entity, before the outline drawn again.
+					if i+1 < len(sc.Items) && sc.Items[i+1].Role == RoleDivider {
+						lines = append(lines, "divider "+pelesvg.D(sc.Items[i+1].Parts[0].Path))
+					}
 					lines = append(lines, "outline "+box(part.Box)+" "+pen(it, ""))
 				}
 			}
@@ -125,6 +128,8 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "link "+it.Link)
 			}
 			label(it.Label, it.At.X, it.At.Y)
+		case RoleDivider:
+			// Written with its entity.
 		case RoleAttributeType, RoleAttributeName, RoleAttributeKeys, RoleAttributeComment:
 			kind := strings.TrimPrefix(string(it.Role), "er.attribute-")
 			if it.Align != scene.Start {

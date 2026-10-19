@@ -42,15 +42,6 @@ func option(config diagram.Config, key string, fallback, lo, hi float64) float64
 	return fallback
 }
 
-// line is a label of one line of text, measured, in a size and face of type.
-func line(s string, width, size float64, face text.Face) *text.Label {
-	lh := jsmath.Round(size * text.LineHeight)
-	return &text.Label{
-		Lines:  [][]text.Span{{{Text: s, Face: face, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lh, Size: size, LineHeight: lh,
-	}
-}
-
 // classes is the class a node's text gives it, as Pele's classNames writes it: a name of a
 // class is an ID2 token, which holds no character it would take out.
 func classes(class string) []string {
@@ -143,14 +134,14 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 				}
 				baseline := y + header/2 + 1
 				if f, ok := common.FitText(name, fit, small, small, measure, text.Bold); ok {
-					it.Label = line(f.Text, f.Width, f.Size, text.Bold)
+					it.Label = common.Line(f.Text, f.Width, f.Size, text.Bold)
 					it.At = scene.Point{X: x + sideInset + 2, Y: baseline}
 					it.Align = scene.Start
 				}
 				if withValue {
 					shown = &scene.Item{
 						Kind: scene.Text, Role: RoleValue, ID: node.Name,
-						Label: line(value, valueWidth, tiny, 0), Align: scene.End,
+						Label: common.Line(value, valueWidth, tiny, 0), Align: scene.End,
 						At:     scene.Point{X: x + b.w - sideInset - 2, Y: baseline},
 						Style:  style.Style{Text: style.Muted},
 						Author: valueAuthor,
@@ -175,7 +166,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 				cy := y + b.h/2
 				valueSize := max(least, jsmath.Round(f.Size*0.8))
 				lines := (f.Size + valueSize) * lineSpacing
-				it.Label = line(f.Text, f.Width, f.Size, 0)
+				it.Label = common.Line(f.Text, f.Width, f.Size, 0)
 				it.At = scene.Point{X: cx, Y: cy}
 				valueWidth := 0.0
 				if value != "" && lines <= b.h-4 {
@@ -185,7 +176,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 					it.At.Y = cy - lines/2 + (f.Size*lineSpacing)/2
 					shown = &scene.Item{
 						Kind: scene.Text, Role: RoleValue, ID: node.Name,
-						Label:  line(value, valueWidth, valueSize, 0),
+						Label:  common.Line(value, valueWidth, valueSize, 0),
 						At:     scene.Point{X: cx, Y: cy + lines/2 - (valueSize*lineSpacing)/2},
 						Style:  style.Style{Text: style.Bg},
 						Author: valueAuthor,

@@ -119,3 +119,20 @@ func Accessibility(src string, p int, out *JisonTokens, first int) int {
 	}
 	return q + 1
 }
+
+// WordAt reports whether word, written in lower case, is at byte at of src, as Pele's wordAt
+// (common/caseless.ts) does: only ASCII letters match in either case, as with the i flag on
+// a regular expression without the u flag. KeywordAt folds any character with |32, which
+// would take a carriage return for the dash of x-axis.
+func WordAt(src string, at int, word string) bool {
+	if at+len(word) > len(src) {
+		return false
+	}
+	for k := 0; k < len(word); k++ {
+		c, w := src[at+k], word[k]
+		if c != w && !(w >= 'a' && w <= 'z' && c == w-32) {
+			return false
+		}
+	}
+	return true
+}

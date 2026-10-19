@@ -128,7 +128,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if len(it.Parts) != 1 || it.Parts[0].Box != it.Box || !it.Parts[0].Rounded {
 				lines = append(lines, "parts differ from the box")
 			}
-			if i+2 >= len(sc.Items) || sc.Items[i+1].Role != "agentflow.collapsed-rule" || sc.Items[i+2].Role != "agentflow.collapsed-dots" {
+			if i+2 >= len(sc.Items) || sc.Items[i+1].Role != RoleCollapsedRule || sc.Items[i+2].Role != RoleCollapsedDots {
 				lines = append(lines, "no rule and dots")
 			} else {
 				d := ""

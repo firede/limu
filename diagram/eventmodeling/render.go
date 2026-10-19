@@ -572,13 +572,9 @@ func verticalEventModel(m *Model, o *layout.Options) *scene.Scene {
 		nodes = append(nodes, node)
 		// The frame's number, its baseline as far below the top of the box as the size of
 		// the frame's name.
-		id := text.Label{
-			Lines: [][]text.Span{{{Text: box.ID, Width: measure.Width(box.ID, mono, 0)}}},
-			Size:  mono, LineHeight: jsmath.Round(mono * text.LineHeight),
-		}
-		id.Widths, id.Width, id.Height = []float64{id.Lines[0][0].Width}, id.Lines[0][0].Width, id.LineHeight
+		id := common.Line(box.ID, measure.Width(box.ID, mono, 0), mono, 0)
 		nodes = append(nodes, scene.Item{
-			Kind: scene.Text, Role: RoleFrameID, ID: box.ID, Label: &id, Align: scene.End,
+			Kind: scene.Text, Role: RoleFrameID, ID: box.ID, Label: id, Align: scene.End,
 			At:    scene.Point{X: pad + w - boxPadX, Y: cy + boxPadY + small - float64(mono*0.35)},
 			Style: style.Style{Text: style.Muted},
 		})

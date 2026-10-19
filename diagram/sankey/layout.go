@@ -281,7 +281,7 @@ func layoutSankey(m *Model, options layoutOptions) ([]placedNode, []placedLink, 
 	for _, column := range columns {
 		y := 0.0
 		for _, i := range column {
-			nodes[i].height = flow[i] * scale
+			nodes[i].height = float64(flow[i] * scale)
 			margin[i] = max(0, claim-nodes[i].height) / 2
 			nodes[i].y = y + margin[i]
 			y += nodes[i].height + float64(2*margin[i]) + gap

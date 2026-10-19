@@ -4,7 +4,6 @@ import (
 	"math"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
@@ -354,12 +353,16 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	if lettered {
 		rs += 16
 	}
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
 	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: numberOption(conf, "nodeSpacing", nodeSep),
-		EdgeSep: edgeSep,
-		RankSep: numberOption(conf, "rankSpacing", rs),
-		PortSep: 20,
-		Apart:   true,
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  numberOption(conf, "nodeSpacing", nodeSep),
+		EdgeSep:  edgeSep,
+		RankSep:  numberOption(conf, "rankSpacing", rs),
+		PortSep:  20,
+		Apart:    true,
 	})
 	// node is the box of the laid-out node i, as Pele's draw passes its CNode to endSide and
 	// the cluster helpers.
@@ -649,7 +652,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			titleY := y - h/2 + 8 + v.label.Height/2
 			box := scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h}
 			cluster := scene.Item{
-				Kind: scene.Group, Role: "class.namespace", ID: n.ID, Box: box,
+				Kind: scene.Group, Role: RoleNamespace, ID: n.ID, Box: box,
 				Parts: []scene.Part{{Box: box, Rounded: true}},
 				Style: style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 			}
@@ -658,7 +661,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 				if c.IsGroup && draw.TitleCrossed(node(i), v.label.Width, titleX, crossings) {
 					depth := draw.StruckDepth(func(k int) int { return nodes[k].Parent }, i)
 					struck = append(struck, scene.Item{
-						Kind: scene.Text, Role: "class.namespace-title", ID: n.ID, Label: &v.label, At: at,
+						Kind: scene.Text, Role: RoleNamespaceTitle, ID: n.ID, Label: &v.label, At: at,
 						Style: style.Style{
 							Text:      style.Muted,
 							Halo:      style.SurfaceAlt.Alpha(draw.StruckTint(depth) / 100).Over(style.Bg),
@@ -681,7 +684,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 				LineTo(x+r, y+(-t)).LineTo(x+(-r), y+(-t)).Close()
 			corner := new(scene.Path).MoveTo(x+(r-fold), y+t).LineTo(x+(r-fold), y+(t+fold)).LineTo(x+r, y+(t+fold))
 			nodeItems = append(nodeItems, scene.Item{
-				Kind: scene.Node, Role: "class.note", Shape: "note", ID: n.ID,
+				Kind: scene.Node, Role: RoleNote, Shape: "note", ID: n.ID,
 				Box:   scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
 				Parts: []scene.Part{{Path: outline}, {Path: corner, Paint: scene.StrokeOnly}},
 				Label: &v.label, At: scene.Point{X: x, Y: y},
@@ -690,7 +693,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			})
 		default:
 			nodeItems = append(nodeItems, scene.Item{
-				Kind: scene.Node, Role: "class.interface", Shape: "interface", ID: n.ID,
+				Kind: scene.Node, Role: RoleInterface, Shape: "interface", ID: n.ID,
 				Box:   scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
 				Label: &v.label, At: scene.Point{X: x, Y: y},
 			})
@@ -725,17 +728,17 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 				route[k] += ox
 				route[k+1] += oy
 			}
-			path = draw.RoutePath(route, "", startTrim, endTrim, draw.OwnReach(startTrim), draw.OwnReach(endTrim))
+			path = draw.RoutePath(route, curve, startTrim, endTrim, draw.OwnReach(startTrim), draw.OwnReach(endTrim))
 		}
 		// Pele draws the edges in a group that ends their lines round.
 		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
-		role := scene.Role("class.relation")
+		role := RoleRelation
 		switch edge.Pattern {
 		case "dashed":
 			own.Dash = style.Dashes(6, 4)
 		case "dotted":
 			own.Dash = style.Dashes(2, 4)
-			role = "class.note-edge"
+			role = RoleNoteEdge
 		}
 		it := scene.Item{
 			Kind: scene.Edge, Role: role, ID: edge.ID,
@@ -755,7 +758,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		if label.Width > 0 {
 			x, y := ce.LabelX+ox, ce.LabelY+oy
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: "class.label", ID: edge.ID,
+				Kind: scene.Text, Role: RoleEdgeLabel, ID: edge.ID,
 				Box:   scene.Rect{X: x - (label.Width+8)/2, Y: y - label.Height/2, W: label.Width + 8, H: label.Height},
 				Parts: []scene.Part{draw.LabelPatch(label, x, y)},
 				Label: label, At: scene.Point{X: x, Y: y},
@@ -766,9 +769,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 
 	var cardItems []scene.Item
 	for _, c := range cards {
-		l := oneLine(c.text, c.width, tiny, tinyHeight, 0)
+		l := common.LineOf(c.text, c.width, tiny, tinyHeight, 0)
 		cardItems = append(cardItems, scene.Item{
-			Kind: scene.Text, Role: "class.cardinality", Label: &l, At: scene.Point{X: c.x + ox, Y: c.y + oy},
+			Kind: scene.Text, Role: RoleCardinality, Label: l, At: scene.Point{X: c.x + ox, Y: c.y + oy},
 			Style: style.Style{Text: style.Muted},
 		})
 	}
@@ -778,7 +781,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	for _, layer := range [][]scene.Item{clusters, edges, struck, labels, cardItems, nodeItems} {
 		sc.Items = append(sc.Items, layer...)
 	}
-	common.WithTitle(sc, db.Title, "class.title", measure, size, padding)
+	common.WithTitle(sc, db.Title, RoleTitle, measure, size, padding)
 	return sc
 }
 
@@ -797,15 +800,6 @@ func classStyle(db *DB, cls *Class) style.Author {
 	return style.Declarations(append(decls, cls.Styles...))
 }
 
-// oneLine is a label of one line of plain text, as Pele writes the text of a member, an
-// annotation or a multiplicity: as it is, with no markup read.
-func oneLine(s string, width, size, lineHeight float64, face text.Face) text.Label {
-	return text.Label{
-		Lines:  [][]text.Span{{{Text: s, Face: face, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lineHeight, Size: size, LineHeight: lineHeight,
-	}
-}
-
 // classItems draws a class centered on x, y, as Pele's classSvg does: the box, with its
 // dividers, and the class's name as its label, then each annotation and member as a text of
 // its own. A static member is underlined, as Pele's text-decoration does, by a line under it.
@@ -818,25 +812,33 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 	parts := []scene.Part{{Box: box, Rounded: true}}
 	first := top + v.titleH
 	second := first + v.attributesH
+	// The lines under the name and the attributes are an item of their own, as Pele gives
+	// them only the stroke color the author set and none of the rest of the class's style.
+	var dividers []scene.Item
 	if h > v.titleH {
 		divider := new(scene.Path).MoveTo(x+left, y+first).LineTo(x+(-left), y+first).
 			MoveTo(x+left, y+second).LineTo(x+(-left), y+second)
-		parts = append(parts, scene.Part{Path: divider, Paint: scene.StrokeOnly})
+		dividers = append(dividers, scene.Item{
+			Kind: scene.Mark, Role: RoleDivider, ID: cls.ID, Box: divider.Bounds(),
+			Parts:  []scene.Part{{Path: divider, Paint: scene.StrokeOnly}},
+			Style:  style.Style{Stroke: style.Border},
+			Author: style.Style{Stroke: v.author.Style.Stroke},
+		})
 	}
 	at := top + titlePad
 	var annotations []scene.Item
 	for _, a := range v.annotations {
-		l := oneLine(a.text, a.width, tiny, tinyHeight, 0)
+		l := common.LineOf(a.text, a.width, tiny, tinyHeight, 0)
 		annotations = append(annotations, scene.Item{
-			Kind: scene.Text, Role: "class.annotation", ID: cls.ID, Label: &l,
+			Kind: scene.Text, Role: RoleAnnotation, ID: cls.ID, Label: l,
 			At:    scene.Point{X: x, Y: y + (at + tinyHeight/2)},
 			Style: style.Style{Text: style.Muted},
 		})
 		at += tinyHeight
 	}
-	classes, tags := common.Clickable(classNames(trimDefault(cls.CSSClasses)))
+	classes, tags := common.Clickable(common.ClassNames(common.TrimDefault(cls.CSSClasses)))
 	it := scene.Item{
-		Kind: scene.Node, Role: "class.class", Shape: "classBox", ID: cls.ID, Class: classes, Tags: tags,
+		Kind: scene.Node, Role: RoleClass, Shape: "classBox", ID: cls.ID, Class: classes, Tags: tags,
 		Box: box, Parts: parts,
 		Label: &v.label, At: scene.Point{X: x, Y: y + (at+first-titlePad)/2},
 		Style:   style.Style{Fill: style.Surface, Stroke: style.Border},
@@ -848,7 +850,7 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 			it.Link = href
 		}
 	}
-	items := append([]scene.Item{it}, annotations...)
+	items := append(append([]scene.Item{it}, dividers...), annotations...)
 	// lines draws the members of a compartment, one text each, from the top of the compartment
 	// down, as the lines of Pele's classSvg does.
 	lines := func(list []line, role scene.Role, from float64) {
@@ -858,9 +860,9 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 			if ln.classifier == "*" {
 				face = text.Italic
 			}
-			l := oneLine(ln.text, ln.width, memberSize, lineHeight, face)
+			l := common.LineOf(ln.text, ln.width, memberSize, lineHeight, face)
 			m := scene.Item{
-				Kind: scene.Text, Role: role, ID: cls.ID, Label: &l,
+				Kind: scene.Text, Role: role, ID: cls.ID, Label: l,
 				At: scene.Point{X: x + (left + padX), Y: y + middle}, Align: scene.Start,
 				Author: style.Style{Text: v.author.Style.Text},
 			}
@@ -876,8 +878,8 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 			middle += lineHeight
 		}
 	}
-	lines(v.attributes, "class.attribute", first)
-	lines(v.methods, "class.method", second)
+	lines(v.attributes, RoleAttribute, first)
+	lines(v.methods, RoleMethod, second)
 	return items
 }
 
@@ -888,24 +890,4 @@ func markerType(name string) scene.MarkerType {
 		return ""
 	}
 	return scene.MarkerType("class." + name)
-}
-
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
-// trimDefault takes /^default\s?/ off a class's classes: the class every class has.
-// Pele's classSvg does this with a replace.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
 }

@@ -71,7 +71,7 @@ func face(x, y float64, mood scene.Shape) scene.Item {
 		mouth.MoveTo(x+-4.5, y+4.5).LineTo(x+4.5, y+4.5)
 	}
 	return scene.Item{
-		Kind: scene.Mark, Role: "journey.face", Shape: mood,
+		Kind: scene.Mark, Role: RoleFace, Shape: mood,
 		Box: scene.Rect{X: x - faceR, Y: y - faceR, W: 2 * faceR, H: 2 * faceR},
 		Parts: []scene.Part{
 			{Path: new(scene.Path).Ellipse(x, y, faceR, faceR), Paint: scene.Hollow},
@@ -87,7 +87,7 @@ func face(x, y float64, mood scene.Shape) scene.Item {
 // which is the series it is drawn in.
 func actorNames(tasks []Task) ([]string, map[string]int) {
 	var names []string
-	for _, name := range Actors(tasks) {
+	for _, name := range journeyActors(tasks) {
 		if name != "" {
 			names = append(names, name)
 		}
@@ -251,12 +251,12 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 			grid.MoveTo(left-6, y).LineTo(right, y)
 			label := text.Layout(strconv.Itoa(score), text.Options{Measurer: measure, Size: tiny})
 			scale = append(scale, scene.Item{
-				Kind: scene.Text, Role: "journey.scale", Label: &label, Align: scene.End,
+				Kind: scene.Text, Role: RoleScale, Label: &label, Align: scene.End,
 				At: scene.Point{X: left - 12, Y: y}, Style: style.Style{Text: style.Muted},
 			})
 		}
 		items = append(items, scene.Item{
-			Kind: scene.Mark, Role: "journey.grid", Box: grid.Bounds(),
+			Kind: scene.Mark, Role: RoleGrid, Box: grid.Bounds(),
 			Parts: []scene.Part{{Path: grid, Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.SurfaceAlt},
 		})
@@ -287,7 +287,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 
 			label := labels[i]
 			card := scene.Item{
-				Kind: scene.Node, Role: "journey.task", Shape: "rect", ID: chars.Trim(task.Task),
+				Kind: scene.Node, Role: RoleTask, Shape: "rect", ID: chars.Trim(task.Task),
 				Box:   scene.Rect{X: x, Y: cardsY, W: cardW, H: cardH},
 				Style: style.Style{Fill: style.Surface, Stroke: style.Border},
 				At:    scene.Point{X: cx, Y: cardsY + padY + textH/2},
@@ -303,7 +303,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 				dx := cx + float64((float64(k)-float64(len(people)-1)/2)*step)
 				dy := cardsY + cardH - padY - dot
 				cards[i] = append(cards[i], scene.Item{
-					Kind: scene.Mark, Role: "journey.actor", Shape: "circle", ID: name, Tooltip: name,
+					Kind: scene.Mark, Role: RoleActor, Shape: "circle", ID: name, Tooltip: name,
 					Box:   scene.Rect{X: dx - dot, Y: dy - dot, W: 2 * dot, H: 2 * dot},
 					Parts: []scene.Part{{Path: new(scene.Path).Ellipse(dx, dy, dot, dot)}},
 					Style: style.Style{Fill: style.Series(actor[name]), Stroke: style.Surface},
@@ -311,14 +311,14 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 			}
 		}
 		items = append(items, scene.Item{
-			Kind: scene.Mark, Role: "journey.stem", Box: stems.Bounds(),
+			Kind: scene.Mark, Role: RoleStem, Box: stems.Bounds(),
 			Parts: []scene.Part{{Path: stems, Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.Border, Dash: style.Dashes(2, 3)},
 		})
 		if n > 1 {
 			// Pele turns the line's corners round.
 			items = append(items, scene.Item{
-				Kind: scene.Edge, Role: "journey.line", Box: line.Bounds(), Route: route,
+				Kind: scene.Edge, Role: RoleLine, Box: line.Bounds(), Route: route,
 				Parts: []scene.Part{{Path: line, Paint: scene.StrokeOnly}},
 				Style: style.Style{Stroke: style.Line, Join: style.JoinRound},
 			})
@@ -330,7 +330,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 				x := left + float64(float64(r.start)*pitch)
 				w := float64(float64(r.count)*pitch) - gap
 				band := scene.Item{
-					Kind: scene.Group, Role: "journey.section", Shape: "rect", ID: chars.Trim(tasks[r.start].Section),
+					Kind: scene.Group, Role: RoleSection, Shape: "rect", ID: chars.Trim(tasks[r.start].Section),
 					Box:   scene.Rect{X: x, Y: top, W: w, H: bandH},
 					Label: r.label, At: scene.Point{X: x + w/2, Y: top + bandH/2},
 					Style: style.Style{Fill: style.SurfaceAlt},
@@ -354,7 +354,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 				cy := y0 + e.y + e.h/2
 				cx := x0 + e.x + dot
 				it := scene.Item{
-					Kind: scene.Node, Role: "journey.legend", Shape: "circle", ID: e.name,
+					Kind: scene.Node, Role: RoleLegend, Shape: "circle", ID: e.name,
 					Box:   scene.Rect{X: x0 + e.x, Y: cy - e.h/2, W: 2*dot + 6 + e.label.Width, H: e.h},
 					Parts: []scene.Part{{Path: new(scene.Path).Ellipse(cx, cy, dot, dot), Paint: scene.FillOnly}},
 					At:    scene.Point{X: x0 + e.x + 2*dot + 6 + e.label.Width/2, Y: cy},
@@ -380,7 +380,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 	}
 	if !title.Empty() {
 		sc.Items = append(sc.Items, scene.Item{
-			Kind: scene.Text, Role: "journey.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: pad + width/2, Y: pad + title.Height/2},
 		})
 	}
@@ -416,13 +416,17 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 			head := common.FitLabel(section, measure, size, room-16, text.Bold)
 			if head.Height != 0 {
 				items = append(items, scene.Item{
-					Kind: scene.Text, Role: "journey.section", Label: &head,
+					Kind: scene.Text, Role: RoleSection, Label: &head,
 					At: scene.Point{X: pad + 8 + head.Width/2, Y: y + head.Height/2},
 				})
 				width = max(width, head.Width+16)
 				y += head.Height + 8
 			}
 		}
+		// Pele measures a task's label at the small size and writes its text with no
+		// font-size, so that a browser draws it at the diagram's own size, wider than it was
+		// measured. Here it is drawn at the size it was measured at, as the scene's labels
+		// are; where it is placed is Pele's.
 		label := common.FitLabel(task.Task, measure, small, room-72, 0)
 		type person struct {
 			name  string
@@ -439,7 +443,7 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 		}
 		w := max(room, label.Width+72)
 		card := scene.Item{
-			Kind: scene.Node, Role: "journey.task", Shape: "rect", ID: chars.Trim(task.Task),
+			Kind: scene.Node, Role: RoleTask, Shape: "rect", ID: chars.Trim(task.Task),
 			Box:   scene.Rect{X: pad, Y: y, W: w, H: h},
 			At:    scene.Point{X: pad + padX + label.Width/2, Y: y + padY + label.Height/2},
 			Style: style.Style{Fill: style.Surface, Stroke: style.Border},
@@ -453,14 +457,14 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 		items = append(items, face(cx, y+padY+faceR, mood(task.Score)))
 		if !math.IsNaN(task.Score) {
 			score := text.Layout(scoreText(min(5, max(1, task.Score))), text.Options{Measurer: measure, Size: small})
-			items = append(items, textItem("journey.score", score, cx, y+padY+2*faceR+small, scene.Middle, style.Paint{}))
+			items = append(items, textItem(RoleScore, score, cx, y+padY+2*faceR+small, scene.Middle, style.Paint{}))
 		}
 		py := y + padY + textH + 4
 		for _, p := range people {
 			ph := max(16, p.label.Height)
 			cy := py + ph/2
 			it := scene.Item{
-				Kind: scene.Node, Role: "journey.actor", Shape: "circle", ID: p.name,
+				Kind: scene.Node, Role: RoleActor, Shape: "circle", ID: p.name,
 				Box:   scene.Rect{X: pad + 16 - dot, Y: py, W: 12 + dot + p.label.Width, H: ph},
 				Parts: []scene.Part{{Path: new(scene.Path).Ellipse(pad+16, cy, dot, dot), Paint: scene.FillOnly}},
 				At:    scene.Point{X: pad + 28 + p.label.Width/2, Y: cy},
@@ -478,7 +482,7 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 			x := pad + w/2
 			link := new(scene.Path).MoveTo(x, y).LineTo(x, y+16)
 			items = append(items, scene.Item{
-				Kind: scene.Edge, Role: "journey.line", Box: link.Bounds(),
+				Kind: scene.Edge, Role: RoleLine, Box: link.Bounds(),
 				Route: []scene.Point{{X: x, Y: y}, {X: x, Y: y + 16}},
 				Parts: []scene.Part{{Path: link, Paint: scene.StrokeOnly}},
 				Style: style.Style{Stroke: style.Line},
@@ -502,7 +506,7 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 	}
 	if !title.Empty() {
 		sc.Items = append(sc.Items, scene.Item{
-			Kind: scene.Text, Role: "journey.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: totalWidth / 2, Y: pad + title.Height/2},
 		})
 	}

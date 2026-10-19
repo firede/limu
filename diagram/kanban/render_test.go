@@ -97,10 +97,10 @@ func paintName(p style.Paint) string {
 
 // textClasses are the classes Pele gives the text of an item of each role.
 var textClasses = map[scene.Role]string{
-	"kanban.column":   "pele-cluster-label",
-	"kanban.card":     "pele-label",
-	"kanban.ticket":   "pele-ticket",
-	"kanban.assigned": "pele-assigned",
+	RoleColumn:   "pele-cluster-label",
+	RoleCard:     "pele-label",
+	RoleTicket:   "pele-ticket",
+	RoleAssigned: "pele-assigned",
 }
 
 // sceneLines writes a scene as the oracle reads Pele's SVG.
@@ -155,40 +155,40 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "kanban.title":
+		case RoleTitle:
 			l := it.Label
 			lines = append(lines, "title "+pt(it.At.X, it.At.Y-l.Height/2+l.LineHeight/2+float64(l.Size*0.35)))
-		case "kanban.column":
+		case RoleColumn:
 			lines = append(lines, fmt.Sprintf("column %s [%s]", pelesvg.ID(it.ID), strings.Join(it.Class, " ")))
 			rect(it)
 			block(it)
-		case "kanban.count":
+		case RoleCount:
 			l := it.Label
 			lines = append(lines, fmt.Sprintf("count %s %s %s", pt(it.At.X, it.At.Y-l.Height/2+l.LineHeight/2+float64(l.Size*0.35)),
 				paintName(it.Style.Text), num(l.Size)))
 			// Pele draws a column's icon after its count.
 			icon(&sc.Items[i-1])
-		case "kanban.card":
+		case RoleCard:
 			classes := it.Class
 			// Pele marks a card of a priority with a class, which the stripe after it says.
-			if i+1 < len(sc.Items) && sc.Items[i+1].Role == "kanban.priority" {
+			if i+1 < len(sc.Items) && sc.Items[i+1].Role == RolePriority {
 				classes = append([]string{"pele-priority-" + string(sc.Items[i+1].Shape)}, classes...)
 			}
 			lines = append(lines, fmt.Sprintf("card %s [%s]", pelesvg.ID(it.ID), strings.Join(classes, " ")))
 			rect(it)
 			// Pele draws the stripe of a priority before the card's text.
-			if i+1 < len(sc.Items) && sc.Items[i+1].Role == "kanban.priority" {
+			if i+1 < len(sc.Items) && sc.Items[i+1].Role == RolePriority {
 				stripe(&lines, &sc.Items[i+1])
 			}
 			block(it)
 			icon(it)
-		case "kanban.priority":
-		case "kanban.ticket":
+		case RolePriority:
+		case RoleTicket:
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
 			}
 			block(it)
-		case "kanban.assigned":
+		case RoleAssigned:
 			block(it)
 		default:
 			lines = append(lines, "unknown role "+string(it.Role))

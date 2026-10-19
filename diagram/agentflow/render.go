@@ -3,13 +3,12 @@ package agentflow
 import (
 	"math"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/flowchart"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
-	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -66,13 +65,6 @@ func numberOption(config diagram.Config, key string, fallback float64) float64 {
 	return fallback
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // A view is a node as it is drawn: Pele's NodeView.
 type view struct {
 	node   *GraphNode
@@ -120,7 +112,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 	padding := o.Pad()
 	graph := db.Graph(DefaultCurve(config))
 	size := o.Size()
-	edgeSize := math.Floor(size*0.875 + 0.5)
+	edgeSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
 	wrapWidth := numberOption(config, "wrappingWidth", 120)
 	minWidth := numberOption(config, "minNodeWidth", 120)
@@ -128,13 +120,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
 	// The routing the options ask for, which Pele has no option for, overrides the curves.
-	curve := ""
-	switch o.Routing {
-	case layout.Orthogonal:
-		curve = "step"
-	case layout.Straight:
-		curve = "linear"
-	}
+	curve := common.RoutingCurve(o.Routing)
 
 	index := make(map[string]int, len(graph.Nodes))
 	for i, n := range graph.Nodes {
@@ -444,7 +430,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 	var titles, clusters, nodes, edges, labels []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "agentflow.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: padding + title.Height/2},
 		})
 	}
@@ -453,14 +439,14 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		c := &cnodes[i]
 		n := v.node
 		x, y := c.X, c.Y
-		classes, tags := common.Clickable(classNames(trimDefault(n.CSSClasses)))
+		classes, tags := common.Clickable(common.ClassNames(common.TrimDefault(n.CSSClasses)))
 		if c.IsGroup {
 			titleX := draw.ClusterTitleX(node(i), v.label.Width, crossings, groupPad)
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
 			own := tint(slot(n), 0.06, v.filled)
 			own.Text = style.Muted
 			cluster := scene.Item{
-				Kind: scene.Group, Role: "agentflow.flow", ID: n.ID, Class: classes, Tags: tags, Box: box,
+				Kind: scene.Group, Role: RoleFlow, ID: n.ID, Class: classes, Tags: tags, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
 				Style:  own,
 				Author: v.author.Style,
@@ -484,7 +470,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		var marks []scene.Item
 		if v.shape == collapsed {
 			s := slot(n)
-			it.Role = "agentflow.collapsed"
+			it.Role = RoleCollapsed
 			it.Parts = []scene.Part{{Box: box, Rounded: true}}
 			it.Style = tint(s, 0.06, v.filled)
 			// What the author set for lines styles the rule, and fills nothing.
@@ -493,7 +479,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			rule := h/2 - dots - 2
 			mid := rule + (dots+2)/2
 			marks = []scene.Item{{
-				Kind: scene.Mark, Role: "agentflow.collapsed-rule", ID: n.ID,
+				Kind: scene.Mark, Role: RoleCollapsedRule, ID: n.ID,
 				Box: scene.Rect{X: x - w/2 + 10, Y: y + rule, W: w - 20},
 				Parts: []scene.Part{{
 					Path:  new(scene.Path).MoveTo(x+(-w/2+10), y+rule).LineTo(x+(w/2-10), y+rule),
@@ -502,7 +488,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 				Style:  style.Style{Stroke: style.Series(s), Fill: style.None, Dash: style.Dashes(3, 3)},
 				Author: line,
 			}, {
-				Kind: scene.Mark, Role: "agentflow.collapsed-dots", ID: n.ID,
+				Kind: scene.Mark, Role: RoleCollapsedDots, ID: n.ID,
 				Box:   scene.Rect{X: x - 9 - 1.75, Y: y + mid - 1.75, W: 18 + 3.5, H: 3.5},
 				Parts: []scene.Part{{Path: dot(dot(dot(new(scene.Path), x, y, -9, mid), x, y, 0, mid), x, y, 9, mid)}},
 				Style: style.Style{Fill: style.Series(s), Stroke: style.None},
@@ -558,7 +544,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		}
 		it := scene.Item{
 			Kind: scene.Edge, Role: scene.Role("agentflow." + kind), ID: edge.ID,
-			Class:  classNames(edgeClassNoise.Replace(edge.Classes)),
+			Class:  common.ClassNames(edgeClassNoise.Replace(edge.Classes)),
 			Box:    path.Path.Bounds(),
 			Parts:  []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 			Ends:   path.Ends("", scene.MarkerType(edge.ArrowTypeEnd)),
@@ -575,7 +561,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		edges = append(edges, it)
 		if label.Width > 0 {
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: "agentflow.edge-label", ID: edge.ID,
+				Kind: scene.Text, Role: RoleEdgeLabel, ID: edge.ID,
 				Box:    scene.Rect{X: x - (label.Width+8)/2, Y: y - label.Height/2, W: label.Width + 8, H: label.Height},
 				Parts:  []scene.Part{draw.LabelPatch(label, x, y)},
 				Label:  label,
@@ -636,19 +622,6 @@ func dot(p *scene.Path, x, y, dx, dy float64) *scene.Path {
 
 // The classes Mermaid gives every edge, which say nothing.
 var edgeClassNoise = strings.NewReplacer("edge-thickness-normal", "", "edge-pattern-solid", "", "flowchart-link", "")
-
-// trimDefault takes /^default\s?/ off a node's classes: the class every node has.
-// It is the replace of /^default\s?/ on node.cssClasses in Pele's draw.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
-}
 
 // hasClass reports whether name is one of classes, the test Pele's draw makes for
 // internal-link with / internal-link(?: |$)/ on the joined class names.

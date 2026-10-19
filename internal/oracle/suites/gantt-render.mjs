@@ -249,6 +249,17 @@ export default async function ({ src, pele, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 1000);
   const next = mutator(usable, FRAGMENTS, random(52));
   while (drawn < 4000) each(next());
+  // Rows whose height has three decimals. The end of the plot, its top added to the height of
+  // all its rows, then rounds to two decimals one way or the other by the last bit of that
+  // height, which a port that fused the product into the sum would change.
+  for (const [height, gap, top, days] of [
+    [6.587, 1.488, 75, [2, 5, 1, 5, 1, 2, 1]],
+    [3.292, 1.639, 50, [5, 1, 5, 5, 3]],
+    [35.089, 8.32, 75, [2, 4, 4, 5, 1]],
+  ]) {
+    const tasks = days.map((d, i) => `T${i} :t${i}, 2024-01-0${i + 1}, ${d}d\n`).join('');
+    each(`---\nconfig:\n  gantt:\n    barHeight: ${height}\n    barGap: ${gap}\n    topPadding: ${top}\n---\ngantt\ndateFormat YYYY-MM-DD\n${tasks}`);
+  }
   process.env.TZ = saved;
   write('diagram/gantt/testdata/pele/render.json', { zones: ZONES, cases: out });
 }

@@ -180,19 +180,19 @@ func classes(it *scene.Item) string {
 	business := strings.HasSuffix(shape, "-business")
 	shape = strings.TrimSuffix(shape, "-business")
 	switch it.Role {
-	case "usecase.system":
+	case RoleSystem:
 		names = []string{"system-boundary", "system-boundary-" + shape}
-	case "usecase.actor":
+	case RoleActor:
 		kind := strings.TrimPrefix(strings.TrimPrefix(shape, "actor"), "-")
 		if kind == "" {
 			kind = "normal"
 		}
 		names = []string{"usecase-actor", "usecase-actor-" + kind}
-	case "usecase.usecase":
+	case RoleUsecase:
 		names = []string{"usecase-element", "usecase-" + shape}
-	case "usecase.note":
+	case RoleNote:
 		names = []string{"usecase-note"}
-	case "usecase.json":
+	case RoleJson:
 		names = []string{"usecase-json-table"}
 	}
 	if business {
@@ -284,15 +284,15 @@ func sceneLines(sc *scene.Scene) []string {
 		it := &sc.Items[i]
 		id := peleID(it.ID)
 		switch it.Role {
-		case "usecase.title":
+		case RoleTitle:
 			lines = append(lines, "title "+textAt(it, it.Label, it.At.X, it.At.Y))
-		case "usecase.system":
+		case RoleSystem:
 			lines = append(lines, fmt.Sprintf("cluster %s [%s]", id, classes(it)))
 			for k := range it.Parts {
 				shape(it, &it.Parts[k])
 			}
 			label(it, it.Label, it.At.X, it.At.Y)
-		case "usecase.relation", "usecase.note-link":
+		case RoleRelation, RoleNoteLink:
 			dash := "-"
 			if it.Style.Dash.Set() {
 				var parts []string
@@ -301,7 +301,7 @@ func sceneLines(sc *scene.Scene) []string {
 				}
 				dash = strings.Join(parts, " ")
 			}
-			if (it.Role == "usecase.note-link") != (it.Shape == "note") {
+			if (it.Role == RoleNoteLink) != (it.Shape == "note") {
 				lines = append(lines, "role "+string(it.Role)+" of a line of shape "+string(it.Shape))
 			}
 			lines = append(lines, fmt.Sprintf("edge %s %s [%s] %s", id, it.Shape, classes(it), dash))
@@ -317,14 +317,14 @@ func sceneLines(sc *scene.Scene) []string {
 					lines = append(lines, "m "+s)
 				}
 			}
-		case "usecase.label":
+		case RoleEdgeLabel:
 			r := it.Box
 			if pelesvg.D(it.Parts[0].Path) != pelesvg.D(new(scene.Path).RoundRect(r, 3)) {
 				lines = append(lines, "patch not the label's box")
 			}
 			lines = append(lines, "label "+id+" "+pt(r.X, r.Y)+","+pt(r.W, r.H))
 			label(it, it.Label, it.At.X, it.At.Y)
-		case "usecase.actor", "usecase.usecase", "usecase.note", "usecase.json":
+		case RoleActor, RoleUsecase, RoleNote, RoleJson:
 			// Where the node's middle is, which Pele's SVG moves what is in the node by, is
 			// checked through where that is drawn.
 			lines = append(lines, fmt.Sprintf("node %s [%s]", id, classes(it)))
@@ -333,9 +333,9 @@ func sceneLines(sc *scene.Scene) []string {
 			var cells []*scene.Item
 			for i+1 < len(sc.Items) {
 				next := &sc.Items[i+1]
-				if next.Role == "usecase.stereotype" {
+				if next.Role == RoleStereotype {
 					stereotype = next
-				} else if next.Role == "usecase.json-key" || next.Role == "usecase.json-value" {
+				} else if next.Role == RoleJsonKey || next.Role == RoleJsonValue {
 					cells = append(cells, next)
 				} else {
 					break

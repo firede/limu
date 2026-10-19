@@ -31,7 +31,19 @@ export default async function ({ src, write, random }) {
     for (let k = 0; k < n; k++) s += bits[Math.floor(next() * bits.length)];
     strings.push(s);
   }
+  // toLowerCase about capital sigmas, which end a word or not by the letters about them and
+  // the case-ignorable characters between: marks, modifiers, an apostrophe, a period, a soft
+  // hyphen, and characters that are cased and ignorable at once.
+  const lower = ['Σ', 'ΣΣ', 'ΑΣ', 'ΑΣ Α', 'ΟΔΟΣ.', '.ΑΣ', 'Α.Σ', "Α'Σ", 'ΑΣ́', 'ΑΣ­', 'ΑΣ́Α', 'ʰΣ', 'Σʰ', 'Αʰ Σ',
+    'aΣ', '1Σ', 'ᾼΣ', 'ⒶΣ', 'Σⓐ', 'ΑΣͅ', 'ꭜΣ', 'İΣ', 'ΑΣ😀', 'ΑΣ1', '.ας', 'ΑΣ:Α', 'ΑΣ’', 'ΑΣ’Α'];
+  const pieces = ['Σ', 'σ', 'Α', 'a', ' ', "'", '.', 'ʰ', '́', '­', 'ᾼ', '1', 'İ', 'ͅ', 'Ⓐ', '😀', '’', ':', '-'];
+  for (let i = 0; i < 1000; i++) {
+    let s = '';
+    for (let k = 1 + Math.floor(next() * 6); k > 0; k--) s += pieces[Math.floor(next() * pieces.length)];
+    lower.push(s);
+  }
   write('internal/chars/testdata/pele/chars.json', {
+    toLowerCase: lower.map((s) => ({ s, lower: s.toLowerCase() })),
     letters,
     toString: numbers.map((n) => ({ n: enc(n), s: String(n) })),
     number: strings.map((s) => ({ s, n: enc(Number(s)), hex: enc(parseInt(s, 16)), dec: enc(parseInt(s, 10)) })),

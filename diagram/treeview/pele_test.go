@@ -72,11 +72,11 @@ func dumpNode(n *Node, icons IconConfig) []any {
 		children = append(children, dumpNode(c, icons))
 	}
 	return []any{n.ID, n.Level, n.Name, string(n.Type), encOpt(n.Icon), encOpt(n.CSSClass), encOpt(n.Description),
-		encOpt(NodeIcon(n, icons)), children}
+		encOpt(getNodeIcon(n, icons)), children}
 }
 
 func dumpModel(m *Model, config diagram.Config) map[string]any {
-	icons := Icons(config)
+	icons := iconConfig(config)
 	s := settings(config)
 	out := map[string]any{
 		"count":    m.Count,

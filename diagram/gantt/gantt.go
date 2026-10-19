@@ -6,6 +6,12 @@
 // Dates are computed as JavaScript computes them in local time (see internal/jsdate), in the
 // zone layout.Options.Location gives, and against the time layout.Options.Now gives, so that
 // a host decides both.
+//
+// The scene's items carry the classes Pele gives the chart's elements, for a host's CSS. A
+// task ("gantt.task") has, in this order, "active" or "done", "crit", "milestone",
+// "clickable" when a click line gives it a link or a callback, and "unscheduled" when its
+// dates could not be worked out. A section's band ("gantt.section") has "section-N", N the
+// section's place among the colors numberSectionStyles sets, counted from 0.
 package gantt
 
 import (
@@ -90,9 +96,9 @@ func (t *Task) End() (time.Time, bool) { return t.end.time(t.loc) }
 func (t *Task) RenderEnd() (time.Time, bool) { return t.renderEnd.time(t.loc) }
 
 // Parse parses a gantt chart's text, as the parse of Pele's gantt chart does: source is what
-// diagram.Prepared.Source gives, title the title its front matter gives, "" for none, and
-// config its configuration. An error is a *diagram.Error.
-func Parse(source, title string, config diagram.Config) (*DB, error) {
+// diagram.Prepared.Source gives, config its configuration, and title the title its front
+// matter gives, "" for none. An error is a *diagram.Error.
+func Parse(source string, config diagram.Config, title string) (*DB, error) {
 	db := newDB()
 	if title != "" {
 		db.Title = title
@@ -110,7 +116,7 @@ func Parse(source, title string, config diagram.Config) (*DB, error) {
 
 // ParsePrepared parses a prepared gantt chart, giving Parse what Pele's parse is given.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Title, p.Config)
+	return Parse(p.Source(false), p.Config, p.Title)
 }
 
 // trim is JavaScript's trim, as Pele's String.prototype.trim calls give it.

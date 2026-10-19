@@ -210,14 +210,14 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 	}
 	var items []scene.Item
 	header := func(g *group, label text.Label, x, y, w, h float64) {
-		it := roundedBox(x, y, w, h, "timeline.section", scene.Group, style.Style{Fill: style.Series(g.section), Text: style.Bg})
+		it := roundedBox(x, y, w, h, RoleSection, scene.Group, style.Style{Fill: style.Series(g.section), Text: style.Bg})
 		it.ID = chars.Trim(m.Sections[g.section])
 		it.Label = &label
 		it.At = scene.Point{X: x + w/2, Y: y + h/2}
 		items = append(items, it)
 	}
 	period := func(i int, color style.Paint, x, y, h float64) {
-		it := roundedBox(x, y, colW, h, "timeline.period", scene.Node, style.Style{Fill: color, Text: style.Bg})
+		it := roundedBox(x, y, colW, h, RolePeriod, scene.Node, style.Style{Fill: color, Text: style.Bg})
 		it.ID = chars.Trim(periods[i].Text)
 		label := periodLabels[i]
 		it.Label = &label
@@ -225,14 +225,14 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 		items = append(items, it)
 	}
 	event := func(label text.Label, color style.Paint, x, y, h float64) scene.Item {
-		it := roundedBox(x, y, eventW, h, "timeline.event", scene.Node, style.Style{Fill: color, FillOpacity: style.N(0.16)})
+		it := roundedBox(x, y, eventW, h, RoleEvent, scene.Node, style.Style{Fill: color, FillOpacity: style.N(0.16)})
 		it.Label = &label
 		it.At = scene.Point{X: x + eventW/2, Y: y + h/2}
 		return it
 	}
 	connector := func(p *scene.Path) {
 		items = append(items, scene.Item{
-			Kind: scene.Mark, Role: "timeline.connector", Box: p.Bounds(),
+			Kind: scene.Mark, Role: RoleConnector, Box: p.Bounds(),
 			Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.Border},
 		})
@@ -240,7 +240,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 	dot := func(x, y float64, color style.Paint) {
 		p := new(scene.Path).Ellipse(x, y, 4, 4)
 		items = append(items, scene.Item{
-			Kind: scene.Mark, Role: "timeline.dot", Shape: "circle", Box: scene.Rect{X: x - 4, Y: y - 4, W: 8, H: 8},
+			Kind: scene.Mark, Role: RoleDot, Shape: "circle", Box: scene.Rect{X: x - 4, Y: y - 4, W: 8, H: 8},
 			Parts: []scene.Part{{Path: p, Paint: scene.FillAndStroke}},
 			Style: style.Style{Fill: color, Stroke: style.Bg, StrokeWidth: style.N(2)},
 		})
@@ -255,7 +255,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 			p.LineTo(x0, y1-arrow+1)
 		}
 		axisItem := scene.Item{
-			Kind: scene.Edge, Role: "timeline.axis",
+			Kind: scene.Edge, Role: RoleAxis,
 			Box:   scene.Rect{X: x0, Y: y0, W: x1 - x0, H: y1 - y0},
 			Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}},
 			Route: []scene.Point{{X: x0, Y: y0}, {X: x1, Y: y1}},
@@ -389,7 +389,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 	totalHeight := math.Ceil(max(height, pad*2))
 	if !title.Empty() {
 		items = append([]scene.Item{{
-			Kind: scene.Text, Role: "timeline.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At:    scene.Point{X: totalWidth / 2, Y: pad + title.Height/2},
 			Style: style.Style{Text: style.Fg},
 		}}, items...)

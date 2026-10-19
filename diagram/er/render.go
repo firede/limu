@@ -4,12 +4,10 @@ import (
 	"math"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
-	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
@@ -49,6 +47,7 @@ const (
 	RoleRelationship      scene.Role = "er.relationship"
 	RoleRelationshipLabel scene.Role = "er.relationship-label"
 	RoleEntity            scene.Role = "er.entity"
+	RoleDivider           scene.Role = "er.divider"
 	RoleAttributeType     scene.Role = "er.attribute-type"
 	RoleAttributeName     scene.Role = "er.attribute-name"
 	RoleAttributeKeys     scene.Role = "er.attribute-keys"
@@ -348,11 +347,15 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	if turned {
 		rootDir = layout.TB
 	}
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
 	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: numberOption(config, "nodeSpacing", nodeSep),
-		EdgeSep: edgeSep,
-		RankSep: numberOption(config, "rankSpacing", rankSep),
-		PortSep: 24,
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
+		EdgeSep:  edgeSep,
+		RankSep:  numberOption(config, "rankSpacing", rankSep),
+		PortSep:  24,
 	})
 
 	spreadEnds(cedges, cnodes, views)
@@ -417,7 +420,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		v := &views[i]
 		c := &cnodes[i]
 		n := v.node
-		classes := classNames(trimDefault(n.CSSClasses))
+		classes := common.ClassNames(common.TrimDefault(n.CSSClasses))
 		if c.IsGroup {
 			v.w, v.h = c.W, c.H
 			box := scene.Rect{X: c.X - c.W/2, Y: c.Y - c.H/2, W: c.W, H: c.H}
@@ -516,7 +519,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			if !direct {
 				stub = markerLength
 			}
-			ep := draw.RoutePath(r, "", stub, stub, draw.OwnReach(stub), draw.OwnReach(stub))
+			ep := draw.RoutePath(r, curve, stub, stub, draw.OwnReach(stub), draw.OwnReach(stub))
 			path = ep.Path
 			if stub > 0 {
 				path = new(scene.Path).MoveTo(ep.SX, ep.SY)
@@ -578,9 +581,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 }
 
 // entity is an entity drawn about x, y, as Pele's draw draws one: its box, with its name, and,
-// when it has attributes, its table: the stripes of every other row, the line under its name
-// and its outline drawn again over the stripes as parts, and the text of each cell as an
-// item of its own after it.
+// when it has attributes, its table: the stripes of every other row and its outline drawn
+// again over them as parts, and the line under its name and the text of each cell as items
+// of their own after it.
 func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.Item {
 	n := v.node
 	w, h := v.w, v.h
@@ -648,12 +651,19 @@ func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.
 		}
 		top += rw.h
 	}
-	divider := y + (y0 + v.headH)
-	it.Parts = append(it.Parts,
-		scene.Part{Path: new(scene.Path).MoveTo(x+x0, divider).LineTo(x+(x0+w), divider), Paint: scene.StrokeOnly},
-		scene.Part{Box: box, Rounded: true, Paint: scene.StrokeOnly},
-	)
-	return append([]scene.Item{it}, cells...)
+	it.Parts = append(it.Parts, scene.Part{Box: box, Rounded: true, Paint: scene.StrokeOnly})
+	// The line under the name is an item of its own, as Pele gives it only the stroke color
+	// the author set and none of the rest of the entity's style. Pele draws it before the
+	// outline drawn again over the stripes; here it is drawn after it, in the same color.
+	at := y + (y0 + v.headH)
+	line := new(scene.Path).MoveTo(x+x0, at).LineTo(x+(x0+w), at)
+	divider := scene.Item{
+		Kind: scene.Mark, Role: RoleDivider, ID: n.Label, Box: line.Bounds(),
+		Parts:  []scene.Part{{Path: line, Paint: scene.StrokeOnly}},
+		Style:  style.Style{Stroke: style.Border},
+		Author: style.Style{Stroke: v.author.Style.Stroke},
+	}
+	return append([]scene.Item{it, divider}, cells...)
 }
 
 // straighten drops the points of a route that lie on a straight run between their
@@ -770,26 +780,6 @@ func inset(route []float64, at int, v *view, c *layout.CNode) {
 	if c.H != v.h && math.Abs(math.Abs(dy)-c.H/2) < 0.5 {
 		route[at+1] -= jsmath.Sign(dy) * (c.H - v.h) / 2
 	}
-}
-
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
-// trimDefault takes /^default\s?/ off an entity's classes: the class every entity has. It
-// is what the replace of node.cssClasses in Pele's draw takes off.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
 }
 
 // hasClass reports whether name is among the classes, as the test / internal-link(?: |$)/ of

@@ -223,7 +223,7 @@ func TestParseMatchesPele(t *testing.T) {
 	}
 	failed := 0
 	for _, c := range p.Cases {
-		db, err := Parse(c.Src, "", nil)
+		db, err := Parse(c.Src, nil, "")
 		ok := check(t, "Parse", c.Src, c.Src, db, err, c.Direct)
 		if ok {
 			pre, err := diagram.Prepare(c.Src, diagram.Options{})
@@ -261,7 +261,7 @@ func TestParseMatchesPele(t *testing.T) {
 // Deep nesting is read without recursion, as Pele reads it.
 func TestDeep(t *testing.T) {
 	src := "sequenceDiagram\n" + strings.Repeat("loop a\n", 5000) + "A->>B: x\n" + strings.Repeat("end\n", 5000)
-	db, err := Parse(src, "", nil)
+	db, err := Parse(src, nil, "")
 	if err != nil {
 		t.Fatal(err)
 	}

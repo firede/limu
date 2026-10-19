@@ -9,7 +9,7 @@ import (
 	"github.com/firede/limu/internal/chars"
 )
 
-// fail panics with Pele's semantic error, which Build recovers.
+// fail panics with Pele's semantic error, which buildGit recovers.
 func fail(message string) {
 	panic(diagram.NewError(message, diagram.Semantic, "gitGraph"))
 }
@@ -310,10 +310,10 @@ func (b *builder) statement(s *Statement) {
 	}
 }
 
-// Build replays a git graph's tree into its model, as Pele's buildGit does: config is the
+// buildGit replays a git graph's tree into its model, as Pele's buildGit does: config is the
 // diagram's configuration and title the title its front matter gives. An error is a
 // *diagram.Error.
-func Build(ast *AST, config diagram.Config, title string) (m *Model, err error) {
+func buildGit(ast *AST, config diagram.Config, title string) (m *Model, err error) {
 	defer func() {
 		if v := recover(); v != nil {
 			e, ok := v.(*diagram.Error)
@@ -353,6 +353,10 @@ func Build(ast *AST, config diagram.Config, title string) (m *Model, err error) 
 	for i, br := range b.branches {
 		lanes[i] = lane{br.Name, b.orders[i]}
 	}
+	// Pele sorts with a.order - b.order, and V8 takes a NaN it gives as not less; here a NaN
+	// compares equal. With NaNs anywhere the two sorts could order lanes differently, but the
+	// only order that can be NaN is the main branch's, from mainBranchOrder: .nan, and the main
+	// branch is first, where both leave it and sort the rest.
 	slices.SortStableFunc(lanes, func(x, y lane) int {
 		d := x.order - y.order
 		switch {

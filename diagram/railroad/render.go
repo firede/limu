@@ -362,12 +362,7 @@ func line(s string, face text.Face, size float64, m text.Measurer) *text.Label {
 	if s == "" {
 		return nil
 	}
-	w := m.Width(s, size, face)
-	lh := jsmath.Round(float64(size * text.LineHeight))
-	return &text.Label{
-		Lines:  [][]text.Span{{{Text: s, Face: face, Width: w}}},
-		Widths: []float64{w}, Width: w, Height: lh, Size: size, LineHeight: lh,
-	}
+	return common.Line(s, m.Width(s, size, face), size, face)
 }
 
 // draw lays the diagram out, with room to spare or tightly, as Pele's draw does.

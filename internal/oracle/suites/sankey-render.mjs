@@ -229,6 +229,17 @@ export default async function ({ pele, src, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, FRAGMENTS, random(53));
   while (drawn < 4000) each(next());
+  // Nodes thinner than a label, which claim room above and below them: the room is the claim
+  // less the node's height, as it is kept, which a port that fused the product of the height
+  // into the difference would change in the last bit.
+  for (const [height, padding, rows] of [
+    [65, 3, 'a,b,1.43\nc,e,6.71\n'],
+    [67, 1, 'c,e,17.1\nd,e,2.18\na,c,8.55\nb,d,12.5\nd,e,21.8\n'],
+    [75, 3, 'b,c,11.3\nd,e,26.5\nc,d,6.12\nb,c,11.3\nb,c,28\nc,e,17.8\na,b,7.58\n'],
+    [106, 2, 'd,e,4.58\na,c,6.58\nb,c,24.9\nc,e,34.4\n'],
+  ]) {
+    each(`---\nconfig:\n  sankey:\n    height: ${height}\n    showValues: false\n    nodePadding: ${padding}\n---\nsankey\n${rows}`);
+  }
   if (refused < 20) throw new Error(`only ${refused} diagrams refused`);
   write('diagram/sankey/testdata/pele/render.json', { cases: out });
 }

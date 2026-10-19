@@ -153,7 +153,7 @@ func BuildGraph(db *DB, hierarchical bool) *Graph {
 	}
 
 	for k, r := range db.Relations {
-		// AddRelation swaps in an interface for the lollipop end of a relation with no other
+		// addRelation swaps in an interface for the lollipop end of a relation with no other
 		// marker.
 		startAt, endAt := classAt, classAt
 		if r.Type1 == Lollipop && r.Type2 == NoEnd {

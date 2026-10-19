@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -185,8 +186,8 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 		name := string(it.Shape)
 		lines = append(lines, "icon "+name+" "+box(b))
 		width := "?"
-		if w, ok := it.Style.StrokeWidth.Get(); ok && w == float64(glyphStroke*b.W)/24 {
-			width = n(glyphStroke)
+		if w, ok := it.Style.StrokeWidth.Get(); ok && w == float64(common.GlyphStroke*b.W)/24 {
+			width = n(common.GlyphStroke)
 		}
 		want := glyphPaths[name].Scaled(b.W/24, b.X, b.Y)
 		got := it.Parts[0].Path

@@ -4,13 +4,11 @@ import (
 	"cmp"
 	"math"
 	"slices"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
-	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
@@ -183,7 +181,7 @@ func Layout(db *DB, _ diagram.Config, o *layout.Options) *scene.Scene {
 func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	graph := BuildGraph(db)
 	size := o.Size()
-	small := math.Floor(size*0.875 + 0.5)
+	small := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
 	padding := o.Pad()
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
@@ -281,11 +279,15 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		cedges = append(cedges, layout.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: label.Width + 12, LabelH: label.Height + 4})
 	}
 
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
 	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: nodeSep,
-		EdgeSep: edgeSep,
-		RankSep: rankSep,
-		PortSep: 20,
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  nodeSep,
+		EdgeSep:  edgeSep,
+		RankSep:  rankSep,
+		PortSep:  20,
 	})
 
 	spreadEnds(cnodes, cedges, views)
@@ -311,7 +313,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	var titles, edges, labels, nodes []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "requirement.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: padding + title.Height/2},
 		})
 	}
@@ -321,13 +323,13 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		x, y := cnodes[i].X, cnodes[i].Y
 		left, top := -v.w/2, -v.h/2
 		box := scene.Rect{X: x + left, Y: y + top, W: v.w, H: v.h}
-		role := scene.Role("requirement.element")
+		role := RoleElement
 		if v.node.Requirement != nil {
-			role = "requirement.requirement"
+			role = RoleRequirement
 		}
 		it := scene.Item{
 			Kind: scene.Node, Role: role, Shape: "rect", ID: v.node.ID,
-			Class:  classNames(trimDefault(v.node.CSSClasses)),
+			Class:  common.ClassNames(common.TrimDefault(v.node.CSSClasses)),
 			Box:    box,
 			Parts:  []scene.Part{{Box: box, Rounded: true}},
 			Label:  &v.name,
@@ -335,7 +337,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
 			Author: v.author.Style,
 		}
-		texts := []scene.Item{textItem("requirement.kind", &v.kind, scene.Middle, x, y+(top+padY+v.kind.Height/2), style.Muted, v.author)}
+		texts := []scene.Item{textItem(RoleKind, &v.kind, scene.Middle, x, y+(top+padY+v.kind.Height/2), style.Muted, v.author)}
 		if len(v.rows) > 0 {
 			divider := top + v.headHeight
 			it.Parts = append(it.Parts, scene.Part{
@@ -346,8 +348,8 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			for k := range v.rows {
 				r := &v.rows[k]
 				texts = append(texts,
-					textItem("requirement.field", &r.key, scene.Start, x+(left+padX), y+(at+r.key.Height/2), style.Muted, v.author),
-					textItem("requirement.value", &r.value, scene.Start, x+(left+padX+v.keyWidth+columnGap), y+(at+r.value.Height/2), style.Fg, v.author))
+					textItem(RoleField, &r.key, scene.Start, x+(left+padX), y+(at+r.key.Height/2), style.Muted, v.author),
+					textItem(RoleValue, &r.value, scene.Start, x+(left+padX+v.keyWidth+columnGap), y+(at+r.value.Height/2), style.Fg, v.author))
 				at += r.height + rowGap
 			}
 		}
@@ -407,7 +409,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			}
 		} else {
 			route = append([]float64(nil), ce.Route...)
-			path = draw.RoutePath(route, "", startTrim, 0, draw.OwnReach(startTrim), 0)
+			path = draw.RoutePath(route, curve, startTrim, 0, draw.OwnReach(startTrim), 0)
 		}
 		// Pele draws the edges in a group that ends their lines round.
 		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
@@ -415,7 +417,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			own.Dash = style.Dashes(5, 4)
 		}
 		it := scene.Item{
-			Kind: scene.Edge, Role: "requirement.relationship", ID: edge.ID,
+			Kind: scene.Edge, Role: RoleRelationship, ID: edge.ID,
 			Box:   path.Path.Bounds(),
 			Parts: []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 			Ends:  path.Ends(start, end),
@@ -430,7 +432,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		}
 		edges = append(edges, it)
 		labels = append(labels, scene.Item{
-			Kind: scene.Text, Role: "requirement.relationship-label", ID: edge.ID,
+			Kind: scene.Text, Role: RoleRelationshipLabel, ID: edge.ID,
 			Box:   scene.Rect{X: labelX - (label.Width+8)/2, Y: labelY - label.Height/2, W: label.Width + 8, H: label.Height},
 			Parts: []scene.Part{draw.LabelPatch(label, labelX, labelY)},
 			Label: label,
@@ -458,23 +460,4 @@ func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, o
 		Style:  style.Style{Text: own},
 		Author: style.Style{Text: author.Style.Text},
 	}
-}
-
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
-// trimDefault takes /^default\s?/ off a node's classes: the class every node has.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
 }
