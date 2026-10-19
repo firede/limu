@@ -160,6 +160,8 @@ type stylable struct {
 	styles  *[]string
 }
 
+// pushUnique adds to target each of values it does not hold yet, in order, as Pele's
+// pushUnique does.
 func pushUnique(target *[]string, values []string) {
 	if len(values) == 0 {
 		return
@@ -217,7 +219,8 @@ func inferKind(properties []draftProperty) string {
 	return ""
 }
 
-// resolver is the state of a resolution.
+// resolver is the state of a resolution, which Pele's resolveUsecase keeps in its locals; its
+// methods are the closures of resolveUsecase that need no more than this.
 type resolver struct {
 	src     string
 	model   *Model
@@ -230,17 +233,26 @@ type resolver struct {
 	first map[string]int
 }
 
+// error is a semantic error at a span, as the error closure of Pele's resolveUsecase makes
+// it.
 func (r *resolver) error(message string, span Span) *diagram.Error {
 	line, column := lineColumn(r.src, span[0])
 	return &diagram.Error{Code: diagram.Semantic, Message: message, Type: "usecase", Line: line, Column: column}
 }
 
+// at is where a span is, as the message of an error gives it, as the at closure of Pele's
+// resolveUsecase writes it.
 func (r *resolver) at(span Span) string { return locationText(r.src, span[0], span[1]) }
 
+// fail stops the resolution with an error at a span, as the fail closure of Pele's
+// resolveUsecase throws it.
 func (r *resolver) fail(message string, span Span) {
 	panic(parseFailure{r.error(message+" at "+r.at(span), span)})
 }
 
+// conflict stops the resolution with an error that points at a declaration and the one before
+// it that it disagrees with, naming the labels generated ids were made from, as the conflict
+// closure of Pele's resolveUsecase throws it.
 func (r *resolver) conflict(message string, current, previous Span, currentLabel, previousLabel *string) {
 	suffix := func(label *string) string {
 		if label == nil {
@@ -252,24 +264,32 @@ func (r *resolver) conflict(message string, current, previous Span, currentLabel
 		r.at(previous)+suffix(previousLabel), current)})
 }
 
+// invalid fails for a metadata property that does not belong to the kind of element it is
+// given to, as the invalid closure of Pele's resolveUsecase does.
 func (r *resolver) invalid(id, kind string, p draftProperty) {
 	r.fail("Metadata property '"+p.Key+"' is invalid for "+kind+" '"+id+"'", p.KeySpan)
 }
 
+// mention notes an offset at which id is mentioned, keeping the first, as the mention closure
+// of Pele's resolveUsecase does.
 func (r *resolver) mention(id string, offset int) {
 	if previous, ok := r.first[id]; !ok || offset < previous {
 		r.first[id] = offset
 	}
 }
 
+// firstOf is the offset at which id is first mentioned, 0 for one never mentioned, as Pele's
+// resolveUsecase reads first.get(id) ?? 0 in its inOrder.
 func (r *resolver) firstOf(id string) int { return r.first[id] }
 
+// register records what a declared id is and where it was declared, as the register closure
+// of Pele's resolveUsecase does.
 func (r *resolver) register(n named, kind string) {
 	r.symbols[n.id] = &origin{kind: kind, span: n.span, generated: n.generated, label: n.label.text}
 }
 
 // claim checks that an id means one thing in the whole diagram, and that an id made from a
-// label is declared once.
+// label is declared once, as the claim closure of Pele's resolveUsecase does.
 func (r *resolver) claim(d named, kind string) {
 	o, ok := r.symbols[d.id]
 	if !ok {
@@ -290,6 +310,8 @@ func (r *resolver) claim(d named, kind string) {
 	}
 }
 
+// unique declares an id that may be declared only once, a JSON node's or an edge's, as the
+// unique closure of Pele's resolveUsecase does.
 func (r *resolver) unique(id, kind string, span Span) {
 	if previous, ok := r.symbols[id]; ok {
 		var previousLabel *string
@@ -302,7 +324,8 @@ func (r *resolver) unique(id, kind string, span Span) {
 }
 
 // actorProperty sets a property of an actor. A metadata statement replaces what a declaration
-// said; two declarations have to agree.
+// said; two declarations have to agree. It is the actorProperty closure of Pele's
+// resolveUsecase.
 func (r *resolver) actorProperty(state *elementState, p draftProperty, replace bool) {
 	clash := func(set bool, previous any) {
 		if !replace && set && previous != p.value {
@@ -328,6 +351,8 @@ func (r *resolver) actorProperty(state *elementState, p draftProperty, replace b
 	}
 }
 
+// elementMetadata applies the properties of a metadata block to an actor or a use case, as
+// the elementMetadata closure of Pele's resolveUsecase does: a use case takes only business.
 func (r *resolver) elementMetadata(state *elementState, properties []draftProperty, replace bool) {
 	for _, p := range properties {
 		if state.kind == "actor" {
@@ -345,6 +370,9 @@ func (r *resolver) elementMetadata(state *elementState, properties []draftProper
 	}
 }
 
+// publish puts an actor or a use case in the model as its state makes it, in place of what
+// the model held for the id, keeping the styles it had, as the publish closure of Pele's
+// resolveUsecase does.
 func (r *resolver) publish(state *elementState) {
 	business := state.business != nil && *state.business
 	parentID := ""
@@ -388,6 +416,8 @@ func (r *resolver) publish(state *elementState) {
 	})
 }
 
+// orEmpty is s, or an empty slice for nil, so that the model holds [] where Pele's holds an
+// empty array. It is limu's own.
 func orEmpty(s []string) []string {
 	if s == nil {
 		return []string{}
@@ -418,6 +448,8 @@ func resolve(src string, d *drafts, headerSpan Span, statements []*Statement, ti
 	boundaries := newOrdered[*boundaryState]()
 	edges := map[string]*Relationship{}
 
+	// inOrder sorts ids by where they are first mentioned, as the inOrder closure of Pele's
+	// resolveUsecase does.
 	inOrder := func(ids []string) []string {
 		slices.SortStableFunc(ids, func(a, b string) int { return r.firstOf(a) - r.firstOf(b) })
 		return ids
@@ -436,6 +468,8 @@ func resolve(src string, d *drafts, headerSpan Span, statements []*Statement, ti
 		}))
 	}
 
+	// declareElement declares an actor or a use case, or adds what another declaration of it
+	// says, as the declareElement closure of Pele's resolveUsecase does.
 	declareElement := func(de *draftElement) {
 		r.claim(de.named, de.kind)
 		var parent *draftBoundary
@@ -492,6 +526,8 @@ func resolve(src string, d *drafts, headerSpan Span, statements []*Statement, ti
 		r.elementMetadata(existing, de.metadata, false)
 	}
 
+	// declareBoundary declares a system boundary, or adds the classes another declaration of it
+	// gives, as the declareBoundary closure of Pele's resolveUsecase does.
 	declareBoundary := func(db *draftBoundary) {
 		r.claim(db.named, "boundary")
 		if existing, ok := boundaries.get(db.id); ok {
@@ -505,7 +541,8 @@ func resolve(src string, d *drafts, headerSpan Span, statements []*Statement, ti
 		r.register(db.named, "boundary")
 	}
 
-	// An end of a relationship that nothing declares becomes a use case.
+	// An end of a relationship that nothing declares becomes a use case, as the endpoint closure
+	// of Pele's resolveUsecase makes it.
 	endpoint := func(end draftEndpoint) string {
 		if end.classed && !end.declares {
 			r.fail("Relationship endpoint '"+end.id+"' uses ::: without declaring the node", end.span)
@@ -519,6 +556,8 @@ func resolve(src string, d *drafts, headerSpan Span, statements []*Statement, ti
 		return "usecase"
 	}
 
+	// stylableOf is what a class or style statement gives classes or styles to, as the stylable
+	// closure of Pele's resolveUsecase finds it.
 	stylableOf := func(id string, span Span) stylable {
 		var kind string
 		if o, ok := r.symbols[id]; ok {
@@ -791,4 +830,5 @@ func resolve(src string, d *drafts, headerSpan Span, statements []*Statement, ti
 	return m, nil
 }
 
+// itoa is n in decimal, as JavaScript writes an integer in a template string.
 func itoa(n int) string { return strconv.Itoa(n) }

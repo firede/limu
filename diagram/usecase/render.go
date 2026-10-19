@@ -160,6 +160,8 @@ func attachEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
 	// Pele's Map gives them in.
 	sides := map[int][]end{}
 	var keys []int
+	// add files the end of a route at point at, which leaves toward point next, under the side
+	// of node index it meets, as the add closure of Pele's attachEnds does.
 	add := func(index int, route []float64, at, next int) {
 		c := &cnodes[index]
 		if c.IsGroup {
@@ -412,6 +414,8 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		rootDir = layout.TB
 	}
 	sideways := rootDir == layout.LR || rootDir == layout.RL
+	// labelOf lays a label out, a plain one handed over as literal makes it, as Pele's text
+	// does.
 	labelOf := func(raw string, markdown bool, size, wrap float64, face text.Face) text.Label {
 		if raw != "" && !markdown {
 			raw = literal(raw)
