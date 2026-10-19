@@ -140,6 +140,8 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 			stroke = ui.Color{}
 		case scene.Solid:
 			fill = Color(s.Line, s.Opacity)
+		case scene.Hollow:
+			fill = Color(s.Bg, s.Opacity)
 		}
 		if part.Rounded || part.Path == nil {
 			radius := 0.0
@@ -183,22 +185,31 @@ func (p *Painter) box(b scene.Rect, radius float64, fill, stroke ui.Color, s sty
 	p.Painter.Stroke(p.Rect(scene.Rect{X: b.X - w/2, Y: b.Y - w/2, W: b.W + w, H: b.H + w}), stroke, p.Len(r), p.Len(w))
 }
 
-// Ends draws the markers at the ends of an edge, in the color of its stroke: filled, or a
-// cross stroked.
+// Ends draws the markers at the ends of an edge, in the color of its stroke, each part as
+// scene.Marker.Outline says.
 func (p *Painter) Ends(it *scene.Item, s style.Resolved) {
 	c := Color(s.Stroke, s.Opacity)
 	if c.A == 0 {
 		return
 	}
 	for _, m := range it.Ends {
-		path, filled := m.Outline()
-		if path == nil {
-			continue
-		}
-		if filled {
-			p.fill(path, c)
-		} else {
-			p.stroke(path, c, s.StrokeWidth, s.Dash)
+		for _, part := range m.Outline() {
+			path := part.Path
+			if path == nil {
+				path = new(scene.Path).RoundRect(part.Box, 0)
+			}
+			switch part.Paint {
+			case scene.FillOnly, scene.Solid:
+				p.fill(path, c)
+			case scene.FillAndStroke:
+				p.fill(path, c)
+				p.stroke(path, c, s.StrokeWidth, nil)
+			case scene.StrokeOnly:
+				p.stroke(path, c, s.StrokeWidth, nil)
+			case scene.Hollow:
+				p.fill(path, Color(s.Bg, s.Opacity))
+				p.stroke(path, c, s.StrokeWidth, nil)
+			}
 		}
 	}
 }

@@ -38,8 +38,14 @@ func hits(it *scene.Item, pt scene.Point, slop float64) bool {
 			}
 		}
 		for _, m := range it.Ends {
-			if p, _ := m.Outline(); p != nil && near(p.Bounds(), pt, slop) {
-				return true
+			for _, part := range m.Outline() {
+				b := part.Box
+				if part.Path != nil {
+					b = part.Path.Bounds()
+				}
+				if near(b, pt, slop) {
+					return true
+				}
 			}
 		}
 		if len(it.Parts) == 0 {

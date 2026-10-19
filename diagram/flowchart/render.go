@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/url"
@@ -33,56 +34,12 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) *scene.Scene {
 		o = &layout.Options{}
 	}
 	fitted := func(down bool) *scene.Scene {
-		return tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, down, tight) })
+		return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, down, tight) })
 	}
-	if runsAcross(db.Direction) {
-		return turnToFit(o, fitted)
+	if common.RunsAcross(db.Direction) {
+		return common.TurnToFit(o, fitted)
 	}
 	return fitted(false)
-}
-
-func runsAcross(dir string) bool { return dir == "LR" || dir == "RL" }
-
-// tighten draws a diagram with room to spare, and tightly instead when that does not fit
-// the width the host has and tight is narrower, as Pele's tighten does.
-func tighten(o *layout.Options, lay func(tight bool) *scene.Scene) *scene.Scene {
-	loose := lay(false)
-	if !(o.MaxWidth > 0) || loose.Width <= o.MaxWidth {
-		return loose
-	}
-	if tight := lay(true); tight.Width < loose.Width {
-		return tight
-	}
-	return loose
-}
-
-// turnToFit draws a diagram across, and down instead when the host allows it, the width it
-// has is under the breakpoint, across does not fit, and down is narrower, as Pele's
-// turnToFit does.
-func turnToFit(o *layout.Options, lay func(down bool) *scene.Scene) *scene.Scene {
-	across := lay(false)
-	if o.KeepDirection || !(o.MaxWidth > 0) || across.Width <= o.MaxWidth {
-		return across
-	}
-	breakpoint := 640.0
-	if o.DirectionBreakpoint > 0 {
-		breakpoint = o.DirectionBreakpoint
-	}
-	if o.MaxWidth >= breakpoint {
-		return across
-	}
-	if down := lay(true); down.Width < across.Width {
-		return down
-	}
-	return across
-}
-
-// titleRoom is the width a title may take before it wraps, as Pele's titleRoom gives it.
-func titleRoom(o *layout.Options) float64 {
-	if o.MaxWidth > 0 {
-		return max(80, o.MaxWidth-2*padding)
-	}
-	return 4000
 }
 
 // numberOption is a number of a flowchart's config, if it is one above 0, at most 2000.
@@ -316,7 +273,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down, tight bool) *sc
 
 	titleMax := 4000.0
 	if tight {
-		titleMax = titleRoom(o)
+		titleMax = common.TitleRoom(o)
 	}
 	title := labelOf(db.Title, false, size, titleMax, text.Bold)
 	titleHeight := 0.0

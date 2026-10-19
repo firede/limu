@@ -312,6 +312,8 @@ func (w *Writer) item(sc *scene.Scene, it *scene.Item, st style.Style) {
 			stroke = style.None
 		case scene.Solid:
 			fill = style.Line
+		case scene.Hollow:
+			fill = style.Bg
 		}
 		w.paintAttr("fill", fill)
 		w.paintAttr("stroke", stroke)
@@ -320,23 +322,34 @@ func (w *Writer) item(sc *scene.Scene, it *scene.Item, st style.Style) {
 		}
 		b.WriteString("/>")
 	}
+	// Markers are drawn solid, on a dashed edge too, as Pele draws them.
+	solid := st
+	solid.Dash = style.Dash{}
 	for _, m := range it.Ends {
-		p, filled := m.Outline()
-		if p == nil {
-			continue
+		for _, part := range m.Outline() {
+			b.WriteString(`<path class="limu-marker" d="`)
+			if part.Path != nil {
+				w.Path(part.Path)
+			} else {
+				w.Path(new(scene.Path).RoundRect(part.Box, 0))
+			}
+			b.WriteByte('"')
+			fill, stroke := st.Stroke, st.Stroke
+			switch part.Paint {
+			case scene.FillOnly, scene.Solid:
+				stroke = style.None
+			case scene.StrokeOnly:
+				fill = style.None
+			case scene.Hollow:
+				fill = style.Bg
+			}
+			w.paintAttr("fill", fill)
+			w.paintAttr("stroke", stroke)
+			if stroke.Visible() {
+				w.strokeAttrs(solid, sw)
+			}
+			b.WriteString("/>")
 		}
-		b.WriteString(`<path class="limu-marker" d="`)
-		w.Path(p)
-		b.WriteByte('"')
-		if filled {
-			w.paintAttr("fill", st.Stroke)
-			b.WriteString(` stroke="none"`)
-		} else {
-			b.WriteString(` fill="none"`)
-			w.paintAttr("stroke", st.Stroke)
-			w.strokeAttrs(st, sw)
-		}
-		b.WriteString("/>")
 	}
 	if pic := it.Picture; pic != nil {
 		w.picture(pic, st)

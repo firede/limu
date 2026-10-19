@@ -329,7 +329,13 @@ func TestMarkersMatchPele(t *testing.T) {
 	p := loadPele(t)
 	for _, c := range p.Markers {
 		m := scene.Marker{Type: c.Type, At: scene.Point{X: c.X, Y: c.Y}, DX: c.DX, DY: c.DY}
-		path, filled := m.Outline()
+		var path *scene.Path
+		filled := false
+		if parts := m.Outline(); len(parts) == 1 {
+			path, filled = parts[0].Path, parts[0].Paint == scene.FillOnly
+		} else if len(parts) > 1 {
+			t.Errorf("%+v: %d parts", m, len(parts))
+		}
 		what := fmt.Sprintf("%+v", m)
 		if c.SVG == "" {
 			if path != nil {

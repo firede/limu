@@ -121,6 +121,9 @@ const (
 	// Solid fills the part in the theme's color of lines, and strokes it: the dot of a final
 	// state, the bar of a fork.
 	Solid
+	// Hollow fills the part with the theme's background, and strokes it: the ring of a final
+	// state, which hides what is beneath it.
+	Hollow
 )
 
 // A MarkerType is the kind of marker at an end of an edge, by Mermaid's names:

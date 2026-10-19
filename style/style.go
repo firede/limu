@@ -228,6 +228,7 @@ func (l *Look) ThemeOrDefault() *Theme {
 type Resolved struct {
 	Fill, Stroke, Text Color // alpha 0 draws nothing
 	Line               Color // the theme's color of lines, for parts painted solid
+	Bg                 Color // the theme's background, for parts painted hollow
 	StrokeWidth        float64
 	Radius             float64
 	Dash               []float64 // none for a solid line
@@ -245,6 +246,7 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 		Stroke:      s.Stroke.Color(th),
 		Text:        s.Text.Color(th),
 		Line:        th.Line,
+		Bg:          th.Bg,
 		StrokeWidth: s.StrokeWidth.v,
 		Radius:      s.Radius.v,
 		Dash:        s.Dash.v,
