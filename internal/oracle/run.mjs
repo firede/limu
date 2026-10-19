@@ -7,6 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 const [pele, limu, ...only] = process.argv.slice(2);
 if (!pele || !limu) {
@@ -27,12 +28,13 @@ const helpers = {
   src: (path) => import(join(pele, 'src', path)),
   // Reads ./cases/<name>.json.
   cases: (name) => JSON.parse(readFileSync(new URL(`./cases/${name}.json`, import.meta.url), 'utf8')),
-  // Writes a fixture, under limu, with the version of Pele it came from.
+  // Writes a fixture, under limu, with the version of Pele it came from, gzipped at
+  // path + '.gz'; internal/fixture reads it back.
   write(path, data) {
-    const out = join(limu, path);
+    const out = join(limu, path + '.gz');
     mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, JSON.stringify({ pele: origin, ...data }, null, 1) + '\n');
-    console.log(`wrote ${path}`);
+    writeFileSync(out, gzipSync(JSON.stringify({ pele: origin, ...data }) + '\n', { level: 9 }));
+    console.log(`wrote ${path}.gz`);
   },
   // A random number generator in [0, 1) that gives the same numbers for the same seed.
   random(seed) {

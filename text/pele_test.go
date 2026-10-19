@@ -2,9 +2,10 @@ package text
 
 import (
 	"encoding/json"
-	"os"
 	"slices"
 	"testing"
+
+	"github.com/firede/limu/internal/fixture"
 )
 
 // The fixtures are what Pele makes of the same cases; ./scripts/oracle.sh writes them.
@@ -45,7 +46,7 @@ type peleText struct {
 
 func loadPele(t *testing.T) peleText {
 	t.Helper()
-	data, err := os.ReadFile("testdata/pele/text.json")
+	data, err := fixture.Read("testdata/pele/text.json")
 	if err != nil {
 		t.Fatal(err)
 	}
