@@ -124,6 +124,10 @@ const (
 	// Hollow fills the part with the theme's background, and strokes it: the ring of a final
 	// state, which hides what is beneath it.
 	Hollow
+	// Shade fills the part with the theme's background and does not stroke it: a stripe of
+	// an entity's table. Over a fill the item's author set, it is the background at 60% laid
+	// over that fill, a tint of it.
+	Shade
 )
 
 // A MarkerType is the kind of marker at an end of an edge, by Mermaid's names:

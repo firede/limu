@@ -142,6 +142,9 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 			fill = Color(s.Line, s.Opacity)
 		case scene.Hollow:
 			fill = Color(s.Bg, s.Opacity)
+		case scene.Shade:
+			stroke = ui.Color{}
+			fill = Color(shade(s.Bg, s.Fill, it.Author.Fill.Visible()), s.Opacity)
 		}
 		if part.Rounded || part.Path == nil {
 			radius := 0.0
@@ -158,6 +161,16 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 			p.stroke(part.Path, stroke, s.StrokeWidth, s.Dash)
 		}
 	}
+}
+
+// shade is the color of a part painted Shade: the background, or, over a fill its author
+// set, the background at 60% laid over that fill.
+func shade(bg, fill style.Color, tint bool) style.Color {
+	if !tint || fill.A == 0 {
+		return bg
+	}
+	mix := func(x, y uint8) uint8 { return uint8(float64(x)*0.6 + float64(y)*0.4 + 0.5) }
+	return style.Color{R: mix(bg.R, fill.R), G: mix(bg.G, fill.G), B: mix(bg.B, fill.B), A: fill.A}
 }
 
 // box draws a box of an outline. MyGo strokes a box inside its edge, where SVG strokes it

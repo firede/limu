@@ -12,7 +12,19 @@ export async function resolve(spec, ctx, next) {
   return next(spec, ctx);
 }
 
+// Pele's num writes a number to two decimals. A suite that reads numbers back out of an SVG
+// to work with them sets globalThis.limuExactNumbers while Pele draws, and num then writes
+// them whole; the suite rounds them as num would once it is done with them.
+const NUM = 'export function num(value: number): string {';
+
 export async function load(url, ctx, next) {
+  if (url.endsWith('/src/svg/builder.ts')) {
+    const loaded = await next(url, ctx);
+    const source = String(loaded.source);
+    if (!source.includes(NUM)) throw new Error(`no num in ${url}`);
+    const exact = `${NUM}\n  if ((globalThis as any).limuExactNumbers) return String(value);`;
+    return { ...loaded, source: source.replace(NUM, exact), shortCircuit: true };
+  }
   if (url.endsWith('.json')) {
     const data = JSON.parse(readFileSync(fileURLToPath(url), 'utf8'));
     let source = `export default ${JSON.stringify(data)};`;

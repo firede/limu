@@ -173,6 +173,25 @@ func (w *Writer) paintAttr(name string, p style.Paint) {
 	}
 }
 
+// tint writes the fill of a part painted Shade over a fill its author set: the background
+// at 60% laid over the fill.
+func (w *Writer) tint(fill style.Paint) {
+	b := &w.b
+	b.WriteString(` fill="`)
+	if w.o.Literal {
+		bg, c := w.th.Color(style.Bg.Token()), fill.Color(w.th)
+		mix := func(x, y uint8) uint8 { return uint8(float64(x)*0.6 + float64(y)*0.4 + 0.5) }
+		b.WriteString(style.RGB(mix(bg.R, c.R), mix(bg.G, c.G), mix(bg.B, c.B)).String())
+	} else {
+		b.WriteString("color-mix(in srgb,")
+		w.variable(style.Bg.Token())
+		b.WriteString(" 60%,")
+		w.Paint(fill)
+		b.WriteByte(')')
+	}
+	b.WriteByte('"')
+}
+
 // Path writes the path's steps, as the d of a <path>.
 func (w *Writer) Path(p *scene.Path) {
 	p.Each(func(op scene.Op, a []float64) {
@@ -305,6 +324,7 @@ func (w *Writer) item(sc *scene.Scene, it *scene.Item, st style.Style) {
 			b.WriteByte('"')
 		}
 		fill, stroke := st.Fill, st.Stroke
+		tint := false
 		switch part.Paint {
 		case scene.StrokeOnly:
 			fill = style.None
@@ -314,8 +334,18 @@ func (w *Writer) item(sc *scene.Scene, it *scene.Item, st style.Style) {
 			fill = style.Line
 		case scene.Hollow:
 			fill = style.Bg
+		case scene.Shade:
+			stroke = style.None
+			tint = it.Author.Fill.Visible() && st.Fill.Visible()
+			if !tint {
+				fill = style.Bg
+			}
 		}
-		w.paintAttr("fill", fill)
+		if tint {
+			w.tint(st.Fill)
+		} else {
+			w.paintAttr("fill", fill)
+		}
 		w.paintAttr("stroke", stroke)
 		if stroke.Visible() {
 			w.strokeAttrs(st, sw)
