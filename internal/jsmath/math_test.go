@@ -8,12 +8,13 @@ import (
 	"github.com/firede/limu/internal/fixture"
 )
 
-// The fixture is what V8 makes of Math.sin, Math.cos, Math.atan2 and Math.acos;
+// The fixture is what V8 makes of Math.sin, Math.cos, Math.atan2, Math.acos and Math.asin;
 // ./scripts/oracle.sh writes it, with its jsmath suite.
 type mathFixture struct {
 	Trig  [][3]json.RawMessage `json:"trig"`
 	Atan2 [][3]json.RawMessage `json:"atan2"`
 	Acos  [][2]json.RawMessage `json:"acos"`
+	Asin  [][2]json.RawMessage `json:"asin"`
 }
 
 func readMath(t *testing.T) mathFixture {
@@ -94,6 +95,16 @@ func TestAcosMatchesV8(t *testing.T) {
 		ac.see(Acos(x), decode(c[1]), x)
 	}
 	ac.done(20000)
+}
+
+func TestAsinMatchesV8(t *testing.T) {
+	p := readMath(t)
+	as := check{t: t, name: "Asin"}
+	for _, c := range p.Asin {
+		x := decode(c[0])
+		as.see(Asin(x), decode(c[1]), x)
+	}
+	as.done(25000)
 }
 
 var percent = 22.505

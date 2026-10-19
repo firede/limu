@@ -3,17 +3,26 @@ package limu
 import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/agentflow"
+	"github.com/firede/limu/diagram/architecture"
+	"github.com/firede/limu/diagram/block"
+	"github.com/firede/limu/diagram/c4"
 	"github.com/firede/limu/diagram/class"
+	"github.com/firede/limu/diagram/cynefin"
 	"github.com/firede/limu/diagram/er"
+	"github.com/firede/limu/diagram/eventmodeling"
 	"github.com/firede/limu/diagram/flowchart"
 	"github.com/firede/limu/diagram/gantt"
 	"github.com/firede/limu/diagram/gitgraph"
+	"github.com/firede/limu/diagram/info"
+	"github.com/firede/limu/diagram/ishikawa"
 	"github.com/firede/limu/diagram/journey"
 	"github.com/firede/limu/diagram/kanban"
+	"github.com/firede/limu/diagram/mindmap"
 	"github.com/firede/limu/diagram/packet"
 	"github.com/firede/limu/diagram/pie"
 	"github.com/firede/limu/diagram/quadrant"
 	"github.com/firede/limu/diagram/radar"
+	"github.com/firede/limu/diagram/railroad"
 	"github.com/firede/limu/diagram/requirement"
 	"github.com/firede/limu/diagram/sankey"
 	"github.com/firede/limu/diagram/sequence"
@@ -21,8 +30,10 @@ import (
 	"github.com/firede/limu/diagram/swimlane"
 	"github.com/firede/limu/diagram/timeline"
 	"github.com/firede/limu/diagram/treemap"
+	"github.com/firede/limu/diagram/treeview"
 	"github.com/firede/limu/diagram/usecase"
 	"github.com/firede/limu/diagram/venn"
+	"github.com/firede/limu/diagram/wardley"
 	"github.com/firede/limu/diagram/xychart"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -165,6 +176,14 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 		if sc, err = xychart.Layout(m, p.Config, o); err != nil {
 			return nil, err
 		}
+	case diagram.Block:
+		db, err := block.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		if sc, err = block.Layout(db, p.Config, o); err != nil {
+			return nil, err
+		}
 	case diagram.Sankey:
 		m, err := sankey.ParsePrepared(p)
 		if err != nil {
@@ -179,6 +198,68 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = venn.Layout(m, p.Config, o)
+	case diagram.Architecture:
+		m, err := architecture.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = architecture.Layout(m, p.Config, o)
+	case diagram.EventModeling:
+		m, err := eventmodeling.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = eventmodeling.Layout(m, p.Config, o)
+	case diagram.Wardley:
+		m, err := wardley.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = wardley.Layout(m, p.Config, o)
+	case diagram.Railroad:
+		m, err := railroad.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = railroad.Layout(m, p.Config, o)
+	case diagram.C4:
+		db, err := c4.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		if sc, err = c4.Layout(db, p.Config, o); err != nil {
+			return nil, err
+		}
+	case diagram.Ishikawa:
+		m, err := ishikawa.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = ishikawa.Layout(m, p.Config, o)
+	case diagram.Mindmap:
+		m, err := mindmap.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = mindmap.Layout(m, p.Config, o)
+	case diagram.Info:
+		m, err := info.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = info.Layout(m, p.Config, o)
+	case diagram.TreeView:
+		m, err := treeview.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = treeview.Layout(m, p.Config, o)
+	case diagram.Cynefin:
+		m, err := cynefin.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = cynefin.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}

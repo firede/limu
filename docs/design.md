@@ -58,7 +58,8 @@ ignores its parts.
 ### What the other diagrams need of it
 
 Before the scene was settled, the drawing of two diagrams unlike flowcharts was checked
-against it; the charts were drawn in it since. They take these items:
+against it; the charts and the rest of Pele's diagrams were drawn in it since. They take
+these items:
 
 | Pele draws | As items |
 |---|---|
@@ -83,12 +84,25 @@ against it; the charts were drawn in it since. They take these items:
 | sankey: a label, its value in another color | two `Text` items, `sankey.label` and `sankey.value`, placed by the measure of the whole |
 | treemap: a section, a leaf | `Group`, `treemap.section`, tinted at 0.12; `Node`, `treemap.leaf`; a value a `Text` item |
 | venn: a set, an overlap with a style | `Mark`, `venn.set`, a circle at 0.2; `Mark`, `venn.overlap`, an outline of arcs |
+| mindmap: a node, a branch | `Node`, `mindmap.node` or `mindmap.root`, its shape from `draw`, one without a shape a stadium filled `Series(i)` at 0.22, or no parts for a leaf; `Edge`, `mindmap.edge`, in `Series(i)`; a branch has no group, and each of its items the class `section-N` |
+| architecture: a group, a service, a junction | `Group`, `architecture.group`, tinted `SurfaceAlt` at 0.5; `Node`, `architecture.service`, a rounded square with its title below; `Node`, `architecture.junction`, a dot |
+| an icon Pele draws itself (architecture, tree view) | `Mark`, `architecture.icon` or `treeview.icon`, after the item it is of, read from Pele's path data with `scene.ParsePath` and stroked round, since a part has no stroke of its own; an icon the host draws is a `Picture` of the item |
+| C4: a boundary, an element, a relation | `Group`, `c4.boundary` (dashed) or `c4.deployment`, its heading start-aligned `Text` items; `Node`, `c4.element`, a person, a box or a cylinder, external ones dashed; `Edge`, `c4.rel`, its label and technology `Text` items on a patch; the kind of each in `Class` |
+| block: a composite, a block | `Group`, `block.composite`; `Node`, `block.block`, its shape Pele's or `block-arrow` |
+| wardley: a component, its inertia, a pipeline, a trend | `Node`, `wardley.component`, its caption a `Text` item, `wardley.label`; `Mark`, `wardley.inertia`; `Mark`, `wardley.pipeline` and its dashed `wardley.pipeline-line`; `Edge`, `wardley.trend`, and `Mark`, `wardley.trend-target` |
+| railroad: a rule's track, a box | `Mark`, `railroad.track`, of lines and arcs; `Node`, `railroad.terminal` (rounded to half its height), `railroad.nonterminal` or `railroad.special`, the marks about a special one `Text` items, `railroad.special-mark` |
+| ishikawa: the spine, a category | `Edge`, `ishikawa.spine`; `Edge`, `ishikawa.bones`, a category's bone and twigs as one path; `Node`, `ishikawa.category`; each cause a `Text` item, `ishikawa.cause`; drawn down in a narrow host, an outline joined by `ishikawa.link` lines |
+| cynefin: a domain, the boundaries | `Mark`, `cynefin.region`, filled `Series(i)` at 0.14, Confusion's an ellipse, dashed, over a `cynefin.backdrop` of the background; `Mark`, `cynefin.boundary`, dashed wavy curves, and `cynefin.cliff`; `Group`, `cynefin.domain`, its name its label, its items `Node`s, `cynefin.item`; `Edge`, `cynefin.transition`, one quadratic curve |
+| event modeling: a lane, a frame, a relation | `Group`, `eventmodeling.lane`; a `Node` for each frame, its role its kind (`eventmodeling.command`, `eventmodeling.event`…), tinted `Series(i)` at 0.22 over a `Shade` box; `Edge`, `eventmodeling.relation` |
+| tree view: an entry, a guide | `Node`, `treeview.directory` or `treeview.file`, its label starting at its point, a highlight a rounded part in `Accent` at 0.14; `Mark`, `treeview.guide`, one path a directory |
+| info | `Text` items, `info.title` and `info.version`; it draws "limu" and the version the build records (`info.Version`) where Pele draws its own |
 
 The scene needed two things for them that flowcharts do not: labels aligned at their start
-or end (`Align`, which journey, kanban, packet, railroad, requirement and treemap diagrams
-use too) and labels turned (`Rotate`, for the axes of charts). Markers of other kinds —
-sequence diagrams' open and asynchronous arrows, class diagrams' diamonds, entity
-relationship diagrams' crow's feet — are added with the diagrams that use them.
+or end (`Align`, which C4, journey, kanban, mindmap, packet, railroad, requirement, tree
+view, treemap and wardley diagrams use too) and labels turned (`Rotate`, for the axes of
+charts). Markers of other kinds — sequence diagrams' open and asynchronous arrows, class
+diagrams' diamonds, entity relationship diagrams' crow's feet — are added with the diagrams
+that use them.
 
 ### Markers
 
@@ -145,15 +159,21 @@ units, `\s` and `trim` with Unicode's spaces, `Math.round`'s halves and V8's `Ma
 (`internal/jsmath`), and products kept apart from the sums they are in, as Go on arm64
 would fuse them into one multiply-add that JavaScript never does.
 
-The charts' trigonometry is V8's too. `jsmath.Sin`, `Cos`, `Atan2`, `Acos` and `Log10` are
-ported from the fdlibm functions in V8's `src/base/ieee754.cc`, with their products fused
-where clang fuses them when it builds Node for arm64; Go's `math` package gives other last
-bits for a good share of inputs, and so does a V8 built without fused multiply-adds, as on
-x86-64. V8's `Math.pow` calls the C library's `pow`, which is not the same on every
-platform, so limu does not copy it. It needs only the powers Pele takes: `Pow10` gives
-whole powers of ten, `x ** 2` is `x*x`, as V8 works it out, and Sankey's six pulls of 0.99
-to a power are written out as V8 gives them, as Go's `math.Pow` multiplies and gives other
-last bits.
+The diagrams' trigonometry is V8's too. `jsmath.Sin`, `Cos`, `Atan2`, `Acos`, `Asin` and
+`Log10` are ported from the fdlibm functions in V8's `src/base/ieee754.cc`, with their
+products fused where clang fuses them when it builds Node for arm64; Go's `math` package
+gives other last bits for a good share of inputs, and so does a V8 built without fused
+multiply-adds, as on x86-64. V8's `Math.pow` calls the C library's `pow`, which is not the
+same on every platform, so limu does not copy it. It needs only the powers Pele takes:
+`Pow10` gives whole powers of ten, `x ** 2` is `x*x`, as V8 works it out, and Sankey's six
+pulls of 0.99 to a power are written out as V8 gives them, as Go's `math.Pow` multiplies
+and gives other last bits.
+
+Where Mermaid hands a diagram to a library, Pele often lays it out in a way of its own, and
+limu ports that: architecture diagrams on a grid, where Mermaid uses a force-directed
+solver, and C4 and block diagrams with their own placing and routing. Cynefin diagrams'
+wavy boundaries are seeded: from the diagram's `seed` setting, or else from a hash of
+`pele`, the id prefix Pele renders with by default, since limu writes no ids.
 
 What the diagrams share beyond layout and drawing is in `diagram/internal/common`, as Pele
 keeps it in `diagrams/common`: the padding about a diagram, fitting it to the host's width,
@@ -182,4 +202,4 @@ commit they were written from.
 | M2 | the diagrams on the layered layout: state, class, entity relationship, requirement, use case, agent flow, swimlane | done |
 | M3 | sequence, gantt, timeline, journey, git graph, packet, kanban | done |
 | M4 | the charts: pie, xy, quadrant, radar, sankey, treemap, venn | done |
-| M5 | the rest: mindmap, architecture, C4, block, wardley, railroad, ishikawa, cynefin, event modeling, tree view, info | |
+| M5 | the rest: mindmap, architecture, C4, block, wardley, railroad, ishikawa, cynefin, event modeling, tree view, info | done |
