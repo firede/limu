@@ -71,7 +71,7 @@ func dumpLabel(l *labelAst) any {
 	return []any{l.negX, enc(l.offsetX), l.negY, enc(l.offsetY)}
 }
 
-func placed(list []placedAst) []any {
+func dumpPlaced(list []placedAst) []any {
 	out := []any{}
 	for _, p := range list {
 		out = append(out, []any{p.name, enc(p.a), enc(p.b)})
@@ -97,7 +97,7 @@ func dumpAST(t *ast) map[string]any {
 		}
 		out["evolution"] = stages
 	}
-	out["anchors"] = placed(t.anchors)
+	out["anchors"] = dumpPlaced(t.anchors)
 	components := []any{}
 	for _, c := range t.components {
 		components = append(components, []any{c.name, enc(c.visibility), enc(c.evolution), dumpLabel(c.label),
@@ -124,7 +124,7 @@ func dumpAST(t *ast) map[string]any {
 		pipelines = append(pipelines, []any{p.parent, components})
 	}
 	out["pipelines"] = pipelines
-	out["notes"] = placed(t.notes)
+	out["notes"] = dumpPlaced(t.notes)
 	boxes := []any{}
 	for _, a := range t.annotations {
 		boxes = append(boxes, []any{enc(a[0]), enc(a[1])})
@@ -135,8 +135,8 @@ func dumpAST(t *ast) map[string]any {
 		annotation = append(annotation, []any{enc(a.number), enc(a.x), enc(a.y), a.text})
 	}
 	out["annotation"] = annotation
-	out["accelerators"] = placed(t.accelerators)
-	out["deaccelerators"] = placed(t.deaccelerators)
+	out["accelerators"] = dumpPlaced(t.accelerators)
+	out["deaccelerators"] = dumpPlaced(t.deaccelerators)
 	return out
 }
 

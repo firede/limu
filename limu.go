@@ -23,6 +23,7 @@ import (
 	"github.com/firede/limu/diagram/treemap"
 	"github.com/firede/limu/diagram/usecase"
 	"github.com/firede/limu/diagram/venn"
+	"github.com/firede/limu/diagram/wardley"
 	"github.com/firede/limu/diagram/xychart"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -179,6 +180,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = venn.Layout(m, p.Config, o)
+	case diagram.Wardley:
+		m, err := wardley.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = wardley.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}

@@ -21,7 +21,9 @@ export async function resolve(spec, ctx, next) {
 // line starts or ends and what is in it; a pie's percentages write, as data-y, where they are
 // before Pele adds the shift to their baseline; a radar chart's labelSvg writes, before each
 // label, the point it is centered on, its size and the text of its lines; and a sankey
-// diagram's labels write the middle of their line as y, with an m before it.
+// diagram's labels write the middle of their line as y, with an m before it; and a Wardley
+// map's labels write, before each, the point it is drawn about, its measures, its
+// attributes and its spans, and its markers where their tips are and the way they point.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -35,6 +37,9 @@ const PIE_INSIDE = 'labels += `<text x="${num(Math.sin(mid) * r)}"';
 const dataY = (y) => `<text\${(globalThis as any).limuExactNumbers ? \` data-y="\${${y}}"\` : ''}`;
 const RADAR_IMPORT = "import { escText, labelSvg, num } from '../../svg/builder.js';";
 const SANKEY_Y = 'y="${num(y + small * 0.35)}"';
+const WARDLEY_BUILDER = "import { esc, escText, labelSvg, num, sharedStyle, spanStyle, textStyle } from '../../svg/builder.js';";
+const WARDLEY_EDGES = "import { marker, markerTrim } from '../../svg/edges.js';";
+const WARDLEY_START = 'function startLabel(';
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -98,6 +103,35 @@ function labelSvg(label: Label, cx: number, cy: number, attrs: string): string {
   if (url.endsWith('/src/diagrams/sankey/render.ts')) {
     const loaded = await next(url, ctx);
     const source = patch(url, String(loaded.source), SANKEY_Y, `y="\${${EXACT.slice(4, -1)} ? 'm' + y : num(y + small * 0.35)}"`);
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/wardley/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = String(loaded.source);
+    source = patch(url, source, WARDLEY_BUILDER, WARDLEY_BUILDER.replace('labelSvg,', 'labelSvg as labelSvgPele,'));
+    source = patch(url, source, WARDLEY_EDGES, WARDLEY_EDGES.replace('marker,', 'marker as markerPele,'));
+    source = patch(url, source, WARDLEY_START, 'function startLabelPele(');
+    source += `
+function limuLabel(tag: string, label: Label, x: number, y: number, attrs: string): string {
+  const lines = label.lines.map((line) => line.map((s) => (s.icon !== undefined ? ['i', s.icon] : ['t', s.style, s.text])));
+  return \`<\${tag} x="\${x}" y="\${y}" w="\${label.width}" h="\${label.height}" size="\${label.size}" lh="\${label.lineHeight}" attrs="\${encodeURIComponent(attrs)}" lines="\${encodeURIComponent(JSON.stringify(lines))}"/>\`;
+}
+function labelSvg(label: Label, cx: number, cy: number, attrs: string, icons?: any): string {
+  const s = labelSvgPele(label, cx, cy, attrs, icons);
+  if (!(globalThis as any).limuExactNumbers || s === '') return s;
+  return limuLabel('limu-label', label, cx, cy, attrs) + s;
+}
+function startLabel(label: Label, x: number, y: number, attrs: string): string {
+  const s = startLabelPele(label, x, y, attrs);
+  if (!(globalThis as any).limuExactNumbers || s === '') return s;
+  return limuLabel('limu-start', label, x, y, attrs) + s;
+}
+function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
+  const s = markerPele(type, x, y, dx, dy, color);
+  if (!(globalThis as any).limuExactNumbers) return s;
+  return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" color="\${color}"/>\` + s;
+}
+`;
     return { ...loaded, source, shortCircuit: true };
   }
   if (url.endsWith('.json')) {
