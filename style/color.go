@@ -33,9 +33,10 @@ func (c Color) String() string {
 }
 
 // ParseColor reads a CSS color: a hex color, rgb() or rgba(), hsl() or hsla(), a named
-// color or transparent. It reports false for anything else, such as currentColor or var().
+// color or transparent, with the white space of CSS about it, its names in either case of
+// their ASCII letters. It reports false for anything else, such as currentColor or var().
 func ParseColor(s string) (Color, bool) {
-	s = strings.ToLower(strings.TrimSpace(s))
+	s = lowerASCII(cssTrim(s))
 	if strings.HasPrefix(s, "#") {
 		return parseHex(s[1:])
 	}
@@ -86,16 +87,17 @@ func parseHex(h string) (Color, bool) {
 	return Color{}, false
 }
 
-// function splits name(args) into the name and its arguments, by commas, spaces or a slash.
+// function splits name(args) into the name and its arguments, by commas, a slash or the
+// white space of CSS. CSS has nothing between a function's name and its parenthesis.
 func function(s string) (string, []string, bool) {
 	open := strings.IndexByte(s, '(')
 	if open <= 0 || !strings.HasSuffix(s, ")") {
 		return "", nil, false
 	}
 	args := strings.FieldsFunc(s[open+1:len(s)-1], func(r rune) bool {
-		return r == ',' || r == '/' || r == ' ' || r == '\t'
+		return r == ',' || r == '/' || strings.ContainsRune(" \t\n\r\f", r)
 	})
-	return strings.TrimSpace(s[:open]), args, true
+	return s[:open], args, true
 }
 
 // number reads a number, or a percentage of full; it reports whether it was a percentage.

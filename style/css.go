@@ -33,11 +33,11 @@ func Declarations(decls []string) Author {
 	var weight, fontStyle, fontSize string
 	for _, decl := range decls {
 		prop, value, ok := strings.Cut(decl, ":")
-		prop = strings.ToLower(strings.TrimSpace(prop))
+		prop = chars.ToLower(chars.Trim(prop))
 		if !ok || prop == "" {
 			continue
 		}
-		value = strings.TrimSpace(replaceFold(value, "!important", ""))
+		value = chars.Trim(replaceFold(value, "!important", ""))
 		if value == "" || unsafe(value) {
 			continue
 		}
@@ -57,10 +57,7 @@ func Declarations(decls []string) Author {
 			a.StrokeOpacity = opacity(value)
 			stroke = a.StrokeOpacity.Or(1)
 		case "opacity":
-			a.Style.Opacity = Num{}
-			if f, ok := length(value); ok {
-				a.Style.Opacity = N(max(0, min(1, f)))
-			}
+			a.Style.Opacity = opacity(value)
 		case "stroke-width":
 			a.Style.StrokeWidth = Num{}
 			if f, ok := length(value); ok && f >= 0 {
@@ -123,8 +120,9 @@ func LineDeclared(decls []string) bool {
 
 // ShapeCSS is the style Pele's resolveStyle writes on a shape of declarations, as it writes
 // it into an attribute: each property of a shape that is kept, with the last value given it,
-// in the order the properties first came, "fill:red;stroke:blue;", with &, <, > and " written
-// as entities and the control characters XML does not allow dropped; "" for none. A diagram
+// in the order the properties first came, "fill:red;stroke:blue;", with & and " written as
+// entities and the control characters XML does not allow dropped; "" for none. (A value with
+// < or > is dropped before, as unsafe.) A diagram
 // that decides by what the attribute holds, as a treemap does whether a class fills a
 // section, reads it here.
 func ShapeCSS(decls []string) string {
@@ -193,7 +191,7 @@ func keyword(value string, of map[string]uint8) uint8 {
 
 // paint is a paint of a color, None for none, or unset for one it cannot read.
 func paint(value string) Paint {
-	if strings.EqualFold(value, "none") {
+	if chars.EqualFoldASCII(value, "none") {
 		return None
 	}
 	if c, ok := ParseColor(value); ok {
@@ -232,16 +230,34 @@ func fontPixels(value string) (float64, bool) {
 
 // length reads a number of pixels, with or without px.
 func length(value string) (float64, bool) {
-	f, err := strconv.ParseFloat(strings.TrimSuffix(strings.TrimSpace(value), "px"), 64)
+	f, err := strconv.ParseFloat(strings.TrimSuffix(cssTrim(value), "px"), 64)
 	return f, err == nil
 }
 
+// cssTrim is s without the white space of CSS about it: spaces, tabs, line feeds, carriage
+// returns and form feeds. A browser reads a value Pele writes with these and no others;
+// what JavaScript's trim takes off besides, as a no-break space, was taken off before.
+func cssTrim(s string) string { return strings.Trim(s, " \t\n\r\f") }
+
+// lowerASCII is s with its ASCII letters in lower case and its other letters as they are, as
+// CSS compares keywords, and as a regular expression's i flag without u compares the ASCII
+// letters of a pattern.
+func lowerASCII(s string) string {
+	b := []byte(s)
+	for i, c := range b {
+		if 'A' <= c && c <= 'Z' {
+			b[i] = c + 'a' - 'A'
+		}
+	}
+	return string(b)
+}
+
 func dashes(value string) Dash {
-	if strings.EqualFold(value, "none") {
+	if chars.EqualFoldASCII(value, "none") {
 		return Solid
 	}
 	var out []float64
-	for f := range strings.FieldsFuncSeq(value, func(r rune) bool { return r == ',' || r == ' ' }) {
+	for f := range strings.FieldsFuncSeq(value, func(r rune) bool { return r == ',' || strings.ContainsRune(" \t\n\r\f", r) }) {
 		n, ok := length(f)
 		if !ok || n < 0 {
 			return Dash{}
@@ -254,12 +270,14 @@ func dashes(value string) Dash {
 	return Dashes(out...)
 }
 
-// unsafe matches Pele's RE_UNSAFE: what in a value could load or run something.
+// unsafe matches Pele's RE_UNSAFE, /url\s*\(|expression\s*\(|javascript:|[<>{};\\]|@import|image-set|\/\*/i:
+// what in a value could load or run something. The i flag, without u, folds the case of
+// ASCII letters only, and \s is JavaScript's white space.
 func unsafe(value string) bool {
 	if strings.ContainsAny(value, "<>{};\\") {
 		return true
 	}
-	v := strings.ToLower(value)
+	v := lowerASCII(value)
 	for _, bad := range []string{"javascript:", "@import", "image-set", "/*"} {
 		if strings.Contains(v, bad) {
 			return true
@@ -267,7 +285,7 @@ func unsafe(value string) bool {
 	}
 	for _, fn := range []string{"url", "expression"} {
 		for i := strings.Index(v, fn); i >= 0; {
-			if strings.HasPrefix(strings.TrimLeft(v[i+len(fn):], " \t\n\r\f"), "(") {
+			if strings.HasPrefix(chars.TrimStart(v[i+len(fn):]), "(") {
 				return true
 			}
 			next := strings.Index(v[i+1:], fn)

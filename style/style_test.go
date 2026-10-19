@@ -1,6 +1,9 @@
 package style
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestParseColor(t *testing.T) {
 	for _, c := range []struct {
@@ -87,7 +90,7 @@ func TestDeclarationsCapJoin(t *testing.T) {
 		{[]string{"stroke-linecap:round", "stroke-linecap:initial", "stroke-linejoin:initial"}, CapButt, JoinMiter},
 		{[]string{"stroke-linecap:round", "stroke-linecap:inherit", "stroke-linejoin:round", "stroke-linejoin:unset"}, 0, 0},
 		{[]string{"stroke-linecap:round", "stroke-linecap:flat", "stroke-linejoin:round", "stroke-linejoin:miter-clip"}, 0, 0},
-		{[]string{"stroke-linecap:ſquare", "stroke-linejoin:arcs"}, 0, 0},
+		{[]string{"stroke-linecap:\u017fquare", "stroke-linejoin:arcs"}, 0, 0},
 	} {
 		s := Declarations(c.decls).Style
 		if s.Cap != c.cap || s.Join != c.join {
@@ -144,6 +147,45 @@ func TestDeclarationsDropUnsafe(t *testing.T) {
 	}
 	if b := Declarations([]string{"font-weight:700", "fill:none"}); !b.Bold || b.Style.Fill != None {
 		t.Errorf("got %+v", b)
+	}
+}
+
+// Declarations are trimmed and lowered as Pele's resolveStyle does, with JavaScript's trim and
+// toLowerCase, and their values then read as a browser reads CSS, with its white space only
+// and its keywords in either case of their ASCII letters.
+func TestDeclarationsReadAsJavaScript(t *testing.T) {
+	red := Of(Color{255, 0, 0, 255})
+	for decl, want := range map[string]Paint{
+		"fill:\ufeffred":       red, // trim takes off a byte order mark
+		"\u00a0FILL\u3000:red": red,
+		"fill:red\u0085":       {}, // which trim leaves, and a browser does not read
+		"fill:RED":             red,
+		"fill:blac\u212a":      {}, // a Kelvin sign is no k to CSS
+		"fill:rgb (255,0,0)":   {},
+		"fill:rgb(255\n0\f0)":  red,
+		"fill:NONE":            None,
+	} {
+		if got := Declarations([]string{decl}).Style.Fill; got != want {
+			t.Errorf("%q: fill %+v, want %+v", decl, got, want)
+		}
+	}
+	if s := Declarations([]string{"stroke-dasharray:4\t2"}).Style.Dash; !slices.Equal(s.Pattern(), []float64{4, 2}) {
+		t.Errorf("dashes %v", s.Pattern())
+	}
+	// \s in Pele's RE_UNSAFE is JavaScript's; its i flag folds ASCII letters only.
+	if Declarations([]string{"fill:url\u3000(x)"}).Style.Fill.Set() {
+		t.Errorf("kept a url( after an ideographic space")
+	}
+	if ShapeCSS([]string{"rx:javascr\u0130pt:x"}) == "" || ShapeCSS([]string{"rx:JavaScript:x"}) != "" {
+		t.Errorf("folded other than ASCII letters")
+	}
+	for value, want := range map[string]float64{"0.5": 0.5, "50%": 0.5, "150%": 1, "-1": 0} {
+		if got, ok := Declarations([]string{"opacity:" + value}).Style.Opacity.Get(); !ok || got != want {
+			t.Errorf("opacity:%s = %v %v, want %v", value, got, ok, want)
+		}
+	}
+	if _, ok := Declarations([]string{"opacity:0.5px"}).Style.Opacity.Get(); ok {
+		t.Errorf("read an opacity in pixels")
 	}
 }
 
