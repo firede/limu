@@ -50,6 +50,7 @@ const (
 	RoleRelationship      scene.Role = "er.relationship"
 	RoleRelationshipLabel scene.Role = "er.relationship-label"
 	RoleEntity            scene.Role = "er.entity"
+	RoleDivider           scene.Role = "er.divider"
 	RoleAttributeType     scene.Role = "er.attribute-type"
 	RoleAttributeName     scene.Role = "er.attribute-name"
 	RoleAttributeKeys     scene.Role = "er.attribute-keys"
@@ -569,9 +570,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 }
 
 // entity is an entity drawn about x, y, as Pele's draw draws one: its box, with its name, and,
-// when it has attributes, its table: the stripes of every other row, the line under its name
-// and its outline drawn again over the stripes as parts, and the text of each cell as an
-// item of its own after it.
+// when it has attributes, its table: the stripes of every other row and its outline drawn
+// again over them as parts, and the line under its name and the text of each cell as items
+// of their own after it.
 func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.Item {
 	n := v.node
 	w, h := v.w, v.h
@@ -639,12 +640,19 @@ func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.
 		}
 		top += rw.h
 	}
-	divider := y + (y0 + v.headH)
-	it.Parts = append(it.Parts,
-		scene.Part{Path: new(scene.Path).MoveTo(x+x0, divider).LineTo(x+(x0+w), divider), Paint: scene.StrokeOnly},
-		scene.Part{Box: box, Rounded: true, Paint: scene.StrokeOnly},
-	)
-	return append([]scene.Item{it}, cells...)
+	it.Parts = append(it.Parts, scene.Part{Box: box, Rounded: true, Paint: scene.StrokeOnly})
+	// The line under the name is an item of its own, as Pele gives it only the stroke color
+	// the author set and none of the rest of the entity's style. Pele draws it before the
+	// outline drawn again over the stripes; here it is drawn after it, in the same color.
+	at := y + (y0 + v.headH)
+	line := new(scene.Path).MoveTo(x+x0, at).LineTo(x+(x0+w), at)
+	divider := scene.Item{
+		Kind: scene.Mark, Role: RoleDivider, ID: n.Label, Box: line.Bounds(),
+		Parts:  []scene.Part{{Path: line, Paint: scene.StrokeOnly}},
+		Style:  style.Style{Stroke: style.Border},
+		Author: style.Style{Stroke: v.author.Style.Stroke},
+	}
+	return append([]scene.Item{it, divider}, cells...)
 }
 
 // straighten drops the points of a route that lie on a straight run between their

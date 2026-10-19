@@ -125,7 +125,7 @@ func sceneLines(sc *scene.Scene) []string {
 	var held []string
 	for i := range sc.Items {
 		it := &sc.Items[i]
-		if held != nil && it.Role != "class.annotation" {
+		if held != nil && it.Role != "class.annotation" && it.Role != "class.divider" {
 			lines = append(lines, held...)
 			held = nil
 		}
@@ -170,8 +170,10 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "tip "+peleText(it.Tooltip))
 			}
 			lines = append(lines, "rect "+box(it.Parts[0].Box)+" "+pen(it, ""))
-			if len(it.Parts) > 1 {
-				lines = append(lines, "divider "+pelesvg.D(it.Parts[1].Path))
+			// Pele draws the lines under the name and the attributes, an item of their own
+			// after the class, before its label.
+			if i+1 < len(sc.Items) && sc.Items[i+1].Role == "class.divider" {
+				lines = append(lines, "divider "+pelesvg.D(sc.Items[i+1].Parts[0].Path))
 			}
 			held = []string{}
 			if len(it.Label.Lines) > 0 {
@@ -179,6 +181,8 @@ func sceneLines(sc *scene.Scene) []string {
 				held = append(held, icons...)
 				icons = icons[:0]
 			}
+		case "class.divider":
+			// Written with its class.
 		case "class.annotation":
 			lines = append(lines, "annotation "+peleText(spans(it.Label))+" "+textAt(it.Label, it.At.X, it.At.Y))
 		case "class.attribute", "class.method":

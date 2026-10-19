@@ -795,10 +795,18 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 	parts := []scene.Part{{Box: box, Rounded: true}}
 	first := top + v.titleH
 	second := first + v.attributesH
+	// The lines under the name and the attributes are an item of their own, as Pele gives
+	// them only the stroke color the author set and none of the rest of the class's style.
+	var dividers []scene.Item
 	if h > v.titleH {
 		divider := new(scene.Path).MoveTo(x+left, y+first).LineTo(x+(-left), y+first).
 			MoveTo(x+left, y+second).LineTo(x+(-left), y+second)
-		parts = append(parts, scene.Part{Path: divider, Paint: scene.StrokeOnly})
+		dividers = append(dividers, scene.Item{
+			Kind: scene.Mark, Role: "class.divider", ID: cls.ID, Box: divider.Bounds(),
+			Parts:  []scene.Part{{Path: divider, Paint: scene.StrokeOnly}},
+			Style:  style.Style{Stroke: style.Border},
+			Author: style.Style{Stroke: v.author.Style.Stroke},
+		})
 	}
 	at := top + titlePad
 	var annotations []scene.Item
@@ -824,7 +832,7 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 			it.Link = href
 		}
 	}
-	items := append([]scene.Item{it}, annotations...)
+	items := append(append([]scene.Item{it}, dividers...), annotations...)
 	lines := func(list []line, role scene.Role, from float64) {
 		middle := from + sectionPad + lineHeight/2
 		for _, ln := range list {
