@@ -2,7 +2,11 @@
 // where things are. A change of them lays a diagram out again; a change of style does not.
 package layout
 
-import "github.com/firede/limu/text"
+import (
+	"time"
+
+	"github.com/firede/limu/text"
+)
 
 // Routing is how edges run between the things they join.
 type Routing uint8
@@ -41,6 +45,31 @@ type Options struct {
 	// grid of pixels. 0 leaves them as they fall.
 	Snap    float64
 	Routing Routing
+
+	// Now is the time a diagram that places things in time takes as the present: where a
+	// gantt chart draws today, and where a task with no start begins. The zero time is
+	// time.Now().
+	Now time.Time
+	// Location is the time zone such a diagram reads and writes dates in, as JavaScript
+	// does in the machine's: the days that tasks start on, the ticks of its axis. nil is
+	// time.Local.
+	Location *time.Location
+}
+
+// Clock is the options' Now, or time.Now() when it is the zero time.
+func (o *Options) Clock() time.Time {
+	if o == nil || o.Now.IsZero() {
+		return time.Now()
+	}
+	return o.Now
+}
+
+// Zone is the options' Location, or time.Local.
+func (o *Options) Zone() *time.Location {
+	if o == nil || o.Location == nil {
+		return time.Local
+	}
+	return o.Location
 }
 
 // Measure is the options' measurer, or text.Arial.
