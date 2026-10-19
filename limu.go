@@ -3,6 +3,7 @@ package limu
 import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/agentflow"
+	"github.com/firede/limu/diagram/architecture"
 	"github.com/firede/limu/diagram/class"
 	"github.com/firede/limu/diagram/er"
 	"github.com/firede/limu/diagram/flowchart"
@@ -179,6 +180,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = venn.Layout(m, p.Config, o)
+	case diagram.Architecture:
+		m, err := architecture.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = architecture.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
