@@ -21,7 +21,9 @@ export async function resolve(spec, ctx, next) {
 // line starts or ends and what is in it; a pie's percentages write, as data-y, where they are
 // before Pele adds the shift to their baseline; a radar chart's labelSvg writes, before each
 // label, the point it is centered on, its size and the text of its lines; and a sankey
-// diagram's labels write the middle of their line as y, with an m before it.
+// diagram's labels write the middle of their line as y, with an m before it; and an
+// architecture diagram's labels write, in place of their text, the point they are centered on
+// and all that is in them, and its markers their tips and the way they point.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -35,6 +37,7 @@ const PIE_INSIDE = 'labels += `<text x="${num(Math.sin(mid) * r)}"';
 const dataY = (y) => `<text\${(globalThis as any).limuExactNumbers ? \` data-y="\${${y}}"\` : ''}`;
 const RADAR_IMPORT = "import { escText, labelSvg, num } from '../../svg/builder.js';";
 const SANKEY_Y = 'y="${num(y + small * 0.35)}"';
+const ARCH_EDGES = "import { edgeLabelSvg, marker, markerTrim } from '../../svg/edges.js';";
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -91,6 +94,32 @@ function labelSvg(label: Label, cx: number, cy: number, attrs: string): string {
   if (!(globalThis as any).limuExactNumbers || s === '') return s;
   const lines = label.lines.map((line) => line.map((span) => span.text).join(''));
   return \`<limu-label x="\${cx}" y="\${cy}" w="\${label.width}" h="\${label.height}" lines="\${encodeURIComponent(JSON.stringify(lines))}"/>\` + s;
+}
+`;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/architecture/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = patch(url, String(loaded.source), RADAR_IMPORT, RADAR_IMPORT.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, ARCH_EDGES, ARCH_EDGES.replace('edgeLabelSvg, marker', 'edgeLabelSvg as edgeLabelSvgPele, marker as markerPele'));
+    source += `
+function limuLabel(label: Label, cx: number, cy: number, attrs: string): string {
+  const lines = label.lines.map((line) => line.map((span) => [span.icon ?? null, span.text, span.style, span.width]));
+  const data = { size: label.size, lineHeight: label.lineHeight, width: label.width, height: label.height, widths: label.widths, lines };
+  return \`<limu-label x="\${cx}" y="\${cy}" attrs="\${encodeURIComponent(attrs)}" data="\${encodeURIComponent(JSON.stringify(data))}"/>\`;
+}
+function labelSvg(label: Label, cx: number, cy: number, attrs: string, icons?: IconResolver): string {
+  if (!(globalThis as any).limuExactNumbers) return labelSvgPele(label, cx, cy, attrs, icons);
+  return label.lines.length === 0 ? '' : limuLabel(label, cx, cy, attrs);
+}
+function edgeLabelSvg(id: string, label: Label, x: number, y: number, attrs: string, icons?: IconResolver): string {
+  if (!(globalThis as any).limuExactNumbers) return edgeLabelSvgPele(id, label, x, y, attrs, icons);
+  const s = edgeLabelSvgPele(id, { ...label, lines: [] }, x, y, attrs, icons);
+  return s.slice(0, -4) + limuLabel(label, x, y, attrs) + '</g>';
+}
+function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
+  if (!(globalThis as any).limuExactNumbers) return markerPele(type, x, y, dx, dy, color);
+  return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" fill="\${color}"/>\`;
 }
 `;
     return { ...loaded, source, shortCircuit: true };
