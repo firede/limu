@@ -371,6 +371,33 @@ func titleX(c *layout.CNode, width float64, crossings draw.Crossings) float64 {
 	return best
 }
 
+// leftLabel is the text of a label whose lines start at left, about cy, inside a node whose
+// middle is (x, y), as Pele's leftLabel draws it: the label centered on the middle of its line
+// when it has one, and otherwise one label for each line, centered on the middle of that line.
+// left and cy are about the node's middle, as Pele works them out; each point is moved to the
+// node last, as Pele's SVG moves it, so that the scene holds what Pele draws to the bit. it is
+// the item each label is drawn as.
+func leftLabel(l *text.Label, x, y, left, cy float64, it scene.Item) []scene.Item {
+	if len(l.Lines) < 2 {
+		it.Label = l
+		it.At = scene.Point{X: x + (left + l.Width/2), Y: y + cy}
+		return []scene.Item{it}
+	}
+	items := make([]scene.Item, len(l.Lines))
+	for i := range l.Lines {
+		// A line on its own, as wide as it is.
+		line := *l
+		line.Lines, line.Widths, line.Width, line.Height = l.Lines[i:i+1], l.Widths[i:i+1], l.Widths[i], l.LineHeight
+		it.Label = &line
+		it.At = scene.Point{
+			X: x + (left + l.Widths[i]/2),
+			Y: y + (cy - l.Height/2 + float64((float64(i)+0.5)*l.LineHeight)),
+		}
+		items[i] = it
+	}
+	return items
+}
+
 // lay lays the diagram out once, as Pele's draw does. turned lays out a diagram that runs
 // across as one that runs down.
 func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
@@ -701,11 +728,11 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 					Kind: scene.Text, Role: "usecase.json-key", ID: n.ID, Label: key,
 					At:    scene.Point{X: x + (x0 + cellPad + key.Width/2), Y: y + (ry + rowH/2)},
 					Style: style.Style{Text: style.Muted},
-				}, scene.Item{
-					Kind: scene.Text, Role: "usecase.json-value", ID: n.ID, Label: value, Align: scene.Start,
-					At:     scene.Point{X: x + (x0 + v.keyW + cellPad), Y: y + (ry + rowH/2)},
-					Author: style.Style{Text: v.author.Style.Text},
 				})
+				cells = append(cells, leftLabel(value, x, y, x0+v.keyW+cellPad, ry+rowH/2, scene.Item{
+					Kind: scene.Text, Role: "usecase.json-value", ID: n.ID,
+					Author: style.Style{Text: v.author.Style.Text},
+				})...)
 				ry += rowH
 			}
 		default:

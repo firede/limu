@@ -3,7 +3,6 @@ package usecase
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"testing"
@@ -18,9 +17,10 @@ import (
 )
 
 // The fixture is what Pele's render draws of use case diagrams, read back out of its SVG as
-// one line per thing drawn, in the order drawn; ./scripts/oracle.sh writes it. The test
-// writes the same lines from the scene, numbers as Pele's SVG writes them, and the shapes of
-// a node about its middle, as Pele draws them.
+// one line per thing drawn, in the order drawn; ./scripts/oracle.sh writes it. Pele draws the
+// inside of a node about the node's middle; the oracle moves it to where it is on the page, as
+// the scene holds it, before it writes numbers as Pele's SVG writes them. The test writes the
+// same lines from the scene.
 
 type peleRender struct {
 	Cases []struct {
@@ -104,59 +104,11 @@ func loneSurrogate(s string) bool {
 
 func firstDiff(a, b []string) int {
 	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || !sameLine(a[i], b[i]) {
+		if i >= len(a) || i >= len(b) || a[i] != b[i] {
 			return i
 		}
 	}
 	return -1
-}
-
-// sameLine reports whether a line the test wrote is the oracle's. The test works out the
-// numbers of a node's shapes about its middle from the scene, which holds them where they
-// are drawn; a number that falls within a rounding error of halfway between two hundredths
-// is marked "~", and may then be either.
-func sameLine(got, want string) bool {
-	if got == want {
-		return true
-	}
-	if !strings.Contains(got, "~") {
-		return false
-	}
-	split := func(s string) []string {
-		return strings.FieldsFunc(s, func(r rune) bool { return r == ' ' || r == ',' || r == '(' || r == ')' })
-	}
-	g, w := split(got), split(want)
-	if len(g) != len(w) {
-		return false
-	}
-	for i := range g {
-		if g[i] == w[i] {
-			continue
-		}
-		t, ok := strings.CutPrefix(g[i], "~")
-		if !ok {
-			return false
-		}
-		if t == w[i] {
-			continue
-		}
-		a, err1 := strconv.ParseFloat(t, 64)
-		b, err2 := strconv.ParseFloat(w[i], 64)
-		if err1 != nil || err2 != nil || math.Abs(a-b) > 0.0100001 {
-			return false
-		}
-	}
-	return true
-}
-
-// relNum is a number of a node's shape, worked out about the node's middle, as Pele writes
-// it, marked "~" when it lies within a rounding error of halfway between two hundredths.
-func relNum(v float64) string {
-	f := v * 100
-	if math.Abs(f-math.Floor(f)-0.5) < 1e-6 {
-		return "~" + pelesvg.Num(v)
-	}
-	return pelesvg.Num(v)
 }
 
 func lineAt(lines []string, i int) string {
@@ -242,37 +194,25 @@ func classes(it *scene.Item) string {
 // sceneLines writes a scene as the oracle reads Pele's SVG.
 func sceneLines(sc *scene.Scene) []string {
 	num := pelesvg.Num
-	abs := func(x, y float64) string { return num(x) + "," + num(y) }
-	// Numbers about a node's middle are written with relNum.
-	rel := func(x, y float64) string { return relNum(x) + "," + relNum(y) }
-	pt := abs
+	pt := func(x, y float64) string { return num(x) + "," + num(y) }
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
 	// Where Pele's text puts the first line of a label centered on (cx, cy), and the paint
-	// the item that holds it gives its text.
+	// the item that holds it gives its text. Pele centers every text of a use case diagram.
 	textAt := func(owner *scene.Item, l *text.Label, cx, cy float64) string {
 		shift := float64(l.Size * 0.35)
-		return "t " + pt(cx, cy-l.Height/2+l.LineHeight/2+shift) + " " + paintName(owner.Style.Text)
+		s := "t " + pt(cx, cy-l.Height/2+l.LineHeight/2+shift) + " " + paintName(owner.Style.Text)
+		if owner.Align != scene.Middle {
+			s += " not centered"
+		}
+		return s
 	}
 	label := func(owner *scene.Item, l *text.Label, cx, cy float64) {
 		if l != nil && len(l.Lines) > 0 {
 			lines = append(lines, textAt(owner, l, cx, cy))
 		}
 	}
-	// A label whose lines start at x, as Pele's leftLabel draws it: one text for each line
-	// when there are several.
-	leftLabel := func(owner *scene.Item, l *text.Label, x, cy float64) {
-		if len(l.Lines) < 2 {
-			label(owner, l, x+l.Width/2, cy)
-			return
-		}
-		for i := range l.Lines {
-			line := *l
-			line.Lines, line.Widths, line.Height = l.Lines[i:i+1], l.Widths[i:i+1], l.LineHeight
-			label(owner, &line, x+l.Widths[i]/2, cy-l.Height/2+(float64(i)+0.5)*l.LineHeight)
-		}
-	}
-	// The subpaths of a path about (ox, oy), as the oracle writes them.
-	subpaths := func(p *scene.Path, ox, oy float64) []string {
+	// The subpaths of a path, as the oracle writes them.
+	subpaths := func(p *scene.Path) []string {
 		var out []string
 		var cur []string
 		var ops []scene.Op
@@ -285,7 +225,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if len(ops) == 6 && ops[0] == scene.MoveTo && ops[5] == scene.Close &&
 				ops[1] == scene.CubeTo && ops[2] == scene.CubeTo && ops[3] == scene.CubeTo && ops[4] == scene.CubeTo {
 				cx, cy := args[1][4], args[0][1]
-				out = append(out, "ellipse "+pt(cx-ox, cy-oy)+" "+pt(args[0][0]-cx, args[1][5]-cy))
+				out = append(out, "ellipse "+pt(cx, cy)+" "+pt(args[0][0]-cx, args[1][5]-cy))
 			} else {
 				out = append(out, strings.Join(cur, " "))
 			}
@@ -297,7 +237,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			s := string("MLQCZ"[op])
 			for i := 0; i < len(a); i += 2 {
-				s += " " + pt(a[i]-ox, a[i+1]-oy)
+				s += " " + pt(a[i], a[i+1])
 			}
 			cur = append(cur, s)
 			ops = append(ops, op)
@@ -306,17 +246,17 @@ func sceneLines(sc *scene.Scene) []string {
 		flush()
 		return out
 	}
-	shape := func(it *scene.Item, part *scene.Part, ox, oy float64) {
+	shape := func(it *scene.Item, part *scene.Part) {
 		if part.Path == nil {
 			r := part.Box
-			s := "rect " + pt(r.X-ox, r.Y-oy) + "," + pt(r.W, r.H)
+			s := "rect " + pt(r.X, r.Y) + "," + pt(r.W, r.H)
 			if part.Rounded {
 				s += " r"
 			}
 			lines = append(lines, s+" "+partPaint(it, part))
 			return
 		}
-		for _, s := range subpaths(part.Path, ox, oy) {
+		for _, s := range subpaths(part.Path) {
 			if !strings.HasPrefix(s, "ellipse") {
 				s = "path " + s
 			}
@@ -332,7 +272,7 @@ func sceneLines(sc *scene.Scene) []string {
 		case "usecase.system":
 			lines = append(lines, fmt.Sprintf("cluster %s [%s]", id, classes(it)))
 			for k := range it.Parts {
-				shape(it, &it.Parts[k], 0, 0)
+				shape(it, &it.Parts[k])
 			}
 			label(it, it.Label, it.At.X, it.At.Y)
 		case "usecase.relation", "usecase.note-link":
@@ -348,7 +288,7 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "role "+string(it.Role)+" of a line of shape "+string(it.Shape))
 			}
 			lines = append(lines, fmt.Sprintf("edge %s %s [%s] %s", id, it.Shape, classes(it), dash))
-			for _, s := range subpaths(it.Parts[0].Path, 0, 0) {
+			for _, s := range subpaths(it.Parts[0].Path) {
 				lines = append(lines, "path "+s)
 			}
 			for _, m := range it.Ends {
@@ -364,9 +304,9 @@ func sceneLines(sc *scene.Scene) []string {
 			lines = append(lines, "label "+id+" "+pt(r.X, r.Y)+","+pt(r.W, r.H))
 			label(it, it.Label, it.At.X, it.At.Y)
 		case "usecase.actor", "usecase.usecase", "usecase.note", "usecase.json":
-			cx, cy := it.Box.X+it.Box.W/2, it.Box.Y+it.Box.H/2
-			pt = rel
-			lines = append(lines, fmt.Sprintf("node %s [%s] translate(%s)", id, classes(it), pt(cx, cy)))
+			// Where the node's middle is, which Pele's SVG moves what is in the node by, is
+			// checked through where that is drawn.
+			lines = append(lines, fmt.Sprintf("node %s [%s]", id, classes(it)))
 			// What follows a node in the scene and is drawn inside it in Pele's SVG.
 			var stereotype *scene.Item
 			var cells []*scene.Item
@@ -381,31 +321,20 @@ func sceneLines(sc *scene.Scene) []string {
 				}
 				i++
 			}
-			ox, oy := cx, cy
-			if it.Role == "usecase.actor" {
-				fy := -it.Box.H/2 + 30
-				lines = append(lines, "figure "+pt(0, fy))
-				ox, oy = cx, cy+fy
-			}
 			for k := range it.Parts {
-				shape(it, &it.Parts[k], ox, oy)
+				shape(it, &it.Parts[k])
 			}
 			if pic := it.Picture; pic != nil {
 				r := pic.Box
-				lines = append(lines, "icon "+peleID(pic.Icon)+" "+pt(r.X-ox, r.Y-oy)+","+pt(r.W, r.H))
+				lines = append(lines, "icon "+peleID(pic.Icon)+" "+pt(r.X, r.Y)+","+pt(r.W, r.H))
 			}
 			if stereotype != nil {
-				label(stereotype, stereotype.Label, stereotype.At.X-cx, stereotype.At.Y-cy)
+				label(stereotype, stereotype.Label, stereotype.At.X, stereotype.At.Y)
 			}
-			label(it, it.Label, it.At.X-cx, it.At.Y-cy)
+			label(it, it.Label, it.At.X, it.At.Y)
 			for _, c := range cells {
-				if c.Align == scene.Start {
-					leftLabel(c, c.Label, c.At.X-cx, c.At.Y-cy)
-				} else {
-					label(c, c.Label, c.At.X-cx, c.At.Y-cy)
-				}
+				label(c, c.Label, c.At.X, c.At.Y)
 			}
-			pt = abs
 		default:
 			lines = append(lines, "unknown role "+string(it.Role))
 		}
