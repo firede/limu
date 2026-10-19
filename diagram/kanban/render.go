@@ -113,13 +113,6 @@ type card struct {
 	height float64
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // labelOf is a label to put on an item: nil for one with nothing to draw.
 func labelOf(l *text.Label) *text.Label {
 	if l.Empty() {
@@ -256,7 +249,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		gy := pad + titleHeight + rowTops[row]
 		box := scene.Rect{X: gx, Y: gy, W: columnWidth, H: rowHeights[row]}
 		column := scene.Item{
-			Kind: scene.Group, Role: "kanban.column", Shape: "rect", ID: section.ID, Class: classNames(section.CSSClasses),
+			Kind: scene.Group, Role: "kanban.column", Shape: "rect", ID: section.ID, Class: common.ClassNames(section.CSSClasses),
 			Box:   box,
 			Parts: []scene.Part{{Box: box, Rounded: true, Paint: scene.FillOnly}},
 			Label: labelOf(&titles[index]),
@@ -285,7 +278,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			cx, cy := gx+columnPad, gy+y
 			box := scene.Rect{X: cx, Y: cy, W: cardWidth, H: c.height}
 			it := scene.Item{
-				Kind: scene.Node, Role: "kanban.card", Shape: "rect", ID: item.ID, Class: classNames(item.CSSClasses),
+				Kind: scene.Node, Role: "kanban.card", Shape: "rect", ID: item.ID, Class: common.ClassNames(item.CSSClasses),
 				Box:   box,
 				Parts: []scene.Part{{Box: box, Rounded: true}},
 				Label: labelOf(&c.label),

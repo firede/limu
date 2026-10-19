@@ -237,13 +237,6 @@ func trim(head int) float64 {
 	return 0
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // writesFill reports whether Pele's resolveStyle keeps a fill of the value: what is left of
 // it without !important and white space about it is not empty, and nothing in it could load
 // or run something.
@@ -819,7 +812,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		}
 		if cls, ok := c.actor.Properties.Get("class"); ok {
 			if s, ok := cls.(string); ok {
-				it.Class = classNames(s)
+				it.Class = common.ClassNames(s)
 			}
 		}
 		if !c.label.Empty() {

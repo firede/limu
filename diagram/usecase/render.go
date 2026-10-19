@@ -258,13 +258,6 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	return common.TurnToFit(o, func(down bool) *scene.Scene { return lay(m, config, o, down) })
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(names []string) []string {
-	return strings.FieldsFunc(strings.Join(names, " "), func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // figure is the parts of an actor's figure, drawn about fx, fy, as Pele's figure draws them:
 // a head and limbs, a hollow body, a solid silhouette, or a box for an icon, with the slash
 // of a business actor across its head.
@@ -652,7 +645,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		if v.kind == kindBoundary {
 			left, top := x-c.W/2, y-c.H/2
 			it := scene.Item{
-				Kind: scene.Group, Role: "usecase.system", Shape: "rect", ID: n.ID, Class: classNames(boundaryClasses[n.ID]),
+				Kind: scene.Group, Role: "usecase.system", Shape: "rect", ID: n.ID, Class: common.ClassNames(strings.Join(boundaryClasses[n.ID], " ")),
 				Box:    scene.Rect{X: left, Y: top, W: c.W, H: c.H},
 				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
@@ -679,7 +672,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 
 		w, h := v.w, v.h
 		it := scene.Item{
-			Kind: scene.Node, ID: n.ID, Class: classNames(classes[n.ID]),
+			Kind: scene.Node, ID: n.ID, Class: common.ClassNames(strings.Join(classes[n.ID], " ")),
 			Box:    scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
 			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
 			Author: v.author.Style,
@@ -878,7 +871,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		}
 		it := scene.Item{
 			Kind: scene.Edge, Role: role, Shape: scene.Shape(edge.RelationshipType), ID: edge.ID,
-			Class:  classNames(relationClasses[edge]),
+			Class:  common.ClassNames(strings.Join(relationClasses[edge], " ")),
 			Box:    path.Path.Bounds(),
 			Parts:  []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 			Ends:   path.Ends(markerType(start), markerType(end)),

@@ -3,7 +3,6 @@ package mindmap
 import (
 	"math"
 	"strconv"
-	"strings"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
@@ -51,13 +50,6 @@ const (
 	bend   = 8
 	rowGap = 10
 )
-
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
 
 // outline is a shape w by h drawn about the origin and moved to cx, cy, as Pele draws a node's
 // shape in the node's own frame.
@@ -392,9 +384,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 		if i == 0 {
 			it.Role = RoleRoot
 			it.Style = style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg}
-			it.Class = classNames(node.Class)
+			it.Class = common.ClassNames(node.Class)
 		} else {
-			it.Class = append([]string{branchClass}, classNames(node.Class)...)
+			it.Class = append([]string{branchClass}, common.ClassNames(node.Class)...)
 		}
 		switch {
 		case shape != "":

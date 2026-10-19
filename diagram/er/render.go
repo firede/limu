@@ -4,12 +4,10 @@ import (
 	"math"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
-	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
@@ -413,7 +411,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		v := &views[i]
 		c := &cnodes[i]
 		n := v.node
-		classes := classNames(trimDefault(n.CSSClasses))
+		classes := common.ClassNames(common.TrimDefault(n.CSSClasses))
 		if c.IsGroup {
 			v.w, v.h = c.W, c.H
 			box := scene.Rect{X: c.X - c.W/2, Y: c.Y - c.H/2, W: c.W, H: c.H}
@@ -765,25 +763,6 @@ func inset(route []float64, at int, v *view, c *layout.CNode) {
 	if c.H != v.h && math.Abs(math.Abs(dy)-c.H/2) < 0.5 {
 		route[at+1] -= jsmath.Sign(dy) * (c.H - v.h) / 2
 	}
-}
-
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
-// trimDefault takes /^default\s?/ off an entity's classes: the class every entity has.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
 }
 
 func hasClass(classes []string, name string) bool {

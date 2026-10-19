@@ -61,13 +61,6 @@ type row struct {
 	top, height float64
 }
 
-// classNames are the classes of an entry's :::class, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // Layout lays a tree view out as a scene, as Pele's renderTreeView does: a row to an entry,
 // each indented under its directory, with a guide down from the directory to its entries. A
 // tree wider than the width the host has is laid out tightly, its indents narrower and its
@@ -283,7 +276,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 			role, face = RoleDirectory, text.Bold
 		}
 		it := scene.Item{
-			Kind: scene.Node, Role: role, ID: node.Name, Class: classNames(node.CSSClass),
+			Kind: scene.Node, Role: role, ID: node.Name, Class: common.ClassNames(node.CSSClass),
 			Box:   scene.Rect{X: inset + r.x, Y: top + r.top, W: totalWidth - inset - (inset + r.x), H: r.height},
 			Style: style.Style{Text: style.Fg},
 		}

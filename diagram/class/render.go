@@ -4,7 +4,6 @@ import (
 	"math"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
@@ -820,7 +819,7 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 		at += tinyHeight
 	}
 	it := scene.Item{
-		Kind: scene.Node, Role: "class.class", Shape: "classBox", ID: cls.ID, Class: classNames(trimDefault(cls.CSSClasses)),
+		Kind: scene.Node, Role: "class.class", Shape: "classBox", ID: cls.ID, Class: common.ClassNames(common.TrimDefault(cls.CSSClasses)),
 		Box: box, Parts: parts,
 		Label: &v.label, At: scene.Point{X: x, Y: y + (at+first-titlePad)/2},
 		Style:   style.Style{Fill: style.Surface, Stroke: style.Border},
@@ -869,23 +868,4 @@ func markerType(name string) scene.MarkerType {
 		return ""
 	}
 	return scene.MarkerType("class." + name)
-}
-
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
-// trimDefault takes /^default\s?/ off a class's classes: the class every class has.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
 }

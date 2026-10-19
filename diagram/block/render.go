@@ -466,14 +466,6 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	return sc, nil
 }
 
-// classNames is the class attribute's names of a block's classes, as Pele's classNames
-// cleans them.
-func classNames(names []string) []string {
-	return strings.FieldsFunc(strings.Join(names, " "), func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // ownPaint is the diagram's own fill and stroke of a part, with what the author's
 // fill-opacity and stroke-opacity make of them: a browser takes those the author set over
 // the paints Pele writes each on its own, so an author's fill-opacity with no fill of their
@@ -799,7 +791,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 			continue
 		}
 		b := v.block
-		classes := classNames(b.Classes)
+		classes := common.ClassNames(strings.Join(b.Classes, " "))
 		if v.kind == kindComposite {
 			top := v.y - v.h/2
 			box := scene.Rect{X: v.x - v.w/2, Y: top, W: v.w, H: v.h}
