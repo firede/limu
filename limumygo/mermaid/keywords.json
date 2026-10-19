@@ -1,0 +1,38 @@
+{
+  "common": "accTitle accDescr",
+  "directions": "TB TD BT RL LR",
+  "inline": {
+    "class": "left right of",
+    "sequence": "as left right of over",
+    "state": "as left right of"
+  },
+  "starts": {
+    "agentflow": "flow end direction click classDef class style linkStyle",
+    "architecture": "group service junction",
+    "block": "columns block end space classDef class style",
+    "c4": "title Person Person_Ext System System_Ext SystemDb SystemDb_Ext SystemQueue SystemQueue_Ext Container Container_Ext ContainerDb ContainerDb_Ext ContainerQueue ContainerQueue_Ext Component Component_Ext ComponentDb ComponentQueue Boundary Enterprise_Boundary System_Boundary Container_Boundary Deployment_Node Node Node_L Node_R Rel BiRel Rel_Back Rel_U Rel_D Rel_L Rel_R RelIndex UpdateElementStyle UpdateRelStyle UpdateLayoutConfig",
+    "class": "class namespace direction note click link callback classDef cssClass style",
+    "cynefin": "title complex complicated clear chaotic confusion",
+    "er": "direction subgraph end classDef class style",
+    "eventmodeling": "timeframe tf resetframe rf data",
+    "flowchart": "subgraph end direction click classDef class style linkStyle",
+    "gantt": "title dateFormat axisFormat tickInterval section excludes includes weekday weekend todayMarker inclusiveEndDates topAxis click",
+    "gitGraph": "commit branch checkout switch merge cherry-pick",
+    "journey": "title section",
+    "packet": "title",
+    "pie": "title",
+    "quadrantChart": "title x-axis y-axis quadrant-1 quadrant-2 quadrant-3 quadrant-4 classDef",
+    "radar": "title axis curve max min graticule ticks showLegend",
+    "railroad": "title",
+    "requirement": "requirement functionalRequirement interfaceRequirement performanceRequirement physicalRequirement designConstraint element direction classDef class style",
+    "sequence": "participant actor Note note activate deactivate loop alt else opt par and critical option break rect end box autonumber create destroy link links title",
+    "state": "state note direction classDef class",
+    "swimlane": "subgraph end direction click classDef class style linkStyle",
+    "timeline": "title section",
+    "treemap": "classDef",
+    "usecase": "actor systemBoundary end direction note classDef class style",
+    "venn": "title set union text style",
+    "wardley": "title component anchor evolve evolution pipeline note annotation annotations accelerator deaccelerator size",
+    "xychart": "title x-axis y-axis bar line"
+  }
+}

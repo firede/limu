@@ -98,12 +98,16 @@
     transition: opacity 240ms ease;
   }
 
+  // The header that comes back over the page as it scrolls up is on the page's color, so
+  // that what scrolls under it does not show through.
   [data-scroll-header].is-header-floating {
     position: fixed;
     z-index: 90;
     top: 0;
     right: 0;
     left: 0;
+    border-bottom: 1px solid var(--line);
+    background: var(--ink);
     opacity: 0;
     pointer-events: none;
     will-change: opacity;

@@ -1,6 +1,7 @@
 package mermaid
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -14,7 +15,8 @@ func spans(line string, toks []editor.Token) []string {
 	names := map[editor.TokenKind]string{
 		editor.TokenKeyword: "kw", editor.TokenString: "str", editor.TokenNumber: "num",
 		editor.TokenComment: "com", editor.TokenOperator: "op", editor.TokenConstant: "const",
-		editor.TokenMeta: "meta", editor.TokenPunctuation: "p",
+		editor.TokenMeta: "meta", editor.TokenPunctuation: "p", editor.TokenVariable: "var",
+		editor.TokenProperty: "prop", editor.TokenFunction: "fn",
 	}
 	var out []string
 	start := 0
@@ -65,13 +67,13 @@ func TestFlowchart(t *testing.T) {
 		{`%%{init: {"theme": "dark"}}%%|meta`},
 		{"%% a comment|com"},
 		{"flowchart|kw", "LR|const"},
-		{"[|p", "]|p", "-->|op", "||p", "||p", "(|p", `"quoted"|str`, ")|p"},
-		{"subgraph|kw"},
-		{"==>|op", "-.->|op"},
+		{"A|var", "[|p", "The|str", "end|str", "]|p", "-->|op", "||p", "yes|str", "||p", "B|var", "(|p", `"quoted"|str`, ")|p"},
+		{"subgraph|kw", "S|var"},
+		{"C|var", "==>|op", "D|var", "-.->|op", "E|var"},
 		{"end|kw"},
-		{"style|kw", ":|p", "#f9f|const", ",|p", ":|p", "2|num"},
+		{"style|kw", "A|var", "fill|prop", ":|p", "#f9f|const", ",|p", "stroke-width|prop", ":|p", "2px|num"},
 		// commit is a keyword of git graphs, not of flowcharts; a semicolon starts a statement.
-		{"-->|op", ";|p", "click|kw"},
+		{"A|var", "-->|op", "commit|var", ";|p", "click|kw", "A|var"},
 	})
 	if state&inFront != 0 || state&declared == 0 || typeOf(state) != diagram.Flowchart {
 		t.Errorf("ends in state %b, type %q", state, typeOf(state))
@@ -89,9 +91,9 @@ func TestKeywordsOfTheType(t *testing.T) {
 		"  end",
 	}, [][]string{
 		{"sequenceDiagram|kw"},
-		{"participant|kw", "as|kw"},
-		{"Note|kw", "right|kw", "of|kw", ":|p", "3|num"},
-		{"loop|kw"},
+		{"participant|kw", "A|var", "as|kw", "Alice|var"},
+		{"Note|kw", "right|kw", "of|kw", "A|var", ":|p", "we|str", "end|str", "at|str", "3|num"},
+		{"loop|kw", "Every|var", "minute|var"},
 		{"end|kw"},
 	})
 	check(t, []string{
@@ -101,9 +103,9 @@ func TestKeywordsOfTheType(t *testing.T) {
 		"  loop",
 	}, [][]string{
 		{"gitGraph|kw"},
-		{"commit|kw", ":|p", `"a"|str`},
-		{"branch|kw"},
-		{},
+		{"commit|kw", "id|var", ":|p", `"a"|str`},
+		{"branch|kw", "develop|var"},
+		{"loop|var"},
 	})
 	check(t, []string{
 		"xychart",
@@ -111,8 +113,40 @@ func TestKeywordsOfTheType(t *testing.T) {
 		"  y-axis 0 --> 100",
 	}, [][]string{
 		{"xychart|kw"},
-		{"x-axis|kw", "[|p", ",|p", "]|p"},
+		{"x-axis|kw", "[|p", "jan|str", ",|p", "feb|str", "]|p"},
 		{"y-axis|kw", "0|num", "-->|op", "100|num"},
+	})
+}
+
+// Names are variables and labels strings, as the website highlights them: a class given
+// with :::, the settings of a node, the declarations of a style, and the links of class and
+// entity relationship diagrams.
+func TestAsTheWebsite(t *testing.T) {
+	check(t, []string{
+		"flowchart LR",
+		"  draft[Draft] --> review[Review]:::warn --o done@{ shape: rounded, label: \"Done\" }",
+		"  classDef warn fill:#e3a040,stroke:#b0611a",
+		"  linkStyle 0 stroke-dasharray:4 4,stroke:rgb(1 2 3)",
+	}, [][]string{
+		{"flowchart|kw", "LR|const"},
+		{"draft|var", "[|p", "Draft|str", "]|p", "-->|op", "review|var", "[|p", "Review|str", "]:::|p", "warn|kw",
+			"--o|op", "done|var", "@{|p", "shape|prop", ":|p", "rounded|str", ",|p", "label|prop", ":|p", `"Done"|str`, "}|p"},
+		{"classDef|kw", "warn|var", "fill|prop", ":|p", "#e3a040|const", ",|p", "stroke|prop", ":|p", "#b0611a|const"},
+		{"linkStyle|kw", "0|num", "stroke-dasharray|prop", ":|p", "4|num", "4|num", ",|p", "stroke|prop", ":|p", "rgb|fn", "(|p", "1|num", "2|num", "3|num", ")|p"},
+	})
+	check(t, []string{
+		"classDiagram",
+		"  Animal <|-- Duck",
+	}, [][]string{
+		{"classDiagram|kw"},
+		{"Animal|var", "<|--|op", "Duck|var"},
+	})
+	check(t, []string{
+		"erDiagram",
+		"  CUSTOMER ||--o{ ORDER : places",
+	}, [][]string{
+		{"erDiagram|kw"},
+		{"CUSTOMER|var", "||--o{|op", "ORDER|var", ":|p", "places|str"},
 	})
 }
 
@@ -143,6 +177,22 @@ func TestEveryType(t *testing.T) {
 		if k := keywordsOf(typ); !k.starts["accTitle"] {
 			t.Errorf("%s has no keywords", typ)
 		}
+	}
+}
+
+// keywords.json names only types limu reads, so that a type's words are not lost to a
+// misspelling.
+func TestKeywordsFile(t *testing.T) {
+	f := file()
+	for _, m := range []map[string]string{f.Starts, f.Inline} {
+		for typ := range m {
+			if !slices.Contains(limu.Types(), diagram.Type(typ)) {
+				t.Errorf("keywords.json has words of %q, which is no type limu reads", typ)
+			}
+		}
+	}
+	if !directions()["LR"] || !keywordsOf(diagram.Sequence).inline["over"] {
+		t.Error("keywords.json was not read")
 	}
 }
 

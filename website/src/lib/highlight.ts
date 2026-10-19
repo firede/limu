@@ -1,3 +1,5 @@
+import mermaidKeywordFile from '../../../limumygo/mermaid/keywords.json' with { type: 'json' };
+
 // A longer line is left as it is, as highlighting it would cost more than it shows.
 const maxHighlightLineLength = 2_000;
 
@@ -14,6 +16,10 @@ export interface HighlightState {
   expectsCommand: boolean;
   expectsRedirect: boolean;
   expectsPath: boolean;
+  // The type of the Mermaid diagram, by limu's name of it, once the line that declares it is
+  // read; '' before, or when it is no type limu reads.
+  diagramType: string;
+  declared: boolean;
 }
 
 export const createHighlightState = (): HighlightState => ({
@@ -26,6 +32,8 @@ export const createHighlightState = (): HighlightState => ({
   expectsCommand: true,
   expectsRedirect: false,
   expectsPath: false,
+  diagramType: '',
+  declared: false,
 });
 
 const escapeHtml = (value: string) => value
@@ -74,9 +82,31 @@ function highlightYamlLine(line: string) {
   return escapeHtml(entry[1]) + span('syn-yaml-key', entry[2]) + span('syn-punctuation', entry[3]) + escapeHtml(entry[4]) + highlighted;
 }
 
-const mermaidDeclaration = /^(?:xychart(?:-beta)?|gitGraph|pie|mindmap|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|journey|timeline|quadrantChart|requirement(?:Diagram)?|C4(?:Context|Container|Component|Dynamic|Deployment)|(?:architecture|sankey|block|packet|kanban|radar|treemap|info|agentflow|usecase|treeView|venn|cynefin|wardley|swimlane|ishikawa|eventmodeling)(?:-beta)?|railroad-(?:ebnf-|abnf-|peg-)?beta)\b/;
-const mermaidKeyword = /^(?:flowchart-elk|flowchart|graph|subgraph|end|direction|click|style|classDef|class|linkStyle|interpolate|call|href|callback)\b/;
+const mermaidDeclaration = /^(?:flowchart-elk|flowchart|graph|xychart(?:-beta)?|gitGraph|pie|mindmap|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|journey|timeline|quadrantChart|requirement(?:Diagram)?|C4(?:Context|Container|Component|Dynamic|Deployment)|(?:architecture|sankey|block|packet|kanban|radar|treemap|info|agentflow|usecase|treeView|venn|cynefin|wardley|swimlane|ishikawa|eventmodeling)(?:-beta)?|railroad-(?:ebnf-|abnf-|peg-)?beta)\b/;
+// The type a declaration says, by limu's name of it, as diagram.DetectType gives it.
+const mermaidDeclaredType = (declaration: string) => {
+  const name = declaration.replace(/-beta$/, '').replace(/-v2$/, '');
+  if (/^(?:flowchart|graph)/.test(name)) return 'flowchart';
+  if (name.startsWith('C4')) return 'c4';
+  if (name.startsWith('railroad')) return 'railroad';
+  const named: Record<string, string> = { sequenceDiagram: 'sequence', classDiagram: 'class', stateDiagram: 'state', erDiagram: 'er', requirementDiagram: 'requirement' };
+  return named[name] ?? name;
+};
+// The keywords of each type, which limumygo's highlighter reads too, so that a diagram's
+// text looks the same here as in the playground: the words that start a statement of the
+// type, and those that are keywords anywhere in one. Text of no type known gets every type's
+// words.
+const wordSet = (list = '') => new Set(list.split(/\s+/).filter(Boolean));
+const mermaidKeywords = new Map(Object.entries(mermaidKeywordFile.starts).map(([type, list]) => [type, {
+  starts: wordSet(`${list} ${mermaidKeywordFile.common}`),
+  inline: wordSet((mermaidKeywordFile.inline as Record<string, string>)[type]),
+}]));
+const mermaidAnyKeywords = { starts: wordSet(`${Object.values(mermaidKeywordFile.starts).join(' ')} ${mermaidKeywordFile.common}`), inline: new Set<string>() };
+const mermaidDirections = wordSet(mermaidKeywordFile.directions);
 const mermaidLink = /^(?:[xo<](?=--|==|-\.))?(?:--+|==+|-\.+-?|~~~+)(?:>|[xo](?!\w))?/;
+// An entity relationship diagram's relationship: the cardinality of each end about a solid
+// or dashed line, as ||--o{.
+const mermaidRelationship = /^[|}][|o](?:--|\.\.)[o|][|{]/;
 const mermaidLinkEnd = /(?:--+|==+|\.+-+)(?:>|[xo](?!\w))?/;
 const mermaidShapes: [string, string[]][] = [
   ['(((', [')))']], ['([', ['])']], ['[(', [')]']], ['[[', [']]']], ['((', ['))']], ['{{', ['}}']],
@@ -102,8 +132,12 @@ function highlightMermaidLine(line: string, state: HighlightState) {
   let output = '';
   let index = 0;
   let afterNode = false;
-  let expectsDirection = false;
+  // No word of the statement has been read yet.
+  let start = true;
   let styleTarget = 0;
+  // Past a colon that starts a label, as a message's in a sequence diagram: its words are
+  // text, not names, and none of them is a keyword.
+  let label = false;
 
   const string = (closers: string[] = []) => {
     const rest = line.slice(index);
@@ -170,6 +204,19 @@ function highlightMermaidLine(line: string, state: HighlightState) {
       output += span('syn-punctuation', '@{');
     } else if ((match = rest.match(/^(:::)([\w-]*)/))) {
       output += span('syn-punctuation', match[1]) + span('syn-language', match[2]);
+    } else if ((match = rest.match(mermaidRelationship))) {
+      output += span('syn-punctuation', match[0]);
+    } else if (rest[0] === ':' && styleTarget < 2) {
+      match = [':'];
+      output += span('syn-punctuation', ':');
+      label = true;
+    } else if (rest[0] === ';') {
+      // A semicolon ends a statement, and the next may start on the same line.
+      match = [';'];
+      output += span('syn-punctuation', ';');
+      start = true;
+      label = false;
+      styleTarget = 0;
     } else if (rest[0] === '|') {
       const close = rest.indexOf('|', 1);
       output += span('syn-punctuation', '|');
@@ -182,37 +229,47 @@ function highlightMermaidLine(line: string, state: HighlightState) {
       continue;
     } else if ((match = rest.match(mermaidLink))) {
       output += span('syn-punctuation', match[0]);
+      start = false;
       // "A -- text --> B": the words between an open link and its arrow are the label.
-      const label = /^(?:--|==|-\.)$/.test(match[0]) ? rest.slice(match[0].length).match(mermaidLinkEnd) : null;
-      if (label?.index) {
-        const text = rest.slice(match[0].length, match[0].length + label.index);
+      const end = /^(?:--|==|-\.)$/.test(match[0]) ? rest.slice(match[0].length).match(mermaidLinkEnd) : null;
+      if (end?.index) {
+        const text = rest.slice(match[0].length, match[0].length + end.index);
         if (/\S/.test(text) && !/[[\](){}|]/.test(text)) {
-          output += span('syn-string', text) + span('syn-punctuation', label[0]);
-          index += match[0].length + text.length + label[0].length;
+          output += span('syn-string', text) + span('syn-punctuation', end[0]);
+          index += match[0].length + text.length + end[0].length;
           continue;
         }
       }
     } else if (styleTarget > 1 && /^[\w-]+\s*:/.test(rest)) {
       output += highlightDeclarations(rest);
       break;
-    } else if (/^\s*$/.test(line.slice(0, index)) && (match = rest.match(mermaidDeclaration))) {
+    } else if (!state.declared && (match = rest.match(mermaidDeclaration))) {
+      state.declared = true;
+      state.diagramType = mermaidDeclaredType(match[0]);
       output += span('syn-keyword', match[0]);
-    } else if ((match = rest.match(mermaidKeyword))) {
-      output += span('syn-keyword', match[0]);
-      expectsDirection = /^(?:flowchart|graph|direction)/.test(match[0]);
-      if (/^(?:style|classDef|linkStyle)$/.test(match[0])) styleTarget = 1;
-      index += match[0].length;
-      continue;
-    } else if (expectsDirection && (match = rest.match(/^(?:TB|TD|BT|RL|LR)\b/))) {
-      output += span('syn-constant', match[0]);
+      start = false;
     } else if ((match = rest.match(/^\d+(?:\.\d+)?\b/))) {
       output += span('syn-number', match[0]);
+      start = false;
       if (styleTarget) styleTarget = 2;
     } else if ((match = rest.match(/^[\p{L}_][\p{L}\p{N}_]*(?:[-.](?![-.])[\p{L}\p{N}_]+)*/u))) {
-      const call = rest[match[0].length] === '(' && /\bcall\s+$/.test(line.slice(0, index));
-      output += span(call ? 'syn-function' : 'syn-variable', match[0]);
-      afterNode = !call;
-      if (styleTarget) styleTarget = 2;
+      // A line that declares no type limu reads still declares one, of which no keyword is known.
+      state.declared = true;
+      const word = match[0];
+      const keywords = mermaidKeywords.get(state.diagramType) ?? mermaidAnyKeywords;
+      if (!label && ((start && keywords.starts.has(word)) || keywords.inline.has(word))) {
+        output += span('syn-keyword', word);
+        if (start && /^(?:style|classDef|linkStyle)$/.test(word)) styleTarget = 1;
+      } else if (!label && mermaidDirections.has(word)) {
+        output += span('syn-constant', word);
+        if (styleTarget) styleTarget = 2;
+      } else {
+        const call = rest[word.length] === '(' && /\bcall\s+$/.test(line.slice(0, index));
+        output += span(label ? 'syn-string' : call ? 'syn-function' : 'syn-variable', word);
+        afterNode = !call && !label;
+        if (styleTarget) styleTarget = 2;
+      }
+      start = false;
     } else if (wasAfterNode && rest[0] === '>') {
       output += span('syn-punctuation', '>');
       index += 1;
@@ -221,6 +278,7 @@ function highlightMermaidLine(line: string, state: HighlightState) {
     } else {
       const shape = mermaidShapes.find(([open]) => rest.startsWith(open));
       if (shape) {
+        start = false;
         output += span('syn-punctuation', shape[0]);
         index += shape[0].length;
         string(shape[1]);
