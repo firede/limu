@@ -1,14 +1,28 @@
-package main
+// Package mermaid is Mermaid's text as a language of MyGo's code editor: its comments,
+// brackets and quotes, and a tokenizer that highlights it.
+//
+//	buf := editor.NewBuffer(src)
+//	buf.SetLanguage(mermaid.Language)
+//
+// The tokenizer reads the diagram's type from the line that declares it, as limu detects
+// it, and highlights as keywords the words that start a statement of that type, as
+// Pele's playground offers them for completion. Words in a node's label or a message are
+// plain text, so that a label that says "end" does not look like a keyword. It reads a line
+// at a time and does not parse; the highlighting is to help read the text, and limu's
+// errors are what say whether it is right.
+package mermaid
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/egoist/mygo/ui/editor"
+	"github.com/firede/limu"
+	"github.com/firede/limu/diagram"
 )
 
-// mermaid is the editor's language for Mermaid's text: its comments, which the editor
-// toggles with Cmd+/, its brackets and quotes, and the tokenizer that highlights it.
-var mermaid = &editor.Language{
+// Language is Mermaid's text, for files named .mmd and .mermaid.
+var Language = &editor.Language{
 	Name:        "Mermaid",
 	Extensions:  []string{".mmd", ".mermaid"},
 	LineComment: "%%",
@@ -18,10 +32,12 @@ var mermaid = &editor.Language{
 		{Open: `"`, Close: `"`, NotIn: []editor.TokenKind{editor.TokenString}},
 	},
 	TabSize:   4,
-	Tokenizer: editor.TokenizerFunc(tokenizeMermaid),
+	Tokenizer: editor.TokenizerFunc(Tokenize),
 }
 
-// The states a line of Mermaid's text can end in, as bits. The text starts in 0.
+// The state a line ends in holds these bits, and from bit 8 the number of the diagram's
+// type in limu.Types, plus one, once the line that declares it is read. The text starts
+// in 0.
 const (
 	// inFront is inside the front matter, which a line of --- opens on the text's first line
 	// and the next such line closes.
@@ -32,35 +48,35 @@ const (
 	declared
 	// begun is past the text's first line, where front matter can no longer open.
 	begun
+
+	typeShift = 8
+	typeMask  = 0xff << typeShift
 )
 
-// keywords are words the diagrams have in common, or that many of them use, highlighted
-// wherever they are not part of a label. It is a short list on purpose: the highlighting
-// is to help read the text, and a word left plain does no harm.
-var keywords = map[string]bool{
-	"subgraph": true, "end": true, "direction": true, "click": true, "style": true,
-	"classDef": true, "class": true, "linkStyle": true, "call": true, "href": true,
-	"participant": true, "actor": true, "as": true, "loop": true, "alt": true, "else": true,
-	"opt": true, "par": true, "and": true, "critical": true, "break": true, "rect": true,
-	"note": true, "Note": true, "over": true, "activate": true, "deactivate": true,
-	"autonumber": true, "create": true, "destroy": true, "box": true, "title": true,
-	"section": true, "state": true, "accTitle": true, "accDescr": true, "dateFormat": true,
-	"axisFormat": true, "tickInterval": true, "excludes": true, "includes": true,
-	"todayMarker": true, "commit": true, "branch": true, "checkout": true, "merge": true,
-	"cherry-pick": true, "x-axis": true, "y-axis": true, "bar": true, "line": true,
-	"columns": true, "group": true, "service": true, "junction": true, "showData": true,
-	"axis": true, "curve": true, "set": true, "union": true, "component": true,
+// types are the types limu reads, in an order that does not change while the program
+// runs, so that a line's state can name one by its number.
+var types = limu.Types()
+
+func typeOf(state uint64) diagram.Type {
+	if n := int(state&typeMask>>typeShift) - 1; n >= 0 && n < len(types) {
+		return types[n]
+	}
+	return ""
 }
 
-// directions are the ways a diagram runs, highlighted as constants.
-var directions = map[string]bool{"TB": true, "TD": true, "BT": true, "RL": true, "LR": true}
+func withType(state uint64, t diagram.Type) uint64 {
+	state &^= typeMask
+	if n := slices.Index(types, t); n >= 0 {
+		state |= uint64(n+1) << typeShift
+	}
+	return state
+}
 
-// tokenizeMermaid highlights a line of Mermaid's text: front matter and directives as meta,
-// comments, strings, numbers, colors, arrows and the other operators, the word that says
-// the diagram's type on its first line, and common keywords. Inside brackets, which hold a
-// node's label, and after a colon, which starts a message or a value, words are plain
-// text, so that a label that says "end" does not look like a keyword.
-func tokenizeMermaid(line string, state uint64, toks []editor.Token) ([]editor.Token, uint64) {
+// Tokenize highlights a line of Mermaid's text, given the state the line before ended in:
+// front matter and directives as meta, comments, strings, numbers, colors, arrows and the
+// other operators, the word that says the diagram's type, the keywords of its type, and
+// directions. It is the Tokenizer of Language.
+func Tokenize(line string, state uint64, toks []editor.Token) ([]editor.Token, uint64) {
 	first := state&begun == 0
 	state |= begun
 	trimmed := strings.TrimSpace(line)
@@ -101,7 +117,14 @@ func tokenizeMermaid(line string, state uint64, toks []editor.Token) ([]editor.T
 		return toks, state
 	}
 	declaration := state&declared == 0
-	state |= declared
+	if declaration {
+		state |= declared
+		if t, err := diagram.DetectType(trimmed); err == nil {
+			state = withType(state, t)
+		}
+	}
+	words := keywordsOf(typeOf(state))
+	start := true  // no word of the statement has been read yet
 	depth := 0     // of the brackets around the scan
 	label := false // past a colon that starts a label or a value
 	for i := 0; i < len(line); {
@@ -129,6 +152,7 @@ func tokenizeMermaid(line string, state uint64, toks []editor.Token) ([]editor.T
 				j++
 			}
 			add(j, editor.TokenNumber)
+			start = false
 			i = j
 		case isWordStart(c):
 			j := wordEnd(line, i)
@@ -141,10 +165,11 @@ func tokenizeMermaid(line string, state uint64, toks []editor.Token) ([]editor.T
 			case depth > 0 || label:
 			case directions[word]:
 				kind = editor.TokenConstant
-			case keywords[word]:
+			case start && words.starts[word], words.inline[word]:
 				kind = editor.TokenKeyword
 			}
 			add(j, kind)
+			start = false
 			i = j
 		case isArrow(c):
 			j := i
@@ -156,6 +181,7 @@ func tokenizeMermaid(line string, state uint64, toks []editor.Token) ([]editor.T
 				kind = editor.TokenOperator
 			}
 			add(j, kind)
+			start = false
 			i = j
 		case c == ':':
 			j := i
@@ -170,10 +196,16 @@ func tokenizeMermaid(line string, state uint64, toks []editor.Token) ([]editor.T
 		case strings.IndexByte("([{", c) >= 0:
 			depth++
 			add(i+1, editor.TokenPunctuation)
+			start = false
 			i++
 		case strings.IndexByte(")]}", c) >= 0:
 			depth = max(0, depth-1)
 			add(i+1, editor.TokenPunctuation)
+			i++
+		case c == ';' && depth == 0:
+			// A semicolon ends a statement, and the next may start on the same line.
+			add(i+1, editor.TokenPunctuation)
+			start, label = true, false
 			i++
 		case strings.IndexByte("|;,@", c) >= 0:
 			add(i+1, editor.TokenPunctuation)

@@ -35,12 +35,13 @@ func main() {
 	look := flag.String("appearance", appearanceLight, "with -png, the appearance: "+strings.Join(appearanceNames, ", "))
 	dark := flag.Bool("dark", false, "with -png, render as the system does in a dark appearance")
 	view := flag.String("view", "diagram", "with -png, the output pane's view: diagram or svg")
+	route := flag.String("route", "/playground", "with -png, the page shown: /playground, /examples or /examples/<type>")
 	w := flag.Int("width", width, "with -png, the width of the window in DIPs")
 	h := flag.Int("height", height, "with -png, the height of the window in DIPs")
 	scale := flag.Float64("scale", 2, "with -png, device pixels to a DIP")
 	flag.Parse()
 	if *out != "" {
-		if err := renderPNG(*out, *srcFile, *look, *view, *dark, *w, *h, float32(*scale)); err != nil {
+		if err := renderPNG(*out, *srcFile, *look, *view, *route, *dark, *w, *h, float32(*scale)); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -49,7 +50,7 @@ func main() {
 }
 
 // renderPNG renders the window, without one, to a PNG file.
-func renderPNG(out, srcFile, look, view string, dark bool, w, h int, scale float32) error {
+func renderPNG(out, srcFile, look, view, route string, dark bool, w, h int, scale float32) error {
 	src := firstSample()
 	if srcFile != "" {
 		var err error
@@ -68,6 +69,7 @@ func renderPNG(out, srcFile, look, view string, dark bool, w, h int, scale float
 	default:
 		return fmt.Errorf("no view %q: there are diagram and svg", view)
 	}
+	a.router.Replace(route)
 	t := ui.NewTester(a.view, w, h)
 	t.SetScale(scale)
 	t.SetDark(dark)

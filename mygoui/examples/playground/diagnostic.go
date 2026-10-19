@@ -96,7 +96,7 @@ func cutOnLine(s string) string {
 	}
 	j := i + len(" on line ")
 	k := j
-	for k < len(s) && isDigit(s[k]) {
+	for k < len(s) && '0' <= s[k] && s[k] <= '9' {
 		k++
 	}
 	if k == j {

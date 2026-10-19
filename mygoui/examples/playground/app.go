@@ -15,6 +15,7 @@ import (
 	"github.com/egoist/mygo/ui/editor"
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/mygoui"
+	"github.com/firede/limu/mygoui/mermaid"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/svg"
 )
@@ -76,6 +77,8 @@ type app struct {
 	notice      string // a message for a toast in the next frame
 	focusEditor bool   // give the editor the keyboard focus in the next frame
 
+	ex examples // the page of examples
+
 	saver *settingsWriter
 }
 
@@ -91,7 +94,7 @@ func newApp(src, appearance string, saver *settingsWriter) *app {
 		saver:      saver,
 	}
 	a.router.Transition = ui.TransitionNone
-	a.buf.SetLanguage(mermaid)
+	a.buf.SetLanguage(mermaid.Language)
 	a.code = &editor.State{Buffer: a.buf, Label: "Mermaid text", Placeholder: "Type a Mermaid diagram, or choose one of the Samples."}
 	a.svgBuf = editor.NewBuffer("")
 	a.svgBuf.SetLanguage(editor.LanguageFor("diagram.svg"))
@@ -128,6 +131,12 @@ func (a *app) view(c *ui.Context) {
 			case r.Match("/playground"):
 				r.Title("Playground")
 				a.playground(c, ap)
+			case r.Match("/examples"):
+				r.Title("Examples")
+				a.examplesPage(c, ap, featured)
+			case r.Match("/examples/{type}"):
+				r.Title("Examples")
+				a.examplesPage(c, ap, r.Param("type"))
 			default:
 				ui.Text(c, "There is no page at "+r.Path()+".")
 			}
@@ -138,8 +147,22 @@ func (a *app) view(c *ui.Context) {
 func (a *app) toolbar(c *ui.Context, ap *appearance) {
 	t := ap.UI
 	ui.Toolbar(c, func() {
+		page := 0
+		if strings.HasPrefix(a.router.Path(), "/examples") {
+			page = 1
+		}
+		if ui.Segmented(c, &page, "Playground", "Examples").Label("Page").Changed() {
+			if page == 0 {
+				a.router.Push("/playground")
+			} else {
+				a.router.Push(examplesPath(a.ex.chosen))
+			}
+		}
 		ui.MenuButton(c, "Samples", func(m *ui.Menu) {
-			samplesMenu(m, func(src string) { a.load(src, "") })
+			samplesMenu(m, func(src string) {
+				a.load(src, "")
+				a.router.Push("/playground")
+			})
 		})
 		if ui.Button(c, "Open…").Clicked() {
 			a.openDialog()

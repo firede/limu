@@ -60,14 +60,15 @@ text ──parse──▶ model ──layout──▶ scene ──backend──�
 | `style` | How a scene looks, at three levels: a theme of colors by token, overrides by role, and a backend's drawing of its own. |
 | `layout` | What changes where things are: the measurer, the size of text, the width the host has, the padding about a diagram, a grid to snap to, how edges are routed, the present and the time zone of a gantt chart. |
 | `svg` | Draws a scene as SVG, its theme as CSS variables. |
-| `mygoui` | Draws a scene with MyGo's native UI, and finds the item under the pointer. A module of its own, so that the rest needs only the standard library. |
+| `mygoui` | Draws a scene with MyGo's native UI, and finds the item under the pointer. A module of its own, so that the rest needs only the standard library. Its package `mygoui/mermaid` is Mermaid's text as a language of MyGo's code editor, highlighted by the keywords of the diagram's type. |
 
 What changes where things are goes to layout; everything else is style, and a
 change of it only redraws. [docs/design.md](docs/design.md) has the details and
 the roadmap.
 
 To try limu on a diagram of your own, run the playground, which shows the text
-beside its diagram, drawn by mygoui, and its SVG:
+beside its diagram, drawn by mygoui, and its SVG, and has a page of examples of
+every type of diagram, each of which opens in the playground:
 `cd mygoui && go run ./examples/playground`.
 
 ## Style
