@@ -1,5 +1,20 @@
 // Package common holds what the diagrams share beyond layout and drawing, as Pele's
-// diagrams/common does: fitting a diagram to the host's width, and reading generic types.
+// diagrams/common does:
+//
+//   - the room about a diagram (Padding), and fitting a diagram to the width the host has
+//     (Tighten, TurnToFit, FitWidth), with the curve the host's routing asks for
+//     (RoutingCurve);
+//   - laying out labels: plain and fitted ones (fit.go), text cut to fit a room and
+//     one-line labels (fittext.go: FitText, Line, LineOf), labels taken literally
+//     (literallabel.go), and a diagram's title (title.go);
+//   - reading generic types (generics.go) and class lists (classes.go: ClassNames,
+//     TrimDefault);
+//   - the icons a host can draw, and the glyphs drawn for them (icons.go);
+//   - the lexer and reader of the Langium grammars, with the token types they share
+//     (tokens.go: Tokenize, Reader, Keyword, AccDescr and the rest);
+//   - the scanning helpers of the hand-written Jison lexers (scan.go: KeywordAt, WordAt,
+//     Accessibility and the rest);
+//   - the indented outlines of kanban boards and mindmaps (outline.go).
 package common
 
 import (
