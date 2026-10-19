@@ -3,50 +3,13 @@
 //
 // A scene has no groups to move what is in them, so it holds where everything is on the page,
 // where Pele writes the inside of a class or a note about its middle, and everything about the
-// title. Pele's SVG is drawn here with its numbers written out in full, by a copy of its
-// sources whose num() gives them so; each number is moved by the groups it is in, one move
-// after the other from the innermost out, as the scene's are, and then written to two decimals
-// as Pele writes them. The markers are drawn again where the title moves them, from their tips
-// and directions, which the copy's classMarker writes beside them.
-import { register } from 'node:module';
-import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+// title. Pele's SVG is drawn here with its numbers written out in full, as the oracle's hooks
+// have num() write them while limuExactNumbers is set; each number is moved by the groups it is
+// in, one move after the other from the innermost out, as the scene's are, and then written to
+// two decimals as Pele writes them. The markers are drawn again where the title moves them,
+// from their tips and directions, which classMarker writes beside them while the flag is set.
 import { lone, mutator } from './parse.mjs';
 import { WRITTEN } from './class.mjs';
-
-// The hooks that load the copy: a module imported with ?exact imports the rest of Pele's
-// sources with ?exact too, its num() writes numbers in full while __peleExact is set, and its
-// classMarker writes what it draws a marker from.
-const HOOKS = `
-export async function resolve(spec, ctx, next) {
-  const parent = ctx.parentURL;
-  if (!parent || !parent.endsWith('?exact')) return next(spec, ctx);
-  const r = await next(spec, { ...ctx, parentURL: parent.slice(0, -6) });
-  return r.url.startsWith('file:') && r.url.endsWith('.ts') ? { ...r, url: r.url + '?exact' } : r;
-}
-const patch = (source, find, replace) => {
-  if (!source.includes(find)) throw new Error('class-render: cannot find ' + find);
-  return source.replace(find, replace);
-};
-export async function load(url, ctx, next) {
-  const r = await next(url, ctx);
-  if (url.endsWith('/svg/builder.ts?exact')) {
-    const head = 'export function num(value: number): string {';
-    return { ...r, source: patch(String(r.source), head, head + ' if ((globalThis as any).__peleExact) return String(value);') };
-  }
-  if (url.endsWith('/diagrams/class/markers.ts?exact')) {
-    const head = 'export function classMarker(';
-    const source = patch(String(r.source), head, 'function drawMarker(') + \`
-export function classMarker(type: EndMarker, x: number, y: number, dx: number, dy: number, color: string): string {
-  const s = drawMarker(type, x, y, dx, dy, color);
-  if (!(globalThis as any).__peleExact) return s;
-  return s.replace('class="pele-marker"', \\\`class="pele-marker" data-m="\\\${type} \\\${x} \\\${y} \\\${dx} \\\${dy}"\\\`);
-}\`;
-    return { ...r, source };
-  }
-  return r;
-}`;
-register('data:text/javascript,' + encodeURIComponent(HOOKS));
 
 // The fragments mutations splice in, for text that parses and still draws something odd.
 const FRAGMENTS = [
@@ -286,14 +249,13 @@ export function readSvg(svg, num, redraw) {
   return lines;
 }
 
-export default async function ({ pele, cases, write, random }) {
-  const exact = (path) => import(pathToFileURL(join(pele, 'src', path)).href + '?exact');
-  const { render, PeleError } = await exact('index.ts');
-  const { preprocess } = await exact('preprocess.ts');
-  const { detect } = await exact('detect.ts');
-  const { metricsMeasurer } = await exact('text/measurer.ts');
-  const { classMarker } = await exact('diagrams/class/markers.ts');
-  const { num } = await exact('svg/builder.ts');
+export default async function ({ src, cases, write, random }) {
+  const { render, PeleError } = await src('index.ts');
+  const { preprocess } = await src('preprocess.ts');
+  const { detect } = await src('detect.ts');
+  const { metricsMeasurer } = await src('text/measurer.ts');
+  const { classMarker } = await src('diagrams/class/markers.ts');
+  const { num } = await src('svg/builder.ts');
 
   const classes = [...DRAWN, ...WRITTEN, ...cases('class').extracted].filter((s) => {
     try {
@@ -307,14 +269,14 @@ export default async function ({ pele, cases, write, random }) {
   const out = [];
   const draw = (source, maxWidth) => {
     let r;
-    globalThis.__peleExact = true;
+    globalThis.limuExactNumbers = true;
     try {
       r = render(source, { measurer: metricsMeasurer, maxWidth, outputLimit: Infinity });
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
       return false;
     } finally {
-      globalThis.__peleExact = false;
+      globalThis.limuExactNumbers = false;
     }
     if (r.type !== 'class') return false;
     out.push({ src: source, maxWidth, lines: readSvg(r.svg, num, redraw) });
