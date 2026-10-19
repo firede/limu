@@ -10,7 +10,7 @@ import (
 )
 
 func Example() {
-	sc, err := limu.Layout("flowchart LR\n  A[Text] --> B[Scene] --> C{Backend}\n  C -->|svg| D[SVG]\n  C -->|mygoui| E[Screen]", nil)
+	sc, err := limu.Layout("flowchart LR\n  A[Text] --> B[Scene] --> C{Backend}\n  C -->|svg| D[SVG]\n  C -->|limumygo| E[Screen]", nil)
 	if err != nil {
 		panic(err)
 	}

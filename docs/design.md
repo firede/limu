@@ -186,9 +186,9 @@ Three levels, from the least to the most a host does:
    default's pieces with the `Writer`'s `Item`, `Parts`, `Ends`, `Picture` and `Label`, and
    colors at their opacities with `PaintAttr` and `Opacity`; it is given a `style.Style`,
    its paints not settled, so that the theme's colors are written as CSS variables. The
-   mygoui package's `Options.Draw` has the same pieces on its `Painter`, and is given a
+   limumygo package's `Options.Draw` has the same pieces on its `Painter`, and is given a
    `style.Resolved`, as MyGo draws with colors. Icons and images are hooks of the
-   backends: the svg package's `IconMarkup`, and mygoui's `DrawIcon` and `DrawImage`.
+   backends: the svg package's `IconMarkup`, and limumygo's `DrawIcon` and `DrawImage`.
 
 A part's style is cascaded, from under to over: the theme's measures, the diagram's own
 style for the part, the overrides for its role, and what its author set in the diagram's
@@ -206,10 +206,10 @@ as a gantt chart's milestone. The edges of mindmaps, journeys, timelines, wardle
 ishikawa and event modeling diagrams, and a cynefin diagram's transitions, end flat, as
 Pele draws them with no cap. An author's `stroke-linecap` and `stroke-linejoin` in `style`
 and `classDef` lines are read, as Pele passes them on to the browser. The svg package
-writes them where they are set; the mygoui package strokes with MyGo's round ends and
+writes them where they are set; the limumygo package strokes with MyGo's round ends and
 corners when both are round, and otherwise fills the outline SVG would stroke.
 
-The mygoui package draws what the svg package writes, but not in every way as a browser
+The limumygo package draws what the svg package writes, but not in every way as a browser
 draws SVG. An item's opacity is laid on each color it is drawn in, as MyGo has no group to
 draw at an opacity, so that where an item's parts overlap, the one below shows through. A
 scene is zoomed and panned with `Options.Scale` and the point `Paint` draws it at, not under

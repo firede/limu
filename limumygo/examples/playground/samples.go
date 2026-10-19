@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/egoist/mygo/ui"
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/mygoui/examples/playground/internal/gallery"
+	"github.com/firede/limu/limumygo/examples/playground/internal/gallery"
 )
 
 // menuExamples is how many of a type's examples the Samples menu lists, the featured ones

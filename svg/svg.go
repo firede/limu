@@ -286,8 +286,8 @@ func (w *Writer) Item(it *scene.Item, st style.Style) {
 // Parts writes the parts of an item's outline: paths, and boxes as <rect>s, the boxes'
 // corners rounded by the style's radius when they are Rounded, each filled and stroked as
 // its Paint says. SVG takes a radius too large for a box as half its width across and half
-// its height down, so that a narrow box's corners are elliptical; the mygoui package takes
-// the smaller of the two both ways.
+// its height down, so that a narrow box's corners are elliptical; the limumygo package
+// takes the smaller of the two both ways.
 func (w *Writer) Parts(it *scene.Item, st style.Style) {
 	b := &w.b
 	sw := st.StrokeWidth.Or(1)
@@ -339,7 +339,7 @@ func (w *Writer) Parts(it *scene.Item, st style.Style) {
 // shade is the fill of an item's parts painted Shade: the theme's background, or, when the
 // item's author set a fill, the background at 60% over it, as Pele draws an entity's
 // stripes at an opacity of 0.6 when its style sets a fill. The parts below show through,
-// in SVG and in the mygoui package alike.
+// in SVG and in the limumygo package alike.
 func shade(it *scene.Item) style.Paint {
 	if it.Author.Fill.Set() {
 		return style.Bg.Alpha(0.6)

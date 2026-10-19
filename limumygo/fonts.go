@@ -1,4 +1,4 @@
-package mygoui
+package limumygo
 
 import (
 	"sync"

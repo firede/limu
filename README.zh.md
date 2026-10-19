@@ -56,14 +56,14 @@ sc, err := d.Layout(&layout.Options{MaxWidth: 480, Padding: new(0.0)})
 | `style` | 场景的外观，分三级：按 token 取色的主题、按角色的覆盖、后端自己的绘制。 |
 | `layout` | 会改变位置的参数：测量器、字号、宿主可用宽度、图表四周的留白、对齐网格、边的走线方式，以及甘特图的当前时间和时区。 |
 | `svg` | 把场景画成 SVG，主题写成 CSS 变量。 |
-| `mygoui` | 用 MyGo 的原生 UI 绘制场景，并找出指针下的部件。它是独立的 module，其余部分因此只依赖标准库。其中的 `mygoui/mermaid` 包把 Mermaid 文本作为 MyGo 代码编辑器的一种语言，按图表类型的关键字高亮。 |
+| `limumygo` | 用 MyGo 的原生 UI 绘制场景，并找出指针下的部件。它是独立的 module，其余部分因此只依赖标准库。其中的 `limumygo/mermaid` 包把 Mermaid 文本作为 MyGo 代码编辑器的一种语言，按图表类型的关键字高亮。 |
 
 会改变位置的参数交给布局；其余都属于样式，改动后只需重画。细节和路线图见
 [docs/design.md](docs/design.md)。
 
-想用自己的图表试试 limu，可以运行 playground，它把文本和由 mygoui 绘制的图、
+想用自己的图表试试 limu，可以运行 playground，它把文本和由 limumygo 绘制的图、
 以及它的 SVG 并排显示，还有一页各类图表的示例，每个都能在 playground 里打开：
-`cd mygoui && go run ./examples/playground`。
+`cd limumygo && go run ./examples/playground`。
 
 ## 样式
 
@@ -99,8 +99,8 @@ svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.St
 ./scripts/verify.sh
 ```
 
-在 limu 的 module 和 mygoui 的 module 里运行 `go vet`、`gofmt` 和全部测试；下载好
-mygoui 依赖的 module 后无需联网。CI 在 amd64（`GOAMD64` 为 v1 和 v3）和 arm64 上运行它。在 Linux 上，mygoui
+在 limu 的 module 和 limumygo 的 module 里运行 `go vet`、`gofmt` 和全部测试；下载好
+limumygo 依赖的 module 后无需联网。CI 在 amd64（`GOAMD64` 为 v1 和 v3）和 arm64 上运行它。在 Linux 上，limumygo
 的测试需要 Pango（`libpangocairo-1.0-0`）。测试比对的 fixture 由 Pele 自己的源码
 生成：
 

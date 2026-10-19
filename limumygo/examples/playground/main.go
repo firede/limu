@@ -1,5 +1,5 @@
 // Command playground tries limu on Mermaid's text: the text on the left, in an editor that
-// highlights it, and on the right the diagram limu lays out, drawn by the mygoui package,
+// highlights it, and on the right the diagram limu lays out, drawn by the limumygo package,
 // or the SVG the svg package writes of it. The diagram is laid out again a moment after
 // each edit, and when the pane's width changes; changing the appearance only draws it
 // again. It remembers the text and the appearance between runs.

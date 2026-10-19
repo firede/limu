@@ -5,8 +5,8 @@ import (
 
 	"github.com/egoist/mygo/ui"
 	"github.com/firede/limu"
-	"github.com/firede/limu/mygoui"
-	"github.com/firede/limu/mygoui/examples/playground/internal/gallery"
+	"github.com/firede/limu/limumygo"
+	"github.com/firede/limu/limumygo/examples/playground/internal/gallery"
 	"github.com/firede/limu/scene"
 )
 
@@ -157,7 +157,7 @@ func (a *app) card(c *ui.Context, ap *appearance, e entry, showType bool) {
 					w, h = cardWidth-2*cardPad, cardHeight-2*cardPad-48
 				}
 				scale := math.Min(1, math.Min(w/cd.sc.Width, h/cd.sc.Height))
-				v := mygoui.View(c.Key(e.ex.Source), cd.sc, &mygoui.Options{Fonts: mygoui.DefaultFonts, Look: ap.Diagram, Scale: scale})
+				v := limumygo.View(c.Key(e.ex.Source), cd.sc, &limumygo.Options{Fonts: limumygo.DefaultFonts, Look: ap.Diagram, Scale: scale})
 				v.Label(e.ex.Title)
 			case cd.err != nil:
 				ui.Text(c, cd.err.Error()).TextColor(t.Danger).MaxLines(6)

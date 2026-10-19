@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/firede/limu/mygoui/examples/playground/internal/gallery"
+	"github.com/firede/limu/limumygo/examples/playground/internal/gallery"
 )
 
 // tester shows the playground with a text, as -png does, without a window.

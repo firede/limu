@@ -1,4 +1,4 @@
-package mygoui
+package limumygo
 
 import (
 	"strings"
@@ -76,6 +76,6 @@ func TestGoldenMindmapIcons(t *testing.T) {
     Backends
       svg
         ::icon(fa fa-code)
-      fa:fa-desktop mygoui`)
+      fa:fa-desktop limumygo`)
 	snap(t, "mindmap-icons", sc, &Options{Fonts: goFonts, DrawIcon: drawIcon}, 1)
 }

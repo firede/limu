@@ -1,4 +1,4 @@
-// Package mygoui draws limu's scenes with MyGo's native UI: Paint draws a scene on a
+// Package limumygo draws limu's scenes with MyGo's native UI: Paint draws a scene on a
 // ui.Painter, View shows one in an element that tells which item the pointer is over and
 // which was clicked, and Fonts measure text for layout with the fonts it is drawn in.
 //
@@ -19,7 +19,7 @@
 // where ui.Painter.Visible says the painter shows, which is in the window's DIPs, and MyGo
 // does not tell a painter the transform that would take the scene's DIPs there. Under a
 // transform, such a path is drawn in part, or not at all.
-package mygoui
+package limumygo
 
 import (
 	"math"

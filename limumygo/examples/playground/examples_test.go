@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/firede/limu/mygoui/examples/playground/internal/gallery"
+	"github.com/firede/limu/limumygo/examples/playground/internal/gallery"
 )
 
 // The toolbar goes to the page of examples, which shows the featured examples of every

@@ -1,4 +1,4 @@
-package mygoui
+package limumygo
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/firede/limu/mygoui/internal/samples"
+	"github.com/firede/limu/limumygo/internal/samples"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
 	"golang.org/x/image/font/gofont/gobold"

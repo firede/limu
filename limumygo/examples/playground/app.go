@@ -14,8 +14,8 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/egoist/mygo/ui/editor"
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/mygoui"
-	"github.com/firede/limu/mygoui/mermaid"
+	"github.com/firede/limu/limumygo"
+	"github.com/firede/limu/limumygo/mermaid"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/svg"
 )
@@ -24,7 +24,7 @@ import (
 const pad = 16
 
 // The font families the SVG names, Primer's stacks of the system's fonts: the diagram is
-// measured in the system's font, as mygoui draws it.
+// measured in the system's font, as limumygo draws it.
 const (
 	fontStack = `-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif`
 	monoStack = `ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace`
@@ -259,7 +259,7 @@ func (a *app) output(c *ui.Context, ap *appearance) {
 func (a *app) diagram(c *ui.Context, ap *appearance, paneWidth float32) {
 	ui.ScrollBoth(c).Grow(1).FillWidth().Children(func() {
 		ui.Row(c).Padding(pad).MinWidth(paneWidth).Justify(ui.Center).AlignItems(ui.Start).Children(func() {
-			w := mygoui.View(c.Key("diagram"), a.scene, &mygoui.Options{Fonts: mygoui.DefaultFonts, Look: ap.Diagram})
+			w := limumygo.View(c.Key("diagram"), a.scene, &limumygo.Options{Fonts: limumygo.DefaultFonts, Look: ap.Diagram})
 			w.Label(typeTitle(a.typ) + " diagram")
 			if a.problem != nil {
 				w.Element().Opacity(0.35)
@@ -490,7 +490,7 @@ func (a *app) exportSVG(ap *appearance) {
 	a.export(".svg", "SVG", func(path string) error { return os.WriteFile(path, []byte(doc), 0o644) })
 }
 
-// exportPNG draws the diagram as mygoui draws it in the window, at twice its size, on its
+// exportPNG draws the diagram as limumygo draws it in the window, at twice its size, on its
 // background.
 func (a *app) exportPNG(ap *appearance) {
 	img := scenePNG(a.scene, ap, 2)
@@ -533,11 +533,11 @@ func (a *app) export(ext, kind string, write func(path string) error) {
 // DIP, as ui.Render draws a view sized to the scene.
 func scenePNG(sc *scene.Scene, ap *appearance, scale float32) *image.RGBA {
 	w, h := int(math.Ceil(sc.Width)), int(math.Ceil(sc.Height))
-	o := &mygoui.Options{Fonts: mygoui.DefaultFonts, Look: ap.Diagram}
+	o := &limumygo.Options{Fonts: limumygo.DefaultFonts, Look: ap.Diagram}
 	return ui.Render(func(c *ui.Context) {
 		c.SetTheme(ap.UI)
 		ui.Box(c).Size(float32(w), float32(h)).Background(ap.UI.Background).Children(func() {
-			mygoui.View(c, sc, o)
+			limumygo.View(c, sc, o)
 		})
 	}, w, h, scale)
 }

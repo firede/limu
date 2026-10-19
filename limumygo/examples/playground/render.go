@@ -7,7 +7,7 @@ import (
 	"github.com/firede/limu"
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/layout"
-	"github.com/firede/limu/mygoui"
+	"github.com/firede/limu/limumygo"
 	"github.com/firede/limu/scene"
 )
 
@@ -16,11 +16,12 @@ import (
 const editDelay = 150 * time.Millisecond
 
 // layoutOptions are what the playground lays a diagram out with: its text measured in the
-// fonts mygoui draws it in, and the width of the pane it is shown in, which a diagram that
-// can draw itself narrower, as one that turns from running across to running down, fits.
+// fonts limumygo draws it in, and the width of the pane it is shown in, which a diagram
+// that can draw itself narrower, as one that turns from running across to running down,
+// fits.
 // The look is not among them: it changes how a diagram is drawn, not where anything is.
 func layoutOptions(width float64) *layout.Options {
-	return &layout.Options{Measurer: mygoui.DefaultFonts, MaxWidth: width}
+	return &layout.Options{Measurer: limumygo.DefaultFonts, MaxWidth: width}
 }
 
 // A job is a laying out of the text: the text at a version of the editor's buffer, and the

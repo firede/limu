@@ -1,4 +1,4 @@
-package mygoui
+package limumygo
 
 import (
 	"image/color"
@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/egoist/mygo/ui"
-	"github.com/firede/limu/mygoui/internal/samples"
+	"github.com/firede/limu/limumygo/internal/samples"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
 )

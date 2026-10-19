@@ -1,4 +1,4 @@
-// Command scene shows two scenes laid out by hand in a window, drawn by the mygoui
+// Command scene shows two scenes laid out by hand in a window, drawn by the limumygo
 // package, and tells which item the pointer is over and which was clicked; with -png, it
 // renders them to a PNG without one:
 //
@@ -15,8 +15,8 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/ui"
-	"github.com/firede/limu/mygoui"
-	"github.com/firede/limu/mygoui/internal/samples"
+	"github.com/firede/limu/limumygo"
+	"github.com/firede/limu/limumygo/internal/samples"
 	"github.com/firede/limu/scene"
 )
 
@@ -25,7 +25,7 @@ const width, height = 760, 400
 
 type app struct {
 	scenes  []*scene.Scene
-	opts    *mygoui.Options
+	opts    *limumygo.Options
 	status  string
 	clicked string
 }
@@ -36,7 +36,7 @@ func (a *app) view(c *ui.Context) {
 	ui.Column(c).Size(width, height).Padding(16).Gap(12).Background(t.Background).Children(func() {
 		ui.Row(c).Gap(16).AlignItems(ui.Start).Children(func() {
 			for i, sc := range a.scenes {
-				w := mygoui.View(c.Key(i), sc, a.opts)
+				w := limumygo.View(c.Key(i), sc, a.opts)
 				w.Element().Background(ui.RGB(255, 255, 255)).Radius(6).Border(1, t.Border)
 				if it := w.Hovered(); it != nil {
 					hovered = describe(it)
@@ -81,10 +81,10 @@ func main() {
 	scale := flag.Float64("scale", 1, "the scale of the PNG")
 	flag.Parse()
 	// The scenes are measured with the fonts they are drawn in.
-	fonts := mygoui.DefaultFonts
+	fonts := limumygo.DefaultFonts
 	a := &app{
 		scenes: []*scene.Scene{samples.Flowchart(fonts), samples.Features(fonts)},
-		opts:   &mygoui.Options{Fonts: fonts},
+		opts:   &limumygo.Options{Fonts: fonts},
 	}
 	if *out != "" {
 		img := ui.Render(a.view, width, height, float32(*scale))

@@ -1,4 +1,4 @@
-module github.com/firede/limu/mygoui
+module github.com/firede/limu/limumygo
 
 go 1.27.1
 
