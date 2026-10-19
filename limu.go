@@ -9,6 +9,7 @@ import (
 	"github.com/firede/limu/diagram/requirement"
 	"github.com/firede/limu/diagram/state"
 	"github.com/firede/limu/diagram/swimlane"
+	"github.com/firede/limu/diagram/timeline"
 	"github.com/firede/limu/diagram/usecase"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -75,6 +76,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = usecase.Layout(m, p.Config, o)
+	case diagram.Timeline:
+		m, err := timeline.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = timeline.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
