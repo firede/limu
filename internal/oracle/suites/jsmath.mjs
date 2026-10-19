@@ -1,5 +1,5 @@
-// Math.sin, Math.cos, Math.atan2 and Math.acos as V8 works them out, which Pele's
-// charts compute with: on the angles and coordinates charts reach, the arithmetic charts do
+// Math.sin, Math.cos, Math.atan2, Math.acos and Math.asin as V8 works them out, which Pele's
+// charts and block diagrams compute with: on the angles and coordinates charts reach, the arithmetic charts do
 // on them, random bit patterns and the special values. An angle written [k, n] is k·π/n,
 // worked out as k * Math.PI / n, which keeps the fixture small; any other input is itself.
 
@@ -92,5 +92,20 @@ export default async function ({ write, random }) {
   for (let i = 0; i < 1000; i++) ac(sign() * next() * 2 ** -int(0, 70));
   for (let i = 0; i < 1000; i++) ac(anyBits());
 
-  write('internal/jsmath/testdata/pele/math.json', { trig, atan2, acos });
+  // Math.asin over [-1, 1] and beyond, and on what a block diagram's self-loop around a
+  // circle asks of it: a radius over the circle's width, at most 1.
+  const asin = [];
+  const as = (x) => asin.push([enc(x), enc(Math.asin(x))]);
+  for (const x of SPECIAL) as(x);
+  for (let i = 0; i < 8000; i++) as(decimal(1, int(1, 4)));
+  for (let i = 0; i < 4000; i++) as(int(-1000, 1000) / pick([1000, 999, 7, 360, int(1, 1000)]));
+  for (let i = 0; i < 3000; i++) as(Math.min(1, int(1, 30) / (2 * (decimal(100, 3) + 22))));
+  for (let i = 0; i < 3000; i++) as(sign() * (1 - next() * 2 ** -int(0, 53)));
+  for (let i = 0; i < 2000; i++) as(sign() * (0.975 + (next() - 0.5) * 2 ** -int(0, 53)));
+  for (let i = 0; i < 2000; i++) as(sign() * (0.5 + (next() - 0.5) * 2 ** -int(0, 53)));
+  for (let i = 0; i < 3000; i++) as(next() * 2 - 1);
+  for (let i = 0; i < 1000; i++) as(sign() * next() * 2 ** -int(0, 70));
+  for (let i = 0; i < 1000; i++) as(anyBits());
+
+  write('internal/jsmath/testdata/pele/math.json', { trig, atan2, acos, asin });
 }
