@@ -147,6 +147,52 @@ func TestDeclarationsDropUnsafe(t *testing.T) {
 	}
 }
 
+// A later value of a property that cannot be read leaves it unset, as Pele writes only the
+// last and a browser drops it.
+func TestDeclarationsLastWins(t *testing.T) {
+	a := Declarations([]string{"stroke-width:3px", "stroke-width:0x", "opacity:0.5", "opacity:half", "fill-opacity:0.5", "fill:red", "fill-opacity:x"})
+	_, width := a.Style.StrokeWidth.Get()
+	_, opacity := a.Style.Opacity.Get()
+	if width || opacity || a.Style.Fill != Of(Color{255, 0, 0, 255}) {
+		t.Errorf("kept %+v", a.Style)
+	}
+}
+
+func TestDeclarationsOpacities(t *testing.T) {
+	a := Declarations([]string{"fill-opacity:0.5", "stroke-opacity:150%"})
+	if f, ok := a.FillOpacity.Get(); !ok || f != 0.5 {
+		t.Errorf("fill-opacity %v %v", f, ok)
+	}
+	if f, ok := a.StrokeOpacity.Get(); !ok || f != 1 {
+		t.Errorf("stroke-opacity %v %v", f, ok)
+	}
+	a = Declarations([]string{"fill-opacity:0.5", "fill-opacity:x", "stroke-opacity:20%"})
+	if _, ok := a.FillOpacity.Get(); ok {
+		t.Errorf("kept a fill-opacity the last declaration could not give")
+	}
+	if f, _ := a.StrokeOpacity.Get(); f != 0.2 {
+		t.Errorf("stroke-opacity %v", f)
+	}
+}
+
+func TestShapeCSS(t *testing.T) {
+	for _, c := range []struct {
+		decls []string
+		want  string
+	}{
+		{nil, ""},
+		{[]string{"color:red", "font-size:20px"}, ""},
+		{[]string{" FILL :red !important", "stroke:blue", "fill:green", "x:y", ":z", "rx"}, "fill:green;stroke:blue;"},
+		{[]string{`stroke:a"b&c`, "fill:url(x)", `stroke-width:\1`}, "stroke:a&quot;b&amp;c;"},
+		// A control character is kept and then dropped as it is written.
+		{[]string{"opacity:0.5", "stroke-linecap:round", "stroke-dasharray:1\x7f2", "rx:\x01"}, "opacity:0.5;stroke-linecap:round;stroke-dasharray:12;rx:;"},
+	} {
+		if got := ShapeCSS(c.decls); got != c.want {
+			t.Errorf("ShapeCSS(%q) = %q, want %q", c.decls, got, c.want)
+		}
+	}
+}
+
 func TestCascade(t *testing.T) {
 	look := &Look{Overrides: Overrides{"flowchart.node": {Fill: Accent, StrokeWidth: N(2)}}}
 	own := Style{Fill: Surface, Stroke: Border, Text: Fg}

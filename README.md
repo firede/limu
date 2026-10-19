@@ -19,9 +19,9 @@ number.
 > [!WARNING]
 > **An early, personal project.** It reads flowcharts; state, class, entity
 > relationship, requirement, use case, agent flow and swimlane diagrams; and
-> sequence, gantt, timeline, user journey, git graph, packet and kanban diagrams.
-> The charts and the rest follow, one family at a time. The API will change in
-> any 0.x release.
+> sequence, gantt, timeline, user journey, git graph, packet and kanban diagrams;
+> and pie, XY, quadrant and radar charts, sankey diagrams, treemaps and venn
+> diagrams. The rest follow. The API will change in any 0.x release.
 
 ```go
 sc, err := limu.Layout("flowchart LR\n  A[Text] --> B[Scene] --> C{Backend}", nil)
