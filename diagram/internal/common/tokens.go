@@ -203,6 +203,42 @@ var AccDescrToken = TokenType{Name: "ACC_DESCR", First: "\t a", Match: func(s st
 	return i + 1 + end + 1
 }}
 
+// AccDescr is Pele's accDescr(name) (common/accDescr.ts): ACC_DESCR under the name given,
+// for grammars where lexing goes on after an `accDescr {` that never closes, because
+// accDescr is also a name there. It matches what AccDescrToken does, but once the braced form
+// finds no closing brace there is none further on, so later braced descriptions fail
+// without scanning the rest of the text again.
+func AccDescr(name string) TokenType {
+	return TokenType{Name: name, First: AccDescrToken.First, Scanner: accDescrScanner}
+}
+
+// accDescrScanner is the scanner of Pele's accDescr, which matches
+// /[\t ]*accDescr(?:[\t ]*:(?:[^\n\r]*?(?=%%)|[^\n\r]*)|\s*({))/y and then, for the braced
+// form, looks for the closing brace unless it has found none before.
+func accDescrScanner() func(string, int) int {
+	unclosed := false
+	return func(s string, at int) int {
+		i := blanks(s, at)
+		if !strings.HasPrefix(s[i:], "accDescr") {
+			return -1
+		}
+		i += len("accDescr")
+		if j := blanks(s, i); j < len(s) && s[j] == ':' {
+			return lineRest(s, j+1)
+		}
+		i = chars.SpaceRun(s, i)
+		if i == len(s) || s[i] != '{' || unclosed {
+			return -1
+		}
+		end := strings.IndexByte(s[i+1:], '}')
+		unclosed = end < 0
+		if end < 0 {
+			return -1
+		}
+		return i + 1 + end + 1
+	}
+}
+
 // AccTitleToken is Pele's ACC_TITLE, /[\t ]*accTitle[\t ]*:(?:[^\n\r]*?(?=%%)|[^\n\r]*)/y.
 var AccTitleToken = TokenType{Name: "ACC_TITLE", First: "\t a", Match: func(s string, at int) int {
 	i := blanks(s, at)

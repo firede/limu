@@ -226,11 +226,9 @@ func renamed(t common.TokenType, name string) common.TokenType {
 	return t
 }
 
-// eventModelingTokens is Pele's EVENTMODELING_TOKENS. Pele gives its EM_ACC_DESCR a scanner
-// that stops looking for the brace that closes a description once it has found none; the
-// pattern it answers for is ACC_DESCR's, whose search for a brace is quick, and here is that
-// pattern. A data block and a block comment that find no closer are not tried again, as
-// none is further on: a later one could close only where the first could.
+// eventModelingTokens is Pele's EVENTMODELING_TOKENS. A data block and a block comment that
+// find no closer are not tried again, as none is further on: a later one could close only
+// where the first could.
 var eventModelingTokens = func() []common.TokenType {
 	keyword := common.Keyword("eventmodeling")
 	keyword.Longer = []int{tID}
@@ -248,7 +246,7 @@ var eventModelingTokens = func() []common.TokenType {
 		common.TokenType{Name: "EM_FID", Match: matchFrameID},
 		common.TokenType{Name: "EM_DATA_INLINE", Match: matchInline},
 		common.TokenType{Name: "EM_DATA_BLOCK", Match: matchBlock, Opener: func(s string, at int) bool { return blockOpener(s, at) >= 0 }},
-		renamed(common.AccDescrToken, "EM_ACC_DESCR"),
+		common.AccDescr("EM_ACC_DESCR"),
 		renamed(common.AccTitleToken, "EM_ACC_TITLE"),
 		renamed(common.TitleToken, "EM_TITLE"),
 		common.TokenType{Name: "EM_WS", Match: matchSpace, Hidden: true},
