@@ -84,3 +84,22 @@ mindmap
             A small fix
             ["`A change behind a **flag**`"]
 ```
+
+## Planning a team offsite, in Korean
+
+```mermaid
+mindmap
+  root((팀 워크숍))
+    일정
+      첫째 날 회고
+      둘째 날 계획
+    장소
+      제주도
+      회의실 예약
+    준비물
+      노트북
+      화이트보드
+    식사
+      점심 도시락
+      저녁 해산물
+```

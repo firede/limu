@@ -135,3 +135,21 @@ sequenceDiagram
     Pool-xRunner: Tear down the VM
     Note over Sched,Pool: Each build gets a clean machine
 ```
+
+## Booking a table, in Japanese
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor 客 as お客様
+    participant アプリ
+    participant 店 as お店
+    客->>アプリ: 日時と人数を選ぶ
+    アプリ->>店: 空席を確認
+    店-->>アプリ: 窓側が空いています
+    アプリ-->>客: 予約内容を表示
+    客->>アプリ: 予約を確定
+    アプリ->>店: 予約を登録
+    Note over アプリ,店: 前日にリマインド
+    アプリ-->>客: 確認メールを送信
+```

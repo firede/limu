@@ -112,3 +112,23 @@ erDiagram
     TEAM |o--o{ PROJECT : owns
     PROJECT ||--o| REPO : "is backed by"
 ```
+
+## A bookstore's data, in Chinese
+
+```mermaid
+erDiagram
+    作者 ||--o{ 图书 : 撰写
+    图书 ||--o{ 订单明细 : 出现在
+    订单 ||--|{ 订单明细 : 包含
+    顾客 ||--o{ 订单 : 下单
+    图书 {
+        string 书号 PK "ISBN-13"
+        string 书名
+        decimal 定价
+    }
+    订单 {
+        bigint 编号 PK
+        timestamp 下单时间
+        string 状态 "待付款、已发货或已完成"
+    }
+```

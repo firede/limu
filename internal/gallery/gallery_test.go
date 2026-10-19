@@ -33,7 +33,7 @@ func TestExamplesLayOut(t *testing.T) {
 	}
 }
 
-// Every type limu reads but info has one entry, with a title, a description, three to six
+// Every type limu reads but info has one entry, with a title, a description, three to seven
 // examples, and one or two featured examples, which come first.
 func TestTypes(t *testing.T) {
 	seen := map[diagram.Type]bool{}
@@ -45,7 +45,7 @@ func TestTypes(t *testing.T) {
 		if typ.Title == "" || typ.Description == "" {
 			t.Errorf("%s: title %q, description %q", typ.Type, typ.Title, typ.Description)
 		}
-		if n := len(typ.Examples); n < 3 || n > 6 {
+		if n := len(typ.Examples); n < 3 || n > 7 {
 			t.Errorf("%s: %d examples", typ.Type, n)
 		}
 		featured, last := 0, true

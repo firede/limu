@@ -104,3 +104,19 @@ flowchart TD
     classDef critical stroke-width:3px,font-weight:bold
     class urgent critical
 ```
+
+## Checking out an order, in Chinese
+
+```mermaid
+flowchart TD
+    start([顾客打开购物车]) --> stock{商品都有库存吗？}
+    stock -- 有 --> addr[确认收货地址]
+    stock -- 缺货 --> wait[提供到货通知，或移除缺货商品]
+    wait --> addr
+    addr --> pay[选择支付方式：微信支付、支付宝或银行卡]
+    pay --> ok{支付成功？}
+    ok -- 是 --> order[(生成订单)]
+    ok -- 否 --> retry[提示失败原因，请顾客重试]
+    retry --> pay
+    order --> notify[发送短信和邮件通知]
+```

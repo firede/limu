@@ -79,3 +79,17 @@ func TestGoldenMindmapIcons(t *testing.T) {
       fa:fa-desktop limumygo`)
 	snap(t, "mindmap-icons", sc, &Options{Fonts: goFonts, DrawIcon: drawIcon}, 1)
 }
+
+// Text in Chinese, Japanese and Korean, which the Go fonts lack, so that the system's text
+// engine falls back to its own: a long Chinese label that wraps between characters, kana
+// with full-width punctuation, Hangul, and Chinese set beside Latin letters and digits,
+// plain and bold, which the system spaces apart where they meet.
+func TestGoldenCJK(t *testing.T) {
+	sc := diagram(t, `flowchart LR
+    A[用户打开购物车] --> B{库存充足吗？}
+    B -->|是| C[确认收货地址并选择配送方式，然后提交订单]
+    B -->|否| D(["在庫切れ：「入荷のお知らせ」を受け取る"])
+    C --> E[("결제 완료")]
+    D --> F["`+"`**API 网关**返回 HTTP 200（成功）`"+`"]`)
+	snap(t, "cjk", sc, &Options{Fonts: goFonts}, 1)
+}

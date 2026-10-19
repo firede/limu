@@ -72,10 +72,13 @@ otherwise.
 
 `/examples` shows the featured example of each type, and `/examples/<type>` every example
 of a type, from limu's gallery, `internal/gallery`, which the playground shows too. The
-examples are limu's own, three to six of each of the 32 types, one Markdown file for each:
-the first one or two, featured, draw a scene a reader could meet, and the others each show
-another feature of the type in a scene of its own. They are mostly scenes developers know,
-and now and then one of the sea; none stands in for content with "Label", "A" or "Alice".
+examples are limu's own, three to seven of each of the 32 types, one Markdown file for
+each: the first one or two, featured, draw a scene a reader could meet, and the others each
+show another feature of the type in a scene of its own. They are mostly scenes developers
+know, and now and then one of the sea; none stands in for content with "Label", "A" or
+"Alice". Four are written in Chinese, Japanese and Korean, a flowchart, a sequence diagram,
+a mindmap and an entity relationship diagram, so that text in those scripts is laid out and
+drawn whenever the examples are.
 They replace the examples of Mermaid's documentation that the playground showed before,
 which stay in limu's tests. Each diagram is SVG written at
 build time, with "Copy source" and "Open in playground" beside it. A switch draws the
@@ -140,6 +143,12 @@ R2.
 | SVG | `svg.Render` and its `Options`: `Literal`, the fonts, `IconMarkup`, `Draw` and the `Writer`; setting the `--limu-*` variables in a page. A section on diagrams that are not trusted: the schemes links and images may use (`LinkSchemes`, `ImageSchemes`), and where icons' markup comes from. |
 | Architecture | The stages, and what belongs to layout and what to style; that a backend of one's own walks the scene, in a sentence or two, as an agent can write one from there; the two pictures of the home page at more length; how limu is ported from Pele and checked against it. |
 | Compatibility | The types limu reads; where it differs from Pele, as in what it does not port (`mount`, zoom) and the differences of the platform; where it differs from Mermaid, mostly as Pele does; how to report a difference. |
+
+Two things about text in Chinese, Japanese and Korean belong in the documents. The API
+page says that `text.Arial` only estimates such text, at an em a character, and wraps
+Chinese and Japanese between characters as Pele does; the MyGo page says that `Fonts`
+measure it in the fonts it is drawn in, and that the system's text engine puts a little
+room where Han characters meet Latin letters and digits, which `Fonts` measure too.
 
 MyGo comes before SVG, as drawing natively is what limu is for. `docs/design.md` stays as
 it is, for those who work on limu; the Architecture page is its short form for those who
