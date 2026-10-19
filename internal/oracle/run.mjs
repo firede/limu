@@ -13,6 +13,7 @@
 //
 //   parse     diagram/testdata/pele/parse.json, for what every diagram's text goes through
 //   common    diagram/internal/common/testdata/pele/common.json
+//   draw      diagram/internal/draw/testdata/pele/draw.json
 //   jsmath    internal/jsmath/testdata/pele/math.json
 //   gantt     dates.json too, beside gantt.json
 //

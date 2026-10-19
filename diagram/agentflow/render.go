@@ -7,7 +7,7 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/flowchart"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
