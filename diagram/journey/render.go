@@ -135,7 +135,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 	textW := float64(minText)
 	labels := make([]text.Label, n)
 	for i, task := range tasks {
-		labels[i] = plainLabel(task.Task, measure, small, textW, 0)
+		labels[i] = common.PlainLabel(task.Task, measure, small, textW, 0)
 	}
 	widest := 0.0
 	for _, label := range labels {
@@ -144,7 +144,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 	if widest > textW {
 		textW = min(math.Ceil(widest), maxText)
 		for i, task := range tasks {
-			labels[i] = fitLabel(task.Task, measure, small, textW, 0)
+			labels[i] = common.FitLabel(task.Task, measure, small, textW, 0)
 		}
 	}
 
@@ -165,7 +165,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 	var legend []entry
 	legendW, legendH, lx := 0.0, 0.0, 0.0
 	for _, name := range names {
-		label := fitLabel(name, measure, small, limit-2*dot-6, 0)
+		label := common.FitLabel(name, measure, small, limit-2*dot-6, 0)
 		w := 2*dot + 6 + label.Width
 		if lx > 0 && lx+w > limit {
 			lx = 0
@@ -187,7 +187,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 	if n > 0 {
 		bodyW = gutter + plotW
 	}
-	title := fitLabel(m.Title, measure, size, max(bodyW, 320), text.Bold)
+	title := common.FitLabel(m.Title, measure, size, max(bodyW, 320), text.Bold)
 	titleH := 0.0
 	if title.Height > 0 {
 		titleH = title.Height + 16
@@ -215,7 +215,7 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 		}
 		var label *text.Label
 		if tasks[i].Section != "" {
-			l := fitLabel(tasks[i].Section, measure, small, float64(float64(end-i)*pitch)-gap-2*padX, text.Bold)
+			l := common.FitLabel(tasks[i].Section, measure, small, float64(float64(end-i)*pitch)-gap-2*padX, text.Bold)
 			label = &l
 			bandH = max(bandH, max(l.Height, lineH)+2*bandPad)
 		}
@@ -399,7 +399,7 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 		maxWidth = 320
 	}
 	room := max(140, maxWidth-2*pad)
-	title := fitLabel(m.Title, measure, size, room, text.Bold)
+	title := common.FitLabel(m.Title, measure, size, room, text.Bold)
 	_, actors := actorNames(m.Tasks)
 	y := pad
 	if title.Height != 0 {
@@ -411,7 +411,7 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 	for index, task := range m.Tasks {
 		if !started || task.Section != section {
 			section, started = task.Section, true
-			head := fitLabel(section, measure, size, room-16, text.Bold)
+			head := common.FitLabel(section, measure, size, room-16, text.Bold)
 			if head.Height != 0 {
 				items = append(items, scene.Item{
 					Kind: scene.Text, Role: "journey.section", Label: &head,
@@ -421,14 +421,14 @@ func verticalJourney(m *Model, o *layout.Options) *scene.Scene {
 				y += head.Height + 8
 			}
 		}
-		label := fitLabel(task.Task, measure, small, room-72, 0)
+		label := common.FitLabel(task.Task, measure, small, room-72, 0)
 		type person struct {
 			name  string
 			label text.Label
 		}
 		var people []person
 		for _, name := range named(task.People) {
-			people = append(people, person{name, fitLabel(name, measure, small, room-44, 0)})
+			people = append(people, person{name, common.FitLabel(name, measure, small, room-44, 0)})
 		}
 		textH := max(label.Height, 42)
 		h := 2*padY + textH

@@ -116,7 +116,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 		}
 		return periodLabels, eventLabels
 	}
-	periodLabels, eventLabels := layLabels(plainLabel)
+	periodLabels, eventLabels := layLabels(common.PlainLabel)
 	widest := 0.0
 	for _, l := range periodLabels {
 		widest = max(widest, l.Width)
@@ -142,7 +142,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 			limit = maxText
 		}
 		textW = min(max(math.Ceil(widest), periodText), limit)
-		periodLabels, eventLabels = layLabels(fitLabel)
+		periodLabels, eventLabels = layLabels(common.FitLabel)
 	}
 
 	lineHeight := jsmath.Round(size * 1.5)
@@ -193,7 +193,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 		}
 		bodyW = float64(float64(slots)*pitch) - gap + end
 	}
-	title := fitLabel(m.Title, measure, size, max(bodyW, 320), text.Bold)
+	title := common.FitLabel(m.Title, measure, size, max(bodyW, 320), text.Bold)
 	titleH := 0.0
 	if title.Height > 0 {
 		titleH = title.Height + 16
@@ -203,7 +203,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 	top := pad + titleH
 
 	sectionLabel := func(g *group, w float64) text.Label {
-		return fitLabel(m.Sections[g.section], measure, size, w-2*padX, text.Bold)
+		return common.FitLabel(m.Sections[g.section], measure, size, w-2*padX, text.Bold)
 	}
 	var items []scene.Item
 	header := func(g *group, label text.Label, x, y, w, h float64) {
