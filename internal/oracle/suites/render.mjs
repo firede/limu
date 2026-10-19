@@ -52,6 +52,16 @@ export function readSvg(svg) {
     const classes = attr(open, 'class').split(' ').slice(kind === 'node' ? 2 : 1).join(' ');
     switch (kind) {
       case 'cluster': {
+        if (classes.split(' ')[0] === 'pele-lane') {
+          // A swimlane's lane: its outline, its title band, its title and how the title is turned.
+          const rects = [...s.matchAll(/<rect [^>]*>/g)].map((m) => m[0]);
+          lines.push(`lane ${id} [${classes.split(' ').slice(1).join(' ')}] ${box(rects[0])} band ${box(rects[1])}`);
+          const t = textAt(s);
+          if (t) lines.push(t);
+          const turn = /<g transform="rotate\(([^)]*)\)">/.exec(s);
+          if (turn) lines.push(`rotate ${turn[1]}`);
+          break;
+        }
         lines.push(`cluster ${id} [${classes}] ${box(tag(s, 'rect'))}`);
         const t = textAt(s);
         if (t) lines.push(t);

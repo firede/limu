@@ -26,15 +26,38 @@ const (
 	padding  = 8
 )
 
+// A Variant is a diagram type that is a flowchart laid out its own way, which may draw its
+// top-level groups itself, as Pele's FlowVariant is.
+type Variant struct {
+	// Type is the diagram's type: the scene's, and the section of the configuration read in
+	// place of the flowchart's when it is one.
+	Type string
+	// Prepare changes the graph before it is laid out.
+	Prepare func(g *Graph)
+	// Layout lays the graph out in place of layout.Compound; tight is set when the diagram is
+	// laid out tightly to fit the host's width.
+	Layout func(nodes []layout.CNode, edges []layout.CEdge, dir layout.Dir, opt layout.LayeredOptions, tight bool) layout.CompoundResult
+	// DrawGroup, if set, draws a top-level group in place of a cluster: c is the group as it
+	// was laid out, label its title, author what its author set for it, and dir the
+	// direction the diagram was laid out in.
+	DrawGroup func(c *layout.CNode, label *text.Label, author style.Author, classes []string, id string, dir layout.Dir) scene.Item
+}
+
 // Layout lays out a parsed flowchart as a scene, as Pele's renderFlowchart draws it: across
 // and loosely, and, when that does not fit o.MaxWidth, tightly, or down instead of across,
 // whichever is narrower.
 func Layout(db *DB, config diagram.Config, o *layout.Options) *scene.Scene {
+	return LayoutVariant(db, config, o, nil)
+}
+
+// LayoutVariant lays out a parsed flowchart as a scene, as Pele's renderFlowchart draws it
+// with a variant, or as Layout does when v is nil.
+func LayoutVariant(db *DB, config diagram.Config, o *layout.Options, v *Variant) *scene.Scene {
 	if o == nil {
 		o = &layout.Options{}
 	}
 	fitted := func(down bool) *scene.Scene {
-		return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, down, tight) })
+		return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, v, down, tight) })
 	}
 	if common.RunsAcross(db.Direction) {
 		return common.TurnToFit(o, fitted)
@@ -75,14 +98,20 @@ type view struct {
 	dy     float64
 }
 
-// lay lays the flowchart out once, as Pele's draw does. down lays out a flowchart that runs
-// across as one that runs down; tight sets nodes closer together.
-func lay(db *DB, config diagram.Config, o *layout.Options, down, tight bool) *scene.Scene {
+// lay lays the flowchart out once, as Pele's draw does, with the variant v if it is not nil.
+// down lays out a flowchart that runs across as one that runs down; tight sets nodes closer
+// together.
+func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, down, tight bool) *scene.Scene {
 	gpad := float64(groupPad)
 	if tight {
 		gpad = 12
 	}
 	flow, _ := config["flowchart"].(diagram.Config)
+	if variant != nil {
+		if own, ok := config[variant.Type].(diagram.Config); ok {
+			flow = own
+		}
+	}
 	curve, _ := flow["curve"].(string)
 	switch o.Routing {
 	case layout.Orthogonal:
@@ -91,10 +120,18 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down, tight bool) *sc
 		curve = "linear"
 	}
 	graph := BuildGraph(db, curve)
+	if variant != nil {
+		variant.Prepare(graph)
+	}
 	size := o.Size()
 	edgeSize := math.Floor(size*0.875 + 0.5)
 	measure := o.Measure()
 	wrapWidth := numberOption(flow, "wrappingWidth", 200)
+	groupMax := 4000.0
+	if variant != nil && tight {
+		wrapWidth = min(wrapWidth, 100)
+		groupMax = max(80, common.TitleRoom(o)/2)
+	}
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
@@ -126,7 +163,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down, tight bool) *sc
 		var v view
 		var c layout.CNode
 		if node.IsGroup {
-			label := labelOf(node.Label, markdown, fontSize, 4000, face)
+			label := labelOf(node.Label, markdown, fontSize, groupMax, face)
 			v = view{node: node, author: author, label: label, shape: "group"}
 			c = layout.NewCNode(0, 0, -1)
 			c.IsGroup = true
@@ -269,7 +306,12 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down, tight bool) *sc
 		opt.NodeSep *= 0.5
 		opt.RankSep *= 0.75
 	}
-	result := layout.Compound(cnodes, cedges, rootDir, opt)
+	var result layout.CompoundResult
+	if variant != nil {
+		result = variant.Layout(cnodes, cedges, rootDir, opt, tight)
+	} else {
+		result = layout.Compound(cnodes, cedges, rootDir, opt)
+	}
 
 	titleMax := 4000.0
 	if tight {
@@ -291,6 +333,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down, tight bool) *sc
 		FontSize: size,
 		Title:    db.AccTitle,
 		Desc:     db.AccDescr,
+	}
+	if variant != nil {
+		sc.Type = variant.Type
 	}
 	node := func(i int) draw.Node {
 		c := &cnodes[i]
@@ -320,6 +365,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down, tight bool) *sc
 		n := v.node
 		x, y := c.X, c.Y
 		classes := classNames(trimDefault(n.CSSClasses))
+		if c.IsGroup && variant != nil && variant.DrawGroup != nil && c.Parent < 0 {
+			clusters = append(clusters, variant.DrawGroup(c, &v.label, v.author, classes, n.ID, rootDir))
+			continue
+		}
 		if c.IsGroup {
 			titleX := draw.ClusterTitleX(node(i), v.label.Width, crossings, gpad)
 			titleY := y - c.H/2 + 8 + v.label.Height/2
