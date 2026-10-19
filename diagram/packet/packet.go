@@ -132,7 +132,7 @@ func dropIndents(s string) string {
 	for i := 0; i < len(s); i++ {
 		b.WriteByte(s[i])
 		if s[i] == '\n' {
-			i = spaceEnd(s, i+1) - 1
+			i = chars.SpaceRun(s, i+1) - 1
 		}
 	}
 	return b.String()

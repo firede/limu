@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/yaml"
 )
@@ -78,13 +79,13 @@ func dumpModel(m *Model) map[string]any {
 }
 
 func dumpTokens(src string) [][2]string {
-	toks, err := tokenize(src, packetTokens, packetTable, "packet")
+	toks, err := common.Tokenize(src, packetTable, "packet")
 	if err != nil {
 		return nil
 	}
 	out := [][2]string{}
-	for i, k := range toks.kinds[:len(toks.kinds)-1] {
-		out = append(out, [2]string{packetTokens[k].name, src[toks.starts[i]:toks.ends[i]]})
+	for i, k := range toks.Kinds[:len(toks.Kinds)-1] {
+		out = append(out, [2]string{packetTokens[k].Name, src[toks.Starts[i]:toks.Ends[i]]})
 	}
 	return out
 }
