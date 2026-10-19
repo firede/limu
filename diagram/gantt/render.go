@@ -325,7 +325,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	if hasTop && hasGrid {
 		gridLead = max(0, min(topPadding-gridStart, plotTop-headHeight))
 	}
-	plotHeight := float64(max(rowCount, 1)) * rowHeight
+	plotHeight := float64(float64(max(rowCount, 1)) * rowHeight)
 	plotBottom := plotTop + plotHeight
 
 	// Bars and where their labels go: inside when they fit, otherwise beside the bar on the

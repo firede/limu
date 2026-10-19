@@ -866,7 +866,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			// Offsets are given for a loop on the right and turned a quarter for one below.
 			px := func(dx, dy float64) float64 {
 				if side {
-					return a.X + pad + (out + dx)
+					return a.X + pad + (out + float64(dx))
 				}
 				return a.X + pad + -dy
 			}
@@ -874,7 +874,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				if side {
 					return a.Y + pad + dy
 				}
-				return a.Y + pad + (out + dx)
+				return a.Y + pad + (out + float64(dx))
 			}
 			p := new(scene.Path).MoveTo(px(0, -spread), py(0, -spread)).CubeTo(
 				px(reach, -2*spread), py(reach, -2*spread),

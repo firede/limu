@@ -753,7 +753,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 					from, to := w/2-15, w/2-5
 					arc := func(at float64) float64 {
 						q := at / (w / 2)
-						return (h / 2) * math.Sqrt(1-float64(q*q))
+						return float64((h / 2) * math.Sqrt(1-float64(q*q)))
 					}
 					slash := new(scene.Path).MoveTo(x+from, y+arc(from)).LineTo(x+to, y+(-arc(to)))
 					it.Parts = append(it.Parts, scene.Part{Path: slash, Paint: scene.StrokeOnly})
