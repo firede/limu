@@ -228,7 +228,7 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 					r = "r"
 				}
 				lines = append(lines, "rect "+box(part.Box)+" "+r+" "+paintName(it.Style.Fill)+"/"+
-					strconv.FormatFloat(float64(it.Style.Fill.Factor()), 'g', -1, 32))
+					strconv.FormatFloat(it.Style.FillOpacity.Or(1), 'g', -1, 32))
 			}
 			if pic := it.Picture; pic != nil {
 				lines = append(lines, "icon "+pelesvg.ID(pic.Icon)+" "+box(pic.Box), "host")

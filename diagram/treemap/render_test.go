@@ -214,7 +214,7 @@ func sceneLines(sc *scene.Scene) []string {
 				rounded = "r"
 			}
 			lines = append(lines, fmt.Sprintf("%s %s [%s] %s,%s %s %s %s %s author=%s", kind, pelesvg.ID(it.ID), strings.Join(it.Class, " "),
-				pt(r.X, r.Y), pt(r.W, r.H), rounded, fillName(it.Style.Fill), strokeName(it.Style.Stroke), pelesvg.CapJoin(it),
+				pt(r.X, r.Y), pt(r.W, r.H), rounded, fillName(pelesvg.OwnFill(it)), strokeName(it.Style.Stroke), pelesvg.CapJoin(it),
 				shapeView(it.Author)))
 			weight := "-"
 			if it.Label != nil && len(it.Label.Lines) > 0 && it.Label.Lines[0][0].Face&text.Bold != 0 {

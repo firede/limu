@@ -658,7 +658,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			it := scene.Item{
 				Kind: scene.Group, Role: "usecase.system", Shape: "rect", ID: n.ID, Class: classNames(boundaryClasses[n.ID]),
 				Box:    scene.Rect{X: left, Y: top, W: c.W, H: c.H},
-				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
 			}
 			if n.BoundaryType == "package" {

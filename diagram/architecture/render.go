@@ -762,7 +762,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene.
 			Kind: scene.Group, Role: RoleGroup, Shape: "rect", ID: group.ID,
 			Box:   box,
 			Parts: []scene.Part{{Box: box, Rounded: true}},
-			Style: style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+			Style: style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 		}
 		var icon *scene.Item
 		if headW[k] > 0 {

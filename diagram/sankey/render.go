@@ -289,15 +289,13 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) 
 		if hasFixed {
 			author = fixed
 		}
-		// The bands are drawn in a group at 40% of the fill's opacity, an author's fill too.
-		if author.Fill.Visible() {
-			author.Fill = author.Fill.Alpha(linkOpacity)
-		}
+		// The bands are drawn in a group with a fill opacity of 0.4, which an author's fill
+		// takes too.
 		bands = append(bands, scene.Item{
 			Kind: scene.Mark, Role: RoleLink, ID: from + "->" + to,
 			Box:    path.Bounds(),
 			Parts:  []scene.Part{{Path: path, Paint: scene.FillOnly}},
-			Style:  style.Style{Fill: style.Series(end).Alpha(linkOpacity)},
+			Style:  style.Style{Fill: style.Series(end), FillOpacity: style.N(linkOpacity)},
 			Author: author,
 			Tooltip: text.DecodeEntities(from) + " → " + text.DecodeEntities(to) + ": " +
 				text.DecodeEntities(prefix) + chars.NumberString(rounded(link.value)) + text.DecodeEntities(suffix),

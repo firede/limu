@@ -158,7 +158,7 @@ func frameItem(box *Box, r scene.Rect) scene.Item {
 	if k, ok := series[box.Kind]; ok {
 		// Pele draws the box in the background first, so that the wash hides what is under it.
 		it.Parts = []scene.Part{{Box: r, Rounded: true, Paint: scene.Shade}, {Box: r, Rounded: true}}
-		it.Style = style.Style{Fill: style.Series(k).Alpha(wash), Stroke: style.Series(k), Text: style.Fg}
+		it.Style = style.Style{Fill: style.Series(k), FillOpacity: style.N(wash), Stroke: style.Series(k), Text: style.Fg}
 	} else {
 		it.Parts = []scene.Part{{Box: r, Rounded: true}}
 		it.Style = style.Style{Fill: style.Bg, Stroke: style.Border, Text: style.Fg}

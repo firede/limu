@@ -53,8 +53,8 @@ func TestDeclarations(t *testing.T) {
 		"fill-opacity:0.5", "rx:10",
 	})
 	th := Default()
-	if c := a.Style.Fill.Color(th); c != (Color{255, 153, 255, 128}) {
-		t.Errorf("fill %v", c)
+	if c := a.Style.Fill.Color(th); c != (Color{255, 153, 255, 255}) || a.Style.FillOpacity != N(0.5) {
+		t.Errorf("fill %v at %v", c, a.Style.FillOpacity)
 	}
 	if c := a.Style.Stroke.Color(th); c != Hex("#333") {
 		t.Errorf("stroke %v", c)
@@ -202,18 +202,46 @@ func TestDeclarationsLastWins(t *testing.T) {
 
 func TestDeclarationsOpacities(t *testing.T) {
 	a := Declarations([]string{"fill-opacity:0.5", "stroke-opacity:150%"})
-	if f, ok := a.FillOpacity.Get(); !ok || f != 0.5 {
+	if f, ok := a.Style.FillOpacity.Get(); !ok || f != 0.5 {
 		t.Errorf("fill-opacity %v %v", f, ok)
 	}
-	if f, ok := a.StrokeOpacity.Get(); !ok || f != 1 {
+	if f, ok := a.Style.StrokeOpacity.Get(); !ok || f != 1 {
 		t.Errorf("stroke-opacity %v %v", f, ok)
 	}
 	a = Declarations([]string{"fill-opacity:0.5", "fill-opacity:x", "stroke-opacity:20%"})
-	if _, ok := a.FillOpacity.Get(); ok {
+	if _, ok := a.Style.FillOpacity.Get(); ok {
 		t.Errorf("kept a fill-opacity the last declaration could not give")
 	}
-	if f, _ := a.StrokeOpacity.Get(); f != 0.2 {
+	if f, _ := a.Style.StrokeOpacity.Get(); f != 0.2 {
 		t.Errorf("stroke-opacity %v", f)
+	}
+	// An opacity alone is kept, with no paint for it to fold into.
+	if a := Declarations([]string{"fill-opacity:0.5"}); a.Style.Fill.Set() || a.Style.FillOpacity != N(0.5) {
+		t.Errorf("fill-opacity alone %+v", a.Style)
+	}
+}
+
+// A fill and its opacity cascade each on their own, as CSS's do: an author's fill over a
+// part the diagram draws at an opacity is drawn at that opacity, and an author's opacity
+// over the diagram's fill draws that fill at it.
+func TestOpacitiesCascade(t *testing.T) {
+	var look *Look
+	red := Of(Color{255, 0, 0, 255})
+	own := Style{Fill: SurfaceAlt, FillOpacity: N(0.5), Stroke: Border}
+	if r := look.Resolve("x", own, Declarations([]string{"fill:red"}).Style); r.Fill != (Color{255, 0, 0, 128}) {
+		t.Errorf("author's fill at the diagram's opacity: %v", r.Fill)
+	}
+	author := Declarations([]string{"fill-opacity:0.25", "stroke-opacity:50%"}).Style
+	r := look.Resolve("x", Style{Fill: Surface, Stroke: red}, author)
+	surface := Default().Surface
+	if r.Fill != (Color{surface.R, surface.G, surface.B, 64}) || r.Stroke != (Color{255, 0, 0, 128}) {
+		t.Errorf("author's opacities over the diagram's paints: %v %v", r.Fill, r.Stroke)
+	}
+	if r.Marker != (Color{255, 0, 0, 255}) {
+		t.Errorf("a marker is filled in %v", r.Marker)
+	}
+	if s := look.Cascade("x", own, author); s.FillOpacity != N(0.25) || s.StrokeOpacity != N(0.5) || s.Fill != SurfaceAlt {
+		t.Errorf("cascade %+v", s)
 	}
 }
 

@@ -160,6 +160,27 @@ func TestRenderOwnAlpha(t *testing.T) {
 	}
 }
 
+// A style's fill and stroke opacities are written with its paints, times the paints' own;
+// a marker is filled in the stroke's color alone and stroked at the stroke opacity.
+func TestRenderFillOpacity(t *testing.T) {
+	sc := sample()
+	sc.Items[3].Author = style.Declarations([]string{"fill:#ff000080", "fill-opacity:0.5", "stroke-opacity:0.25"}).Style
+	got := Render(sc, &Options{Literal: true})
+	if !strings.Contains(got, `fill="#ff0000" fill-opacity="0.25"`) || !strings.Contains(got, `stroke-opacity="0.25"`) {
+		t.Errorf("opacities not written:\n%s", got)
+	}
+	edge := &scene.Scene{Width: 20, Height: 20, Items: []scene.Item{{
+		Kind: scene.Edge, Role: "flowchart.edge",
+		Parts: []scene.Part{{Path: new(scene.Path).MoveTo(0, 10).LineTo(20, 10), Paint: scene.StrokeOnly}},
+		Ends:  [2]scene.Marker{{}, {Type: "arrow_point", At: scene.Point{X: 20, Y: 10}, DX: 1}},
+		Style: style.Style{Stroke: style.Of(style.Hex("#f00")), StrokeOpacity: style.N(0.25)},
+	}}}
+	got = Render(edge, &Options{Literal: true})
+	if !strings.Contains(got, `class="limu-marker" d="M20,10L12,13.36L12,6.64Z" fill="#ff0000" stroke="none"/>`) {
+		t.Errorf("marker not filled opaque:\n%s", got)
+	}
+}
+
 // icons is an IconMarkup that has every icon, a circle.
 func icons(string) string { return `<circle cx="12" cy="12" r="10"/>` }
 

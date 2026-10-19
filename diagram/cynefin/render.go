@@ -275,7 +275,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		items = append(items, scene.Item{
 			Kind: scene.Mark, Role: RoleRegion, ID: q.name, Box: p.Bounds(),
 			Parts: []scene.Part{{Path: p, Paint: scene.FillOnly}},
-			Style: style.Style{Fill: style.Series(q.series).Alpha(0.14)},
+			Style: style.Style{Fill: style.Series(q.series), FillOpacity: style.N(0.14)},
 		})
 	}
 	stroke := func(role scene.Role, curve []float64, st style.Style) {
@@ -304,7 +304,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		scene.Item{
 			Kind: scene.Mark, Role: RoleRegion, Shape: "ellipse", ID: Confusion, Box: ovalBox,
 			Parts: []scene.Part{{Path: oval}},
-			Style: style.Style{Fill: style.Series(confusionColor).Alpha(0.18), Stroke: style.Border, Dash: style.Dashes(4, 2)},
+			Style: style.Style{Fill: style.Series(confusionColor), FillOpacity: style.N(0.18), Stroke: style.Border, Dash: style.Dashes(4, 2)},
 		})
 
 	drawBlock := func(b *block) {

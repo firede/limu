@@ -17,6 +17,12 @@ func CapJoin(it *scene.Item) string {
 	return r.Cap.String() + " " + r.Join.String()
 }
 
+// OwnFill is the item's own fill at its own fill opacity, one paint, as the render oracles
+// compare a fill Pele writes and the fill-opacity it writes beside it.
+func OwnFill(it *scene.Item) style.Paint {
+	return it.Style.Fill.Alpha(it.Style.FillOpacity.Or(1))
+}
+
 // FlowLines writes the scene of a flowchart or a swimlane diagram as the render oracle reads
 // Pele's SVG of one: a line for each thing drawn, in the order drawn, with numbers as Pele's
 // SVG writes them.

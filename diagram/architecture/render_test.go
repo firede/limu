@@ -162,7 +162,7 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 			radius = "r3"
 		}
 		stroke := paintName(it.Style.Stroke)
-		lines = append(lines, "rect "+pt(r.X, r.Y)+","+pt(r.W, r.H)+" "+radius+" "+paintName(it.Style.Fill)+" "+stroke+" "+pelesvg.CapJoin(it))
+		lines = append(lines, "rect "+pt(r.X, r.Y)+","+pt(r.W, r.H)+" "+radius+" "+paintName(pelesvg.OwnFill(it))+" "+stroke+" "+pelesvg.CapJoin(it))
 	}
 	// The icon of an item: a Picture the host draws, or Pele's glyph, the item after it.
 	icon := func(owner *scene.Item, next *scene.Item) bool {
@@ -251,7 +251,7 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 			// The circle, as Path.Ellipse draws it: from its right end, four quarters.
 			a := it.Parts[0].Path.Args
 			cx, cy := a[6], a[1]
-			lines = append(lines, "circle "+pt(cx, cy)+" "+pelesvg.Num(a[0]-cx)+" "+paintName(it.Style.Fill))
+			lines = append(lines, "circle "+pt(cx, cy)+" "+pelesvg.Num(a[0]-cx)+" "+paintName(pelesvg.OwnFill(it)))
 		default:
 			lines = append(lines, "unknown role "+string(it.Role))
 		}

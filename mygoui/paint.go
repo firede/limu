@@ -235,8 +235,10 @@ func (p *Painter) box(b scene.Rect, radius float64, fill, stroke ui.Color, s sty
 // scene.Marker.Outline says, solid, with the edge's caps and with its corners turned as
 // the marker's type says or else as the edge's are.
 func (p *Painter) Ends(it *scene.Item, s style.Resolved) {
-	c := Color(s.Stroke, s.Opacity)
-	if c.A == 0 {
+	// Filled in the stroke's color alone, and stroked at the stroke's opacity, as Pele draws
+	// them.
+	c, line := Color(s.Marker, s.Opacity), Color(s.Stroke, s.Opacity)
+	if c.A == 0 && line.A == 0 {
 		return
 	}
 	for _, m := range it.Ends {
@@ -254,12 +256,12 @@ func (p *Painter) Ends(it *scene.Item, s style.Resolved) {
 				p.fill(path, c)
 			case scene.FillAndStroke:
 				p.fill(path, c)
-				p.stroke(path, c, pn)
+				p.stroke(path, line, pn)
 			case scene.StrokeOnly:
-				p.stroke(path, c, pn)
+				p.stroke(path, line, pn)
 			case scene.Hollow:
 				p.fill(path, Color(s.Bg, s.Opacity))
-				p.stroke(path, c, pn)
+				p.stroke(path, line, pn)
 			}
 		}
 	}

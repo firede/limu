@@ -651,7 +651,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			cluster := scene.Item{
 				Kind: scene.Group, Role: "class.namespace", ID: n.ID, Box: box,
 				Parts: []scene.Part{{Box: box, Rounded: true}},
-				Style: style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style: style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 			}
 			if !v.label.Empty() {
 				at := scene.Point{X: titleX + ox, Y: titleY}

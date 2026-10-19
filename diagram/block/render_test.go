@@ -127,15 +127,19 @@ func paintName(p style.Paint) string {
 }
 
 // partPaint is how a part of an item is painted, as the oracle reads Pele's fill and stroke.
+// The diagram's fill and stroke are at the opacities the author's style laid over the
+// diagram's gives, as the oracle reads them from Pele's attributes and the author's style.
 func partPaint(it *scene.Item, part *scene.Part) string {
-	stroke := paintName(it.Style.Stroke)
+	s := it.Author.Over(it.Style)
+	stroke := paintName(it.Style.Stroke.Alpha(s.StrokeOpacity.Or(1)))
+	fill := paintName(it.Style.Fill.Alpha(s.FillOpacity.Or(1)))
 	switch part.Paint {
 	case scene.StrokeOnly:
 		return "none " + stroke
 	case scene.FillOnly:
-		return paintName(it.Style.Fill) + " -"
+		return fill + " -"
 	}
-	return paintName(it.Style.Fill) + " " + stroke
+	return fill + " " + stroke
 }
 
 // labelLine is the line the oracle writes of a label drawn about at: the point, the label's

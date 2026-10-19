@@ -15,21 +15,16 @@ type Author struct {
 	// What changes the size of text, which layout takes.
 	Bold, Italic bool
 	FontSize     float64 // 0 when it was not set
-	// FillOpacity and StrokeOpacity are the fill-opacity and stroke-opacity the author set,
-	// from 0 to 1, unset when none was or the last could not be read. Style's fill and stroke
-	// already have them; a diagram whose shapes have a fill, a stroke or an opacity of their
-	// own, which the author's replace each on its own, reads them here.
-	FillOpacity, StrokeOpacity Num
 }
 
 // Declarations reads Mermaid's style declarations, as "fill:#f9f" and "stroke-width:4px",
 // as Pele's resolveStyle does: later ones win, !important is ignored, and a value that could
 // reach outside the diagram is dropped. Of the properties, fill, stroke, color, the widths,
 // dashes, caps and joins, opacities and rx or ry are kept, and the font's weight, style and
-// size.
+// size. A fill-opacity and a stroke-opacity are the style's FillOpacity and StrokeOpacity,
+// apart from the paints, as CSS cascades them.
 func Declarations(decls []string) Author {
 	var a Author
-	fill, stroke := 1.0, 1.0
 	var weight, fontStyle, fontSize string
 	for _, decl := range decls {
 		prop, value, ok := strings.Cut(decl, ":")
@@ -51,11 +46,9 @@ func Declarations(decls []string) Author {
 		// Pele keeps the last value of a property alone, so one that cannot be read leaves
 		// the property unset, as a browser drops what it cannot take.
 		case "fill-opacity":
-			a.FillOpacity = opacity(value)
-			fill = a.FillOpacity.Or(1)
+			a.Style.FillOpacity = opacity(value)
 		case "stroke-opacity":
-			a.StrokeOpacity = opacity(value)
-			stroke = a.StrokeOpacity.Or(1)
+			a.Style.StrokeOpacity = opacity(value)
 		case "opacity":
 			a.Style.Opacity = opacity(value)
 		case "stroke-width":
@@ -83,18 +76,20 @@ func Declarations(decls []string) Author {
 			fontSize = value
 		}
 	}
-	if fill < 1 {
-		a.Style.Fill = a.Style.Fill.Alpha(fill)
-	}
-	if stroke < 1 {
-		a.Style.Stroke = a.Style.Stroke.Alpha(stroke)
-	}
 	a.Bold = weight == "bold" || weight == "bolder" || chars.Number(weight) >= 600
 	a.Italic = fontStyle == "italic"
 	if px, ok := fontPixels(fontSize); ok && px > 0 && px <= 200 {
 		a.FontSize = px
 	}
 	return a
+}
+
+// FillDeclared reports whether declarations set a fill with a value that is not dropped,
+// whether or not it can be read: whether the shape Pele's resolveStyle writes matches
+// /[";]fill:/, as the diagrams that draw a tint only where the author gave no fill test it.
+func FillDeclared(decls []string) bool {
+	css := ShapeCSS(decls)
+	return strings.HasPrefix(css, "fill:") || strings.Contains(css, ";fill:")
 }
 
 // LineDeclared reports whether declarations set anything of a line: a property of a shape

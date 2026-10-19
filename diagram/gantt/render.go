@@ -587,7 +587,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			case "done":
 				it.Style.Fill = style.SurfaceAlt
 			case "active":
-				it.Style.Fill = color.Alpha(0.25)
+				it.Style.Fill, it.Style.FillOpacity = color, style.N(0.25)
 			default:
 				it.Style.Fill = color
 			}

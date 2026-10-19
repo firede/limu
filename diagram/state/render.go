@@ -707,7 +707,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			box := scene.Rect{X: left, Y: top, W: c.W, H: c.H}
 			it.Kind, it.Box = scene.Group, box
 			it.Parts = []scene.Part{{Box: box, Rounded: true}}
-			it.Style = style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Fg, Radius: style.N(corner)}
+			it.Style = style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Fg, Radius: style.N(corner)}
 			if v.titleH > 0 {
 				rule := new(scene.Path).MoveTo(left, top+v.titleH).LineTo(left+c.W, top+v.titleH)
 				it.Parts = append(it.Parts, scene.Part{Path: rule, Paint: scene.StrokeOnly})

@@ -291,7 +291,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 			x := inset + r.x - highlightOverhang
 			box := scene.Rect{X: x, Y: top + r.top + 1, W: totalWidth - inset + highlightOverhang - x, H: r.height - 2}
 			it.Parts = []scene.Part{{Box: box, Rounded: true, Paint: scene.FillOnly}}
-			it.Style.Fill = style.Accent.Alpha(highlight)
+			it.Style.Fill, it.Style.FillOpacity = style.Accent, style.N(highlight)
 		}
 		var glyph *scene.Item
 		if r.icon != "" {

@@ -152,11 +152,11 @@ func partPaint(it *scene.Item, part *scene.Part, corners bool) string {
 	case scene.StrokeOnly:
 		s = "none " + stroke
 	case scene.FillOnly:
-		return name(it.Style.Fill) + " -"
+		return name(pelesvg.OwnFill(it)) + " -"
 	case scene.Hollow:
 		s = "var(--_bg) " + stroke
 	default:
-		s = name(it.Style.Fill) + " " + stroke
+		s = name(pelesvg.OwnFill(it)) + " " + stroke
 	}
 	if stroke != "-" && stroke != "none" {
 		s += ends(it, 0, corners)

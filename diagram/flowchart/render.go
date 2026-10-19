@@ -386,7 +386,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			cluster := scene.Item{
 				Kind: scene.Group, Role: "flowchart.cluster", ID: n.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
 			}
 			label := &v.label

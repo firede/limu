@@ -208,7 +208,7 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 				if part.Rounded {
 					r = "r"
 				}
-				lines = append(lines, "part "+r+" "+paintName(it.Style.Fill)+" "+paintName(it.Style.Stroke)+" "+width(it)+" "+pelesvg.CapJoin(it))
+				lines = append(lines, "part "+r+" "+paintName(pelesvg.OwnFill(it))+" "+paintName(it.Style.Stroke)+" "+width(it)+" "+pelesvg.CapJoin(it))
 			}
 			frame := scene.Item{Parts: draw.Outline(string(it.Shape), 0, 0, b.W, b.H)}
 			frame.Move(b.X+b.W/2, b.Y+b.H/2)

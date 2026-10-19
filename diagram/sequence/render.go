@@ -294,7 +294,7 @@ func writesFill(value string) bool {
 // draw, for the boxes and the rect blocks alike.
 func fillStyle(fill string, written bool) (style.Style, style.Style) {
 	if !written {
-		return style.Style{Fill: style.SurfaceAlt.Alpha(0.5)}, style.Style{}
+		return style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5)}, style.Style{}
 	}
 	return style.Style{Fill: style.SurfaceAlt}, style.Declarations([]string{"fill:" + fill}).Style
 }

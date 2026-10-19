@@ -178,13 +178,21 @@ func (w *Writer) variable(t style.Token) {
 
 // PaintAttr writes an attribute of paint, name="…" as Paint writes it, and name-opacity
 // with its Opacity when that is under 1: for "fill", fill="…" fill-opacity="…".
-func (w *Writer) PaintAttr(name string, p style.Paint) {
+func (w *Writer) PaintAttr(name string, p style.Paint) { w.paintAttr(name, p, style.Num{}) }
+
+// paintAttr writes name="paint" as PaintAttr does, its opacity times opacity when that is
+// set: a style's FillOpacity or StrokeOpacity.
+func (w *Writer) paintAttr(name string, p style.Paint, opacity style.Num) {
 	w.b.WriteByte(' ')
 	w.b.WriteString(name)
 	w.b.WriteString(`="`)
 	w.Paint(p)
 	w.b.WriteByte('"')
-	if a := w.Opacity(p); p.Visible() && a < 1 {
+	a := w.Opacity(p)
+	if k, ok := opacity.Get(); ok {
+		a *= max(0, min(1, k))
+	}
+	if p.Visible() && a < 1 {
 		w.b.WriteByte(' ')
 		w.b.WriteString(name)
 		w.b.WriteString(`-opacity="`)
@@ -300,21 +308,23 @@ func (w *Writer) Parts(it *scene.Item, st style.Style) {
 			w.Path(part.Path)
 			b.WriteByte('"')
 		}
-		fill, stroke := st.Fill, st.Stroke
+		// The style's fill is at its fill opacity; the theme's colors a part is painted in
+		// otherwise are not.
+		fill, stroke, fillOpacity := st.Fill, st.Stroke, st.FillOpacity
 		switch part.Paint {
 		case scene.StrokeOnly:
 			fill = style.None
 		case scene.FillOnly:
 			stroke = style.None
 		case scene.Solid:
-			fill = style.Line
+			fill, fillOpacity = style.Line, style.Num{}
 		case scene.Hollow:
-			fill = style.Bg
+			fill, fillOpacity = style.Bg, style.Num{}
 		case scene.Shade:
-			fill, stroke = shade(it), style.None
+			fill, stroke, fillOpacity = shade(it), style.None, style.Num{}
 		}
-		w.PaintAttr("fill", fill)
-		w.PaintAttr("stroke", stroke)
+		w.paintAttr("fill", fill, fillOpacity)
+		w.paintAttr("stroke", stroke, st.StrokeOpacity)
 		if stroke.Visible() {
 			w.strokeAttrs(st, sw)
 		}
@@ -359,8 +369,9 @@ func (w *Writer) Ends(it *scene.Item, st style.Style) {
 			case scene.Hollow:
 				fill = style.Bg
 			}
+			// Filled in the stroke's color alone, and stroked at the stroke's opacity.
 			w.PaintAttr("fill", fill)
-			w.PaintAttr("stroke", stroke)
+			w.paintAttr("stroke", stroke, st.StrokeOpacity)
 			if stroke.Visible() {
 				ms := solid
 				if j := m.Type.Join(); j.Set() {

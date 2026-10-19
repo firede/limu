@@ -387,7 +387,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 			// Every node off the root is filled with a tint of its branch's color and
 			// outlined in it, whether its shape was given in the source or is the pill of a
 			// node that branches. The root is neutral.
-			Style: style.Style{Fill: color.Alpha(tint), Stroke: color, Text: style.Fg},
+			Style: style.Style{Fill: color, FillOpacity: style.N(tint), Stroke: color, Text: style.Fg},
 		}
 		if i == 0 {
 			it.Role = RoleRoot
