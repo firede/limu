@@ -2,6 +2,7 @@ package limu
 
 import (
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/agentflow"
 	"github.com/firede/limu/diagram/er"
 	"github.com/firede/limu/diagram/flowchart"
 	"github.com/firede/limu/diagram/requirement"
@@ -54,6 +55,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = er.Layout(db, p.Config, o)
+	case diagram.AgentFlow:
+		db, err := agentflow.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = agentflow.Layout(db, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
