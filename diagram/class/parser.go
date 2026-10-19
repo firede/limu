@@ -151,37 +151,37 @@ func (p *parser) members() []string {
 func (p *parser) classStatement() string {
 	p.i++
 	id := p.name(true)
-	p.db.AddClass(id)
+	p.db.addClass(id)
 	if p.typ() == t_SQS {
-		p.db.SetClassLabel(id, p.classLabel())
+		p.db.setClassLabel(id, p.classLabel())
 	}
 	switch p.typ() {
 	case t_STYLE_SEPARATOR:
 		p.i++
 		css := p.alphaNum()
-		p.db.SetCSSClass(id, css)
+		p.db.setCSSClass(id, css)
 		if p.typ() == t_STRUCT_START {
 			p.i++
-			p.db.AddMembers(id, p.members())
+			p.db.addMembers(id, p.members())
 		}
 	case t_STRUCT_START:
 		p.i++
 		if p.typ() == t_STRUCT_STOP {
 			p.i++
 		} else {
-			p.db.AddMembers(id, p.members())
+			p.db.addMembers(id, p.members())
 		}
 	case t_ANNOTATION_START:
 		p.i++
 		annotation := p.alphaNum()
 		p.expect(t_ANNOTATION_END)
-		p.db.AddAnnotation(id, annotation)
+		p.db.addAnnotation(id, annotation)
 		if p.typ() == t_STRUCT_START {
 			p.i++
 			if p.typ() == t_STRUCT_STOP {
 				p.i++
 			} else {
-				p.db.AddMembers(id, p.members())
+				p.db.addMembers(id, p.members())
 			}
 		}
 	}
@@ -191,11 +191,11 @@ func (p *parser) classStatement() string {
 func (p *parser) noteStatement() string {
 	if p.typ() == t_NOTE {
 		p.i++
-		return p.db.AddNote(p.expect(t_STR), "")
+		return p.db.addNote(p.expect(t_STR), "")
 	}
 	p.i++
 	id := p.name(true)
-	return p.db.AddNote(p.expect(t_STR), id)
+	return p.db.addNote(p.expect(t_STR), id)
 }
 
 // namespaceStatement reads namespaces, which nest, with a stack of open ones.
@@ -206,9 +206,9 @@ func (p *parser) namespaceStatement() {
 		ns := p.name(false)
 		var id string
 		if p.typ() == t_SQS {
-			id = p.db.AddNamespace(ns, p.classLabel())
+			id = p.db.addNamespace(ns, p.classLabel())
 		} else {
-			id = p.db.AddNamespace(ns, "")
+			id = p.db.addNamespace(ns, "")
 		}
 		p.expect(t_STRUCT_START)
 		if p.typ() == t_NEWLINE {
@@ -242,8 +242,8 @@ func (p *parser) namespaceStatement() {
 				p.expect(t_STRUCT_STOP)
 				done := open[len(open)-1]
 				open = open[:len(open)-1]
-				p.db.AddClassesToNamespace(done.id, done.classes, done.notes)
-				p.db.PopNamespace()
+				p.db.addClassesToNamespace(done.id, done.classes, done.notes)
+				p.db.popNamespace()
 				if len(open) == 0 {
 					item = false
 					break
@@ -269,7 +269,7 @@ func (p *parser) classOrRelation() {
 	id1 := p.name(true)
 	t := p.typ()
 	if t == t_LABEL {
-		p.db.AddMember(id1, CleanupLabel(p.next()))
+		p.db.addMember(id1, CleanupLabel(p.next()))
 		return
 	}
 	title1 := "none"
@@ -301,7 +301,7 @@ func (p *parser) classOrRelation() {
 		r.Title = CleanupLabel(p.next())
 		r.HasTitle = true
 	}
-	p.db.AddRelation(r)
+	p.db.addRelation(r)
 }
 
 func (p *parser) styles() []string {
@@ -324,7 +324,7 @@ func (p *parser) styles() []string {
 
 func (p *parser) tooltip(id string) {
 	if p.typ() == t_STR {
-		p.db.SetTooltip(id, p.next())
+		p.db.setTooltip(id, p.next())
 	}
 }
 
@@ -335,12 +335,12 @@ func (p *parser) linkStatement(id string) {
 		tip, hasTip = p.next(), true
 	}
 	if p.typ() == t_LINK_TARGET {
-		p.db.SetLink(id, href, p.next(), true)
+		p.db.setLink(id, href, p.next(), true)
 	} else {
-		p.db.SetLink(id, href, "", false)
+		p.db.setLink(id, href, "", false)
 	}
 	if hasTip {
-		p.db.SetTooltip(id, tip)
+		p.db.setTooltip(id, tip)
 	}
 }
 
@@ -363,12 +363,12 @@ func (p *parser) statement() {
 		p.i++
 		annotation := p.alphaNum()
 		p.expect(t_ANNOTATION_END)
-		p.db.AddAnnotation(p.name(true), annotation)
+		p.db.addAnnotation(p.name(true), annotation)
 		return
 	case t_CALLBACK:
 		p.i++
 		id := p.name(true)
-		p.db.SetClickEvent(id)
+		p.db.setClickEvent(id)
 		p.expect(t_STR)
 		p.tooltip(id)
 		return
@@ -388,18 +388,18 @@ func (p *parser) statement() {
 		if p.typ() == t_CALLBACK_ARGS {
 			p.i++
 		}
-		p.db.SetClickEvent(id)
+		p.db.setClickEvent(id)
 		p.tooltip(id)
 		return
 	case t_STYLE:
 		p.i++
 		id := p.expect(t_ALPHA)
-		p.db.SetCSSStyle(id, p.styles())
+		p.db.setCSSStyle(id, p.styles())
 		return
 	case t_CSSCLASS:
 		p.i++
 		ids := p.expect(t_STR)
-		p.db.SetCSSClass(ids, p.expect(t_ALPHA))
+		p.db.setCSSClass(ids, p.expect(t_ALPHA))
 		return
 	case t_NOTE, t_NOTE_FOR:
 		p.noteStatement()
@@ -411,7 +411,7 @@ func (p *parser) statement() {
 			p.i++
 			ids = append(ids, p.expect(t_ALPHA))
 		}
-		p.db.DefineClass(ids, p.styles())
+		p.db.defineClass(ids, p.styles())
 		return
 	case t_direction_tb, t_direction_bt, t_direction_rl, t_direction_lr:
 		p.i++
@@ -419,14 +419,14 @@ func (p *parser) statement() {
 		return
 	case t_acc_title:
 		p.i++
-		p.db.SetAccTitle(chars.Trim(p.expect(t_acc_title_value)))
+		p.db.setAccTitle(chars.Trim(p.expect(t_acc_title_value)))
 		return
 	case t_acc_descr:
 		p.i++
-		p.db.SetAccDescription(chars.Trim(p.expect(t_acc_descr_value)))
+		p.db.setAccDescription(chars.Trim(p.expect(t_acc_descr_value)))
 		return
 	case t_acc_descr_multiline_value:
-		p.db.SetAccDescription(chars.Trim(p.next()))
+		p.db.setAccDescription(chars.Trim(p.next()))
 		return
 	}
 	p.fail("'acc_title', 'acc_descr', 'acc_descr_multiline_value', 'NAMESPACE', 'ANNOTATION_START', 'CLASS', " +

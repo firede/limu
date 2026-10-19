@@ -58,10 +58,10 @@ func normaliseNodeShapes(nodes []*GraphNode, d *DB) {
 			node.Shape = DefaultShape
 		}
 		if removedShapes[node.Shape] {
-			d.EmitError(ShapeRemoved, `shape "`+node.Shape+`" was removed in v0.8.1, using "`+DefaultShape+`"`, node.ID)
+			d.emitError(ShapeRemoved, `shape "`+node.Shape+`" was removed in v0.8.1, using "`+DefaultShape+`"`, node.ID)
 			node.Shape = DefaultShape
 		} else if !allowedShapes[node.Shape] {
-			d.EmitWarning(ShapeUnsupported, `shape "`+node.Shape+`" is not supported, using "`+DefaultShape+`"`, node.ID)
+			d.emitWarning(ShapeUnsupported, `shape "`+node.Shape+`" is not supported, using "`+DefaultShape+`"`, node.ID)
 			node.Shape = DefaultShape
 		}
 	}

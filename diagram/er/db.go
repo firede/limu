@@ -125,9 +125,9 @@ func (d *DB) Class(id string) *ClassDef { return d.classes[id] }
 // Subgraph is the subgraph of id, or nil.
 func (d *DB) Subgraph(id string) *Subgraph { return d.subgraphLookup[id] }
 
-// AddEntity is the entity of a name, added if it is new, as Pele's addEntity does; an alias
+// addEntity is the entity of a name, added if it is new, as Pele's addEntity does; an alias
 // is taken if the entity has none yet.
-func (d *DB) AddEntity(name, alias string) *Entity {
+func (d *DB) addEntity(name, alias string) *Entity {
 	e := d.entities[name]
 	if e == nil {
 		e = &Entity{
@@ -145,10 +145,10 @@ func (d *DB) AddEntity(name, alias string) *Entity {
 	return e
 }
 
-// AddAttributes adds attributes to an entity, as Pele's addAttributes does. The grammar
+// addAttributes adds attributes to an entity, as Pele's addAttributes does. The grammar
 // builds the list back to front, so the last attribute written comes first.
-func (d *DB) AddAttributes(name string, attributes []Attribute) {
-	e := d.AddEntity(name, "")
+func (d *DB) addAttributes(name string, attributes []Attribute) {
+	e := d.addEntity(name, "")
 	for i := len(attributes) - 1; i >= 0; i-- {
 		a := attributes[i]
 		if a.Keys == nil {
@@ -158,24 +158,24 @@ func (d *DB) AddAttributes(name string, attributes []Attribute) {
 	}
 }
 
-// AddRelationship adds a relationship, as Pele's addRelationship does: a name that is a
+// addRelationship adds a relationship, as Pele's addRelationship does: a name that is a
 // subgraph's id stands for the subgraph.
-func (d *DB) AddRelationship(entA, roleA, entB string, spec RelSpec) {
+func (d *DB) addRelationship(entA, roleA, entB string, spec RelSpec) {
 	a, b := entA, entB
 	if d.subgraphLookup[entA] == nil {
-		a = d.AddEntity(entA, "").ID
+		a = d.addEntity(entA, "").ID
 	}
 	if d.subgraphLookup[entB] == nil {
-		b = d.AddEntity(entB, "").ID
+		b = d.addEntity(entB, "").ID
 	}
 	d.Relationships = append(d.Relationships, Relationship{EntityA: a, RoleA: roleA, EntityB: b, RelSpec: spec})
 }
 
-// SetDirection sets the direction the diagram runs in.
-func (d *DB) SetDirection(dir string) { d.Direction = dir }
+// setDirection sets the direction the diagram runs in.
+func (d *DB) setDirection(dir string) { d.Direction = dir }
 
-// AddCSSStyles adds styles to entities and subgraphs, as Pele's addCssStyles does.
-func (d *DB) AddCSSStyles(ids, styles []string) {
+// addCSSStyles adds styles to entities and subgraphs, as Pele's addCssStyles does.
+func (d *DB) addCSSStyles(ids, styles []string) {
 	if styles == nil {
 		return
 	}
@@ -189,8 +189,8 @@ func (d *DB) AddCSSStyles(ids, styles []string) {
 	}
 }
 
-// AddClass defines classes, or adds styles to them, as Pele's addClass does.
-func (d *DB) AddClass(ids, styles []string) {
+// addClass defines classes, or adds styles to them, as Pele's addClass does.
+func (d *DB) addClass(ids, styles []string) {
 	for _, id := range ids {
 		def := d.classes[id]
 		if def == nil {
@@ -207,8 +207,8 @@ func (d *DB) AddClass(ids, styles []string) {
 	}
 }
 
-// SetClass gives entities and subgraphs classes, as Pele's setClass does.
-func (d *DB) SetClass(ids, classNames []string) {
+// setClass gives entities and subgraphs classes, as Pele's setClass does.
+func (d *DB) setClass(ids, classNames []string) {
 	for _, id := range ids {
 		if e := d.entities[id]; e != nil {
 			for _, name := range classNames {
@@ -259,12 +259,12 @@ func (d *DB) addSubGraph(idText string, list []docItem, title string) string {
 	return id
 }
 
-// SetAccTitle sets the title for assistive technology, its leading white space taken off.
-func (d *DB) SetAccTitle(text string) { d.AccTitle = chars.TrimStart(text) }
+// setAccTitle sets the title for assistive technology, its leading white space taken off.
+func (d *DB) setAccTitle(text string) { d.AccTitle = chars.TrimStart(text) }
 
-// SetAccDescription sets the description for assistive technology, as Pele's
+// setAccDescription sets the description for assistive technology, as Pele's
 // setAccDescription does: the white space that starts each line after the first is taken
 // off, /\n\s+/g replaced by a line feed.
-func (d *DB) SetAccDescription(text string) {
+func (d *DB) setAccDescription(text string) {
 	d.AccDescr = chars.DropIndents(text)
 }

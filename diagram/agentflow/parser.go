@@ -254,7 +254,7 @@ func (p *parser) shapeData() string {
 // of its statement over it.
 func (p *parser) attach(id, data string, from, to int) {
 	loc := p.span(from, to)
-	p.check(p.db.AddVertex(id, nil, "", nil, nil, nil, data, true, loc))
+	p.check(p.db.addVertex(id, nil, "", nil, nil, nil, data, true, loc))
 	p.db.extendVertexMapping(id, loc)
 }
 
@@ -263,7 +263,7 @@ func (p *parser) attachData(id string, f *frame) {
 	if !f.hasData {
 		return
 	}
-	p.check(p.db.AddVertex(id, nil, "", nil, nil, nil, f.data, true, p.span(f.dataFrom, f.dataTo)))
+	p.check(p.db.addVertex(id, nil, "", nil, nil, nil, f.data, true, p.span(f.dataFrom, f.dataTo)))
 }
 
 func (p *parser) vertex() string {
@@ -365,7 +365,7 @@ func (p *parser) vertex() string {
 			typ = "inv_trapezoid"
 		}
 	}
-	p.check(p.db.AddVertex(id, label, typ, nil, nil, props, "", false, nil))
+	p.check(p.db.addVertex(id, label, typ, nil, nil, props, "", false, nil))
 	p.db.addVertexMapping(id, typ == "", p.span(from, p.i-1))
 	return id
 }
@@ -374,7 +374,7 @@ func (p *parser) styledVertex() string {
 	id := p.vertex()
 	if p.typ() == t_STYLE_SEPARATOR {
 		p.i++
-		p.db.SetClass(id, p.idString())
+		p.db.setClass(id, p.idString())
 	}
 	return id
 }
@@ -422,7 +422,7 @@ func (p *parser) link() *LinkInfo {
 		id, hasID = p.next(), true
 	}
 	if p.typ() == t_LINK {
-		info := p.db.DestructLink(p.next(), "")
+		info := p.db.destructLink(p.next(), "")
 		info.ID, info.HasID = id, hasID
 		if p.typ() == t_PIPE {
 			p.i++
@@ -438,7 +438,7 @@ func (p *parser) link() *LinkInfo {
 		start := p.next()
 		label := p.edgeText()
 		end := p.expect(t_LINK, "'EDGE_TEXT'")
-		info := p.db.DestructLink(end, start)
+		info := p.db.destructLink(end, start)
 		info.Text = label
 		info.ID, info.HasID = id, hasID
 		return &info
@@ -464,7 +464,7 @@ func (p *parser) vertexStatement() []string {
 		if p.hasPending {
 			p.attach(next[len(next)-1], p.pendingData, p.dataFrom, p.dataTo)
 		}
-		p.check(p.db.AddLink(stmt, next, info))
+		p.check(p.db.addLink(stmt, next, info))
 		p.db.addEdgeMapping(next, p.span(from, p.i-1))
 		nodes = append(append([]string{}, next...), nodes...)
 		stmt = next
@@ -499,7 +499,7 @@ func (p *parser) linkStyleStatement() {
 	}
 	p.expect(t_SPACE, "")
 	if p.typ() != t_INTERPOLATE {
-		p.check(p.db.UpdateLink(positions, p.stylesOpt()))
+		p.check(p.db.updateLink(positions, p.stylesOpt()))
 		return
 	}
 	p.i++
@@ -508,31 +508,31 @@ func (p *parser) linkStyleStatement() {
 	if p.typ() == t_SPACE {
 		p.i++
 		styles := p.stylesOpt()
-		p.check(p.db.UpdateLinkInterpolate(positions, interpolate))
-		p.check(p.db.UpdateLink(positions, styles))
+		p.check(p.db.updateLinkInterpolate(positions, interpolate))
+		p.check(p.db.updateLink(positions, styles))
 	} else {
-		p.check(p.db.UpdateLinkInterpolate(positions, interpolate))
+		p.check(p.db.updateLinkInterpolate(positions, interpolate))
 	}
 }
 
 func (p *parser) linkTail(id, url string) {
 	if p.typ() != t_SPACE {
-		p.db.SetLink(id, url, "")
+		p.db.setLink(id, url, "")
 		return
 	}
 	p.i++
 	if p.typ() == t_LINK_TARGET {
-		p.db.SetLink(id, url, p.next())
+		p.db.setLink(id, url, p.next())
 		return
 	}
 	tooltip := p.expect(t_STR, "'LINK_TARGET'")
 	if p.typ() == t_SPACE {
 		p.i++
-		p.db.SetLink(id, url, p.expect(t_LINK_TARGET, ""))
+		p.db.setLink(id, url, p.expect(t_LINK_TARGET, ""))
 	} else {
-		p.db.SetLink(id, url, "")
+		p.db.setLink(id, url, "")
 	}
-	p.db.SetTooltip(id, tooltip)
+	p.db.setTooltip(id, tooltip)
 }
 
 func (p *parser) clickStatement() {
@@ -548,9 +548,9 @@ func (p *parser) clickStatement() {
 			p.i++
 			tooltip, hasTooltip = p.expect(t_STR, ""), true
 		}
-		p.db.SetClickEvent(id)
+		p.db.setClickEvent(id)
 		if hasTooltip {
-			p.db.SetTooltip(id, tooltip)
+			p.db.setTooltip(id, tooltip)
 		}
 	case t_HREF:
 		p.i++
@@ -562,10 +562,10 @@ func (p *parser) clickStatement() {
 		if p.typ() == t_SPACE {
 			p.i++
 			tooltip := p.expect(t_STR, "")
-			p.db.SetClickEvent(id)
-			p.db.SetTooltip(id, tooltip)
+			p.db.setClickEvent(id)
+			p.db.setTooltip(id, tooltip)
 		} else {
-			p.db.SetClickEvent(id)
+			p.db.setClickEvent(id)
 		}
 	}
 }
@@ -601,7 +601,7 @@ func (p *parser) statement() (docItem, bool) {
 		p.expect(t_SPACE, "")
 		id := p.idString()
 		p.expect(t_SPACE, "")
-		p.check(p.db.AddVertex(id, nil, "", p.stylesOpt(), nil, nil, "", false, nil))
+		p.check(p.db.addVertex(id, nil, "", p.stylesOpt(), nil, nil, "", false, nil))
 		p.separator()
 		return docItem{}, false
 	case t_LINKSTYLE:
@@ -613,7 +613,7 @@ func (p *parser) statement() (docItem, bool) {
 		p.expect(t_SPACE, "")
 		id := p.idString()
 		p.expect(t_SPACE, "")
-		p.db.AddClass(id, p.stylesOpt())
+		p.db.addClass(id, p.stylesOpt())
 		p.separator()
 		return docItem{}, false
 	case t_CLASS:
@@ -621,7 +621,7 @@ func (p *parser) statement() (docItem, bool) {
 		p.expect(t_SPACE, "")
 		ids := p.idString()
 		p.expect(t_SPACE, "")
-		p.db.SetClass(ids, p.idString())
+		p.db.setClass(ids, p.idString())
 		p.separator()
 		return docItem{}, false
 	case t_CLICK:
@@ -644,16 +644,16 @@ func (p *parser) statement() (docItem, bool) {
 	case t_acc_title:
 		p.i++
 		value := chars.Trim(p.expect(t_acc_title_value, ""))
-		p.db.SetAccTitle(value)
+		p.db.setAccTitle(value)
 		return docItem{kind: itemString, text: value}, true
 	case t_acc_descr:
 		p.i++
 		value := chars.Trim(p.expect(t_acc_descr_value, ""))
-		p.db.SetAccDescription(value)
+		p.db.setAccDescription(value)
 		return docItem{kind: itemString, text: value}, true
 	case t_acc_descr_multiline_value:
 		value := chars.Trim(p.next())
-		p.db.SetAccDescription(value)
+		p.db.setAccDescription(value)
 		return docItem{kind: itemString, text: value}, true
 	}
 	if !idTokens[t] {
@@ -742,7 +742,7 @@ func (p *parser) parse() {
 	p.expect(t_GRAPH, "'SPACE', 'NEWLINE', 'COMMENT'")
 	if p.typ() == t_NODIR {
 		p.i++
-		p.db.SetDirection("TB")
+		p.db.setDirection("TB")
 	} else {
 		dir := p.expect(t_DIR, "'NODIR'")
 		t := p.typ()
@@ -757,7 +757,7 @@ func (p *parser) parse() {
 			p.fail("'COMMENT', 'SEMI', 'NEWLINE', 'SPACE'")
 		}
 		p.i++
-		p.db.SetDirection(dir)
+		p.db.setDirection(dir)
 	}
 	p.document()
 	if p.typ() != t_END {

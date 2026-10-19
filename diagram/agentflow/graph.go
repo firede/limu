@@ -236,7 +236,7 @@ func BuildGraph(d *DB, paletteLength int, defaultCurve string) *Graph {
 		}
 		for _, id := range sg.Nodes {
 			if closesLoop(id, sg.ID, i) {
-				d.EmitWarning(ContainmentViolation, `Container "`+sg.ID+`" cannot contain "`+id+`" because "`+id+
+				d.emitWarning(ContainmentViolation, `Container "`+sg.ID+`" cannot contain "`+id+`" because "`+id+
 					`" already contains it. The nesting that would close the loop is dropped.`, id)
 				continue
 			}

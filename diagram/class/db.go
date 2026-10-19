@@ -175,8 +175,8 @@ func lookupID(id string) string {
 	return className(id)
 }
 
-// AddClass adds a class of a name that may carry a generic type, unless there is one.
-func (db *DB) AddClass(id string) {
+// addClass adds a class of a name that may carry a generic type, unless there is one.
+func (db *DB) addClass(id string) {
 	name, typ := splitName(id)
 	if db.classes[name] != nil {
 		return
@@ -202,26 +202,26 @@ func (db *DB) tag(node *Class, cssClass string) {
 // ensure is the class for a name that may carry a generic type, created if needed. Mermaid
 // throws a TypeError where this creates, as for an annotation on a class not yet declared.
 func (db *DB) ensure(id string) *Class {
-	db.AddClass(id)
+	db.addClass(id)
 	return db.classes[className(id)]
 }
 
-// SetClassLabel sets the label a class is shown with.
-func (db *DB) SetClassLabel(id, label string) { db.ensure(id).Label = label }
+// setClassLabel sets the label a class is shown with.
+func (db *DB) setClassLabel(id, label string) { db.ensure(id).Label = label }
 
-// AddRelation adds a relation, and the classes at its ends. A lollipop end with no marker at
+// addRelation adds a relation, and the classes at its ends. A lollipop end with no marker at
 // the other is an interface of its own.
-func (db *DB) AddRelation(r *Relation) {
+func (db *DB) addRelation(r *Relation) {
 	switch {
 	case r.Type1 == Lollipop && r.Type2 == NoEnd:
-		db.AddClass(r.ID2)
+		db.addClass(r.ID2)
 		r.ID1 = db.addInterface(r.ID1, r.ID2)
 	case r.Type2 == Lollipop && r.Type1 == NoEnd:
-		db.AddClass(r.ID1)
+		db.addClass(r.ID1)
 		r.ID2 = db.addInterface(r.ID2, r.ID1)
 	default:
-		db.AddClass(r.ID1)
-		db.AddClass(r.ID2)
+		db.addClass(r.ID1)
+		db.addClass(r.ID2)
 	}
 	r.ID1 = className(r.ID1)
 	r.ID2 = className(r.ID2)
@@ -236,15 +236,15 @@ func (db *DB) addInterface(label, classID string) string {
 	return id
 }
 
-// AddAnnotation adds an annotation, as `interface` of `<<interface>>`, to a class.
-func (db *DB) AddAnnotation(class, annotation string) {
+// addAnnotation adds an annotation, as `interface` of `<<interface>>`, to a class.
+func (db *DB) addAnnotation(class, annotation string) {
 	node := db.ensure(class)
 	node.Annotations = append(node.Annotations, annotation)
 }
 
-// AddMember adds a member to a class: an annotation, a method or an attribute, as Pele's
+// addMember adds a member to a class: an annotation, a method or an attribute, as Pele's
 // addMember reads it.
-func (db *DB) AddMember(class, member string) {
+func (db *DB) addMember(class, member string) {
 	node := db.ensure(class)
 	t := chars.Trim(member)
 	switch {
@@ -262,15 +262,15 @@ func (db *DB) AddMember(class, member string) {
 	}
 }
 
-// AddMembers adds the members of a class's body, in order.
-func (db *DB) AddMembers(class string, members []string) {
+// addMembers adds the members of a class's body, in order.
+func (db *DB) addMembers(class string, members []string) {
 	for _, m := range members {
-		db.AddMember(class, m)
+		db.addMember(class, m)
 	}
 }
 
-// AddNote adds a note, for a class or "" for none, and gives its id.
-func (db *DB) AddNote(text, class string) string {
+// addNote adds a note, for a class or "" for none, and gives its id.
+func (db *DB) addNote(text, class string) string {
 	index := len(db.Notes)
 	id := "note" + itoa(index)
 	note := &Note{ID: id, Class: class, Text: text, Index: index}
@@ -284,8 +284,8 @@ func CleanupLabel(label string) string {
 	return chars.Trim(strings.TrimPrefix(label, ":"))
 }
 
-// SetCSSClass adds a class name to each class of a list of ids.
-func (db *DB) SetCSSClass(ids, cssClass string) {
+// setCSSClass adds a class name to each class of a list of ids.
+func (db *DB) setCSSClass(ids, cssClass string) {
 	for _, id := range strings.Split(ids, ",") {
 		node := db.classes[lookupID(id)]
 		if node == nil {
@@ -298,11 +298,11 @@ func (db *DB) SetCSSClass(ids, cssClass string) {
 	}
 }
 
-// DefineClass defines a class of styles for each of ids, and styles the classes that already
+// defineClass defines a class of styles for each of ids, and styles the classes that already
 // have its name. Mermaid tests `cssClasses.includes(id)`, which also matches part of a longer
 // name (a classDef named `def` styles every class, through `default`); Pele compares whole
 // names, and so does this.
-func (db *DB) DefineClass(ids, style []string) {
+func (db *DB) defineClass(ids, style []string) {
 	for _, id := range ids {
 		sc := db.styleClasses[id]
 		if sc == nil {
@@ -330,8 +330,8 @@ func (db *DB) DefineClass(ids, style []string) {
 	}
 }
 
-// SetTooltip sets the tooltip of each class of a list of ids.
-func (db *DB) SetTooltip(ids, tooltip string) {
+// setTooltip sets the tooltip of each class of a list of ids.
+func (db *DB) setTooltip(ids, tooltip string) {
 	for _, id := range strings.Split(ids, ",") {
 		if node := db.classes[className(id)]; node != nil {
 			node.Tooltip = tooltip
@@ -339,9 +339,9 @@ func (db *DB) SetTooltip(ids, tooltip string) {
 	}
 }
 
-// SetLink makes each class of a list of ids a link. Entity codes are resolved first, so that
+// setLink makes each class of a list of ids a link. Entity codes are resolved first, so that
 // what is checked is what a browser would follow. A target not given is _blank.
-func (db *DB) SetLink(ids, link, target string, hasTarget bool) {
+func (db *DB) setLink(ids, link, target string, hasTarget bool) {
 	u := chars.Trim(text.DecodeEntities(link))
 	for _, id := range strings.Split(ids, ",") {
 		node := db.classes[lookupID(id)]
@@ -357,32 +357,32 @@ func (db *DB) SetLink(ids, link, target string, hasTarget bool) {
 			node.LinkTarget = target
 		}
 	}
-	db.SetCSSClass(ids, "clickable")
+	db.setCSSClass(ids, "clickable")
 }
 
-// SetClickEvent marks each class of a list of ids as having a callback. Callbacks are never
+// setClickEvent marks each class of a list of ids as having a callback. Callbacks are never
 // run; the class is only marked clickable, as in Mermaid's strict mode.
-func (db *DB) SetClickEvent(ids string) {
+func (db *DB) setClickEvent(ids string) {
 	for _, id := range strings.Split(ids, ",") {
 		if node := db.classes[className(id)]; node != nil {
 			node.HaveCallback = true
 		}
 	}
-	db.SetCSSClass(ids, "clickable")
+	db.setCSSClass(ids, "clickable")
 }
 
-// SetAccTitle sets the title for assistive technology.
-func (db *DB) SetAccTitle(s string) { db.AccTitle = chars.TrimStart(s) }
+// setAccTitle sets the title for assistive technology.
+func (db *DB) setAccTitle(s string) { db.AccTitle = chars.TrimStart(s) }
 
-// SetAccDescription sets the description for assistive technology, with the white space at
+// setAccDescription sets the description for assistive technology, with the white space at
 // the start of each of its lines taken out, as /\n\s+/g replaced with a line feed does.
-func (db *DB) SetAccDescription(s string) {
+func (db *DB) setAccDescription(s string) {
 	db.AccDescr = chars.DropIndents(s)
 }
 
-// AddNamespace opens a namespace in the one open, and its ancestors where its name is
+// addNamespace opens a namespace in the one open, and its ancestors where its name is
 // dotted, as Pele's addNamespace does, and gives its full name. A label of "" is none.
-func (db *DB) AddNamespace(id, label string) string {
+func (db *DB) addNamespace(id, label string) string {
 	prefix := ""
 	if k := len(db.namespaceStack); k > 0 {
 		prefix = db.namespaceStack[k-1]
@@ -445,15 +445,15 @@ func (db *DB) AddNamespace(id, label string) string {
 	}
 }
 
-// PopNamespace closes the namespace open.
-func (db *DB) PopNamespace() {
+// popNamespace closes the namespace open.
+func (db *DB) popNamespace() {
 	if k := len(db.namespaceStack); k > 0 {
 		db.namespaceStack = db.namespaceStack[:k-1]
 	}
 }
 
-// AddClassesToNamespace puts classes and notes, by name, in a namespace.
-func (db *DB) AddClassesToNamespace(id string, classNames, noteNames []string) {
+// addClassesToNamespace puts classes and notes, by name, in a namespace.
+func (db *DB) addClassesToNamespace(id string, classNames, noteNames []string) {
 	ns := db.namespaces[id]
 	if ns == nil {
 		return
@@ -482,8 +482,8 @@ func (db *DB) AddClassesToNamespace(id string, classNames, noteNames []string) {
 	}
 }
 
-// SetCSSStyle adds style declarations to a class, by its id as written.
-func (db *DB) SetCSSStyle(id string, styles []string) {
+// setCSSStyle adds style declarations to a class, by its id as written.
+func (db *DB) setCSSStyle(id string, styles []string) {
 	node := db.classes[id]
 	if node == nil {
 		return
