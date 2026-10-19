@@ -28,7 +28,8 @@ func brEnd(s string, i int) int {
 // PlainLabel lays out text as plain text in which only <br> is markup, so that other tags
 // and icon names show as written instead of being read as formatting, as Pele's plainLabel
 // does: a < that starts no <br> is written &lt;, as /<(?!br\s*\/?>)/gi replaces it, and :fa-
-// is written &colon;fa-.
+// is written &colon;fa-. Text wraps at max even where that is 0 or less, as a box that has
+// no room left gives it.
 func PlainLabel(raw string, measure text.Measurer, size, max float64, base text.Face) text.Label {
 	s := raw
 	if strings.Contains(s, "<") {
@@ -45,7 +46,7 @@ func PlainLabel(raw string, measure text.Measurer, size, max float64, base text.
 	if strings.Contains(s, ":fa-") {
 		s = strings.ReplaceAll(s, ":fa-", "&colon;fa-")
 	}
-	return text.Layout(s, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: base})
+	return text.Layout(s, text.Options{Measurer: measure, Size: size, MaxWidth: max, Bounded: true, Face: base})
 }
 
 // unitEnd is the end of the piece of text at byte i that FitLabel may cut a word before, as
