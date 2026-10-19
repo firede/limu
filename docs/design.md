@@ -107,7 +107,7 @@ commit they were written from.
 | | | |
 |---|---|---|
 | M0 | the stages and their types, text measured and laid out, styles, the svg backend, the oracle | done |
-| M1 | flowcharts from text to pixels: the parser, the layered and compound layouts, the shapes; a backend for MyGo's native UI; a look in the Platinum style in mygo-platinum | |
+| M1 | flowcharts from text to pixels: the parser, the layered and compound layouts, the shapes; a backend for MyGo's native UI; a look in the Platinum style in mygo-platinum | done |
 | M2 | the diagrams on the layered layout: state, class, entity relationship, requirement, use case, agent flow, swimlane | |
 | M3 | sequence, gantt, timeline, journey, git graph, packet, kanban | |
 | M4 | the charts: pie, xy, quadrant, radar, sankey, treemap, venn | |
