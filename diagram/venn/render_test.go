@@ -172,6 +172,11 @@ func peleLine(line string) string {
 		strokeOpacity, hasStrokeOpacity := lastOpacity(decls, "stroke-opacity")
 		s := style.Declarations(without(without(decls, "fill-opacity"), "stroke-opacity")).Style
 		s.Text = style.Paint{}
+		if _, ok := lastOpacity(decls, "fill-opacity"); !ok && !hasStrokeOpacity && view(s) == view(style.Style{}) {
+			// A style that sets nothing a browser draws is read as no style, and the line as
+			// Pele writes a set the author gave none, as sceneLines writes it too.
+			return strings.Join(fields[:n-1], " ") + " css="
+		}
 		if !s.Fill.Set() {
 			s.Fill = fill
 		}
@@ -208,6 +213,32 @@ func peleLine(line string) string {
 		return strings.Join(head[:n-1], " ") + " " + author(style.Style{Text: s.Text, Opacity: s.Opacity}) + line[bar:]
 	}
 	return line
+}
+
+// setAttributes is a set's fill, fill opacity and stroke as Pele writes them on its circle,
+// where the author gave the set no style and its own style is no more than those, and whether
+// it is. A set of Pele's with no style is so read as it is, and the oracle keeps only the
+// sets with one in full.
+func setAttributes(it *scene.Item) (string, bool) {
+	s := it.Style
+	opacity, ok := s.FillOpacity.Get()
+	if !ok || view(it.Author) != view(style.Style{}) ||
+		view(s) != view(style.Style{Fill: s.Fill, FillOpacity: s.FillOpacity, Stroke: s.Stroke}) {
+		return "", false
+	}
+	name := func(p style.Paint) string {
+		for k, hex := range series {
+			if p == style.Series(k) {
+				return fmt.Sprintf("var(--pele-series-%d,%s)", k+1, hex)
+			}
+		}
+		return ""
+	}
+	fill, stroke := name(s.Fill), name(s.Stroke)
+	if fill == "" || stroke == "" {
+		return "", false
+	}
+	return fill + " " + chars.NumberString(opacity) + " " + stroke, true
 }
 
 // afterCSS is where the part of a line after its style begins, as an id before it may hold
@@ -348,6 +379,10 @@ func sceneLines(sc *scene.Scene) []string {
 			cx, cy, r := a[6], a[1], it.Box.W/2
 			if pathLine(it.Parts[0].Path) != pathLine(new(scene.Path).Ellipse(cx, cy, r, r)) {
 				lines = append(lines, "set drawn other than as its circle")
+			}
+			if attrs, ok := setAttributes(it); ok {
+				lines = append(lines, "set "+pelesvg.ID(it.ID)+" "+pt(cx, cy)+" "+num(r)+" "+attrs+" "+pelesvg.CapJoin(it)+" css=")
+				continue
 			}
 			lines = append(lines, "set "+pelesvg.ID(it.ID)+" "+pt(cx, cy)+" "+num(r)+" "+pelesvg.CapJoin(it)+
 				" style="+view(it.Author.Over(it.Style)))
