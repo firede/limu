@@ -72,7 +72,13 @@ func (p *Prepared) Source(keepComments bool) string {
 // Prepare reads a diagram's front matter, directives and type, as Pele's parseSource does
 // before it calls the parser of the type. It does not know which types are supported: for one
 // that is not, Unsupported is Pele's error.
+//
+// Pele is handed a JavaScript string, which the browser decoded from UTF-8; a Go string may
+// hold bytes that are not UTF-8. Prepare first replaces those as the browser's decoder does,
+// each maximal subpart of an ill-formed sequence with U+FFFD, so that what is measured and
+// drawn is what Pele would measure and draw, and the scene holds only valid UTF-8.
 func Prepare(source string, opt Options) (*Prepared, error) {
+	source = chars.Decode(source)
 	limit := opt.Limit
 	if limit == 0 {
 		limit = DefaultLimit
@@ -117,5 +123,5 @@ func Prepare(source string, opt Options) (*Prepared, error) {
 // Unsupported is the error of a diagram of a type that has no parser, as Pele's parseSource
 // gives it.
 func Unsupported(typ Type) *Error {
-	return NewError(`Diagram type "`+string(typ)+`" is not supported yet.`, UnsupportedDiagram, string(typ))
+	return NewError(`Diagram type "`+string(typ)+`" is not supported yet.`, UnsupportedDiagram, typ)
 }

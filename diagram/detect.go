@@ -155,9 +155,10 @@ func Detect(cleaned string) Type {
 }
 
 // DetectType is the type of diagram a text is, or "" when it is none, as Pele's detectType
-// finds it. Its error is one of its front matter.
+// finds it. Its error is one of its front matter. Bytes that are not UTF-8 are read as
+// Prepare reads them.
 func DetectType(text string) (Type, error) {
-	pre, err := Preprocess(text)
+	pre, err := Preprocess(chars.Decode(text))
 	if err != nil {
 		return "", err
 	}
