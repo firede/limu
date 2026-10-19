@@ -2,7 +2,8 @@ package jsmath
 
 import "math"
 
-// Math.atan2 and Math.acos as V8 works them out: fdlibm's e_atan2.c, s_atan.c and e_acos.c,
+// Math.atan2, Math.acos and Math.asin as V8 works them out: fdlibm's e_atan2.c, s_atan.c,
+// e_acos.c and e_asin.c,
 // from V8's src/base/ieee754.cc, with products fused as clang fuses them (see trig.go).
 
 // Atan2 is Math.atan2(y, x), as fdlibm's __ieee754_atan2 does.
@@ -244,4 +245,74 @@ func Acos(x float64) float64 {
 	r := p(z) / q(z)
 	w := fma(r, s, c)
 	return 2.0 * (df + w)
+}
+
+// Asin is Math.asin, as fdlibm's __ieee754_asin does.
+func Asin(x float64) float64 {
+	const (
+		huge   float64 = 1.000e+300
+		pio2Hi float64 = 1.57079632679489655800e+00
+		pio2Lo float64 = 6.12323399573676603587e-17
+		pio4Hi float64 = 7.85398163397448278999e-01
+		pS0            = 1.66666666666666657415e-01
+		pS1            = -3.25565818622400915405e-01
+		pS2            = 2.01212532134862925881e-01
+		pS3            = -4.00555345006794114027e-02
+		pS4            = 7.91534994289814532176e-04
+		pS5            = 3.47933107596021167570e-05
+		qS1            = -2.40339491173441421878e+00
+		qS2            = 2.02094576023350569471e+00
+		qS3            = -6.88283971605453293030e-01
+		qS4            = 7.70381505559019352791e-02
+	)
+	fma := math.FMA
+	// p and q are the numerator and denominator of the rational approximation of
+	// (asin(x) - x)/x, as fdlibm writes them out in each branch.
+	p := func(t float64) float64 {
+		return float64(t * fma(t, fma(t, fma(t, fma(t, fma(t, pS5, pS4), pS3), pS2), pS1), pS0))
+	}
+	q := func(t float64) float64 {
+		return fma(t, fma(t, fma(t, fma(t, qS4, qS3), qS2), qS1), 1)
+	}
+	bits := math.Float64bits(x)
+	hx := int32(bits >> 32)
+	ix := hx & 0x7fffffff
+	if ix >= 0x3ff00000 { // |x| >= 1
+		if (ix-0x3ff00000)|int32(uint32(bits)) == 0 { // |x| is 1: asin(±1) = ±π/2
+			return fma(x, pio2Hi, float64(x*pio2Lo))
+		}
+		return math.NaN() // asin(|x| > 1) is NaN
+	}
+	if ix < 0x3fe00000 { // |x| < 0.5
+		t := 0.0
+		if ix < 0x3e400000 { // |x| < 2^-27
+			if huge+x > 1 {
+				return x
+			}
+		} else {
+			t = float64(x * x)
+		}
+		w := p(t) / q(t)
+		return fma(x, w, x)
+	}
+	// 1 > |x| >= 0.5
+	w := 1 - math.Abs(x)
+	t := w * 0.5
+	pt, qt := p(t), q(t)
+	s := math.Sqrt(t)
+	if ix >= 0x3fef3333 { // |x| > 0.975
+		w = pt / qt
+		t = pio2Hi - fma(2.0, fma(s, w, s), -pio2Lo)
+	} else {
+		w = math.Float64frombits(math.Float64bits(s) &^ 0xffffffff)
+		c := fma(-w, w, t) / (s + w)
+		r := pt / qt
+		pp := fma(float64(2.0*s), r, -fma(-2.0, c, pio2Lo))
+		qq := fma(-2.0, w, pio4Hi)
+		t = pio4Hi - (pp - qq)
+	}
+	if hx > 0 {
+		return t
+	}
+	return -t
 }

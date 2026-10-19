@@ -20,10 +20,12 @@ export async function resolve(spec, ctx, next) {
 // patch writes what the suite needs to compare it: a kanban board's textBlock writes, in place of each line of text, where the
 // line starts or ends and what is in it; a pie's percentages write, as data-y, where they are
 // before Pele adds the shift to their baseline; a radar chart's labelSvg writes, before each
-// label, the point it is centered on, its size and the text of its lines; and a sankey
-// diagram's labels write the middle of their line as y, with an m before it; and an
+// label, the point it is centered on, its size and the text of its lines; a sankey
+// diagram's labels write the middle of their line as y, with an m before it; an
 // architecture diagram's labels write, in place of their text, the point they are centered on
-// and all that is in them, and its markers their tips and the way they point.
+// and all that is in them, and its markers their tips and the way they point; and a block
+// diagram's labelSvg writes, before each label, the point it is centered on, its size and its
+// spans, and its blocks write the size they are drawn at as data-limu.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -38,6 +40,7 @@ const dataY = (y) => `<text\${(globalThis as any).limuExactNumbers ? \` data-y="
 const RADAR_IMPORT = "import { escText, labelSvg, num } from '../../svg/builder.js';";
 const SANKEY_Y = 'y="${num(y + small * 0.35)}"';
 const ARCH_EDGES = "import { edgeLabelSvg, marker, markerTrim } from '../../svg/edges.js';";
+const BLOCK_NODE = 'transform="translate(${num(v.x)},${num(v.y)})">`';
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -127,6 +130,20 @@ function marker(type: string, x: number, y: number, dx: number, dy: number, colo
   if (url.endsWith('/src/diagrams/sankey/render.ts')) {
     const loaded = await next(url, ctx);
     const source = patch(url, String(loaded.source), SANKEY_Y, `y="\${${EXACT.slice(4, -1)} ? 'm' + y : num(y + small * 0.35)}"`);
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/block/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = patch(url, String(loaded.source), RADAR_IMPORT, RADAR_IMPORT.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, BLOCK_NODE, BLOCK_NODE.replace('>`', `\${${EXACT.slice(4, -1)} ? \` data-limu="\${v.bw} \${v.bh}"\` : ''}>\``));
+    source += `
+function labelSvg(label: Label, cx: number, cy: number, attrs: string, icons?: any): string {
+  const s = labelSvgPele(label, cx, cy, attrs, icons);
+  if (!(globalThis as any).limuExactNumbers || s === '') return s;
+  const lines = label.lines.map((line) => line.map((span) => [span.text, span.style, span.icon ?? null, span.width]));
+  return \`<limu-label x="\${cx}" y="\${cy}" w="\${label.width}" h="\${label.height}" lines="\${encodeURIComponent(JSON.stringify(lines))}"/>\` + s;
+}
+`;
     return { ...loaded, source, shortCircuit: true };
   }
   if (url.endsWith('.json')) {

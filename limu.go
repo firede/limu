@@ -4,6 +4,7 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/agentflow"
 	"github.com/firede/limu/diagram/architecture"
+	"github.com/firede/limu/diagram/block"
 	"github.com/firede/limu/diagram/class"
 	"github.com/firede/limu/diagram/er"
 	"github.com/firede/limu/diagram/eventmodeling"
@@ -165,6 +166,14 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		if sc, err = xychart.Layout(m, p.Config, o); err != nil {
+			return nil, err
+		}
+	case diagram.Block:
+		db, err := block.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		if sc, err = block.Layout(db, p.Config, o); err != nil {
 			return nil, err
 		}
 	case diagram.Sankey:
