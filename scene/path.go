@@ -166,8 +166,19 @@ func (p *Path) ArcTo(rx, ry, rot float64, large, sweep bool, x, y float64) *Path
 	} else if sweep && dt < 0 {
 		dt += 2 * math.Pi
 	}
-	// At most a quarter turn a curve.
-	n := int(math.Ceil(math.Abs(dt) / (math.Pi / 2)))
+	if math.IsNaN(cx) || math.IsInf(cx, 0) || math.IsNaN(cy) || math.IsInf(cy, 0) ||
+		math.IsNaN(t1) || !(math.Abs(dt) <= 2*math.Pi) || dt == 0 {
+		// Radii or ends that are not finite numbers place no ellipse, and an arc of no turn
+		// is a line; the path still reaches its end.
+		return p.LineTo(x, y)
+	}
+	// At most a quarter turn a curve. A turn of a quarter, or of a half, comes out of the
+	// conversion a little over it as often as not: a quarter, as of a rounded corner, to a part
+	// in 10^12 or less, and a half, whose center the conversion finds from the square root of a
+	// difference near 0, to a part in 10^6 where its radius is small beside its coordinates. A
+	// turn within a part in 10^4 of a whole number of quarters is that many curves, each a
+	// little over a quarter at most, which strays from the ellipse no more than a quarter does.
+	n := max(1, int(math.Ceil(math.Abs(dt)/(math.Pi/2)-1e-4)))
 	step := dt / float64(n)
 	k := 4.0 / 3 * math.Tan(step/4)
 	point := func(t float64) (float64, float64, float64, float64) {

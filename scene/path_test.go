@@ -36,6 +36,27 @@ func TestArcTo(t *testing.T) {
 	if p := new(Path).MoveTo(0, 0).ArcTo(0, 5, 0, false, true, 4, 0); p.Ops[1] != LineTo {
 		t.Error("a zero radius is a line")
 	}
+	// A quarter turn is one curve, though the angle the conversion finds is a little over.
+	for _, r := range []float64{1, 3, 4.5, 7.25, 10, 1e3} {
+		for _, at := range []Point{{0, 0}, {0.1, 0.2}, {123.45, 678.9}, {-3.3, 1e4}} {
+			for _, sweep := range []bool{false, true} {
+				p := new(Path).MoveTo(at.X+r, at.Y).ArcTo(r, r, 0, false, sweep, at.X, at.Y+r)
+				if got := len(p.Ops) - 1; got != 1 {
+					t.Errorf("a quarter turn of radius %v from %v in %d curves", r, at, got)
+				}
+				if p := new(Path).MoveTo(at.X+r, at.Y).ArcTo(r, r, 0, false, sweep, at.X-r, at.Y); len(p.Ops)-1 != 2 {
+					t.Errorf("a half turn of radius %v from %v in %d curves", r, at, len(p.Ops)-1)
+				}
+			}
+		}
+	}
+	// What is not a finite number places no ellipse: the path goes on to its end in a line.
+	for _, c := range [][3]float64{{math.NaN(), 5, 4}, {math.Inf(1), 5, 4}, {5, 5, math.NaN()}} {
+		p := new(Path).MoveTo(0, 0).ArcTo(c[0], c[1], 0, false, true, c[2], 3)
+		if len(p.Ops) != 2 || p.Ops[1] != LineTo || p.Args[3] != 3 {
+			t.Errorf("ArcTo(%v) %v %v", c, p.Ops, p.Args)
+		}
+	}
 }
 
 func TestShapes(t *testing.T) {
