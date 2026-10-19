@@ -9,7 +9,7 @@
 // limu's layout moves it: the number plus the body's move, in that order. The lines hold every
 // number in full, as String() writes it, so that a difference in the last bit shows.
 import { lone, mutator } from './parse.mjs';
-import { capJoin } from './render.mjs';
+import { capJoin } from './flowchart-render.mjs';
 import { FRAGMENTS, corpus, hostileCorpus, outlines } from './ishikawa.mjs';
 
 // The icons the host has, in the cases drawn with icons.

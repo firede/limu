@@ -3,7 +3,7 @@
 // limu's test writes the same lines from its scene.
 import { FRAGMENTS, agentflowCorpus } from './agentflow.mjs';
 import { mutator } from './parse.mjs';
-import { capJoin } from './render.mjs';
+import { capJoin } from './flowchart-render.mjs';
 
 const H = 'agentflow-beta\n';
 

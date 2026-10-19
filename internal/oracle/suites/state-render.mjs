@@ -3,7 +3,7 @@
 // writes the same lines from its scene.
 import { lone, mutator } from './parse.mjs';
 import { WRITTEN, stateCorpus } from './state.mjs';
-import { capJoin } from './render.mjs';
+import { capJoin } from './flowchart-render.mjs';
 
 // The fragments mutations splice in, for text that parses and still draws something odd.
 const FRAGMENTS = [

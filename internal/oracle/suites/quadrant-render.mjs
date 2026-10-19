@@ -6,7 +6,7 @@
 // numbers are where the scene has them. They are drawn here written out in full, as the
 // oracle's hooks have num() write them while limuExactNumbers is set, and compared whole.
 import { lone, mutator } from './parse.mjs';
-import { capJoin } from './render.mjs';
+import { capJoin } from './flowchart-render.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './quadrant.mjs';
 
 // Pele's escapes in attribute values and text, undone.

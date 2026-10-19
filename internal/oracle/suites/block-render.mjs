@@ -12,7 +12,7 @@
 // spans, and each block the size it is drawn at, which its shape is drawn from: the shapes
 // themselves are drawShape's, which the draw suite checks.
 import { lone, mutator } from './parse.mjs';
-import { capJoin } from './render.mjs';
+import { capJoin } from './flowchart-render.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './block.mjs';
 
 // Pele's escapes in attribute values, undone.
