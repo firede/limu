@@ -158,8 +158,8 @@ func lineRest(s string, i int) int {
 	return len(s)
 }
 
-// lineBreak matches \r?\n at byte i, or gives -1.
-func lineBreak(s string, i int) int {
+// LineBreak matches \r?\n at byte i, or gives -1.
+func LineBreak(s string, i int) int {
 	switch {
 	case strings.HasPrefix(s[i:], "\r\n"):
 		return i + 2
@@ -169,10 +169,10 @@ func lineBreak(s string, i int) int {
 	return -1
 }
 
-// closed matches (?:\r?\n|(?!\S)) at byte i: a line break, or nothing before white space or
+// Closed matches (?:\r?\n|(?!\S)) at byte i: a line break, or nothing before white space or
 // the end of the text; -1 where neither is.
-func closed(s string, i int) int {
-	if end := lineBreak(s, i); end >= 0 {
+func Closed(s string, i int) int {
+	if end := LineBreak(s, i); end >= 0 {
 		return end
 	}
 	if i == len(s) || spaceAt(s, i) {
@@ -292,7 +292,7 @@ var StringToken = TokenType{Name: "STRING", First: `"'`, Match: func(s string, a
 }}
 
 // NewlineToken is Pele's NEWLINE, /\r?\n/y.
-var NewlineToken = TokenType{Name: "NEWLINE", First: "\r\n", Match: lineBreak}
+var NewlineToken = TokenType{Name: "NEWLINE", First: "\r\n", Match: LineBreak}
 
 // WhitespaceToken is Pele's WHITESPACE, /[\t ]+/y, which is hidden.
 var WhitespaceToken = TokenType{Name: "WHITESPACE", First: "\t ", Hidden: true, Match: func(s string, at int) int {
@@ -307,7 +307,7 @@ func yamlOpener(s string, at int) int {
 	if !strings.HasPrefix(s[at:], "---") {
 		return -1
 	}
-	return lineBreak(s, blanks(s, at+3))
+	return LineBreak(s, blanks(s, at+3))
 }
 
 // YAMLToken is Pele's YAML, /---[\t ]*\r?\n(?:[\S\s]*?\r?\n)?---(?:\r?\n|(?!\S))/y, front
@@ -322,16 +322,16 @@ var YAMLToken = TokenType{
 			return -1
 		}
 		for k := q; k < len(s); k++ {
-			j := lineBreak(s, k)
+			j := LineBreak(s, k)
 			if j < 0 || !strings.HasPrefix(s[j:], "---") {
 				continue
 			}
-			if end := closed(s, j+3); end >= 0 {
+			if end := Closed(s, j+3); end >= 0 {
 				return end
 			}
 		}
 		if strings.HasPrefix(s[q:], "---") {
-			return closed(s, q+3)
+			return Closed(s, q+3)
 		}
 		return -1
 	},
@@ -360,7 +360,7 @@ var DirectiveToken = TokenType{
 			if !strings.HasPrefix(s[k:], "}%%") {
 				continue
 			}
-			if end := closed(s, k+3); end >= 0 {
+			if end := Closed(s, k+3); end >= 0 {
 				return end
 			}
 		}
