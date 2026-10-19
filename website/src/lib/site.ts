@@ -1,4 +1,4 @@
-export const siteDescription = 'limu reads Mermaid diagrams and lays them out in Go, for programs that draw them themselves: natively with MyGo, as SVG, or in a look of their own.';
+export const siteDescription = 'limu is a diagram layout engine in Go. It reads Mermaid and leaves the drawing to your program.';
 export const repositoryUrl = 'https://github.com/firede/limu';
 export const modulePath = 'github.com/firede/limu';
 

@@ -1,23 +1,23 @@
 ---
 title: "MyGo"
-description: "Drawing diagrams natively with limumygo: the widget, painting, fonts, and finding the item under the pointer."
+description: "Draw diagrams natively with limumygo, and find the part under the pointer."
 ---
 
-The limumygo package draws limu's scenes with [MyGo](https://mygo.egoist.dev)'s native UI, on the GPU, and tells which part of a diagram is under the pointer. It is what limu is for: a diagram drawn in an app's own window, in its own fonts, that the app can ask about.
+The limumygo package draws limu's scenes on the GPU with [MyGo](https://mygo.egoist.dev)'s native UI, and tells you which part of a diagram is under the pointer. This is what limu was built for. The diagram lives in your app's own window, uses your app's fonts, and can answer questions about itself.
 
 ## Installing
 
-limumygo is a module of its own, so that limu's other packages need only Go's standard library:
+limumygo is a separate module, which keeps limu's other packages free of anything beyond Go's standard library.
 
 ```shell
 go get github.com/firede/limu/limumygo
 ```
 
-It needs what MyGo needs to build an app; see [MyGo's documentation](https://mygo.egoist.dev).
+You also need whatever MyGo needs to build an app. See [MyGo's documentation](https://mygo.egoist.dev).
 
 ## Showing a diagram
 
-`limumygo.View` builds an element the size of a scene, which draws it. Lay the diagram out with the fonts it is drawn in, as the [Fonts](#fonts) section says:
+`limumygo.View` builds an element the size of a scene and draws the scene in it. Lay out the diagram with the same fonts you draw it in, as explained under [Fonts](#fonts).
 
 ```go
 package main
@@ -73,15 +73,15 @@ func main() {
 }
 ```
 
-A change of theme, as when the system turns dark, only draws the scene again.
+When the theme changes, for example when the system switches to dark mode, the scene is only redrawn.
 
-The widget shows the tooltip of the item under the pointer, and the pointer is a hand over an item with a link. `Hovered` returns the item under the pointer and `Clicked` the item clicked since the last frame, or nil. `Element` returns the widget's element, to place it or give it a background, and `Label` names the diagram for assistive technology, which reads it as an image, in place of the scene's title.
+The widget shows the tooltip of the item under the pointer and turns the pointer into a hand over items with a link. `Hovered` returns the item under the pointer, and `Clicked` returns the item clicked since the last frame. Both return nil when there's no item. `Element` gives you the widget's element so you can place it or give it a background. Assistive technology reads the diagram as an image named by the scene's title, and `Label` sets a different name.
 
-To fit a diagram to the width an element has, read the width from the element's `LayoutBounds`, which holds the frame before's, and lay the diagram out again when it changes, with `MaxWidth`. Parse the text once with `limu.Parse`, and lay out a large diagram on another goroutine, as the [playground](/playground) does.
+To fit a diagram to its element, read the element's width from `LayoutBounds`, which holds the size from the previous frame. When the width changes, lay the diagram out again with a new `MaxWidth`. Parse the text once with `limu.Parse`, and lay out large diagrams on another goroutine, as the [playground](/playground) does.
 
 ### Finding the item under the pointer
 
-`limumygo.ItemAt` finds the item of a scene at a point, in the scene's units, without a widget: the one drawn last of those there, and so on top. An item is there when its box holds the point, or its label's box; an edge, and an item drawn only in lines, when one of its lines passes within a slop of the point, or one of its markers holds it. The widget's slop is `limumygo.Slop`, 4 DIPs.
+`limumygo.ItemAt` finds the item at a point in scene coordinates, without needing a widget. When several items overlap, it returns the one drawn last, which is the one on top. A point hits an item when it's inside the item's box or its label's box. Edges and items made only of lines are hit when the point is within a tolerance of a line or inside one of their markers. The widget uses `limumygo.Slop`, which is 4 DIPs.
 
 ```go
 if it := limumygo.ItemAt(sc, scene.Point{X: x, Y: y}, limumygo.Slop); it != nil {
@@ -91,7 +91,7 @@ if it := limumygo.ItemAt(sc, scene.Point{X: x, Y: y}, limumygo.Slop); it != nil 
 
 ## Painting
 
-`limumygo.Paint` draws a scene on a `ui.Painter`, with its top left corner at a point, in DIPs. It draws an element of one's own:
+`limumygo.Paint` draws a scene on a `ui.Painter` with its top left corner at a given point, in DIPs. Use it to draw a diagram inside an element of your own.
 
 ```go
 o := &limumygo.Options{Look: look, Fonts: fonts, Scale: 2}
@@ -100,13 +100,17 @@ ui.Box(c).Size(float32(sc.Width*2), float32(sc.Height*2)).Draw(func(p *ui.Painte
 })
 ```
 
-`Options.Scale` is how many DIPs a unit of the scene takes. To zoom or pan a diagram, change the scale and the point it is drawn at; do not draw it under `ui.Painter.Transform`, nor in an element that is transformed. A path too large for one of MyGo's masks is drawn only where the painter shows, which MyGo tells in the window's DIPs and not under a transform, so a transformed diagram can be drawn in part.
+`Options.Scale` sets how many DIPs one scene unit takes. To zoom or pan, change the scale and the point you draw at. Don't draw under `ui.Painter.Transform` or inside a transformed element. MyGo clips very large paths to the visible area in window coordinates, and it can't account for a transform, so a transformed diagram may be drawn only in part.
 
-MyGo draws the scene as the svg package writes it, with a few differences. An item's opacity is laid on each color it is drawn in, as MyGo's painter has no group to draw at an opacity, so that where an item's parts overlap, the one below shows through. A radius too large for a box is the smaller of half its width and half its height, where SVG makes a narrow box's corners elliptical. MyGo strokes paths with round ends and corners only, so a line with others is drawn by filling its outline.
+limumygo draws the same picture as the svg package, with a few differences.
+
+- MyGo has no way to draw a group at an opacity, so limumygo applies an item's opacity to each of its colors. Where an item's parts overlap, the lower part shows through.
+- When a corner radius is too large for a box, limumygo uses the smaller of half the width and half the height. SVG uses elliptical corners instead.
+- MyGo strokes paths only with round ends and corners. Lines with other ends or corners are drawn by filling their outline.
 
 ## Fonts
 
-A diagram is laid out with a measurer and drawn in fonts; when they differ, text does not fit the room layout gave it. `limumygo.Fonts` are both: a `text.Measurer` that measures with the fonts the painter draws in, shaped by the system's text engine as MyGo shapes the text of its elements.
+A diagram is laid out with a measurer and drawn with fonts. If the two don't match, text won't fit the space layout gave it. `limumygo.Fonts` does both jobs. It's a `text.Measurer` that measures with the same fonts the painter draws with, shaped by the system's text engine just as MyGo shapes the rest of its text.
 
 ```go
 fonts := limumygo.NewFonts("Inter, system-ui", "JetBrains Mono, monospace")
@@ -114,15 +118,15 @@ sc, err := limu.Layout(src, &layout.Options{Measurer: fonts})
 w := limumygo.View(c, sc, &limumygo.Options{Look: look, Fonts: fonts})
 ```
 
-`limumygo.DefaultFonts` are the system's font and its monospaced one. A family is a list tried in turn, as `ui.Font` takes it. Bold text is set in the family's bold weight, italic text in its italics, and monospaced text in the mono family. Fonts keep the text they shaped last, so that measuring and drawing a label again costs nothing, and are safe to use from several goroutines.
+`limumygo.DefaultFonts` uses the system font and its monospaced font. A family is a list of fonts to try in order, as `ui.Font` takes it. Bold and italic text use the family's bold weight and italics, and monospaced text uses the mono family. Fonts cache the text they shaped most recently, so measuring and then drawing the same label costs nothing extra. They're safe to use from several goroutines.
 
-Text in Chinese, Japanese and Korean is measured in the fonts it is drawn in, falling back to the system's fonts for the scripts a family lacks. The system's text engine puts a little room where Han characters meet Latin letters and digits, and `Fonts` measure that room too.
+Chinese, Japanese and Korean text is measured in the fonts it's drawn in, falling back to the system's fonts for scripts the family doesn't cover. The system's text engine adds a little space where Han characters meet Latin letters or digits, and `Fonts` measures that space too.
 
 ## Icons and images
 
-limumygo loads no image and follows no link: the host decides, as an app is the one that knows where its images come from and what a link may open.
+limumygo never loads images or follows links on its own. Your app knows where its images come from and which links are safe to open, so it makes those decisions.
 
-`Options.DrawIcon` draws an icon by name, as `fa:fa-car`, in the color of the item's text. Layout leaves room in a label only for the icons the host says it can draw, through `layout.Options.Icons`, so give both the same set:
+`Options.DrawIcon` draws an icon by name, such as `fa:fa-car`, in the color of the item's text. Layout leaves room in labels only for icons you report through `layout.Options.Icons`, so give both the same set.
 
 ```go
 icons := map[string]*ui.SVG{"fa:fa-car": car}
@@ -141,13 +145,13 @@ o := &limumygo.Options{
 }
 ```
 
-`Options.DrawImage` draws an image from its address, in a box: fitted and centered when `fit` is set, and otherwise stretched to fill it. The address is one layout let through, of a scheme `layout.Options.ImageSchemes` allows; loading the image, and keeping it, is the host's. Without `DrawIcon` or `DrawImage`, icons or images are left out.
+`Options.DrawImage` draws an image from its URL into a box. When `fit` is set, the image keeps its proportions and is centered. Otherwise it's stretched to fill the box. Layout only passes through URLs whose scheme `layout.Options.ImageSchemes` allows, and loading and caching the image is up to you. Without `DrawIcon` or `DrawImage`, icons and images are left out.
 
-A clicked item's `Link` is where it leads. Open it, or not, as the app's own links are.
+When an item with a link is clicked, its `Link` field holds the target. Open it the same way your app opens any other link, or don't.
 
-## Drawing of one's own
+## Custom drawing
 
-`Options.Draw` draws each item in place of the default, which `next` draws. The `limumygo.Painter` it is given embeds the `ui.Painter`, places the scene's units in DIPs (`Point`, `Rect`, `Len`, `Path`), and draws the default's pieces: `Item`, `Parts`, `Ends`, `Picture` and `Label`. It is given the item's style settled into colors and measures, a `style.Resolved`, as MyGo draws with colors.
+`Options.Draw` draws each item in place of the default, and `next` draws it the default way. The `limumygo.Painter` it receives embeds the `ui.Painter` and converts scene coordinates to DIPs with `Point`, `Rect`, `Len` and `Path`. It can also draw the default pieces with `Item`, `Parts`, `Ends`, `Picture` and `Label`. The style arrives as a `style.Resolved`, with every color already worked out, because MyGo draws with plain colors.
 
 ```go
 o.Draw = func(p *limumygo.Painter, it *scene.Item, s style.Resolved, next func()) {
@@ -155,25 +159,25 @@ o.Draw = func(p *limumygo.Painter, it *scene.Item, s style.Resolved, next func()
 		next()
 		return
 	}
-	// A node as a box of its own, with its label as the default draws it.
+	// Draw the node as a box of our own, and its label the default way.
 	p.Fill(p.Rect(it.Box), limumygo.Color(s.Fill, s.Opacity), 8)
 	p.Label(it, s)
 }
 ```
 
-[mygo-platinum](https://github.com/firede/mygo-platinum) draws diagrams this way, in the look of the classic Mac OS.
+[mygo-platinum](https://github.com/firede/mygo-platinum) uses this to draw diagrams in the style of the classic Mac OS.
 
-## The editor's language
+## Editor highlighting
 
-The package `limumygo/mermaid` is Mermaid's text as a language of MyGo's code editor. It highlights the keywords of the diagram's type, as the line that declares it says:
+The `limumygo/mermaid` package makes Mermaid a language in MyGo's code editor. It knows the keywords of each diagram type and picks the type from the line that declares it.
 
 ```go
 buf := editor.NewBuffer(src)
 buf.SetLanguage(mermaid.Language)
 ```
 
-It reads a line at a time and does not parse; limu's errors are what say whether the text is right.
+It reads one line at a time and doesn't parse the diagram. Use limu's errors to find out whether the text is valid.
 
 ## In a browser
 
-A MyGo app runs in a browser, compiled to WebAssembly, and limumygo with it, as the [playground](/playground) does: see MyGo's documentation for building and loading it. There, text is shaped by the browser, and `Fonts` measure it as the browser sets it. limu and limumygo add about 7 MB to the WebAssembly before it is compressed.
+MyGo apps can also run in a browser as WebAssembly, and limumygo comes along. The [playground](/playground) works this way. See MyGo's documentation for how to build and load such an app. In a browser, the browser shapes text, and `Fonts` measures it the way the browser sets it. limu and limumygo add about 7 MB to the uncompressed WebAssembly.

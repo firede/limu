@@ -27,7 +27,7 @@ export interface ExampleType {
 export const exampleTypes: ExampleType[] = gallery;
 
 export const examplesTitle = 'Examples';
-export const examplesDescription = 'Every type of diagram limu reads, drawn by its svg package when the site was built.';
+export const examplesDescription = 'Every type of diagram limu supports, rendered by its svg package when the site was built.';
 
 export const exampleTypeHref = (type: string): string => `/examples/${type}`;
 

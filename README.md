@@ -5,25 +5,22 @@ English | [简体中文](README.zh.md)
 [![verify](https://github.com/firede/limu/actions/workflows/verify.yml/badge.svg?branch=main)](https://github.com/firede/limu/actions/workflows/verify.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/firede/limu.svg)](https://pkg.go.dev/github.com/firede/limu)
 
-Mermaid diagrams, read and laid out in Go, for programs that draw them
-themselves — on a GPU with [MyGo](https://mygo.egoist.dev)'s native UI, as
-SVG, or in a look of their own.
+limu is a diagram layout engine in Go. It reads Mermaid and leaves the drawing to
+your program, which can draw natively with [MyGo](https://mygo.egoist.dev), as SVG,
+or in a style of its own. [limu.firede.com](https://limu.firede.com) has the documentation, examples and a
+playground.
 
-Most of it is ported from [Pele](https://github.com/obsidianmd/pele), the
-small and fast Mermaid renderer of the Obsidian team. Where Pele writes SVG,
-limu stops one step short: it lays a diagram out as a scene — each part, what
-it is and where it is, but not how it looks — and leaves the drawing to a
-backend. Its tests compare what it does with what Pele does, number for
-number.
+Most of limu is ported from [Pele](https://github.com/obsidianmd/pele), the small,
+fast Mermaid renderer made by the Obsidian team. Pele writes SVG, and limu stops one
+step earlier, at the scene. A scene is the laid-out diagram as data. It says what
+each part is and where it goes, but not how it looks, and a backend draws it. limu's
+tests compare its output with Pele's, number for number.
 
 > [!WARNING]
-> **An early, personal project.** It reads every type of diagram Pele draws:
-> flowcharts; state, class, entity relationship, requirement, use case, agent
-> flow and swimlane diagrams; sequence, gantt, timeline, user journey, git graph,
-> packet and kanban diagrams; pie, XY, quadrant and radar charts, sankey
-> diagrams, treemaps and venn diagrams; and mindmaps, architecture, C4, block,
-> wardley, railroad, ishikawa, cynefin, event modeling, tree view and info
-> diagrams. The API will change in any 0.x release.
+> **limu is an early, personal project**, and its API may change in any 0.x
+> release. It supports every diagram type Pele draws, from flowcharts and sequence
+> diagrams to sankey, C4 and wardley diagrams.
+> [Compatibility](https://limu.firede.com/compatibility) lists them all.
 
 ```go
 sc, err := limu.Layout("flowchart LR\n  A[Text] --> B[Scene] --> C{Backend}", nil)
@@ -33,9 +30,9 @@ if err != nil {
 out := svg.Render(sc, nil)
 ```
 
-A host that lays a diagram out again, as when the width it has changes, parses
-it once, with the limits and configuration Pele's `parse` takes, and lays it out
-as often as it needs, from any goroutine:
+To lay out a diagram more than once, for example when its width changes, parse it
+once and lay out the result as often as you need, from any goroutine. `Parse` takes
+the limits and configuration that Pele's `parse` takes.
 
 ```go
 d, err := limu.Parse(src, diagram.Options{Config: diagram.Config{"seed": 7.0}})
@@ -45,7 +42,7 @@ if err != nil {
 sc, err := d.Layout(&layout.Options{MaxWidth: 480, Padding: new(0.0)})
 ```
 
-## How it is built
+## How it's built
 
 ```
 text ──parse──▶ model ──layout──▶ scene ──backend──▶ SVG, a GPU, a grid of pixels
@@ -53,23 +50,23 @@ text ──parse──▶ model ──layout──▶ scene ──backend──�
 
 | Package | What it does |
 |---|---|
-| `limu` | `Layout`: a diagram's text to its scene; `Parse`, to lay one diagram out many times; `Types` and `Supports`, the types it reads. |
-| `diagram` | Reads a diagram's front matter and directives, and tells its type; a package for each type parses it and lays it out. What the diagrams share is under `diagram/internal`: `graphs`, the layered, compound and swimlane layouts; `draw`, the geometry of shapes and edges; `css`, what authors set with `classDef` and `style`; and `common`. |
-| `text` | Measures text, through a `Measurer` the host gives, and lays out labels: lines, wrapping, emphasis, icons, entities. `text.Arial` measures with a table of Arial's advances, with no font at hand. |
-| `scene` | A diagram laid out: items, their roles and shapes, boxes, paths, markers, labels. |
-| `style` | How a scene looks, at three levels: a theme of colors by token, overrides by role, and a backend's drawing of its own. |
-| `layout` | What changes where things are: the measurer, the size of text, the width the host has, the padding about a diagram, a grid to snap to, how edges are routed, the present and the time zone of a gantt chart. |
-| `svg` | Draws a scene as SVG, its theme as CSS variables. |
-| `limumygo` | Draws a scene with MyGo's native UI, and finds the item under the pointer. A module of its own, so that the rest needs only the standard library. Its package `limumygo/mermaid` is Mermaid's text as a language of MyGo's code editor, highlighted by the keywords of the diagram's type. |
+| `limu` | Parses a diagram and lays it out. `Parse` lets you lay out one diagram many times, and `Types` and `Supports` tell which types limu supports. |
+| `diagram` | Reads the front matter, directives and type that every diagram shares. Each type has a package under it that parses and lays out that type. Code the types share lives under `diagram/internal`, with the layered, compound and swimlane layouts in `graphs`, the geometry of shapes and edges in `draw`, the styles authors set with `classDef` and `style` in `css`, and the rest in `common`. |
+| `text` | Measures text with the `Measurer` you provide, and lays out labels with line breaks, wrapping, emphasis, icons and entities. `text.Arial` measures from a table of Arial's character widths without loading a font. |
+| `scene` | Describes a laid-out diagram as items with roles, shapes, boxes, paths, markers and labels. |
+| `style` | Holds themes, which give colors by token, and overrides for each role. |
+| `layout` | Holds the options that change where things go, such as the measurer, text size, available width, padding, grid snapping, edge routing, and the current time and time zone for gantt charts. |
+| `svg` | Renders a scene as SVG, with theme colors as CSS variables. |
+| `limumygo` | Draws a scene with MyGo's native UI and finds the item under the pointer. It's a separate module, so the rest of limu needs only the standard library. Its `limumygo/mermaid` package adds Mermaid to MyGo's code editor and highlights each diagram type's keywords. |
 
-What changes where things are goes to layout; everything else is style, and a
-change of it only redraws. [docs/design.md](docs/design.md) has the details and
+Anything that changes where things go belongs to layout. Everything else is style,
+and changing it only redraws. [docs/design.md](docs/design.md) has the details and
 the roadmap.
 
-To try limu on a diagram of your own, open the
-[playground](https://limu.firede.com/playground), which shows the text beside its
-diagram, drawn by limumygo, and its SVG, and opens any of limu's examples from its
-Examples menu. The same program runs on a desktop:
+To try limu on your own diagram, open the
+[playground](https://limu.firede.com/playground). It shows the text next to the
+diagram drawn by limumygo and its SVG, and its Examples menu opens any of limu's
+examples. The same program runs on the desktop with
 `cd limumygo && go run ./examples/playground`.
 
 ## Style
@@ -85,12 +82,12 @@ look := style.Look{
 out := svg.Render(sc, &svg.Options{Look: look})
 ```
 
-The themes limu has are `style.Default()`, Pele's light theme, and its own
-`style.Kohu()` and `style.KohuDark()`, a light and a dark one. A part's style is
-the theme's, under the diagram's own, under the overrides for its role, under
-what the diagram's author set with `classDef` and `style`. To draw a part some
-other way, a backend takes a function in place of its default, and gives it the
-default's pieces to draw with:
+limu has three themes. `style.Default()` is Pele's light theme, and `style.Kohu()`
+and `style.KohuDark()` are limu's own light and dark themes. A part's style is
+layered from the theme up through the diagram's own style and your overrides for its
+role, with what the diagram's author set with `classDef` and `style` on top. To draw a part
+another way, give a backend a function to use in place of its default drawing. The
+function can still draw the default pieces.
 
 ```go
 svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.Style, next func()) {
@@ -98,7 +95,7 @@ svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.St
 		next()
 		return
 	}
-	// write the diamond some other way, then its label as the default does
+	// Write the diamond your own way, then its label the default way.
 	w.Label(it, s)
 }})
 ```
@@ -109,20 +106,22 @@ svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.St
 ./scripts/verify.sh
 ```
 
-runs `go vet`, `gofmt` and the tests, in limu's module and in the limumygo
-module, offline once limumygo's modules are downloaded. CI runs it on amd64, at `GOAMD64` v1 and v3, and on arm64. On
-Linux, the limumygo tests need Pango (`libpangocairo-1.0-0`). The tests compare
-with fixtures written from Pele's own sources:
+This runs `go vet`, `gofmt` and the tests in limu's module and in the limumygo
+module. Once limumygo's dependencies are downloaded, it works offline. CI runs it on
+amd64, with `GOAMD64` at v1 and v3, and on arm64. On Linux, the limumygo tests need
+Pango (`libpangocairo-1.0-0`).
+
+The tests compare against fixtures generated from Pele's own source.
 
 ```sh
 ./scripts/oracle.sh ../pele
 ```
 
-runs Pele's TypeScript with Node 24, with nothing to install, over the cases of
-the suites in `internal/oracle/suites`, and writes the fixtures to the packages'
-`testdata/pele`. It runs only on arm64. Run it after adding a case, or to follow
-a new version of Pele.
+This runs Pele's TypeScript with Node 24, with nothing to install, over the cases of
+the suites in `internal/oracle/suites`, and writes the fixtures to each package's
+`testdata/pele`. It runs only on arm64. Run it after adding a case or to follow a new
+version of Pele.
 
 ## License
 
-MIT — see [LICENSE](LICENSE), which carries Pele's license too.
+MIT. See [LICENSE](LICENSE), which also includes Pele's license.

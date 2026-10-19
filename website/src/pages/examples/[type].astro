@@ -23,7 +23,7 @@ const headings = t.examples.map((example) => ({ depth: 2, slug: slug(example.tit
 <DocsLayout current="examples" title={t.title} description={t.description} headings={headings} markdownPath={`${exampleTypeHref(t.type)}.md`} child={t.title}>
   <div data-diagram-scope>
     <DiagramThemeSwitch />
-    {t.beta && <p>{t.title} diagrams are in beta: they are written with -beta, as Mermaid may still change them.</p>}
+    {t.beta && <p>{t.title} diagrams are in beta. They are declared with -beta because Mermaid may still change them.</p>}
     {t.examples.map((example) => <ExampleCard example={example} typeTitle={t.title} id={slug(example.title)} />)}
   </div>
   <nav class="example-pager" aria-label="Types of diagram">

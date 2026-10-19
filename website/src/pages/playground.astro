@@ -33,7 +33,7 @@ if (size > maxSize) throw new Error(`The playground's WebAssembly is ${size} byt
 const firstExample = exampleTypes.find((t) => t.type === 'flowchart')?.examples[0]?.source ?? '';
 ---
 
-<BaseLayout title="Playground" description="Try limu on a Mermaid diagram of your own: the text, the diagram limu lays out and draws, and its SVG.">
+<BaseLayout title="Playground" description="Write a Mermaid diagram and see how limu lays it out and draws it, along with its SVG.">
   <div class="playground-page">
     <header class="playground-bar">
       <a class="wordmark" href="/" aria-label="limu home"><Mark size={18} />limu</a>

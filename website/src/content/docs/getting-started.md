@@ -1,9 +1,9 @@
 ---
 title: "Getting started"
-description: "Install limu, lay a diagram out, and draw it as SVG."
+description: "Install limu, lay out a diagram, and render it as SVG."
 ---
 
-limu reads a diagram's Mermaid text and lays it out as a scene: each part of the diagram, what it is and where it is. A backend draws the scene. This page lays a diagram out and draws it with the svg package, which, like limu itself, needs only Go's standard library. To draw diagrams natively, see [MyGo](/mygo).
+limu turns Mermaid text into a scene, which records what each part of a diagram is and where it goes. A backend then draws the scene. This page uses the svg package, which needs only Go's standard library, as limu itself does. To draw diagrams natively instead, see [MyGo](/mygo).
 
 ## Installing
 
@@ -15,7 +15,7 @@ go get github.com/firede/limu
 
 ## Drawing a diagram
 
-`limu.Layout` reads a diagram's text and lays it out; `svg.Render` writes the scene as an SVG document.
+`limu.Layout` reads a diagram and lays it out, and `svg.Render` writes the resulting scene as an SVG document.
 
 ```go
 package main
@@ -42,13 +42,13 @@ func main() {
 }
 ```
 
-With no options, layout measures text with `text.Arial`, a table of Arial's advances, so the SVG sets its text in Arial or a font as wide. A program that draws in fonts of its own measures with them; see [Measuring text](/api#measuring-text).
+By default, layout measures text with `text.Arial`, a table of Arial's character widths, so the SVG should set its text in Arial or a font of the same width. If you draw text in other fonts, measure it with those fonts instead. See [Measuring text](/api#measuring-text).
 
-The theme gives the diagram its colors. The svg package writes them as CSS variables, with the theme's colors as their fallbacks, so a page can change them without drawing the diagram again. See [Theming](/theming).
+The theme sets the diagram's colors. The svg package writes them as CSS variables with the theme's colors as fallbacks, so a page can change them without rendering the diagram again. See [Theming](/theming).
 
 ## Errors
 
-`limu.Layout` gives a `*diagram.Error` for text it cannot read: text of no type limu reads, text that does not parse, or text past a limit. Its `Code` says which, and `Line` and `Column` say where, when the error has a place.
+When limu can't read a diagram, `limu.Layout` returns a `*diagram.Error`. Its `Code` says whether the type is unsupported, the text doesn't parse, or the text is over a limit. `Line` and `Column` give the position when there is one.
 
 ```go
 sc, err := limu.Layout(src, nil)
@@ -58,21 +58,21 @@ if errors.As(err, &derr) {
 }
 ```
 
-A message can hold text from the diagram. Show it as text, not as markup.
+Error messages can quote the diagram's text, so display them as text rather than markup.
 
 ## Fitting a width
 
-`layout.Options.MaxWidth` is the width the host has for the diagram. A diagram that can draw itself narrower does: a flowchart that runs across, for one, turns to run down when it does not fit. A diagram that cannot is as wide as it needs.
+Set `layout.Options.MaxWidth` to the width you have. Diagrams that can get narrower will, so a wide flowchart may switch from running across to running down. Diagrams that can't get narrower keep the width they need.
 
 ```go
 sc, err := limu.Layout(src, &layout.Options{MaxWidth: 480})
 ```
 
-The SVG's size is the scene's. To scale it down further in a page, give it `max-width: 100%` and `height: auto` in CSS.
+The SVG is the size of the scene. To let a page scale it down further, give it `max-width: 100%` and `height: auto` in CSS.
 
 ## Laying out again
 
-A host that lays a diagram out more than once, as when the width it has changes, parses the text once with `limu.Parse` and lays the `Diagram` out as often as it needs. Laying it out changes nothing in it, so it may be laid out from many goroutines at once.
+If you lay out the same diagram more than once, for example when the available width changes, parse it once with `limu.Parse` and call `Layout` on the result as often as you need. Layout doesn't change the parsed diagram, so it's safe to call from several goroutines at once.
 
 ```go
 d, err := limu.Parse(src, diagram.Options{})
@@ -83,11 +83,11 @@ wide, err := d.Layout(&layout.Options{MaxWidth: 640})
 narrow, err := d.Layout(&layout.Options{MaxWidth: 320})
 ```
 
-A change of theme needs no layout at all: the same scene is drawn in any theme.
+Changing the theme doesn't need a new layout at all. Draw the same scene in the new theme.
 
-## Types of diagram
+## Diagram types
 
-limu reads every type of diagram that Pele draws, which is every type built into Mermaid. `limu.Types` lists them. `limu.Supports` tells whether limu reads the type a text declares, without parsing the rest of it:
+limu supports every diagram type that Pele draws, which covers every type built into Mermaid. `limu.Types` lists them. `limu.Supports` checks a text's declared type without parsing the rest.
 
 ```go
 if !limu.Supports(src) {
@@ -97,9 +97,9 @@ if !limu.Supports(src) {
 
 [Examples](/examples) shows each type, and [Compatibility](/compatibility) lists the keywords that declare them.
 
-## Next
+## Next steps
 
-- [API](/api): the options of parsing and layout, the limits, and the scene.
-- [Theming](/theming): themes, overrides by role, and drawing of your own.
-- [MyGo](/mygo): drawing diagrams natively, and finding the part under the pointer.
-- [SVG](/svg): the SVG's variables and classes, and diagrams that are not trusted.
+- [API](/api) covers parsing and layout options, limits and the scene.
+- [Theming](/theming) covers themes, per-role overrides and custom drawing.
+- [MyGo](/mygo) draws diagrams natively and finds the part under the pointer.
+- [SVG](/svg) covers CSS variables, classes and untrusted diagrams.

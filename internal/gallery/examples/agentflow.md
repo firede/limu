@@ -1,6 +1,6 @@
 ---
 title: Agentflow
-description: The work of AI agents: their tasks, tools and decisions, and how work is handed on.
+description: The tasks, tools and decisions of AI agents, and how they hand work to each other.
 beta: true
 featured: 2
 ---

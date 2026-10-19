@@ -5,14 +5,14 @@ export const installs = [
     id: 'mygo',
     title: 'MyGo',
     command: 'go get github.com/firede/limu/limumygo',
-    note: 'limumygo draws a scene with MyGo’s native UI, on the GPU, and tells which part of it is under the pointer. Lay the diagram out with the fonts it is drawn in.',
+    note: 'limumygo draws a scene on the GPU with MyGo’s native UI and tells you which part is under the pointer. Lay out the diagram with the same fonts you draw it in.',
     code: `fonts := limumygo.DefaultFonts
 sc, err := limu.Layout(src, &layout.Options{Measurer: fonts})
 if err != nil {
 	return err
 }
 
-// In a view: draw the diagram, and see which part was clicked.
+// Draw the diagram in a view, and see which part was clicked.
 w := limumygo.View(c, sc, &limumygo.Options{
 	Look:  style.Look{Theme: style.KohuDark()},
 	Fonts: fonts,
@@ -25,7 +25,7 @@ if it := w.Clicked(); it != nil {
     id: 'svg',
     title: 'SVG',
     command: 'go get github.com/firede/limu',
-    note: 'The svg package writes a scene as SVG, its colors as CSS variables that a page can set. limu and its svg package need nothing but Go’s standard library.',
+    note: 'The svg package writes a scene as SVG and leaves its colors as CSS variables, so a page can restyle it. limu and the svg package use only Go’s standard library.',
     code: `sc, err := limu.Layout(src, nil)
 if err != nil {
 	return err
