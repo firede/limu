@@ -1,11 +1,17 @@
 package scene
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 // Snap moves everything in the scene onto a grid of unit: the corners of boxes, the points
 // of paths and routes, the tips of markers and the points labels are drawn about. It is for
 // a backend that draws on whole pixels, after layout; a box's sides are snapped each on its
-// own, so boxes that touch go on touching. The scene's size is rounded up.
+// own, so boxes that touch go on touching. A path of straight lines has each of its points
+// snapped; a path with curves is moved as a whole, by what puts its first point on the grid,
+// so that its curves keep their shape, as rounding each of their points would not. The
+// scene's size is rounded up.
 func (sc *Scene) Snap(unit float64) {
 	if !(unit > 0) {
 		return
@@ -24,12 +30,30 @@ func (sc *Scene) Snap(unit float64) {
 		it.Box = box(it.Box)
 		for j := range it.Parts {
 			part := &it.Parts[j]
-			part.Box = box(part.Box)
-			if p := part.Path; p != nil && !paths[p] {
-				paths[p] = true
-				for k := range p.Args {
-					p.Args[k] = at(p.Args[k])
+			p := part.Path
+			if p == nil {
+				part.Box = box(part.Box)
+				continue
+			}
+			if paths[p] {
+				continue
+			}
+			paths[p] = true
+			if len(p.Args) < 2 {
+				continue
+			}
+			if slices.Contains(p.Ops, QuadTo) || slices.Contains(p.Ops, CubeTo) {
+				x, y := at(p.Args[0]), at(p.Args[1])
+				dx, dy := x-p.Args[0], y-p.Args[1]
+				for k := 2; k+1 < len(p.Args); k += 2 {
+					p.Args[k] += dx
+					p.Args[k+1] += dy
 				}
+				p.Args[0], p.Args[1] = x, y
+				continue
+			}
+			for k := range p.Args {
+				p.Args[k] = at(p.Args[k])
 			}
 		}
 		for j := range it.Route {

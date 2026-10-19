@@ -104,7 +104,7 @@ func sceneLines(sc *scene.Scene) []string {
 	pen := func(it *scene.Item, part *scene.Part) string {
 		fill, opacity := "none", "-"
 		if part.Paint != scene.StrokeOnly {
-			fill, opacity = paintName(it.Style.Fill)
+			fill, opacity = paintName(pelesvg.OwnFill(it))
 		}
 		stroke, _ := paintName(it.Style.Stroke)
 		width := "-"

@@ -48,9 +48,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := pelesvg.FlowLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, Padding: c.Padding}))
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		want := pelesvg.TagsLast(c.Lines, "clickable")
+		if i := pelesvg.FirstDiff(got, want); i >= 0 {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, padding %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, (&layout.Options{Padding: c.Padding}).Pad(), i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, padding %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, (&layout.Options{Padding: c.Padding}).Pad(), i, pelesvg.At(got, i), pelesvg.At(want, i))
 			}
 		}
 	}

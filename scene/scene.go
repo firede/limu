@@ -1,17 +1,20 @@
-// Package scene is a diagram laid out: each of its parts, where it is and what it is, in
-// the order it is drawn — but not how it looks. A backend draws a scene: the svg package as
-// SVG, others on screens of their own.
+// Package scene is a diagram laid out: a list of items, each a thing of the diagram, where it
+// is and what it is, in the order they are drawn — but not how they look. A backend draws a
+// scene: the svg package as SVG, others on screens of their own.
 //
-// A part says what it is by its Role, as "flowchart.node", and, if it has an outline, by its
-// Shape, as "diam". Its colors are tokens of the theme (see the style package), settled
-// only when it is drawn, so a scene is drawn in any theme without being laid out again.
+// An item says what it is by its Kind, its Role, as "flowchart.node", and, if it has an
+// outline, by its Shape, as "diam". Its colors are tokens of the theme (see the style
+// package), settled only when it is drawn, so a scene is drawn in any theme without being
+// laid out again.
 //
-// A part also carries what a plain backend needs to draw it: the outline as Parts, the
-// route of a line as a Path, the markers at its ends, a label laid out. A backend with a look
-// of its own may draw a part its own way from its Role, Shape, Box and Route instead.
+// An item also carries what a plain backend needs to draw it: its outline as Parts, paths
+// and boxes; for an edge, the markers at its ends; a label laid out. A backend with a look of
+// its own may draw an item its own way from its Role, Shape, Box and, for an edge, its Route
+// instead.
 package scene
 
 import (
+	"math"
 	"slices"
 
 	"github.com/firede/limu/style"
@@ -29,7 +32,7 @@ type Scene struct {
 	Items         []Item  // in the order they are drawn
 }
 
-// A Kind is the sort of thing a part is.
+// A Kind is the sort of thing an item is.
 type Kind uint8
 
 const (
@@ -44,28 +47,46 @@ const (
 // "sequence.lifeline". Styles are given by role.
 type Role string
 
-// A Shape names a part's outline, as Mermaid does: "rect", "rounded", "diam", "cyl"…
+// A Shape names an item's outline, as Mermaid does: "rect", "rounded", "diam", "cyl"…
 type Shape string
 
-// An Item is a part of a diagram.
+// An Item is a thing of a diagram, as it is drawn: a node, a group, an edge, a label on its
+// own or a mark.
 type Item struct {
 	Kind  Kind
 	Role  Role
 	Shape Shape
 	ID    string // the id the diagram's text gave it, if any
-	// Class is the classes the diagram's text gives the part, as classDef does, or a gantt
-	// task's tags, and those a diagram sorts its parts into, as a gantt chart's sections.
-	// The svg backend writes them as the element's classes, for a host's CSS.
+	// Class is the classes the diagram's author gave the item, by name: with class statements
+	// and classDef's default, with :::name, or in a list of classes where the diagram takes
+	// one, as a kanban card or a tree view's entry does. A class's style is already in Author.
 	Class []string
+	// Tags are what the diagram says the item is beyond its role, which Pele writes among the
+	// classes of what it draws: a C4 element's kind ("person", "system_db"…) and "external",
+	// a C4 relation's kind ("rel", "birel"…) and a deployment node's ("node", "nodeL",
+	// "nodeR"); a gantt task's state ("done", "active", "crit", "milestone", "unscheduled");
+	// the branch a gantt section or a mindmap's node or edge is in ("section-0"…); a wardley
+	// component's sourcing ("build", "buy", "outsource", "market"); "reset" on an event
+	// modeling frame that resets; and "clickable", which Mermaid gives what has a click.
+	//
+	// The svg backend writes the tags and then the classes as the element's classes, for a
+	// host's CSS.
+	Tags []string
 
-	// Box is where the part is. For an edge, it holds its route.
+	// Box is where the item is: the box of its shape, for a node or a group; for an edge, the
+	// box its path lies in, the control points of its curves included, and for a mark, of
+	// what it draws. A Text item's Box is
+	// where the diagram sets its label, as an edge label's patch, and is empty where the
+	// diagram gives the label no box of its own; LabelBox is where its label is drawn.
 	Box Rect
 
 	// Parts draw the outline; a backend that draws the shape its own way ignores them.
 	Parts []Part
 
 	// For an edge: the route it takes, as the corners of a line that runs straight between
-	// them, and the markers at its ends. Its curves are in Parts.
+	// them, and the markers at its ends. Its curves are in Parts. Every edge has a route; a
+	// self-loop's, which no layout routes, is the corners its curve is drawn about
+	// (Path.Corners).
 	Route []Point
 	Ends  [2]Marker
 
@@ -76,13 +97,13 @@ type Item struct {
 	Align  Align
 	Rotate float64
 
-	// Picture is an image or an icon the part shows, as a flowchart's node may.
+	// Picture is an image or an icon the item shows, as a flowchart's node may.
 	Picture *Picture
 
 	Style  style.Style // the diagram's own
 	Author style.Style // what the author set with classDef and style lines
 
-	Link    string // where the part leads, when it is a link
+	Link    string // where the item leads, when it is a link
 	Tooltip string
 }
 
@@ -100,7 +121,9 @@ func (it *Item) Move(dx, dy float64) {
 	box(&it.Box)
 	parts := slices.Clone(it.Parts)
 	for k := range parts {
-		box(&parts[k].Box)
+		if parts[k].Path == nil {
+			box(&parts[k].Box)
+		}
 		if p := parts[k].Path; p != nil {
 			q := &Path{Ops: p.Ops, Args: slices.Clone(p.Args)}
 			for j := 0; j+1 < len(q.Args); j += 2 {
@@ -145,13 +168,47 @@ const (
 	End                 // each line ending at it
 )
 
-// A Part is a piece of a part's outline: a path, or, when Path is nil, the box Box, its
-// corners rounded by the style's radius when Rounded is set.
+// A Part is a piece of an item's outline. It is a path when Path is set, and Box and Rounded
+// are then unused; when Path is nil, it is the box Box, its corners rounded by the style's
+// radius when Rounded is set.
 type Part struct {
 	Path    *Path
 	Box     Rect
 	Rounded bool
 	Paint   Painting
+}
+
+// LabelBox is the box the item's label is drawn in, laid about At as Align says and turned
+// by Rotate degrees about it: the box the turned label lies in. It is empty for an item with
+// no label.
+func (it *Item) LabelBox() Rect {
+	l := it.Label
+	if l == nil || l.Empty() {
+		return Rect{}
+	}
+	x := it.At.X - l.Width/2
+	switch it.Align {
+	case Start:
+		x = it.At.X
+	case End:
+		x = it.At.X - l.Width
+	}
+	r := Rect{X: x, Y: it.At.Y - l.Height/2, W: l.Width, H: l.Height}
+	if it.Rotate == 0 {
+		return r
+	}
+	sin, cos := math.Sincos(it.Rotate * math.Pi / 180)
+	turn := func(px, py float64) (float64, float64) {
+		dx, dy := px-it.At.X, py-it.At.Y
+		return it.At.X + dx*cos - dy*sin, it.At.Y + dx*sin + dy*cos
+	}
+	x0, y0 := math.Inf(1), math.Inf(1)
+	x1, y1 := math.Inf(-1), math.Inf(-1)
+	for _, c := range [4][2]float64{{r.X, r.Y}, {r.X + r.W, r.Y}, {r.X, r.Y + r.H}, {r.X + r.W, r.Y + r.H}} {
+		px, py := turn(c[0], c[1])
+		x0, y0, x1, y1 = min(x0, px), min(y0, py), max(x1, px), max(y1, py)
+	}
+	return Rect{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}
 }
 
 // Painting is how a part is painted in its item's style.
@@ -179,7 +236,10 @@ const (
 )
 
 // A MarkerType is the kind of marker at an end of an edge, by Mermaid's names:
-// "arrow_point", "arrow_circle", "arrow_cross"… The empty one is no marker.
+// "arrow_point", "arrow_circle", "arrow_cross"… The empty one is no marker: an end Pele
+// draws no marker at has the empty type, whatever name the diagram's model gives it ("none",
+// or "arrow_open" for an open line). Every type but the empty one is in the scene's table
+// of markers, with a trim and an outline.
 type MarkerType string
 
 // A Marker is what an edge has at an end: its kind, where its tip is, and the way it

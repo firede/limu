@@ -82,6 +82,8 @@ type view struct {
 	w, h   float64
 	dy     float64
 	loops  int
+	// filled is whether the author's style declares a fill, which replaces the wash of a tint.
+	filled bool
 }
 
 // slot is the palette slot of a flow, collapsed or not: its own, or the one past the kinds.
@@ -94,9 +96,15 @@ func slot(n *GraphNode) int {
 }
 
 // tint is a palette color as an outline with a light wash of the same color inside, as Pele's
-// tint draws it. A fill the author set replaces the wash, opaque, as it replaces any fill.
-func tint(slot int, wash float64) style.Style {
-	return style.Style{Fill: style.Series(slot).Alpha(wash), Stroke: style.Series(slot)}
+// tint draws it: the wash a fill opacity, which Pele writes only where the author declares no
+// fill, so that a fill the author sets is opaque, and a fill opacity the author sets with no
+// fill washes the palette color at it.
+func tint(slot int, wash float64, filled bool) style.Style {
+	s := style.Style{Fill: style.Series(slot), Stroke: style.Series(slot)}
+	if !filled {
+		s.FillOpacity = style.N(wash)
+	}
+	return s
 }
 
 // A held edge runs between a node and a flow around it, which the layout has no place for.
@@ -189,6 +197,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			v = view{node: node, author: author, label: label, shape: shape, w: s.W, h: s.H, dy: s.DY}
 			c = layout.NewCNode(s.W, s.H, -1)
 		}
+		v.filled = style.FillDeclared(decls)
 		c.Seq = float64(len(views))
 		views = append(views, v)
 		cnodes = append(cnodes, c)
@@ -444,14 +453,14 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		c := &cnodes[i]
 		n := v.node
 		x, y := c.X, c.Y
-		classes := classNames(trimDefault(n.CSSClasses))
+		classes, tags := common.Clickable(classNames(trimDefault(n.CSSClasses)))
 		if c.IsGroup {
 			titleX := draw.ClusterTitleX(node(i), v.label.Width, crossings, groupPad)
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
-			own := tint(slot(n), 0.06)
+			own := tint(slot(n), 0.06, v.filled)
 			own.Text = style.Muted
 			cluster := scene.Item{
-				Kind: scene.Group, Role: "agentflow.flow", ID: n.ID, Class: classes, Box: box,
+				Kind: scene.Group, Role: "agentflow.flow", ID: n.ID, Class: classes, Tags: tags, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
 				Style:  own,
 				Author: v.author.Style,
@@ -467,7 +476,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		w, h := v.w, v.h
 		box := scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h}
 		it := scene.Item{
-			Kind: scene.Node, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Box: box,
+			Kind: scene.Node, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Tags: tags, Box: box,
 			Author: v.author.Style,
 			Label:  &v.label, At: scene.Point{X: x, Y: y + v.dy},
 			Tooltip: n.Tooltip,
@@ -477,7 +486,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			s := slot(n)
 			it.Role = "agentflow.collapsed"
 			it.Parts = []scene.Part{{Box: box, Rounded: true}}
-			it.Style = tint(s, 0.06)
+			it.Style = tint(s, 0.06, v.filled)
 			// What the author set for lines styles the rule, and fills nothing.
 			line := v.author.Style
 			line.Fill = style.Paint{}
@@ -509,7 +518,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			}
 			it.Role = scene.Role("agentflow." + kind)
 			it.Parts = draw.Outline(v.shape, x, y, w, h)
-			it.Style = tint(s, 0.14)
+			it.Style = tint(s, 0.14, v.filled)
 		}
 		if hasClass(classes, "internal-link") && n.Label != "" && !o.NoLinks {
 			// The label is a note's name, but it ends up a link, so it is checked as an address.
@@ -558,6 +567,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		}
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
+		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
 		}
 		edges = append(edges, it)
 		if label.Width > 0 {

@@ -225,7 +225,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 		items = append(items, it)
 	}
 	event := func(label text.Label, color style.Paint, x, y, h float64) scene.Item {
-		it := roundedBox(x, y, eventW, h, "timeline.event", scene.Node, style.Style{Fill: color.Alpha(0.16)})
+		it := roundedBox(x, y, eventW, h, "timeline.event", scene.Node, style.Style{Fill: color, FillOpacity: style.N(0.16)})
 		it.Label = &label
 		it.At = scene.Point{X: x + eventW/2, Y: y + h/2}
 		return it

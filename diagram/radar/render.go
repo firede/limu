@@ -235,7 +235,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, width, height floa
 		items = append(items, scene.Item{
 			Kind: scene.Mark, Role: RoleCurve, ID: curve.Name, Box: path.Bounds(),
 			Parts: []scene.Part{{Path: path}},
-			Style: style.Style{Fill: color.Alpha(0.2), Stroke: color, StrokeWidth: style.N(1.5), Join: style.JoinRound},
+			Style: style.Style{Fill: color, FillOpacity: style.N(0.2), Stroke: color, StrokeWidth: style.N(1.5), Join: style.JoinRound},
 		})
 	}
 	items = append(items, labels...)
@@ -274,7 +274,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, width, height floa
 			Box:   scene.Rect{X: legendX, Y: y - row/2, W: swatch + 8 + l.Width, H: row},
 			Parts: []scene.Part{{Box: scene.Rect{X: legendX, Y: y - swatch/2, W: swatch, H: swatch}, Rounded: true}},
 			At:    scene.Point{X: legendX + swatch + 8 + l.Width/2, Y: y},
-			Style: style.Style{Fill: style.Series(index).Alpha(0.4), Stroke: style.Series(index), Text: style.Fg, Radius: style.N(2)},
+			Style: style.Style{Fill: style.Series(index), FillOpacity: style.N(0.4), Stroke: style.Series(index), Text: style.Fg, Radius: style.N(2)},
 		}
 		if len(l.Lines) > 0 {
 			it.Label = l

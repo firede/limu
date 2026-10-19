@@ -425,7 +425,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			cluster := scene.Item{
 				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
 			}
 			if !v.label.Empty() {
@@ -545,6 +545,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
 		if edge.Pattern == "dashed" {
 			own.Dash = style.Dashes(4, 3)
+		}
+		if len(route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			route = path.Corners()
 		}
 		edges = append(edges, scene.Item{
 			Kind: scene.Edge, Role: RoleRelationship, ID: edge.ID,

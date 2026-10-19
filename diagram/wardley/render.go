@@ -24,7 +24,7 @@ import (
 // label; "wardley.trend" for the dashed arrow to where a component is evolving and
 // "wardley.trend-target" for the circle there, their ids the component's; for each node, a
 // Node of its class — "wardley.anchor", "wardley.component", "wardley.pipeline-parent" or
-// "wardley.pipeline-component" — with its shape and its sourcing strategy as its class, a
+// "wardley.pipeline-component" — with its shape and its sourcing strategy as its tag, a
 // "wardley.inertia" bar when it resists change, and "wardley.label" for its label, all with
 // the node's id; "wardley.annotation" for each numbered circle, "wardley.annotations" for the
 // box that lists their texts and "wardley.annotation-text" for each line of it;
@@ -497,7 +497,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, plotW, naturalW fl
 		// on it is hollow.
 		inner := scene.FillAndStroke
 		if strategy != "" {
-			it.Class = []string{strategy}
+			it.Tags = []string{strategy}
 			it.Shape = "circle"
 			it.Box = circleBox(x, y, 2*radius)
 			switch strategy {

@@ -429,7 +429,7 @@ func verticalCauses(m *Model, o *layout.Options) *scene.Scene {
 				rx = 12
 				it.Role = RoleHead
 			}
-			it.Parts = []scene.Part{{Path: new(scene.Path).RoundRect(box, rx), Box: box}}
+			it.Parts = []scene.Part{{Path: new(scene.Path).RoundRect(box, rx)}}
 			it.Style = style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg}
 		}
 		nodes = append(nodes, it)

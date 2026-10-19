@@ -16,7 +16,7 @@ import (
 )
 
 // The scene's roles. A frame is a node of the role of its kind, "eventmodeling.command" and
-// the rest, its name its label, with the class "reset" for a reset frame; its example data
+// the rest, its name its label, with the tag "reset" for a reset frame; its example data
 // is a text item after it. Across, a lane is a group, with its label; down, each frame's lane
 // is named by a text item before it, and its number by one after it. A note and a
 // specification are nodes, their heading the label, their lines a text item after each.
@@ -153,12 +153,12 @@ func frameItem(box *Box, r scene.Rect) scene.Item {
 		Kind: scene.Node, Role: scene.Role("eventmodeling." + string(box.Kind)), Shape: "rect", ID: box.ID, Box: r,
 	}
 	if box.Reset {
-		it.Class = []string{"reset"}
+		it.Tags = []string{"reset"}
 	}
 	if k, ok := series[box.Kind]; ok {
 		// Pele draws the box in the background first, so that the wash hides what is under it.
 		it.Parts = []scene.Part{{Box: r, Rounded: true, Paint: scene.Shade}, {Box: r, Rounded: true}}
-		it.Style = style.Style{Fill: style.Series(k).Alpha(wash), Stroke: style.Series(k), Text: style.Fg}
+		it.Style = style.Style{Fill: style.Series(k), FillOpacity: style.N(wash), Stroke: style.Series(k), Text: style.Fg}
 	} else {
 		it.Parts = []scene.Part{{Box: r, Rounded: true}}
 		it.Style = style.Style{Fill: style.Bg, Stroke: style.Border, Text: style.Fg}

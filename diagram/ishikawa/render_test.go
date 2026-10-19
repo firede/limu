@@ -226,6 +226,10 @@ func sceneLines(sc *scene.Scene) []string {
 	rect := func(it *scene.Item) {
 		part := &it.Parts[0]
 		r := part.Box
+		if part.Path != nil {
+			// A box with corners of its own, a path in the item's box.
+			r = it.Box
+		}
 		radius := "?"
 		switch {
 		case part.Path == nil && part.Rounded:

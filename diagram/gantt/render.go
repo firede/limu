@@ -493,8 +493,8 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			box := scene.Rect{X: 0, Y: y, W: sc.Width, H: h}
 			bands = append(bands, scene.Item{
 				Kind: scene.Mark, Role: "gantt.section", Shape: "rect", ID: section,
-				Class: []string{"section-" + strconv.FormatFloat(index, 'f', -1, 64)},
-				Box:   box, Parts: []scene.Part{{Box: box}},
+				Tags: []string{"section-" + strconv.FormatFloat(index, 'f', -1, 64)},
+				Box:  box, Parts: []scene.Part{{Box: box}},
 				Style: style.Style{Fill: fill, Stroke: style.None},
 			})
 		}
@@ -560,7 +560,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		case t.Done:
 			state = "done"
 		}
-		// The classes Pele gives the task besides pele-task.
+		// The classes Pele gives the task besides pele-task, the task's tags.
 		var class []string
 		if state != "" {
 			class = append(class, state)
@@ -589,7 +589,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			case "done":
 				it.Style.Fill = style.SurfaceAlt
 			case "active":
-				it.Style.Fill = color.Alpha(0.25)
+				it.Style.Fill, it.Style.FillOpacity = color, style.N(0.25)
 			default:
 				it.Style.Fill = color
 			}
@@ -619,7 +619,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 				it.Style.Text = style.Muted
 			}
 		}
-		it.Class = class
+		it.Tags = class
 		if !b.label.Empty() {
 			it.Label = &b.label
 		}

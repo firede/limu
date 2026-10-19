@@ -2,7 +2,6 @@ package treemap
 
 import (
 	"math"
-	"strings"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
@@ -59,13 +58,6 @@ func classes(class string) []string {
 		return nil
 	}
 	return []string{class}
-}
-
-// fillsShape reports whether declarations give a shape a fill of its own, as Pele finds it
-// with /[";]fill:/ in the style it writes on the shape.
-func fillsShape(decls []string) bool {
-	css := style.ShapeCSS(decls)
-	return strings.HasPrefix(css, "fill:") || strings.Contains(css, ";fill:")
 }
 
 // Layout lays a treemap out as a scene, as Pele's renderTreemap does: the tree squarified into
@@ -132,12 +124,11 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 
 		if node.Section {
 			// A section is a tint of its color, unless a class gives it a fill of its own.
-			fill := color.Alpha(0.12)
-			if fillsShape(node.CSS) {
-				fill = color
-			}
 			it.Kind, it.Role = scene.Group, RoleSection
-			it.Style = style.Style{Fill: fill, Stroke: color, Text: style.Fg}
+			it.Style = style.Style{Fill: color, Stroke: color, Text: style.Fg}
+			if !style.FillDeclared(node.CSS) {
+				it.Style.FillOpacity = style.N(0.12)
+			}
 			var shown *scene.Item
 			if b.h >= header {
 				room := b.w - 2*sideInset - 4
