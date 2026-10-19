@@ -158,6 +158,23 @@ func TestDeclarationsLastWins(t *testing.T) {
 	}
 }
 
+func TestDeclarationsOpacities(t *testing.T) {
+	a := Declarations([]string{"fill-opacity:0.5", "stroke-opacity:150%"})
+	if f, ok := a.FillOpacity.Get(); !ok || f != 0.5 {
+		t.Errorf("fill-opacity %v %v", f, ok)
+	}
+	if f, ok := a.StrokeOpacity.Get(); !ok || f != 1 {
+		t.Errorf("stroke-opacity %v %v", f, ok)
+	}
+	a = Declarations([]string{"fill-opacity:0.5", "fill-opacity:x", "stroke-opacity:20%"})
+	if _, ok := a.FillOpacity.Get(); ok {
+		t.Errorf("kept a fill-opacity the last declaration could not give")
+	}
+	if f, _ := a.StrokeOpacity.Get(); f != 0.2 {
+		t.Errorf("stroke-opacity %v", f)
+	}
+}
+
 func TestShapeCSS(t *testing.T) {
 	for _, c := range []struct {
 		decls []string

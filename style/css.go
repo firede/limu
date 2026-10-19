@@ -15,6 +15,11 @@ type Author struct {
 	// What changes the size of text, which layout takes.
 	Bold, Italic bool
 	FontSize     float64 // 0 when it was not set
+	// FillOpacity and StrokeOpacity are the fill-opacity and stroke-opacity the author set,
+	// from 0 to 1, unset when none was or the last could not be read. Style's fill and stroke
+	// already have them; a diagram whose shapes have a fill, a stroke or an opacity of their
+	// own, which the author's replace each on its own, reads them here.
+	FillOpacity, StrokeOpacity Num
 }
 
 // Declarations reads Mermaid's style declarations, as "fill:#f9f" and "stroke-width:4px",
@@ -46,9 +51,11 @@ func Declarations(decls []string) Author {
 		// Pele keeps the last value of a property alone, so one that cannot be read leaves
 		// the property unset, as a browser drops what it cannot take.
 		case "fill-opacity":
-			fill = fraction(value, 1)
+			a.FillOpacity = opacity(value)
+			fill = a.FillOpacity.Or(1)
 		case "stroke-opacity":
-			stroke = fraction(value, 1)
+			a.StrokeOpacity = opacity(value)
+			stroke = a.StrokeOpacity.Or(1)
 		case "opacity":
 			a.Style.Opacity = Num{}
 			if f, ok := length(value); ok {
@@ -198,13 +205,12 @@ func paint(value string) Paint {
 	return Paint{}
 }
 
-// fraction reads an opacity, as 0.5 or 50%, or gives back fallback.
-func fraction(value string, fallback float64) float64 {
-	f, _, ok := number(value, 1)
-	if !ok {
-		return fallback
+// opacity reads an opacity, as 0.5 or 50%, kept from 0 to 1, or unset for one it cannot read.
+func opacity(value string) Num {
+	if f, _, ok := number(value, 1); ok {
+		return N(max(0, min(1, f)))
 	}
-	return max(0, min(1, f))
+	return Num{}
 }
 
 // fontPixels reads a font size as Pele's resolveStyle does: one that /^[\d.]+(px)?$/ takes,
