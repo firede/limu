@@ -9,22 +9,14 @@
 // number in the body is moved as limu's layout moves it: the number plus the body's move, in
 // that order. The lines hold every number in full, as String() writes it, so that a
 // difference in the last bit shows.
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { attr, TRANSLATE, n, capJoin } from '../lib/svg.mjs';
 import { readLabel, readMarker, withoutPele } from '../lib/limu.mjs';
-import { lone, mutator } from './parse.mjs';
-import { capJoin } from './flowchart-render.mjs';
 import { FRAGMENTS, corpus, hostileCorpus, outlines } from './ishikawa.mjs';
 
 // The icons the host has, in the cases drawn with icons.
 export const ICONS = ['fa:fa-car', 'fa:fa-user', 'fab:fa-github'];
-
-// Pele's escapes in attribute values, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (v) => String(v);
-const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
 // The lines of an Ishikawa diagram's SVG, drawn with its numbers in full, in type of size
 // fontSize where nothing sets another.

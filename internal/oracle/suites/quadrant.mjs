@@ -2,9 +2,9 @@
 // of Mermaid's specs and documentation as Pele's tests collect them, the seeds of Pele's
 // tests/quadrant/oracle.test.ts, cases written here, those sources mutated at random, charts
 // built at random, and random strings of tokens.
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/quadrant/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -211,22 +211,7 @@ export const WRITTEN = [
 // The sources in Mermaid's specs and documentation as Pele's tests collect them:
 // loadCorpus('quadrant', /quadrant/i).
 function specSources(pele) {
-  const out = new Set();
-  const dir = join(pele, 'tests/compat/quadrant');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f))) {
-    const src = readFileSync(join(dir, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/quadrant/i.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  for (const s of JSON.parse(readFileSync(join(pele, 'tests/corpus/quadrant-docs.json'), 'utf8'))) out.add(s);
-  return [...out];
+  return [...new Set([...testStrings(pele, 'tests/compat/quadrant', /\.spec\.[jt]s$/, /quadrant/i), ...docs(pele, 'quadrant')])];
 }
 
 // The corpus the suites start from.
@@ -237,7 +222,7 @@ export function corpus(pele) {
 // Quadrant charts built at random, which mostly parse, with labels, points, styles and
 // settings of every kind the layout handles differently.
 export function randomDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   // Words that may stand outside quotes, and those that may only stand inside them, or in a
   // title.
   const words = ['Low', 'High', 'Reach', 'Engagement', 'Campaign', 'a', 'very', 'long', 'label', 'that', 'wraps',

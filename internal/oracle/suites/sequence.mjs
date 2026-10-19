@@ -4,9 +4,9 @@
 // statements built from the grammar's own shapes as Pele's oracle test builds them, and
 // whole diagrams. Each case is parsed as Pele's parse does it, after the preprocessing every
 // diagram goes through, and as the parser alone reads the raw text.
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/sequence/oracle.test.ts.
 export const FRAGMENTS = [
@@ -144,22 +144,7 @@ export const WRITTEN = [
 // The sources in Mermaid's specs as Pele ports them, and its documentation, as Pele's
 // loadCorpus('sequence', /sequenceDiagram/i) collects them.
 function specSources(pele) {
-  const out = new Set();
-  const dir = join(pele, 'tests/compat/sequence');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f))) {
-    const src = readFileSync(join(dir, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/sequenceDiagram/i.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  for (const sample of JSON.parse(readFileSync(join(pele, 'tests/corpus/sequence-docs.json'), 'utf8'))) out.add(sample);
-  return [...out];
+  return [...new Set([...testStrings(pele, 'tests/compat/sequence', /\.spec\.[jt]s$/, /sequenceDiagram/i), ...docs(pele, 'sequence')])];
 }
 
 export function corpus(pele) {
@@ -169,7 +154,7 @@ export function corpus(pele) {
 // Statements built from the grammar's own shapes, with parts swapped, dropped and repeated,
 // as Pele's oracle test builds them.
 export function generated(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   return () => {
     let src = 'sequenceDiagram\n';
     for (let lines = 1 + Math.floor(rnd() * 6); lines > 0; lines--) {
@@ -190,7 +175,7 @@ export function generated(rnd) {
 // nested in blocks, boxes, activations, participants created and destroyed, numbers, with
 // texts of all lengths, and the settings that change what is drawn.
 export function drawableDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const texts = ['hi', 'Hello Bob, how are you?', 'ok', '', 'x', 'Ä Ö ü', '日本語のテキスト', '😀 smile', 'a #35; b #quot;c#quot;',
     'x < y & z', 'a much longer message that will need to wrap somewhere along the way to the other side', 'GET /api/v1/items?id=42',

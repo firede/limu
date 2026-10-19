@@ -3,9 +3,9 @@
 // makes of the tree with the title the text's front matter gives. The cases are Mermaid's
 // documentation and specs, the inputs of Pele's own tests, cases written here, random
 // treemaps, and all of those mutated at random.
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/treemap/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -181,35 +181,14 @@ export const WRITTEN = [
   'not a treemap',
 ];
 
-// Strings in the sources of a folder of Pele's tests that hold the keyword, as Pele's
-// loadCorpus and loadTestStrings collect them, from files whose names match.
-function testStrings(pele, dir, files) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/treemap/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
-
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests, its
 // seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/treemap-docs.json'), 'utf8'));
   return [
     ...new Set([
-      ...docs,
-      ...testStrings(pele, 'tests/compat/treemap', /\.test\.[jt]s$/),
-      ...testStrings(pele, 'tests/render', /^treemap.*\.test\.ts$/),
+      ...docs(pele, 'treemap'),
+      ...testStrings(pele, 'tests/compat/treemap', /\.test\.[jt]s$/, /treemap/),
+      ...testStrings(pele, 'tests/render', /^treemap.*\.test\.ts$/, /treemap/),
       ...SEEDS,
       ...WRITTEN,
     ]),
@@ -236,7 +215,7 @@ const FORMATS = [',', '$0,0', '$,', ',.2f', '.1f', '.0%', ',.1%', '.3e', 'e', 'd
 
 // Random treemaps, most of them well formed, with random configuration.
 export function randomDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const quote = (name) => (name.includes("'") || chance(0.85) ? `"${name}"` : `'${name}'`);
   return () => {

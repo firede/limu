@@ -5,16 +5,10 @@
 // label of the y axis, which the scene holds as the label's turn about the same point, so its
 // numbers are where the scene has them. They are drawn here written out in full, as the
 // oracle's hooks have num() write them while limuExactNumbers is set, and compared whole.
-import { lone, mutator } from './parse.mjs';
-import { capJoin } from './flowchart-render.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, capJoin } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './quadrant.mjs';
-
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 
 // A color of a point's style, as limu's test writes one: a hex code of six digits, in lower
 // case.

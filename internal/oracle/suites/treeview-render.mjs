@@ -12,22 +12,16 @@
 // A label of one line of plain text is written as its text and its style; any other with the
 // size, the widths and the spans of its lines. An icon Pele draws itself is written by the
 // name of its glyph, one the host draws by the name the host was given.
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n, pt, readHead } from '../lib/svg.mjs';
 import { readLabel, withoutPele } from '../lib/limu.mjs';
-import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './treeview.mjs';
 
 // The icons the host has, in the cases drawn with icons: one of Pele's own among them, which
 // the host's then takes the place of.
 export const ICONS = ['logos:react', 'mdi:home', 'material:typescript', 'mermaid-treeview:folder', 'fa:fa-car', 'p:x', 'material:docker'];
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (v) => String(Number(v));
-const pt = (x, y) => `${n(x)},${n(y)}`;
 // The control characters Pele's esc drops.
 const clean = (s) => s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+/g, '');
 
@@ -65,19 +59,9 @@ function steps(d) {
 export function readSvg(svg, glyphs) {
   svg = withoutPele(svg);
   const lines = [];
-  const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`);
-  let body = svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>'));
-  const title = /^<title id="[^"]*">([^<]*)<\/title>/.exec(body);
-  if (title) {
-    lines.push(`acc-title ${unescape(title[1])}`);
-    body = body.slice(title[0].length);
-  }
-  const desc = /^<desc id="[^"]*">([^<]*)<\/desc>/.exec(body);
-  if (desc) {
-    lines.push(`acc-desc ${unescape(desc[1])}`);
-    body = body.slice(desc[0].length);
-  }
+  const { open: head, body: all, acc } = readHead(svg);
+  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`, ...acc);
+  const body = all.slice(0, all.lastIndexOf('</svg>'));
   // What a label is written with before its place: its anchor, class, fill, weight and style.
   const look = (anchor, attrs) =>
     [anchor, attr(attrs, 'class') ?? '-', attr(attrs, 'fill') ?? '-', attr(attrs, 'font-weight') ? 'b' : '-', attr(attrs, 'font-style') === 'italic' ? 'i' : '-'].join(' ');

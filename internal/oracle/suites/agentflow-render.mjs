@@ -1,9 +1,9 @@
 // Agent flows drawn end to end: what Pele's render draws, read back out of its SVG as one line
 // per thing drawn, in the order drawn, with every number of its geometry as the SVG writes it.
 // limu's test writes the same lines from its scene.
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, tag, capJoin } from '../lib/svg.mjs';
 import { FRAGMENTS, agentflowCorpus } from './agentflow.mjs';
-import { mutator } from './parse.mjs';
-import { capJoin } from './flowchart-render.mjs';
 
 const H = 'agentflow-beta\n';
 
@@ -54,12 +54,6 @@ const WRITTEN = [
   '---\nconfig:\n  agentflow:\n    rankSpacing: 5000\n    nodeSpacing: 3000\n    minNodeWidth: 9000\n---\nagentflow-beta\na --> b & c\n',
 ];
 
-// Pele's escapes in attribute values, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 const box = (s) => `${attr(s, 'x') ?? 0},${attr(s, 'y') ?? 0},${attr(s, 'width')},${attr(s, 'height')}`;
 // Where a label's first line sits: the first x and y in its text.
 const textAt = (s) => {
@@ -67,10 +61,6 @@ const textAt = (s) => {
   if (i < 0) return undefined;
   const m = / x="([^"]*)" y="([^"]*)"/.exec(s.slice(i));
   return `t ${m[1]},${m[2]}`;
-};
-const tag = (s, name) => {
-  const i = s.indexOf('<' + name + ' ');
-  return i < 0 ? undefined : s.slice(i, s.indexOf('>', i));
 };
 // The elements of a node's shape, before its label, each with its geometry.
 const elements = (s) => {

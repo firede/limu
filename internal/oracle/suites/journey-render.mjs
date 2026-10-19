@@ -7,18 +7,13 @@
 // the oracle's hooks have num() write them while limuExactNumbers is set, and a number in a
 // face is moved as limu moves it, the face's middle added to it, before it is written to two
 // decimals as Pele writes it.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, TRANSLATE } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './journey.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 // A series' color as Pele writes it, by the name of limu's token.
 const paintName = (p) => (p === undefined ? '-' : p.replace(/^var\(--pele-(series-\d),[^)]*\)$/, '$1'));
-const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
 // The lines of a journey diagram's SVG, drawn with its numbers in full; num writes a number as
 // Pele does.

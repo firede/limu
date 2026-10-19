@@ -8,18 +8,12 @@
 // it, and a difference in the last bit shows. The hooks also have each label written with the
 // point it is centered on, its size and the text of its lines, which is what the scene holds of
 // a label.
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { attr, pt, readHead } from '../lib/svg.mjs';
 import { readLabel } from '../lib/limu.mjs';
-import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './radar.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (x) => String(x);
-const pt = (x, y) => `${n(x)},${n(y)}`;
 const TRANSLATE = /^translate\(([^,]*),([^)]*)\)$/;
 
 // What a group of Pele's chart is called in the lines, by its class.
@@ -34,20 +28,9 @@ const CONTEXT = {
 // The lines of a radar chart's SVG, drawn with its numbers in full.
 export function readSvg(svg, fontSize) {
   const lines = [];
-  const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`);
+  const { open: head, body, acc } = readHead(svg);
+  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`, ...acc);
   const rootFill = attr(head, 'fill');
-  let body = svg.slice(svg.indexOf('>') + 1);
-  const title = /^<title id="[^"]*">([^<]*)<\/title>/.exec(body);
-  if (title) {
-    lines.push(`acc-title ${unescape(title[1])}`);
-    body = body.slice(title[0].length);
-  }
-  const desc = /^<desc id="[^"]*">([^<]*)<\/desc>/.exec(body);
-  if (desc) {
-    lines.push(`acc-desc ${unescape(desc[1])}`);
-    body = body.slice(desc[0].length);
-  }
   // The groups open about the element read, each with what it gives the elements in it.
   const stack = [{ fill: rootFill, dx: 0, dy: 0 }];
   const inherited = (e, name) => {

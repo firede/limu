@@ -2,6 +2,7 @@
 // edges and loops, markers, the patches under edge labels, and where clusters' titles go.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { picker } from '../lib/corpus.mjs';
 
 const SHAPE_ATTRS = ' fill="var(--_s)" stroke="var(--_b)"';
 const LINE_ATTRS = ' stroke="var(--_b)"';
@@ -16,7 +17,7 @@ export default async function ({ pele, src, cases, write, random }) {
   const { layoutLabel } = await src('text/label.ts');
   const c = cases('draw');
   const next = random(20261019);
-  const pick = (list) => list[Math.floor(next() * list.length)];
+  const pick = picker(next);
   const between = (a, b) => a + next() * (b - a);
   // Numbers as layouts make them: often whole or halves, sometimes anything.
   const coord = (a, b) => {

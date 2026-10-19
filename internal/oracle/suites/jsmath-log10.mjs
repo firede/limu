@@ -1,6 +1,6 @@
 // Math.log10, which the axis of a gantt chart takes the floor of: about powers of ten, one ulp
 // at a time, and at random.
-import { enc } from './parse.mjs';
+import { enc } from '../lib/value.mjs';
 
 export default async function ({ write, random }) {
   const buf = new DataView(new ArrayBuffer(8));

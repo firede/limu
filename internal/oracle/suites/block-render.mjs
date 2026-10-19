@@ -11,20 +11,11 @@
 // have each label of a block diagram write the point it is centered on, its size and its
 // spans, and each block the size it is drawn at, which its shape is drawn from: the shapes
 // themselves are drawShape's, which the draw suite checks.
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { attr, TRANSLATE, n, pt, capJoin } from '../lib/svg.mjs';
 import { readLabel } from '../lib/limu.mjs';
-import { lone, mutator } from './parse.mjs';
-import { capJoin } from './flowchart-render.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './block.mjs';
-
-// Pele's escapes in attribute values, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (s) => String(Number(s));
-const pt = (x, y) => `${n(x)},${n(y)}`;
-const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
 // The last opacity an element's style attribute gives a property, as a browser takes it over
 // the element's attribute: a number, or a percentage, clamped to [0, 1].

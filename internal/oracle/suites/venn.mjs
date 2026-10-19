@@ -4,36 +4,11 @@
 // lexed with the lexer's question about indentation answered no and answered yes, parsed as the
 // raw text, and parsed as Pele's parse does it, after the preprocessing every diagram goes
 // through.
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
-
-// An array literal of a test's source, evaluated with the names given.
-export function arrayIn(file, start, names = {}, close = '\n];') {
-  const src = readFileSync(file, 'utf8');
-  const from = src.indexOf(start);
-  if (from < 0) throw new Error(`no ${start} in ${file}`);
-  const open = from + start.length;
-  const end = src.indexOf(close, open);
-  return new Function(...Object.keys(names), 'return [' + src.slice(open, end) + '\n];')(...Object.values(names));
-}
-
-// Every string literal in a file of Pele's tests that keyword matches, as its loadCorpus finds
-// them.
-function literals(file, keyword) {
-  const out = [];
-  const src = readFileSync(file, 'utf8');
-  for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-    const raw = m[1] ?? m[2] ?? m[3];
-    if (!keyword.test(raw)) continue;
-    try {
-      out.push(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-    } catch {
-      continue;
-    }
-  }
-  return out;
-}
+import { enc, peleError } from '../lib/value.mjs';
+import { arrayIn, docs, fileLiterals, lone, testFiles, picker } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments and seeds, tests/venn/oracle.test.ts, and fragments for the pipeline and
 // for what Pele draws.
@@ -139,11 +114,10 @@ export function hostile(pele) {
 // The corpus the suites start from: documentation, specs, Pele's tests and the cases above.
 export function corpus(pele) {
   const out = new Set();
-  const dir = join(pele, 'tests/compat/venn');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f))) for (const s of literals(join(dir, file), /venn-beta/)) out.add(s);
-  for (const s of JSON.parse(readFileSync(join(pele, 'tests/corpus/venn-docs.json'), 'utf8'))) out.add(s);
+  for (const file of testFiles(pele, 'tests/compat/venn', /\.spec\.[jt]s$/)) for (const s of fileLiterals(file, /venn-beta/)) out.add(s);
+  for (const s of docs(pele, 'venn')) out.add(s);
   const render = join(pele, 'tests/render/venn.test.ts');
-  for (const s of literals(render, /venn-beta/)) out.add(s);
+  for (const s of fileLiterals(render, /venn-beta/)) out.add(s);
   // What Pele's render tests draw with svgOf, which puts the header before it.
   for (const m of readFileSync(render, 'utf8').matchAll(/svgOf\(\s*(`(?:[^`\\]|\\.)*`|'(?:[^'\\\n]|\\.)*')/g)) {
     try {
@@ -160,7 +134,7 @@ export function corpus(pele) {
 // Diagrams of random statements over a few ids, most of which parse, as Pele's oracle test
 // builds them, with titles and styles of more kinds.
 export function statementDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const id = () => pick(['A', 'B', 'C', '"D e"', 'x-1', '_y']);
   const label = () => pick(['', '', '["L"]', '[L m]', '[""]', '["a<br>b"]', '["#35; x"]']);
   const size = () => pick(['', '', ':5', ': 2.5', ':-1', ':.5', ':0']);
@@ -190,7 +164,7 @@ export function statementDiagrams(rnd) {
 // pairs, of three and of more, labels and texts of every kind of text, styles on sets,
 // overlaps and texts, titles, and front matter.
 export function drawableDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'Frontend', 'Backend', '"Data Science"', 'x_1', '"é"', '"中文"', 'Ops'];
   const labels = ['Alpha', '"Beta"', '"A rather long label for a set that goes on and on"', '"a<br>b"', '"<b>bold</b> text"', '"#35; &amp; x"',

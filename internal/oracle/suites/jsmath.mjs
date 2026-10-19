@@ -2,8 +2,9 @@
 // charts and block diagrams compute with: on the angles and coordinates charts reach, the arithmetic charts do
 // on them, random bit patterns and the special values. An angle written [k, n] is k·π/n,
 // worked out as k * Math.PI / n, which keeps the fixture small; any other input is itself.
+import { enc } from '../lib/value.mjs';
+import { picker } from '../lib/corpus.mjs';
 
-import { enc } from './parse.mjs';
 
 const SPECIAL = [
   0, -0, Infinity, -Infinity, NaN, 1, -1, 0.5, -0.5, 2, -2, 3, -3, 10, 0.1, 5e-324, -5e-324, 2.2250738585072014e-308,
@@ -32,7 +33,7 @@ export default async function ({ write, random }) {
   const anySize = (lo = -1074, hi = 1023) => sign() * (1 + next()) * 2 ** int(lo, hi);
   // A number as data in a chart has it, with a few decimals.
   const decimal = (scale, places) => Math.round((next() - 0.5) * 2 * scale * 10 ** places) / 10 ** places;
-  const pick = (list) => list[Math.floor(next() * list.length)];
+  const pick = picker(next);
 
   // Angles, for Math.sin and Math.cos together.
   const trig = [];

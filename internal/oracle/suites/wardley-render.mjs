@@ -10,19 +10,15 @@
 // in the last bit shows. A label whose lines start at a point is written where limu centers
 // it: its first baseline less a little over a third of its size, and down by half of what
 // its lines after the first take.
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n } from '../lib/svg.mjs';
 import { readLabel, readMarker } from '../lib/limu.mjs';
-import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, corpus, hostile, randomMaps } from './wardley.mjs';
 
 // The icons the host has, in the cases drawn with icons.
 export const ICONS = ['star', 'fa:fa-car', 'fa:fa-coffee'];
 
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (v) => String(v);
 const FACES = ['-', 'b', 'i', 'bi'];
 
 // The lines of a map's SVG, drawn with its numbers in full.

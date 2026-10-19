@@ -4,9 +4,10 @@
 // each entry shows and the layout settings under the configuration the text's front matter
 // and directives give. The cases are Mermaid's documentation and specs, the inputs of Pele's
 // own tests, cases written here, random diagrams, and all of those mutated at random.
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { readFileSync } from 'node:fs';
+import { enc, peleError } from '../lib/value.mjs';
+import { literals, lone, picker, testFiles, unquote, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/treeview/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -156,27 +157,14 @@ export const WRITTEN = [
 // Strings in the sources of a folder of Pele's tests that hold the keyword, as Pele's
 // loadCorpus collects them, from files whose names match; and the arrays of strings the box
 // drawing specs join with line feeds.
-function testStrings(pele, dir, files) {
+function treeStrings(pele, dir, files) {
   const out = new Set();
-  const path = join(pele, dir);
-  const unquote = (raw) => new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')();
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/treeView/.test(raw)) continue;
-      try {
-        out.add(unquote(raw));
-      } catch {
-        continue;
-      }
-    }
+  for (const file of testFiles(pele, dir, files)) {
+    const src = readFileSync(file, 'utf8');
+    for (const s of literals(src, /treeView/)) out.add(s);
     for (const m of src.matchAll(/\[((?:\s*'(?:[^'\\\n]|\\.)*',?)+)\s*\]\.join\(\s*'\\n'\s*\)/g)) {
-      try {
-        out.add([...m[1].matchAll(/'((?:[^'\\\n]|\\.)*)'/g)].map((s) => unquote(s[1])).join('\n'));
-      } catch {
-        continue;
-      }
+      const lines = [...m[1].matchAll(/'((?:[^'\\\n]|\\.)*)'/g)].map((s) => unquote(s[1]));
+      if (!lines.includes(undefined)) out.add(lines.join('\n'));
     }
   }
   return [...out];
@@ -185,13 +173,12 @@ function testStrings(pele, dir, files) {
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests, its
 // seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/treeview-docs.json'), 'utf8'));
   return [
     ...new Set([
-      ...docs,
-      ...testStrings(pele, 'tests/compat/treeview', /\.(spec|test)\.[jt]s$/),
-      ...testStrings(pele, 'tests/treeview', /\.test\.ts$/),
-      ...testStrings(pele, 'tests/render', /^treeview.*\.test\.ts$/i),
+      ...docs(pele, 'treeview'),
+      ...treeStrings(pele, 'tests/compat/treeview', /\.(spec|test)\.[jt]s$/),
+      ...treeStrings(pele, 'tests/treeview', /\.test\.ts$/),
+      ...treeStrings(pele, 'tests/render', /^treeview.*\.test\.ts$/i),
       ...SEEDS,
       ...WRITTEN,
     ]),
@@ -212,7 +199,7 @@ const TITLES = ['T', 'Project', 'A title that is much wider than the tree it nam
 
 // Random tree views, most of them well formed, with random configuration.
 export function randomDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   return () => {
     const settings = [];

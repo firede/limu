@@ -14,35 +14,22 @@
 //
 // The author's colors are written as the style attribute Pele gives an element, after css=;
 // the test reads them with limu's reader of declarations before it compares.
+import { join } from 'node:path';
+import { peleError } from '../lib/value.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n, readHead } from '../lib/svg.mjs';
 import { readLabel, readMarker } from '../lib/limu.mjs';
-import { lone, mutator, peleError } from './parse.mjs';
 import { FRAGMENTS, corpus, drawableDiagrams, statementDiagrams } from './c4.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (s) => String(Number(s));
 const TRANSLATE = /^translate\(([^,]*),([^)]*)\)$/;
 
 // The lines of a C4 diagram's SVG, drawn with its numbers in full.
 export function readSvg(svg) {
   const lines = [];
-  const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${n(attr(head, 'width'))},${n(attr(head, 'height'))}`);
-  let body = svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>'));
-  const title = /^<title id="[^"]*">([^<]*)<\/title>/.exec(body);
-  if (title) {
-    lines.push(`acc-title ${unescape(title[1])}`);
-    body = body.slice(title[0].length);
-  }
-  const desc = /^<desc id="[^"]*">([^<]*)<\/desc>/.exec(body);
-  if (desc) {
-    lines.push(`acc-desc ${unescape(desc[1])}`);
-    body = body.slice(desc[0].length);
-  }
+  const { open: head, body: all, acc } = readHead(svg);
+  lines.push(`size ${n(attr(head, 'width'))},${n(attr(head, 'height'))}`, ...acc);
+  const body = all.slice(0, all.lastIndexOf('</svg>'));
 
   // The groups open about the element read: each one's move, if it has one, its class, and
   // the cap and join of the lines in it.

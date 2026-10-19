@@ -4,7 +4,6 @@
 // The cases are dates around the changes of offset of each zone, dates at random, strings
 // written here and strings made of the pieces V8's date parser reads.
 
-import { enc } from './parse.mjs';
 
 export const ZONES = ['UTC', 'America/New_York', 'Europe/London', 'Asia/Kolkata', 'Australia/Lord_Howe'];
 

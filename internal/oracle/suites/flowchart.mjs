@@ -1,7 +1,9 @@
 // Flowcharts parsed as Pele parses them, from text to FlowDb, and the graph buildFlowGraph
 // makes of it: the sources of Pele's tests and Mermaid's specs and documentation, cases
 // written here, and those sources mutated at random.
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/flowchart/oracle.test.ts, and more of what Pele reads beyond the
 // grammar: metadata, links, Unicode.

@@ -1,6 +1,6 @@
 // How JavaScript reads characters and numbers, where the ports keep its meaning: Pele's table
 // of letters outside ASCII, String() of numbers, Number() of strings and parseInt in base 16.
-import { enc } from './parse.mjs';
+import { enc } from '../lib/value.mjs';
 
 export default async function ({ src, write, random }) {
   const { isUnicodeLetter } = await src('util/unicode.ts');

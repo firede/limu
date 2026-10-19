@@ -3,9 +3,9 @@
 // out of Pele's parseSource, with front matter, directives and entity codes read first. The
 // cases are Mermaid's documentation and specs, the inputs of Pele's own tests, cases written
 // here, random diagrams, and all of those mutated at random.
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { picker, lone, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 const KEYWORD = /C4(?:Context|Container|Component|Dynamic|Deployment)/;
 
@@ -175,7 +175,7 @@ const SEPARATORS = ['\n', '\n', '\n', '\n\n', '\n  ', ' \n', ' ', '', '\r\n', '\
 export const HEADERS = ['C4Context', 'C4Container', 'C4Component', 'C4Dynamic', 'C4Deployment'];
 
 export function statementDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   return () => {
     let src = pick(HEADERS) + pick(SEPARATORS);
     const count = 1 + Math.floor(rnd() * 8);
@@ -210,7 +210,7 @@ const SPRITES = ['', 'person', 'cylinder', 'queue', 'database', 'box', 'pipe', '
 // Random C4 diagrams, most of them well formed and drawable: shapes in nested boundaries,
 // relations between them, style and layout updates, titles and front matter.
 export function drawableDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const quote = (s) => (chance(0.9) ? `"${s}"` : s.replace(/[,)"]/g, '') || 'u');
   return () => {
@@ -306,36 +306,15 @@ export function drawableDiagrams(rnd) {
   };
 }
 
-// Strings in the sources of a folder of Pele's tests that hold the keyword, as Pele's
-// loadCorpus collects them, from files whose names match.
-function testStrings(pele, dir, files) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!KEYWORD.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
-
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests, its
 // seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/c4-docs.json'), 'utf8'));
   return [
     ...new Set([
-      ...docs,
-      ...testStrings(pele, 'tests/compat/c4', /\.spec\.[jt]s$/),
-      ...testStrings(pele, 'tests/render', /^c4.*\.test\.ts$/),
-      ...testStrings(pele, 'tests/c4', /\.test\.ts$/),
+      ...docs(pele, 'c4'),
+      ...testStrings(pele, 'tests/compat/c4', /\.spec\.[jt]s$/, KEYWORD),
+      ...testStrings(pele, 'tests/render', /^c4.*\.test\.ts$/, KEYWORD),
+      ...testStrings(pele, 'tests/c4', /\.test\.ts$/, KEYWORD),
       ...SEEDS,
     ]),
   ].filter((s) => !lone(s) && s.length <= 20000);

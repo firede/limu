@@ -9,21 +9,14 @@
 // inside groups is moved as limu's layout moves it: by the innermost group's move first, then
 // by each one out from it. The lines hold every number in full, as String() writes it, so
 // that a difference in the last bit shows.
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { attr, TRANSLATE, n } from '../lib/svg.mjs';
 import { readLabel, withoutPele } from '../lib/limu.mjs';
-import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, corpus, hostileCorpus, maps } from './mindmap.mjs';
 
 // The icons the host has, in the cases drawn with icons.
 export const ICONS = ['fa fa-book', 'star', 'phone', 'fa:fa-car', 'mdi:home', 'fa fa-x'];
-
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (v) => String(v);
-const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
 // The lines of a mindmap's SVG, drawn with its numbers in full.
 export function readSvg(svg) {

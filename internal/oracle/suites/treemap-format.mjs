@@ -2,7 +2,8 @@
 // documents, specifiers put together at random from the parts its pattern reads, with fills of
 // every kind and parts out of order, and values of every size and sign, halfway between two
 // results, and not finite.
-import { enc } from './parse.mjs';
+import { enc } from '../lib/value.mjs';
+import { picker } from '../lib/corpus.mjs';
 
 const SPECS = [
   ',', '$0,0', '$,', ',.2f', '.1f', '.0%', ',.1%', '.3e', 'e', 'd', ',d', '~', '.2~f', '+,', '$,.2f', '.3', 'x', '', '>10,.2f',
@@ -14,7 +15,7 @@ const SPECS = [
 export default async function ({ src, write, random }) {
   const { formatter } = await src('diagrams/treemap/format.ts');
   const rnd = random(51);
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const maybe = (p, s) => (rnd() < p ? s : '');
   const specs = [...SPECS];
   for (let i = 0; i < 700; i++) {

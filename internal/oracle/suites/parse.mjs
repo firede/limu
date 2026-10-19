@@ -1,59 +1,9 @@
 // What every diagram's text goes through before its own parser: front matter, directives and
 // comments read (preprocess), the type found (detect), entity codes hidden (encodeEntities),
 // and the limit on a source's length.
-
-// A value as JSON can carry it exactly: an object as its entries in JavaScript's order (or
-// sorted, for a config, whose order nothing reads), and the numbers JSON has no words for.
-export function enc(v, sorted = false) {
-  if (v === undefined) return { $: 'undefined' };
-  if (v === null || typeof v === 'boolean' || typeof v === 'string') return v;
-  if (typeof v === 'number') {
-    if (Number.isNaN(v)) return { $n: 'NaN' };
-    if (v === Infinity) return { $n: 'Infinity' };
-    if (v === -Infinity) return { $n: '-Infinity' };
-    if (Object.is(v, -0)) return { $n: '-0' };
-    return v;
-  }
-  if (Array.isArray(v)) return v.map((x) => enc(x, sorted));
-  let keys = Object.keys(v);
-  if (sorted) keys = keys.sort();
-  return { $o: keys.map((k) => [k, enc(v[k], sorted)]) };
-}
-
-export function peleError(e) {
-  return { code: e.code, message: e.message, type: e.type, line: e.line, column: e.column, snippet: e.snippet };
-}
-
-// Lone surrogates have no UTF-8, so Go strings cannot hold them; inputs with them are left out.
-export function lone(s) {
-  return /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(s);
-}
-
-export function mutator(corpus, fragments, rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
-  return () => {
-    let s = pick(corpus);
-    const edits = 1 + Math.floor(rnd() * 3);
-    for (let k = 0; k < edits; k++) {
-      const pos = Math.floor(rnd() * (s.length + 1));
-      const r = rnd();
-      if (r < 0.35) {
-        s = s.slice(0, pos) + pick(fragments) + s.slice(pos);
-      } else if (r < 0.6) {
-        s = s.slice(0, pos) + s.slice(pos + 1 + Math.floor(rnd() * 3));
-      } else if (r < 0.75) {
-        const other = pick(corpus);
-        const from = Math.floor(rnd() * other.length);
-        s = s.slice(0, pos) + other.slice(from, from + Math.floor(rnd() * 20)) + s.slice(pos);
-      } else if (r < 0.9) {
-        s = s.slice(0, pos) + s.slice(pos, pos + Math.floor(rnd() * 6)) + s.slice(pos);
-      } else {
-        s = s.slice(0, pos) + pick(fragments) + s.slice(pos + 1);
-      }
-    }
-    return s;
-  };
-}
+import { enc, peleError } from '../lib/value.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 const FRAGMENTS = [
   '---\n', '---', '--- \n', '  ---\n', '\n', '\r\n', '\r', '%%', '%% c\n', '%%{', '}%%', '%%{init: {"theme": "dark"}}%%\n',

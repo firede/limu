@@ -4,7 +4,7 @@
 // sources written here, and mutations of all of them.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { mutator } from './parse.mjs';
+import { mutator } from '../lib/mutate.mjs';
 import { readSvg } from './flowchart-render.mjs';
 
 const FRAGMENTS = [

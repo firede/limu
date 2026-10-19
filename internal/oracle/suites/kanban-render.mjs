@@ -8,19 +8,14 @@
 // place of Pele's drawing of it. A number inside groups is moved as limu's layout moves it:
 // the groups' moves are added up from the outermost in, the number is added to their sum, and
 // only then is it written to two decimals as Pele writes it.
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { attr, TRANSLATE } from '../lib/svg.mjs';
 import { readLabel, withoutPele } from '../lib/limu.mjs';
-import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, boards, corpus, hostileCorpus } from './kanban.mjs';
 
 // The icons the host has, in the cases drawn with icons.
 export const ICONS = ['star', 'inbox', 'phone', 'fa:fa-car', 'fa fa-x'];
-
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
 // The lines of a board's SVG, drawn with its numbers in full; num writes a number as Pele does.
 export function readSvg(svg, num) {
