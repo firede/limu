@@ -82,7 +82,9 @@ type Item struct {
 	Parts []Part
 
 	// For an edge: the route it takes, as the corners of a line that runs straight between
-	// them, and the markers at its ends. Its curves are in Parts.
+	// them, and the markers at its ends. Its curves are in Parts. Every edge has a route; a
+	// self-loop's, which no layout routes, is the corners its curve is drawn about
+	// (Path.Corners).
 	Route []Point
 	Ends  [2]Marker
 
@@ -93,13 +95,13 @@ type Item struct {
 	Align  Align
 	Rotate float64
 
-	// Picture is an image or an icon the part shows, as a flowchart's node may.
+	// Picture is an image or an icon the item shows, as a flowchart's node may.
 	Picture *Picture
 
 	Style  style.Style // the diagram's own
 	Author style.Style // what the author set with classDef and style lines
 
-	Link    string // where the part leads, when it is a link
+	Link    string // where the item leads, when it is a link
 	Tooltip string
 }
 
