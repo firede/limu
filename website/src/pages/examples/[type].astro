@@ -16,9 +16,11 @@ interface Props {
 }
 
 const { t, previous, next } = Astro.props;
+// The sidebar lists the page's examples under its title, as the overview lists the types.
+const headings = t.examples.map((example) => ({ depth: 2, slug: slug(example.title), text: example.title }));
 ---
 
-<DocsLayout current="examples" title={t.title} description={t.description} markdownPath={`${exampleTypeHref(t.type)}.md`} child={t.title}>
+<DocsLayout current="examples" title={t.title} description={t.description} headings={headings} markdownPath={`${exampleTypeHref(t.type)}.md`} child={t.title}>
   <div data-diagram-scope>
     <DiagramThemeSwitch />
     {t.beta && <p>{t.title} diagrams are in beta: they are written with -beta, as Mermaid may still change them.</p>}

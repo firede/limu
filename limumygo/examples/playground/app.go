@@ -158,17 +158,6 @@ func (a *app) toolbar(c *ui.Context, ap *appearance) {
 	t := ap.UI
 	ui.Toolbar(c, func() {
 		ui.MenuButton(c, "Examples", func(m *ui.Menu) { examplesMenu(m, a.load) })
-		if ui.Button(c, "Copy link").Tooltip("Copy a link that opens this diagram in the playground").Clicked() {
-			a.share(c)
-		}
-		ui.MenuButton(c, "Download", func(m *ui.Menu) {
-			if m.Item("SVG").Disabled(a.scene == nil).Chosen() {
-				a.downloadSVG(ap)
-			}
-			if m.Item("PNG").Disabled(a.scene == nil).Chosen() {
-				a.downloadPNG(ap)
-			}
-		})
 		if appearanceMenu {
 			ui.Spacer(c)
 			ui.MenuButton(c, "Appearance", func(m *ui.Menu) {
@@ -185,7 +174,9 @@ func (a *app) toolbar(c *ui.Context, ap *appearance) {
 	}).Label("Playground").FillWidth().Padding(4, 8).Background(t.Background).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
 }
 
-// output is the pane of what limu makes of the text: the diagram, or its SVG.
+// output is the pane of what limu makes of the text: the diagram, or its SVG, under a bar
+// of what can be done with it. The bar's buttons are there in either view, but Copy SVG,
+// so that changing the view does not move them, nor change the bar's height.
 func (a *app) output(c *ui.Context, ap *appearance) {
 	t := ap.UI
 	pane := ui.Column(c).Fill()
@@ -193,17 +184,28 @@ func (a *app) output(c *ui.Context, ap *appearance) {
 	// it. When it changes, the diagram is laid out again to fit it.
 	a.layout(c, math.Floor(float64(pane.LayoutBounds().W))-2*pad)
 	pane.Children(func() {
-		ui.Row(c).FillWidth().Padding(6, 12).Gap(8).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-			segmented(c, ap, &a.shows, "Diagram", "SVG").Label("Output")
-			ui.Box(c).Grow(1)
+		ui.Toolbar(c, func() {
+			segmented(c, ap, &a.shows, "Diagram", "SVG").Label("View")
+			ui.Spacer(c)
 			if a.shows == viewSVG {
-				if ui.Button(c, "Copy").Disabled(a.scene == nil).Clicked() {
+				if ui.Button(c, "Copy SVG").Disabled(a.scene == nil).Clicked() {
 					a.ensureSVG(ap)
 					c.WriteClipboard(a.svgDoc)
 					c.Toast("Copied the SVG")
 				}
 			}
-		})
+			if ui.Button(c, "Copy link").Tooltip("Copy a link that opens this diagram in the playground").Clicked() {
+				a.share(c)
+			}
+			ui.MenuButton(c, "Download", func(m *ui.Menu) {
+				if m.Item("SVG").Disabled(a.scene == nil).Chosen() {
+					a.downloadSVG(ap)
+				}
+				if m.Item("PNG").Disabled(a.scene == nil).Chosen() {
+					a.downloadPNG(ap)
+				}
+			})
+		}).Label("Output").FillWidth().Padding(4, 8).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
 		switch {
 		case a.scene == nil:
 			ui.Column(c).Grow(1).FillWidth().Center().Padding(24).Gap(6).Children(func() {

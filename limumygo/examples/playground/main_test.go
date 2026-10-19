@@ -152,8 +152,8 @@ func TestSystemAppearance(t *testing.T) {
 	}
 }
 
-// The SVG view shows the scene's SVG, indented, in the appearance, and Copy copies it as
-// the svg package wrote it.
+// The SVG view shows the scene's SVG, indented, in the appearance, and Copy SVG copies it
+// as the svg package wrote it.
 func TestSVGView(t *testing.T) {
 	a, tt := tester(t, "flowchart LR\n  A --> B\n", appearanceDark)
 	a.shows = viewSVG
@@ -162,7 +162,7 @@ func TestSVGView(t *testing.T) {
 	if !strings.HasPrefix(text, "<svg ") || !strings.Contains(text, "\n  <g ") || !strings.Contains(text, "#d0dddc") {
 		t.Errorf("SVG view %.200q", text)
 	}
-	if err := tt.Click("Copy"); err != nil {
+	if err := tt.Click("Copy SVG"); err != nil {
 		t.Fatal(err)
 	}
 	if got := tt.Clipboard(); got != a.svgDoc || strings.Contains(got, "\n") {

@@ -37,6 +37,7 @@
 // that switching the theme shows as a change of the whole figure.
 .example-card {
   min-width: 0;
+  scroll-margin-top: 32px;
   margin: 0 0 24px;
   overflow: hidden;
   border: 1px solid var(--line);
