@@ -69,8 +69,6 @@ func (p *parser) typ() token { return p.toks[p.i].typ }
 
 func (p *parser) typAt(i int) token { return p.toks[i].typ }
 
-func (p *parser) text() string { return p.toks[p.i].text }
-
 // next is the text of the token at i, and steps past it.
 func (p *parser) next() string {
 	s := p.toks[p.i].text
@@ -269,13 +267,12 @@ func (p *parser) classOrRelation() {
 	id1 := p.name(true)
 	t := p.typ()
 	if t == t_LABEL {
-		p.db.addMember(id1, CleanupLabel(p.next()))
+		p.db.addMember(id1, cleanupLabel(p.next()))
 		return
 	}
 	title1 := "none"
 	if t == t_STR {
 		title1 = p.next()
-		t = p.typ()
 	} else if endType[t] == 0 && t != t_LINE && t != t_DOTTED_LINE {
 		return
 	}
@@ -298,7 +295,7 @@ func (p *parser) classOrRelation() {
 	r := &Relation{ID1: id1, ID2: id2, Type1: type1, Type2: type2, LineType: lineType,
 		RelationTitle1: title1, RelationTitle2: title2}
 	if p.typ() == t_LABEL {
-		r.Title = CleanupLabel(p.next())
+		r.Title = cleanupLabel(p.next())
 		r.HasTitle = true
 	}
 	p.db.addRelation(r)

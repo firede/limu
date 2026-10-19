@@ -305,7 +305,7 @@ func TestMembersMatchPele(t *testing.T) {
 	}
 	failed := 0
 	for _, m := range p.Members {
-		if !compare(t, m.Kind, m.Input, dumpMember(NewMember(m.Input, m.Kind)), m.Member) {
+		if !compare(t, m.Kind, m.Input, dumpMember(newMember(m.Input, m.Kind)), m.Member) {
 			if failed++; failed >= 10 {
 				t.Fatal("too many failures")
 			}

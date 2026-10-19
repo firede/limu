@@ -19,10 +19,10 @@ type Member struct {
 
 func isVisibility(s string) bool { return s == "#" || s == "+" || s == "~" || s == "-" }
 
-// NewMember reads a member as Pele's ClassMember does. Mermaid throws a TypeError for a method
+// newMember reads a member as Pele's ClassMember does. Mermaid throws a TypeError for a method
 // with no opening parenthesis, such as `run)`; it is kept here as an attribute, so it is
 // shown as written.
-func NewMember(input, memberType string) *Member {
+func newMember(input, memberType string) *Member {
 	m := &Member{MemberType: memberType}
 	if memberType != "method" || !m.parseMethod(input) {
 		m.parseAttribute(input)

@@ -32,18 +32,18 @@ var allowedShapes = map[string]bool{
 // DefaultShape is the shape of a node that names none, or one agent flows do not draw.
 const DefaultShape = "roundedRect"
 
-// ResolveShapeAlias is the shape an author-facing name stands for, or the name itself, as
+// resolveShapeAlias is the shape an author-facing name stands for, or the name itself, as
 // Pele's resolveShapeAlias gives it.
-func ResolveShapeAlias(shape string) string {
+func resolveShapeAlias(shape string) string {
 	if s, ok := shapeAliases[shape]; ok {
 		return s
 	}
 	return shape
 }
 
-// IsValidShape reports whether a node's metadata may name a shape so, as Pele's isValidShape
+// isValidShape reports whether a node's metadata may name a shape so, as Pele's isValidShape
 // does: a flowchart's shape, or "constructor", which Mermaid finds with `in` on a plain object.
-func IsValidShape(name string) bool {
+func isValidShape(name string) bool {
 	return flowchart.IsValidShape(name) || name == "constructor"
 }
 

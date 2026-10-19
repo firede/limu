@@ -70,10 +70,10 @@ func qualifyIcon(icon, defaultIconPack string) string {
 	return defaultIconPack + ":" + icon
 }
 
-// NodeIcon is the qualified name of an entry's icon, or "" when it shows none, as Pele's
+// getNodeIcon is the qualified name of an entry's icon, or "" when it shows none, as Pele's
 // getNodeIcon gives it. An icon() annotation always wins; otherwise icons appear only with
 // ShowIcons.
-func NodeIcon(node *Node, config IconConfig) string {
+func getNodeIcon(node *Node, config IconConfig) string {
 	if node.Icon == "none" {
 		return ""
 	}
@@ -98,8 +98,8 @@ func NodeIcon(node *Node, config IconConfig) string {
 	return builtinPack + ":file"
 }
 
-// Icons is the icon settings of a diagram's config, as Pele's iconConfig reads them.
-func Icons(config diagram.Config) IconConfig {
+// iconConfig is the icon settings of a diagram's config, as Pele's iconConfig reads them.
+func iconConfig(config diagram.Config) IconConfig {
 	c, _ := config["treeView"].(diagram.Config)
 	maps := func(v any) diagram.Config {
 		m, _ := v.(diagram.Config)

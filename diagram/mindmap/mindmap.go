@@ -107,8 +107,8 @@ func (d *db) DecorateNode(text string, class bool) {
 	}
 }
 
-// Tokenize reads a mindmap's tokens, as Pele's tokenize does.
-func Tokenize(src string) common.OutlineTokens {
+// tokenize reads a mindmap's tokens, as Pele's tokenize does.
+func tokenize(src string) common.OutlineTokens {
 	return common.TokenizeOutline(src, false)
 }
 

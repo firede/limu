@@ -87,7 +87,7 @@ func face(x, y float64, mood scene.Shape) scene.Item {
 // which is the series it is drawn in.
 func actorNames(tasks []Task) ([]string, map[string]int) {
 	var names []string
-	for _, name := range Actors(tasks) {
+	for _, name := range journeyActors(tasks) {
 		if name != "" {
 			names = append(names, name)
 		}

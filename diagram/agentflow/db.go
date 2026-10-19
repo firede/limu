@@ -284,8 +284,8 @@ var presentationKeys = map[string]bool{
 
 var toolShapes = map[string]bool{"subroutine": true, "subprocess": true, "subproc": true, "framed-rectangle": true, "tool": true}
 
-// IsToolDefinition reports whether a node is drawn as a tool, as Pele's isToolDefinition does.
-func IsToolDefinition(n *Node) bool { return toolShapes[n.Type] }
+// isToolDefinition reports whether a node is drawn as a tool, as Pele's isToolDefinition does.
+func isToolDefinition(n *Node) bool { return toolShapes[n.Type] }
 
 func labelType(t string) LabelType {
 	switch t {
@@ -650,7 +650,7 @@ func (d *DB) addVertex(id string, text *Text, typ string, style, classes []strin
 			fields = m
 			if s, ok := m.Value("shape").(string); ok {
 				authoredShape, hasAuthored = s, true
-				m.Set("shape", ResolveShapeAlias(s))
+				m.Set("shape", resolveShapeAlias(s))
 			}
 		}
 	}
@@ -730,7 +730,7 @@ func (d *DB) addVertex(id string, text *Text, typ string, style, classes []strin
 			return d.shapeError("No such shape: "+name+". Shape names should be lowercase.", loc)
 		}
 		resolved := shape.(string)
-		if !IsValidShape(resolved) {
+		if !isValidShape(resolved) {
 			return d.shapeError("No such shape: "+resolved+".", loc)
 		}
 		vertex.Type = resolved
@@ -1168,10 +1168,10 @@ func (d *DB) destructLink(end, start string) LinkInfo {
 // VertexKind is what a node is, from its shape, as Pele's vertexKind gives it: "tool",
 // "action", "input", "refdoc", "decision" or "task".
 func (d *DB) VertexKind(v *Node) string {
-	if IsToolDefinition(v) {
+	if isToolDefinition(v) {
 		return "tool"
 	}
-	switch ResolveShapeAlias(v.Type) {
+	switch resolveShapeAlias(v.Type) {
 	case "hexagon", "hex":
 		return "action"
 	case "lean-right", "lean_right":
@@ -1239,7 +1239,7 @@ func (d *DB) SemanticModel() *SemanticModel {
 			m.Connectors = append(m.Connectors, c)
 			continue
 		}
-		m.Vertices = append(m.Vertices, SemanticVertex{ID: v.ID, Label: v.Text, Shape: ResolveShapeAlias(v.Type),
+		m.Vertices = append(m.Vertices, SemanticVertex{ID: v.ID, Label: v.Text, Shape: resolveShapeAlias(v.Type),
 			VertexKind: d.VertexKind(v), Metadata: metadata})
 	}
 	for _, e := range d.Edges {

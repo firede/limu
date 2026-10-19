@@ -9,7 +9,7 @@ import (
 	"github.com/firede/limu/internal/chars"
 )
 
-// fail panics with Pele's semantic error, which Build recovers.
+// fail panics with Pele's semantic error, which buildGit recovers.
 func fail(message string) {
 	panic(diagram.NewError(message, diagram.Semantic, "gitGraph"))
 }
@@ -310,10 +310,10 @@ func (b *builder) statement(s *Statement) {
 	}
 }
 
-// Build replays a git graph's tree into its model, as Pele's buildGit does: config is the
+// buildGit replays a git graph's tree into its model, as Pele's buildGit does: config is the
 // diagram's configuration and title the title its front matter gives. An error is a
 // *diagram.Error.
-func Build(ast *AST, config diagram.Config, title string) (m *Model, err error) {
+func buildGit(ast *AST, config diagram.Config, title string) (m *Model, err error) {
 	defer func() {
 		if v := recover(); v != nil {
 			e, ok := v.(*diagram.Error)

@@ -193,7 +193,7 @@ func compare(t *testing.T, what, src string, got, want any) bool {
 // result.
 func check(t *testing.T, what, text string, config diagram.Config, title string, want peleResult) bool {
 	t.Helper()
-	ast, err := ParseAST(text)
+	ast, err := parseGit(text)
 	if err != nil {
 		if want.Error == nil || want.AST != nil {
 			t.Errorf("%s(%q): %v, Pele had none", what, text, err)
@@ -208,7 +208,7 @@ func check(t *testing.T, what, text string, config diagram.Config, title string,
 	if !compare(t, what+" tree", text, dumpAST(ast), want.AST) {
 		return false
 	}
-	m, err := Build(ast, config, title)
+	m, err := buildGit(ast, config, title)
 	switch {
 	case err != nil && want.Error == nil:
 		t.Errorf("%s(%q): %v, Pele had none", what, text, err)

@@ -284,7 +284,7 @@ func BuildGraph(d *DB, paletteLength int, defaultCurve string) *Graph {
 			existing.CSSClasses = strings.Join(vertex.Classes, " ")
 			continue
 		}
-		typ := ResolveShapeAlias(vertex.Type)
+		typ := resolveShapeAlias(vertex.Type)
 		if typ == "square" || typ == "" {
 			typ = "squareRect"
 		}

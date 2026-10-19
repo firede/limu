@@ -251,14 +251,14 @@ func (db *DB) addMember(class, member string) {
 	case strings.HasPrefix(t, "<<") && strings.HasSuffix(t, ">>"):
 		node.Annotations = append(node.Annotations, t[2:len(t)-2])
 	case strings.IndexByte(t, ')') > 0:
-		m := NewMember(t, "method")
+		m := newMember(t, "method")
 		if m.MemberType == "method" {
 			node.Methods = append(node.Methods, m)
 		} else {
 			node.Members = append(node.Members, m)
 		}
 	case t != "":
-		node.Members = append(node.Members, NewMember(t, "attribute"))
+		node.Members = append(node.Members, newMember(t, "attribute"))
 	}
 }
 
@@ -279,8 +279,8 @@ func (db *DB) addNote(text, class string) string {
 	return id
 }
 
-// CleanupLabel is a label after a colon, as Pele's cleanupLabel takes it.
-func CleanupLabel(label string) string {
+// cleanupLabel is a label after a colon, as Pele's cleanupLabel takes it.
+func cleanupLabel(label string) string {
 	return chars.Trim(strings.TrimPrefix(label, ":"))
 }
 

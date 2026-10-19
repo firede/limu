@@ -85,7 +85,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 	size := o.Size()
 	measure := o.Measure()
 	const pad = common.Padding
-	icons := Icons(config)
+	icons := iconConfig(config)
 
 	s := settings(config)
 	paddingX, paddingY := s.paddingX, s.paddingY
@@ -127,7 +127,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 	// Siblings line up: when one entry of a folder has an icon, the others leave room for one.
 	hasIcon := func(list []*Node) bool {
 		for _, child := range list {
-			if NodeIcon(child, icons) != "" {
+			if getNodeIcon(child, icons) != "" {
 				return true
 			}
 		}
@@ -166,7 +166,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 		if node.Type == Directory {
 			face = text.Bold
 		}
-		r := &row{node: node, x: x, icon: NodeIcon(node, icons), text: name, labelX: labelX, tight: tight}
+		r := &row{node: node, x: x, icon: getNodeIcon(node, icons), text: name, labelX: labelX, tight: tight}
 		var width float64
 		if tight {
 			r.label = common.LiteralLabel(name, measure, size, room, face)
