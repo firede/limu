@@ -1,0 +1,17 @@
+{
+ "labels": [
+  {"text": "A", "markdown": false},
+  {"text": "Start", "markdown": false},
+  {"text": "Is it working?", "markdown": false},
+  {"text": "Database", "markdown": false},
+  {"text": "Send the request<br>and wait for a reply", "markdown": false},
+  {"text": "A label long enough that it has to wrap onto more than one line", "markdown": false},
+  {"text": "**Bold** and _italic_", "markdown": true},
+  {"text": "中文标签", "markdown": false},
+  {"text": "x", "markdown": false},
+  {"text": "One<br>Two<br>Three<br>Four", "markdown": false},
+  {"text": "", "markdown": false}
+ ],
+ "sizes": [16, 14],
+ "wrap": [200, 4000]
+}
