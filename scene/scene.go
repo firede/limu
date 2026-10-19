@@ -75,9 +75,9 @@ type Item struct {
 
 	// Box is where the item is: the box of its shape, for a node or a group; for an edge, the
 	// box its path lies in, the control points of its curves included, and for a mark, of
-	// what it draws. A Text item's Box is
-	// where the diagram sets its label, as an edge label's patch, and is empty where the
-	// diagram gives the label no box of its own; LabelBox is where its label is drawn.
+	// what it draws. A Text item's Box is where the diagram sets its label, as an edge
+	// label's patch, and is empty where the diagram gives the label no box of its own;
+	// LabelBox is where its label is drawn.
 	Box Rect
 
 	// Parts draw the outline; a backend that draws the shape its own way ignores them.

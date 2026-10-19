@@ -54,12 +54,11 @@ text ──parse──▶ model ──layout──▶ scene ──backend──�
 | Package | What it does |
 |---|---|
 | `limu` | `Layout`: a diagram's text to its scene; `Parse`, to lay one diagram out many times; `Types` and `Supports`, the types it reads. |
-| `diagram` | Reads a diagram's front matter and directives, and tells its type; a package for each type parses it and lays it out. |
+| `diagram` | Reads a diagram's front matter and directives, and tells its type; a package for each type parses it and lays it out. What the diagrams share is under `diagram/internal`: `graphs`, the layered, compound and swimlane layouts; `draw`, the geometry of shapes and edges; `css`, what authors set with `classDef` and `style`; and `common`. |
 | `text` | Measures text, through a `Measurer` the host gives, and lays out labels: lines, wrapping, emphasis, icons, entities. `text.Arial` measures with a table of Arial's advances, with no font at hand. |
 | `scene` | A diagram laid out: items, their roles and shapes, boxes, paths, markers, labels. |
 | `style` | How a scene looks, at three levels: a theme of colors by token, overrides by role, and a backend's drawing of its own. |
-| `layout` | What changes where things are: the measurer, the size of text, the width the host has, the padding about a diagram, a grid to snap to, how edges are routed, the present and the time zone of a gantt chart. The layered, compound and swimlane layouts. |
-| `draw` | The geometry diagrams share: shapes' outlines and edges' paths. |
+| `layout` | What changes where things are: the measurer, the size of text, the width the host has, the padding about a diagram, a grid to snap to, how edges are routed, the present and the time zone of a gantt chart. |
 | `svg` | Draws a scene as SVG, its theme as CSS variables. |
 | `mygoui` | Draws a scene with MyGo's native UI, and finds the item under the pointer. A module of its own, so that the rest needs only the standard library. |
 
@@ -83,7 +82,7 @@ out := svg.Render(sc, &svg.Options{Look: look})
 A part's style is the theme's, under the diagram's own, under the overrides for
 its role, under what the diagram's author set with `classDef` and `style`. To
 draw a part some other way, a backend takes a function in place of its
-default:
+default, and gives it the default's pieces to draw with:
 
 ```go
 svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.Style, next func()) {
@@ -91,7 +90,8 @@ svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.St
 		next()
 		return
 	}
-	// write the diamond some other way
+	// write the diamond some other way, then its label as the default does
+	w.Label(it, s)
 }})
 ```
 
@@ -101,16 +101,19 @@ svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.St
 ./scripts/verify.sh
 ```
 
-runs `go vet`, `gofmt` and the tests, offline. The tests compare with
-fixtures written from Pele's own sources:
+runs `go vet`, `gofmt` and the tests, in limu's module and in the mygoui
+module, offline once mygoui's modules are downloaded. CI runs it on amd64, at `GOAMD64` v1 and v3, and on arm64. On
+Linux, the mygoui tests need Pango (`libpangocairo-1.0-0`). The tests compare
+with fixtures written from Pele's own sources:
 
 ```sh
 ./scripts/oracle.sh ../pele
 ```
 
-runs Pele's TypeScript with Node 24, with nothing to install, over the cases in
-`internal/oracle/cases`, and writes the fixtures to the packages' `testdata/pele`.
-Run it after adding a case, or to follow a new version of Pele.
+runs Pele's TypeScript with Node 24, with nothing to install, over the cases of
+the suites in `internal/oracle/suites`, and writes the fixtures to the packages'
+`testdata/pele`. It runs only on arm64. Run it after adding a case, or to follow
+a new version of Pele.
 
 ## License
 
