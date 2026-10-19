@@ -200,5 +200,7 @@ export default async function ({ pele, src, cases, write, random }) {
     if (s.length <= 3000 && s.isWellFormed()) each(s);
   }
   console.log(`swimlane: ${docs.length} docs, ${own.length} written, ${flowcharts.length} flowcharts, ${out.length} drawn`);
-  write('diagram/swimlane/testdata/pele/render.json', { cases: out });
+  // The test reads a line with a tag among its classes with the tag moved last, so the lines
+  // that name one are kept in full.
+  write('diagram/swimlane/testdata/pele/render.json', { cases: out }, { keep: (line) => line.includes('clickable') });
 }

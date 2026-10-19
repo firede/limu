@@ -135,5 +135,7 @@ export default async function ({ pele, src, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, FRAGMENTS, random(32));
   while (drawn < 5000) each(next());
-  write('diagram/treemap/testdata/pele/render.json', { cases: out });
+  // The test reads the style Pele writes, css=, as limu reads declarations, so the lines with
+  // one are kept in full.
+  write('diagram/treemap/testdata/pele/render.json', { cases: out }, { keep: (line) => / css=[^ ]/.test(line) });
 }

@@ -267,5 +267,7 @@ export default async function ({ pele, src, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 2000);
   const next = mutator(usable, FRAGMENTS, random(42));
   while (drawn < 2800) each(next());
-  write('diagram/railroad/testdata/pele/render.json', { cases: out });
+  // The test draws the arcs of a track, and the circles at its ends, again as limu draws
+  // them, so their lines are kept in full.
+  write('diagram/railroad/testdata/pele/render.json', { cases: out }, { keep: (line) => /^(start|end) /.test(line) || (/^(track|arrows) /.test(line) && line.includes(' A ')) });
 }

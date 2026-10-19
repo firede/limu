@@ -161,5 +161,8 @@ export default async function ({ pele, src, write, random }) {
   const randoms = seeds.filter((s) => Number.isFinite(s)).map((s) => [s, seededRandom(s)]);
   const strings = ['', 'pele', 'other', 'pele-0-1', 'pele-12-345', 'a', 'é', '😀', '中文', 'x'.repeat(100), 'the quick brown fox jumps over the lazy dog'];
   const hashes = strings.map((s) => [s, hashString(s)]);
-  write('diagram/cynefin/testdata/pele/render.json', { cases: out, randoms, hashes });
+  // The test reads the data of a path as the scene would draw it, which writes again what is
+  // not a move, a line, a curve or a close, as arcs, so the lines of such paths are kept in
+  // full: the data is what lies between the class and id and the six fields of the pen.
+  write('diagram/cynefin/testdata/pele/render.json', { cases: out, randoms, hashes }, { keep: (line) => line.startsWith('path ') && /[^MLQCZ0-9.,\s-]/.test(line.split(' ').slice(3, -6).join(' ')) });
 }

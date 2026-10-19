@@ -198,5 +198,7 @@ export default async function ({ src, pele, write, random }) {
   // A case whose blocks run to thousands, as space:9999 makes them, is left out: the fixture
   // would hold every one of them.
   const cases = out.filter((c) => JSON.stringify(c).length <= 40000);
-  write('diagram/block/testdata/pele/render.json', { cases });
+  // The test writes the curves of an arc as the arc of Pele's line where ArcTo draws it
+  // with those curves, so the lines of paths with arcs are kept in full.
+  write('diagram/block/testdata/pele/render.json', { cases }, { keep: (line) => line.startsWith('path ') && line.includes(' A ') });
 }

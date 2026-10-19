@@ -2,6 +2,7 @@ package fixture
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"math"
 	"os"
@@ -31,7 +32,7 @@ func root(t *testing.T) string {
 // Every fixture of the module was written from the pinned version of Pele and holds cases.
 func TestFixturesArePinned(t *testing.T) {
 	top := root(t)
-	count := 0
+	count, drawings := 0, 0
 	err := filepath.WalkDir(top, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -50,7 +51,9 @@ func TestFixturesArePinned(t *testing.T) {
 			}
 			return nil
 		}
-		if filepath.Base(filepath.Dir(path)) != "pele" || filepath.Base(filepath.Dir(filepath.Dir(path))) != "testdata" || !strings.HasSuffix(path, ".json.gz") {
+		// The full lines of a fixture of drawings are not tracked, and are not a fixture.
+		if filepath.Base(filepath.Dir(path)) != "pele" || filepath.Base(filepath.Dir(filepath.Dir(path))) != "testdata" ||
+			!strings.HasSuffix(path, ".json.gz") || strings.HasSuffix(path, ".full.json.gz") {
 			return nil
 		}
 		count++
@@ -59,9 +62,15 @@ func TestFixturesArePinned(t *testing.T) {
 			t.Errorf("%s: %v", path, err)
 			return nil
 		}
+		rel, _ := filepath.Rel(top, path)
 		if err := Check(data); err != nil {
-			rel, _ := filepath.Rel(top, path)
 			t.Errorf("%s: %v", rel, err)
+		}
+		if filepath.Base(path) == "render.json.gz" {
+			drawings++
+			if err := checkDrawings(data); err != nil {
+				t.Errorf("%s: %v", rel, err)
+			}
 		}
 		return nil
 	})
@@ -71,10 +80,66 @@ func TestFixturesArePinned(t *testing.T) {
 	if count < 80 {
 		t.Errorf("%d fixtures, fewer than the 80 the oracle writes", count)
 	}
+	if drawings < 33 {
+		t.Errorf("%d fixtures of drawings, fewer than the 33 the oracle writes", drawings)
+	}
+}
+
+// checkDrawings says what is wrong with the shape of a fixture of drawings, if anything: its
+// first FullCases cases hold their lines, and each of the rest a digest of them in their
+// place, with the lines it keeps in full. A case where Pele drew nothing, as one it refused
+// with an error, holds neither.
+func checkDrawings(data []byte) error {
+	var f struct {
+		Cases []map[string]json.RawMessage `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &f); err != nil {
+		return err
+	}
+	digests := 0
+	for i, c := range f.Cases {
+		var d Drawing
+		raw, _ := json.Marshal(c)
+		if err := json.Unmarshal(raw, &d); err != nil {
+			return fmt.Errorf("case %d: %v", i, err)
+		}
+		_, lines := c["lines"]
+		_, digest := c["digest"]
+		switch {
+		case i < FullCases && (digest || d.Kept != nil):
+			return fmt.Errorf("case %d, of the first %d, holds a digest in place of its lines", i, FullCases)
+		case i >= FullCases && lines:
+			return fmt.Errorf("case %d, past the first %d, holds its lines in place of a digest", i, FullCases)
+		case digest && !isDigest(d.Digest):
+			return fmt.Errorf("case %d holds %q, not a digest", i, d.Digest)
+		case !digest && d.Kept != nil:
+			return fmt.Errorf("case %d keeps lines beside no digest", i)
+		}
+		if digest {
+			digests++
+		}
+	}
+	if digests == 0 {
+		return fmt.Errorf("no digests in %d cases", len(f.Cases))
+	}
+	return nil
+}
+
+// isDigest says whether s is written as Digest writes one: 32 lowercase hexadecimal digits.
+func isDigest(s string) bool {
+	if len(s) != 32 {
+		return false
+	}
+	for _, r := range s {
+		if !('0' <= r && r <= '9' || 'a' <= r && r <= 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func TestCheck(t *testing.T) {
-	pinned := `"pele":{"version":"1.6.0","commit":"44da152bbb79b91f03e68016f42499bb25bf6e82"}`
+	pinned := `"pele":{"version":"1.6.0","commit":"44da152bbb79b91f03e68016f42499bb25bf6e82","arch":"arm64","node":"v24.22.0"}`
 	for _, c := range []struct {
 		json string
 		ok   bool
@@ -85,6 +150,9 @@ func TestCheck(t *testing.T) {
 		{`{` + pinned + `,"cases":[ ]}`, false},
 		{`{"pele":{"version":"1.6.0","commit":"0000000"},"cases":[1]}`, false},
 		{`{"cases":[1]}`, false},
+		// The architecture and the version of Node are recorded and not compared.
+		{`{"pele":{"version":"1.6.0","commit":"44da152bbb79b91f03e68016f42499bb25bf6e82"},"cases":[1]}`, true},
+		{`{"pele":{"version":"1.6.0","commit":"44da152bbb79b91f03e68016f42499bb25bf6e82","arch":"x64","node":"v26.0.0"},"cases":[1]}`, true},
 	} {
 		if err := Check([]byte(c.json)); (err == nil) != c.ok {
 			t.Errorf("Check(%s) = %v", c.json, err)

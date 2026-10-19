@@ -224,5 +224,7 @@ export default async function ({ pele, src, write, random }) {
     const s = next();
     if (s.length <= 3000) each(s);
   }
-  write('diagram/pie/testdata/pele/render.json', { cases: out });
+  // The test writes the curves of an arc as the arc of Pele's line where ArcTo draws it
+  // with those curves, so the lines of circles and of paths with arcs are kept in full.
+  write('diagram/pie/testdata/pele/render.json', { cases: out }, { keep: (line) => line.startsWith('circle ') || (line.startsWith('path ') && line.includes(' A ')) });
 }

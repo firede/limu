@@ -12,13 +12,18 @@ import (
 	"os"
 )
 
-// Origin is the version of Pele a fixture was written from, as the oracle records it.
+// Origin is the version of Pele a fixture was written from, as the oracle records it, with
+// the architecture and the version of Node that ran it.
 type Origin struct {
 	Version string `json:"version"`
 	Commit  string `json:"commit"`
+	Arch    string `json:"arch"`
+	Node    string `json:"node"`
 }
 
-// Pinned is the version of Pele limu follows; every fixture is written from it.
+// Pinned is the version of Pele limu follows; every fixture is written from it. Its Arch and
+// Node are not compared, as the oracle runs only on arm64 and a fixture holds what Pele makes
+// of its cases whichever Node runs it.
 var Pinned = Origin{Version: "1.6.0", Commit: "44da152bbb79b91f03e68016f42499bb25bf6e82"}
 
 // Read is the JSON of the fixture at path, which is kept as path + ".gz".
@@ -46,7 +51,7 @@ func Check(data []byte) error {
 	if err := json.Unmarshal(top["pele"], &origin); err != nil {
 		return fmt.Errorf("no origin: %v", err)
 	}
-	if origin != Pinned {
+	if origin.Version != Pinned.Version || origin.Commit != Pinned.Commit {
 		return fmt.Errorf("written from Pele %s, commit %s, not %s, commit %s", origin.Version, origin.Commit, Pinned.Version, Pinned.Commit)
 	}
 	for key, raw := range top {

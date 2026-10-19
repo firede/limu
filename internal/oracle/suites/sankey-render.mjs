@@ -241,5 +241,7 @@ export default async function ({ pele, src, write, random }) {
     each(`---\nconfig:\n  sankey:\n    height: ${height}\n    showValues: false\n    nodePadding: ${padding}\n---\nsankey\n${rows}`);
   }
   if (refused < 20) throw new Error(`only ${refused} diagrams refused`);
-  write('diagram/sankey/testdata/pele/render.json', { cases: out });
+  // The test reads the style Pele writes, css=, as limu reads declarations, so the lines with
+  // one are kept in full.
+  write('diagram/sankey/testdata/pele/render.json', { cases: out }, { keep: (line) => / css=[^ ]/.test(line) });
 }

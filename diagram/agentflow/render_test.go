@@ -22,22 +22,23 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
 	var p peleRender
-	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 2000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, narrow := 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		if c.MaxWidth > 0 {
 			narrow++
 		}
@@ -52,10 +53,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
-		want := pelesvg.TagsLast(c.Lines, "clickable")
-		if i := fixture.FirstDiff(got, want); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, pelesvg.TagsLast("clickable")); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, at(got, i), at(want, i))
+				t.Errorf("Layout(%q, max %v), %s", c.Src, c.MaxWidth, msg)
 			}
 		}
 	}
@@ -63,13 +63,6 @@ func TestLayoutMatchesPele(t *testing.T) {
 		t.Errorf("%d of %d differ", failed, len(p.Cases))
 	}
 	t.Logf("%d cases, %d of them narrow", len(p.Cases), narrow)
-}
-
-func at(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
-	}
-	return "(none)"
 }
 
 // sceneLines writes a scene as the oracle reads Pele's SVG.

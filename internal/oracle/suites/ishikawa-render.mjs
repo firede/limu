@@ -165,5 +165,7 @@ export default async function ({ src, pele, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, FRAGMENTS, random(52));
   for (let i = 0; drawn < 3000 && i < 40000; i++) each(next());
-  write('diagram/ishikawa/testdata/pele/render.json', { cases: out });
+  // The test draws the arcs of the head's outline again as limu draws them, so its lines are
+  // kept in full.
+  write('diagram/ishikawa/testdata/pele/render.json', { cases: out }, { keep: (line) => line.startsWith('outline ') });
 }
