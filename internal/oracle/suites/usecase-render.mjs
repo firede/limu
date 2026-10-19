@@ -1,6 +1,12 @@
 // Use case diagrams drawn end to end: what Pele's render draws, read back out of its SVG as one
-// line per thing drawn, in the order drawn, with numbers as the SVG writes them. limu's test
-// writes the same lines from its scene.
+// line per thing drawn, in the order drawn. limu's test writes the same lines from its scene.
+//
+// A scene has no groups to move what is in them, so it holds where everything is on the page,
+// where Pele writes the inside of a node about the node's middle, and an actor's figure about a
+// point of its own. Pele's SVG is drawn here with its numbers written out in full, as the
+// oracle's hooks have num() write them while limuExactNumbers is set. A number inside groups is
+// moved as limu's render moves it: the groups' moves are added up from the outermost in, the
+// number is added to their sum, and only then is it written to two decimals as Pele writes it.
 import { lone, mutator } from './parse.mjs';
 import { FRAGMENTS, corpus, drawableDiagrams } from './usecase.mjs';
 
@@ -10,98 +16,147 @@ const attr = (s, name) => {
   const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
   return m ? unescape(m[1]) : undefined;
 };
-const box = (s) => `${attr(s, 'x') ?? 0},${attr(s, 'y') ?? 0},${attr(s, 'width')},${attr(s, 'height')}`;
 // How a shape is painted: its fill, with its opacity, and its stroke.
 const paint = (s) => {
   const opacity = attr(s, 'fill-opacity');
   return `${attr(s, 'fill') ?? '-'}${opacity ? '/' + opacity : ''} ${attr(s, 'stroke') ?? '-'}`;
 };
-// Where a text's first line sits, the first x and y in it, and its own fill; s starts with
-// the text.
-const textAt = (s) => {
-  const m = / x="([^"]*)" y="([^"]*)"/.exec(s);
-  return `t ${m[1]},${m[2]} ${attr(s.slice(0, s.indexOf('>')), 'fill') ?? '-'}`;
-};
+const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
-// The subpaths of a path's d, each as one string of absolute commands, M, L, C and Z, with
-// H and V written as L. A circle drawn as two arcs is written as an ellipse.
-function subpaths(d) {
-  const out = [];
-  let cur = [];
-  let x = '0';
-  let y = '0';
-  for (const m of d.matchAll(/([MLHVCAZ])([^MLHVCAZ]*)/g)) {
-    const nums = m[2].trim() === '' ? [] : m[2].trim().split(/[ ,]+/);
-    switch (m[1]) {
-      case 'M':
-        if (cur.length) out.push(cur.join(' '));
-        cur = [`M ${nums[0]},${nums[1]}`];
-        [x, y] = nums;
-        break;
-      case 'L':
-        cur.push(`L ${nums[0]},${nums[1]}`);
-        [x, y] = nums;
-        break;
-      case 'H':
-        x = nums[0];
-        cur.push(`L ${x},${y}`);
-        break;
-      case 'V':
-        y = nums[0];
-        cur.push(`L ${x},${y}`);
-        break;
-      case 'C':
-        cur.push(`C ${nums[0]},${nums[1]} ${nums[2]},${nums[3]} ${nums[4]},${nums[5]}`);
-        [x, y] = nums.slice(4);
-        break;
-      case 'A':
-        cur.push(`A ${nums.join(',')}`);
-        [x, y] = nums.slice(5);
-        break;
-      case 'Z':
-        cur.push('Z');
-        break;
+// How the numbers of what is drawn are read: moves holds the moves of the groups they are in,
+// the outermost first, and num writes a number as Pele does.
+function frame(num, moves) {
+  const move = (v, axis) => {
+    if (moves.length === 0) return v;
+    let by = moves[0][axis];
+    for (let k = 1; k < moves.length; k++) by = by + moves[k][axis];
+    return by + v;
+  };
+  // A point, moved; a size, which no group moves.
+  const pt = (x, y) => `${num(move(Number(x), 0))},${num(move(Number(y), 1))}`;
+  const size = (v) => num(Number(v));
+  // An ellipse as the scene holds it, by its middle and its right end and bottom: the middle,
+  // moved, and the radii as far as those ends are from it.
+  const ellipse = (cx, cy, rx, ry) => {
+    const x = move(Number(cx), 0);
+    const y = move(Number(cy), 1);
+    return `ellipse ${num(x)},${num(y)} ${num(x + Number(rx) - x)},${num(y + Number(ry) - y)}`;
+  };
+  const box = (s) => `${pt(attr(s, 'x') ?? 0, attr(s, 'y') ?? 0)},${size(attr(s, 'width'))},${size(attr(s, 'height'))}`;
+  // Where a text's first line sits, the first x and y in it, and its own fill; s starts with
+  // the text.
+  const textAt = (s) => {
+    const m = / x="([^"]*)" y="([^"]*)"/.exec(s);
+    return `t ${pt(m[1], m[2])} ${attr(s.slice(0, s.indexOf('>')), 'fill') ?? '-'}`;
+  };
+  // The subpaths of a path's d, each as one string of absolute commands, M, L, C and Z, with
+  // H and V written as L. A circle drawn as two arcs is written as an ellipse, its middle
+  // found before it is moved.
+  const subpaths = (d) => {
+    const out = [];
+    let cur = [];
+    let x = '0';
+    let y = '0';
+    for (const m of d.matchAll(/([MLHVCAZ])([^MLHVCAZ]*)/g)) {
+      const nums = m[2].trim() === '' ? [] : m[2].trim().split(/[ ,]+/);
+      switch (m[1]) {
+        case 'M':
+          if (cur.length) out.push(cur);
+          [x, y] = nums;
+          cur = [['M', x, y]];
+          break;
+        case 'L':
+          [x, y] = nums;
+          cur.push(['L', x, y]);
+          break;
+        case 'H':
+          x = nums[0];
+          cur.push(['L', x, y]);
+          break;
+        case 'V':
+          y = nums[0];
+          cur.push(['L', x, y]);
+          break;
+        case 'C':
+          cur.push(['C', ...nums]);
+          [x, y] = nums.slice(4);
+          break;
+        case 'A':
+          cur.push(['A', ...nums]);
+          [x, y] = nums.slice(5);
+          break;
+        case 'Z':
+          cur.push(['Z']);
+          break;
+      }
     }
-  }
-  if (cur.length) out.push(cur.join(' '));
-  return out.map((s) => {
-    // M x,y1 A r,r,0,1,1,x,y2 A r,r,0,1,1,x,y1 Z: a circle on the line from y1 to y2.
-    const m = /^M ([^,\s]+),([^,\s]+) A ([^,\s]+),\3,0,1,1,\1,([^,\s]+) A \3,\3,0,1,1,\1,\2 Z$/.exec(s);
-    return m ? `ellipse ${m[1]},${(Number(m[2]) + Number(m[4])) / 2} ${m[3]},${m[3]}` : s;
-  });
+    if (cur.length) out.push(cur);
+    return out.map((s) => {
+      // M x,y1 A r,r,0,1,1,x,y2 A r,r,0,1,1,x,y1 Z: a circle on the line from y1 to y2.
+      const [m, a, b, z] = s;
+      if (
+        s.length === 4 &&
+        a[0] === 'A' &&
+        b[0] === 'A' &&
+        z[0] === 'Z' &&
+        a.slice(1).join() === [a[1], a[1], 0, 1, 1, m[1], a[7]].join() &&
+        b.slice(1).join() === [a[1], a[1], 0, 1, 1, m[1], m[2]].join()
+      ) {
+        return ellipse(m[1], (Number(m[2]) + Number(a[7])) / 2, a[1], a[1]);
+      }
+      return s
+        .map(([op, ...nums]) => {
+          if (op === 'A') return `A ${nums.join(',')}`;
+          const pts = [];
+          for (let i = 0; i < nums.length; i += 2) pts.push(pt(nums[i], nums[i + 1]));
+          return [op, ...pts].join(' ');
+        })
+        .join(' ');
+    });
+  };
+  return { pt, size, box, ellipse, textAt, subpaths, moves };
 }
 
-// Every element of a node or cluster, in order, as lines.
-function shapes(s, lines) {
-  for (const m of s.matchAll(/<(circle|ellipse|path|rect|svg|text|g) [^>]*>/g)) {
+// Every element of a node or cluster, in order, as lines. A group inside, such as an actor's
+// figure, moves what is in it.
+function shapes(s, lines, f) {
+  const open = [];
+  for (const m of s.matchAll(/<(\/?)(circle|ellipse|path|rect|svg|text|g)\b[^>]*>/g)) {
     const e = m[0];
-    switch (m[1]) {
+    if (m[1]) {
+      if (m[2] === 'g' && open.pop()) f.moves.pop();
+      continue;
+    }
+    switch (m[2]) {
       case 'circle':
       case 'ellipse': {
         const rx = attr(e, 'r') ?? attr(e, 'rx');
         const ry = attr(e, 'r') ?? attr(e, 'ry');
-        lines.push(`ellipse ${attr(e, 'cx') ?? 0},${attr(e, 'cy') ?? 0} ${rx},${ry} ${paint(e)}`);
+        lines.push(`${f.ellipse(attr(e, 'cx') ?? 0, attr(e, 'cy') ?? 0, rx, ry)} ${paint(e)}`);
         break;
       }
       case 'path':
-        for (const p of subpaths(attr(e, 'd'))) lines.push(`${p.startsWith('ellipse') ? '' : 'path '}${p} ${paint(e)}`);
+        for (const p of f.subpaths(attr(e, 'd'))) lines.push(`${p.startsWith('ellipse') ? '' : 'path '}${p} ${paint(e)}`);
         break;
       case 'rect': {
         const rounded = attr(e, 'rx') !== undefined || (attr(e, 'style') ?? '').includes('rx:');
-        lines.push(`rect ${box(e)}${rounded ? ' r' : ''} ${paint(e)}`);
+        lines.push(`rect ${f.box(e)}${rounded ? ' r' : ''} ${paint(e)}`);
         break;
       }
       case 'svg':
-        lines.push(`icon ${attr(e, 'data-icon')} ${box(e)}`);
+        lines.push(`icon ${attr(e, 'data-icon')} ${f.box(e)}`);
         break;
       case 'text': {
         const end = s.indexOf('</text>', m.index);
-        lines.push(textAt(s.slice(m.index, end)));
+        lines.push(f.textAt(s.slice(m.index, end)));
         break;
       }
-      case 'g':
-        if (e.includes('pele-actor-figure')) lines.push(`figure ${/translate\(([^)]*)\)/.exec(e)[1]}`);
+      case 'g': {
+        const t = TRANSLATE.exec(attr(e, 'transform') ?? '');
+        if (t) f.moves.push([Number(t[1]), Number(t[2])]);
+        open.push(t !== null);
         break;
+      }
     }
   }
 }
@@ -117,13 +172,15 @@ const classesAfter = (cls, n) =>
 
 const GROUP = /<g class="pele-(cluster|edge|edge-label|node)[ "]/g;
 
-// The lines of a use case diagram's SVG.
-export function readSvg(svg) {
+// The lines of a use case diagram's SVG, drawn with its numbers in full; num writes a number as
+// Pele does.
+export function readSvg(svg, num) {
   const lines = [];
+  const page = frame(num, []);
   const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${attr(head, 'width')},${attr(head, 'height')}`);
+  lines.push(`size ${page.size(attr(head, 'width'))},${page.size(attr(head, 'height'))}`);
   const title = svg.indexOf('<text class="pele-title"');
-  if (title >= 0) lines.push('title ' + textAt(svg.slice(title)));
+  if (title >= 0) lines.push('title ' + page.textAt(svg.slice(title)));
   const starts = [...svg.matchAll(GROUP)];
   for (let k = 0; k < starts.length; k++) {
     const kind = starts[k][1];
@@ -135,25 +192,29 @@ export function readSvg(svg) {
     switch (kind) {
       case 'cluster':
         lines.push(`cluster ${id} [${classesAfter(cls, 2)}]`);
-        shapes(s, lines);
+        shapes(s, lines, page);
         break;
       case 'edge': {
         const type = cls.split(' ')[1].slice('pele-'.length);
         const path = /<path d="[^"]*"[^>]*>/.exec(s)[0];
         lines.push(`edge ${id} ${type} [${classesAfter(cls, 2)}] ${attr(path, 'stroke-dasharray') ?? '-'}`);
-        for (const p of subpaths(attr(path, 'd'))) lines.push('path ' + p);
+        for (const p of page.subpaths(attr(path, 'd'))) lines.push('path ' + p);
         for (const m of s.matchAll(/<(path|circle) class="pele-marker"[^>]*>/g)) {
-          lines.push(m[1] === 'path' ? `m ${subpaths(attr(m[0], 'd')).join(' ')}` : `m o ${attr(m[0], 'cx')},${attr(m[0], 'cy')}`);
+          lines.push(m[1] === 'path' ? `m ${page.subpaths(attr(m[0], 'd')).join(' ')}` : `m o ${page.pt(attr(m[0], 'cx'), attr(m[0], 'cy'))}`);
         }
         break;
       }
       case 'edge-label':
-        lines.push(`label ${id} ${box(/<rect [^>]*>/.exec(s)[0])}`, textAt(s.slice(s.indexOf('<text'))));
+        lines.push(`label ${id} ${page.box(/<rect [^>]*>/.exec(s)[0])}`, page.textAt(s.slice(s.indexOf('<text'))));
         break;
-      case 'node':
-        lines.push(`node ${id} [${classesAfter(cls, 2)}] ${attr(open, 'transform')}`);
-        shapes(s, lines);
+      case 'node': {
+        // The node's middle, which moves everything in it, and is checked through where that
+        // is drawn: a scene holds no middle of its own for a node.
+        const t = TRANSLATE.exec(attr(open, 'transform'));
+        lines.push(`node ${id} [${classesAfter(cls, 2)}]`);
+        shapes(s, lines, frame(num, [[Number(t[1]), Number(t[2])]]));
         break;
+      }
     }
   }
   return lines;
@@ -162,19 +223,23 @@ export function readSvg(svg) {
 export default async function ({ src, pele, write, random }) {
   const { render, PeleError } = await src('index.ts');
   const { metricsMeasurer } = await src('text/measurer.ts');
+  const { num } = await src('svg/builder.ts');
 
   const out = [];
   const draw = (source, maxWidth, fontSize) => {
     let r;
+    globalThis.limuExactNumbers = true;
     try {
       r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, outputLimit: Infinity });
     } catch (e) {
       if (e instanceof RangeError) return false;
       if (!(e instanceof PeleError)) throw e;
       return false;
+    } finally {
+      globalThis.limuExactNumbers = false;
     }
     if (r.type !== 'usecase') return false;
-    out.push({ src: source, maxWidth, fontSize, lines: readSvg(r.svg) });
+    out.push({ src: source, maxWidth, fontSize, lines: readSvg(r.svg, num) });
     return true;
   };
   const seen = new Set();
