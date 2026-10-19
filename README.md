@@ -84,10 +84,12 @@ look := style.Look{
 out := svg.Render(sc, &svg.Options{Look: look})
 ```
 
-A part's style is the theme's, under the diagram's own, under the overrides for
-its role, under what the diagram's author set with `classDef` and `style`. To
-draw a part some other way, a backend takes a function in place of its
-default, and gives it the default's pieces to draw with:
+The themes limu has are `style.Default()`, Pele's light theme, and its own
+`style.Kohu()` and `style.KohuDark()`, a light and a dark one. A part's style is
+the theme's, under the diagram's own, under the overrides for its role, under
+what the diagram's author set with `classDef` and `style`. To draw a part some
+other way, a backend takes a function in place of its default, and gives it the
+default's pieces to draw with:
 
 ```go
 svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.Style, next func()) {

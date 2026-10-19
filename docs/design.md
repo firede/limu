@@ -177,7 +177,8 @@ Three levels, from the least to the most a host does:
    by token: `Bg`, `Fg`, `Muted`, `Line`, `Surface`, `SurfaceAlt`, `Border`, `Accent`,
    `Critical`, eight series, a corner radius and a stroke width. The svg package writes
    them as CSS variables, `--limu-surface` and the rest, with the theme's colors as
-   fallbacks.
+   fallbacks. `style.Default()` is Pele's light theme; `style.Kohu()` and
+   `style.KohuDark()` are limu's own, a light and a dark one.
 2. **Overrides** (`style.Overrides`): a `style.Style` for a role, laid over the diagram's
    own style for its parts. What a style leaves unset comes from under it.
 3. **Drawing of one's own**: each backend takes a function that draws an item in place of

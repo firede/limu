@@ -78,9 +78,10 @@ look := style.Look{
 out := svg.Render(sc, &svg.Options{Look: look})
 ```
 
-一个部件的样式从下到上依次叠加：主题、图表自身的样式、该角色的覆盖、作者用
-`classDef` 和 `style` 写下的样式。要用别的方式画某个部件，后端接受一个函数来
-代替默认画法，并提供默认画法的各个部分供它调用：
+limu 带有三个主题：Pele 的亮色主题 `style.Default()`，以及 limu 自己的一亮一暗
+`style.Kohu()` 和 `style.KohuDark()`。一个部件的样式从下到上依次叠加：主题、图表
+自身的样式、该角色的覆盖、作者用 `classDef` 和 `style` 写下的样式。要用别的方式画
+某个部件，后端接受一个函数来代替默认画法，并提供默认画法的各个部分供它调用：
 
 ```go
 svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.Style, next func()) {

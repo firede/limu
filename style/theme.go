@@ -100,6 +100,50 @@ func Default() *Theme {
 	}
 }
 
+// Kohu is limu's light theme, in the colors of limu kohu, the red limu of Hawaiʻi, in a tide
+// pool: neutrals of the pool's teal, the limu's red for the accent, and amber for what is
+// critical, so that it is not taken for the accent. The series are colors of algae.
+func Kohu() *Theme {
+	return &Theme{
+		Bg:         Hex("#f1f6f5"),
+		Fg:         Hex("#0f262a"),
+		Muted:      Hex("#536f72"),
+		Line:       Hex("#23393d"),
+		Surface:    Hex("#e5eeec"),
+		SurfaceAlt: Hex("#d6e4e2"),
+		Border:     Hex("#76939a"),
+		Accent:     Hex("#a92e4a"),
+		Critical:   Hex("#b0611a"),
+		Series: [8]Color{
+			Hex("#4f8a3a"), Hex("#b5435c"), Hex("#23817d"), Hex("#a8761c"),
+			Hex("#3d6aa3"), Hex("#7b5aa0"), Hex("#c0668a"), Hex("#7d6a3f"),
+		},
+		Radius:      4,
+		StrokeWidth: 1,
+	}
+}
+
+// KohuDark is limu's dark theme, Kohu's colors in the dark of the pool.
+func KohuDark() *Theme {
+	return &Theme{
+		Bg:         Hex("#0c1618"),
+		Fg:         Hex("#d0dddc"),
+		Muted:      Hex("#7f989b"),
+		Line:       Hex("#b4c7c7"),
+		Surface:    Hex("#142428"),
+		SurfaceAlt: Hex("#1b2f34"),
+		Border:     Hex("#557176"),
+		Accent:     Hex("#ee8494"),
+		Critical:   Hex("#e3a040"),
+		Series: [8]Color{
+			Hex("#8cbf6a"), Hex("#e37d90"), Hex("#5cbcb3"), Hex("#d9a748"),
+			Hex("#78a3d9"), Hex("#ad92d1"), Hex("#e693b3"), Hex("#b9a272"),
+		},
+		Radius:      4,
+		StrokeWidth: 1,
+	}
+}
+
 // Color is the theme's color for a token.
 func (th *Theme) Color(t Token) Color {
 	switch t {
