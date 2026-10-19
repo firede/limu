@@ -1,4 +1,4 @@
-// Math.sin, Math.cos, Math.atan2, Math.acos and Math.pow as V8 works them out, which Pele's
+// Math.sin, Math.cos, Math.atan2 and Math.acos as V8 works them out, which Pele's
 // charts compute with: on the angles and coordinates charts reach, the arithmetic charts do
 // on them, random bit patterns and the special values. An angle written [k, n] is k·π/n,
 // worked out as k * Math.PI / n, which keeps the fixture small; any other input is itself.
@@ -92,23 +92,5 @@ export default async function ({ write, random }) {
   for (let i = 0; i < 1000; i++) ac(sign() * next() * 2 ** -int(0, 70));
   for (let i = 0; i < 1000; i++) ac(anyBits());
 
-  // Math.pow, with the exponents charts give it, and x ** y, which is the same.
-  const pow = [];
-  const pw = (x, y) => {
-    const r = Math.pow(x, y);
-    if (!Object.is(r, x ** y)) throw new Error(`Math.pow(${x}, ${y}) is not ${x} ** ${y}`);
-    pow.push([enc(x), enc(y), enc(r)]);
-  };
-  for (const x of SPECIAL) for (const y of SPECIAL) pw(x, y);
-  for (let n = -400; n <= 400; n++) for (const x of [0.99, 10, 2, 0.5, 0.9, 1.01, 3, 0.1, -2, -0.5]) pw(x, n);
-  for (let i = 0; i < 7000; i++) pw(Math.round(next() * 2000) / 1000, int(-30, 400));
-  for (let i = 0; i < 5000; i++) pw(decimal(1000, int(0, 3)), pick([2, 3, 4, 0.5, -1, -2, -0.5, 1 / 3, 1.5, 0.25, 10, 1, 0]));
-  for (let i = 0; i < 3000; i++) pw(decimal(100, 2), int(-12, 12));
-  for (let i = 0; i < 2000; i++) pw(next() * 10, decimal(10, int(0, 3)));
-  for (let i = 0; i < 2000; i++) pw(Math.abs(anySize()), (next() - 0.5) * 8);
-  for (let i = 0; i < 1000; i++) pw(1 + (next() - 0.5) * 2 ** -int(1, 52), anySize(-10, 70));
-  for (let i = 0; i < 1000; i++) pw(anyBits(), anyBits());
-  for (let i = 0; i < 1000; i++) pw(int(1, 64) ** pick([2, 3, 4, 8, 16, 32]), pick([0.5, 0.25, 0.125, 1.5, 0.75, 2.5, 0.0625]));
-
-  write('internal/jsmath/testdata/pele/math.json', { trig, atan2, acos, pow });
+  write('internal/jsmath/testdata/pele/math.json', { trig, atan2, acos });
 }

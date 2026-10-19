@@ -20,6 +20,10 @@ type TokenType struct {
 	Name    string
 	Literal string
 	Match   func(src string, at int) int
+	// Scanner makes a matcher that answers as Match would, for a pattern that could rescan
+	// the text, as Pele's scanner does: it is called once for each text tokenized, so the
+	// matcher may remember what it has scanned. A type with a Scanner needs no Match.
+	Scanner func() func(src string, at int) int
 	// Opener reports whether the start of a construct that needs a closer is at a byte. When
 	// it is but the whole type does not match, no closer is in the rest of the text, and the
 	// type is not tried again.
@@ -72,11 +76,18 @@ func Tokenize(src string, table *Table, typ string) (*Tokens, error) {
 	types := table.Types
 	out := &Tokens{Src: src}
 	dead := make([]bool, len(types))
+	scanners := make([]func(string, int) int, len(types))
 	match := func(k, p int) int {
 		if dead[k] {
 			return -1
 		}
 		t := &types[k]
+		if t.Scanner != nil {
+			if scanners[k] == nil {
+				scanners[k] = t.Scanner()
+			}
+			return scanners[k](src, p)
+		}
 		if t.Literal != "" {
 			if strings.HasPrefix(src[p:], t.Literal) {
 				return p + len(t.Literal)

@@ -141,8 +141,10 @@ ported from the fdlibm functions in V8's `src/base/ieee754.cc`, with their produ
 where clang fuses them when it builds Node for arm64; Go's `math` package gives other last
 bits for a good share of inputs, and so does a V8 built without fused multiply-adds, as on
 x86-64. V8's `Math.pow` calls the C library's `pow`, which is not the same on every
-platform; `jsmath.Pow` rounds correctly, as Apple's `pow`, which Node calls on macOS, does
-for every power Pele takes but misses by an ulp in about one result in a thousand.
+platform, so limu does not copy it. It needs only the powers Pele takes: `Pow10` gives
+whole powers of ten, `x ** 2` is `x*x`, as V8 works it out, and Sankey's six pulls of 0.99
+to a power are written out as V8 gives them, as Go's `math.Pow` multiplies and gives other
+last bits.
 
 What the diagrams share beyond layout and drawing is in `diagram/internal/common`, as Pele
 keeps it in `diagrams/common`: the padding about a diagram, fitting it to the host's width,

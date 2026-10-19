@@ -11,8 +11,11 @@ import (
 	"github.com/firede/limu/diagram/journey"
 	"github.com/firede/limu/diagram/kanban"
 	"github.com/firede/limu/diagram/packet"
+	"github.com/firede/limu/diagram/pie"
 	"github.com/firede/limu/diagram/quadrant"
+	"github.com/firede/limu/diagram/radar"
 	"github.com/firede/limu/diagram/requirement"
+	"github.com/firede/limu/diagram/sankey"
 	"github.com/firede/limu/diagram/sequence"
 	"github.com/firede/limu/diagram/state"
 	"github.com/firede/limu/diagram/swimlane"
@@ -104,12 +107,24 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = packet.Layout(m, p.Config, o)
+	case diagram.Pie:
+		m, err := pie.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = pie.Layout(m, p.Config, o)
 	case diagram.QuadrantChart:
 		m, err := quadrant.ParsePrepared(p)
 		if err != nil {
 			return nil, err
 		}
 		sc = quadrant.Layout(m, p.Config, o)
+	case diagram.Radar:
+		m, err := radar.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = radar.Layout(m, p.Config, o)
 	case diagram.Kanban:
 		m, err := kanban.ParsePrepared(p)
 		if err != nil {
@@ -148,6 +163,14 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		if sc, err = xychart.Layout(m, p.Config, o); err != nil {
+			return nil, err
+		}
+	case diagram.Sankey:
+		m, err := sankey.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		if sc, err = sankey.Layout(m, p.Config, o); err != nil {
 			return nil, err
 		}
 	case diagram.Venn:

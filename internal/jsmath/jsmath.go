@@ -5,10 +5,12 @@ package jsmath
 import "math"
 
 // Round is Math.round: the nearest integer, halves up. It is not math.Floor(x+0.5), which
-// rounds 0.49999999999999994 up, as the sum is 1.
+// rounds 0.49999999999999994 up, as the sum is 1. x is converted where it is subtracted
+// from, as Go, once Round is inlined, would fuse a product passed as x into that
+// subtraction: Round(22.505*100) would be 2250.
 func Round(x float64) float64 {
 	r := math.Floor(x)
-	if x-r >= 0.5 {
+	if float64(x)-r >= 0.5 {
 		r++
 	}
 	return r
