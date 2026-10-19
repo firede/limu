@@ -24,6 +24,9 @@ type jsObject struct {
 	values map[string]any
 }
 
+// set gives a key a value, as an assignment to a property does: a new key goes last, and a key
+// set again keeps its place. It is part of limu's JSON.parse, which Pele has from the
+// platform.
 func (o *jsObject) set(key string, v any) {
 	if _, ok := o.values[key]; !ok {
 		o.keys = append(o.keys, key)
@@ -31,7 +34,8 @@ func (o *jsObject) set(key string, v any) {
 	o.values[key] = v
 }
 
-// ordered is the keys in the order JavaScript iterates them.
+// ordered is the keys in the order JavaScript iterates them. It is part of limu's JSON.parse,
+// which Pele has from the platform.
 func (o *jsObject) ordered() []string {
 	var index, other []string
 	for _, k := range o.keys {
@@ -53,13 +57,15 @@ func (o *jsObject) ordered() []string {
 	return append(index, other...)
 }
 
+// arrayIndex is the value of a key that isArrayIndex accepts. It is part of limu's JSON.parse,
+// which Pele has from the platform.
 func arrayIndex(k string) uint64 {
 	v, _ := strconv.ParseUint(k, 10, 64)
 	return v
 }
 
 // isArrayIndex reports whether a key is an array index: the canonical decimal of an integer
-// below 2^32 - 1.
+// below 2^32 - 1. It is part of limu's JSON.parse, which Pele has from the platform.
 func isArrayIndex(k string) bool {
 	if k == "" || len(k) > 10 || len(k) > 1 && k[0] == '0' {
 		return false
@@ -80,8 +86,12 @@ type jsonReader struct {
 
 type jsonFailed struct{}
 
+// fail stops the reading where the text is not JSON, where the JSON.parse that Pele's addLinks
+// and addProperties call throws and they catch it.
 func (r *jsonReader) fail() { panic(jsonFailed{}) }
 
+// peek is the code unit at the reader's position, or -1 at the end. It is part of limu's
+// JSON.parse, which Pele has from the platform.
 func (r *jsonReader) peek() int {
 	if r.i < len(r.u) {
 		return int(r.u[r.i])
@@ -89,6 +99,8 @@ func (r *jsonReader) peek() int {
 	return -1
 }
 
+// space moves past the white space JSON allows between tokens: spaces, tabs, line feeds and
+// carriage returns. It is part of limu's JSON.parse, which Pele has from the platform.
 func (r *jsonReader) space() {
 	for {
 		switch r.peek() {
@@ -100,6 +112,8 @@ func (r *jsonReader) space() {
 	}
 }
 
+// value reads a value of JSON, which may hold others, as JSON.parse reads it. It is part of
+// limu's JSON.parse, which Pele has from the platform.
 func (r *jsonReader) value() any {
 	r.space()
 	switch c := r.peek(); {
@@ -173,6 +187,8 @@ func (r *jsonReader) value() any {
 	return nil
 }
 
+// literal reads the word true, false or null, failing on anything else. It is part of limu's
+// JSON.parse, which Pele has from the platform.
 func (r *jsonReader) literal(word string) {
 	for k := 0; k < len(word); k++ {
 		if r.peek() != int(word[k]) {
@@ -182,6 +198,9 @@ func (r *jsonReader) literal(word string) {
 	}
 }
 
+// str reads a string of JSON from its opening quote, undoing its escapes, as JSON.parse reads
+// it: a \u escape gives a code unit, so a surrogate written alone stays alone until the string
+// is decoded. It is part of limu's JSON.parse, which Pele has from the platform.
 func (r *jsonReader) str() string {
 	r.i++
 	var out []uint16
@@ -231,6 +250,8 @@ func (r *jsonReader) str() string {
 	}
 }
 
+// hexDigit is the value of a hexadecimal digit. It is part of limu's JSON.parse, which Pele
+// has from the platform.
 func hexDigit(c int) int {
 	switch {
 	case c <= '9':
@@ -241,6 +262,8 @@ func hexDigit(c int) int {
 	return c - 'A' + 10
 }
 
+// number reads a number of JSON, as JSON.parse reads it. It is part of limu's JSON.parse,
+// which Pele has from the platform.
 func (r *jsonReader) number() float64 {
 	start := r.i
 	if r.peek() == '-' {
@@ -286,7 +309,9 @@ func (r *jsonReader) number() float64 {
 	return f
 }
 
-// parseJSON is JSON.parse: the value, and false where the text is not JSON.
+// parseJSON is JSON.parse: the value, and false where the text is not JSON. Pele's addLinks
+// and addProperties call the platform's JSON.parse; limu has its own, so that keys keep
+// JavaScript's order.
 func parseJSON(text string) (v any, ok bool) {
 	r := &jsonReader{u: utf16.Encode([]rune(text))}
 	defer func() {
@@ -305,7 +330,9 @@ func parseJSON(text string) (v any, ok bool) {
 	return v, true
 }
 
-// stringify is JSON.stringify of a value JSON.parse gave.
+// stringify is JSON.stringify of a value JSON.parse gave. Pele has no counterpart: the tests
+// compare the values a participant's menus hold with what Pele's oracle suite writes with
+// JSON.stringify.
 func stringify(v any) string {
 	var b strings.Builder
 	var write func(v any)
@@ -349,6 +376,8 @@ func stringify(v any) string {
 	return b.String()
 }
 
+// quote writes a string as JSON.stringify quotes it. It is part of limu's JSON.stringify,
+// which Pele has from the platform.
 func quote(b *strings.Builder, s string) {
 	const hex = "0123456789abcdef"
 	b.WriteByte('"')
@@ -385,7 +414,8 @@ type Entries struct {
 	Values map[string]any
 }
 
-// Set sets key to v; a key set again keeps its place.
+// Set sets key to v; a key set again keeps its place. It stands for Map.set on the links and
+// properties of Pele's SeqActor.
 func (e *Entries) Set(key string, v any) {
 	if e.Values == nil {
 		e.Values = map[string]any{}
@@ -396,13 +426,15 @@ func (e *Entries) Set(key string, v any) {
 	e.Values[key] = v
 }
 
-// Get is the value of key, and whether it is set.
+// Get is the value of key, and whether it is set. It stands for Map.get on the links and
+// properties of Pele's SeqActor.
 func (e *Entries) Get(key string) (any, bool) {
 	v, ok := e.Values[key]
 	return v, ok
 }
 
-// JSON is the value of key as JSON.stringify writes it.
+// JSON is the value of key as JSON.stringify writes it. Pele has no counterpart; the tests
+// compare it with what Pele's oracle suite writes.
 func (e *Entries) JSON(key string) string { return stringify(e.Values[key]) }
 
 // entriesOf is Pele's entries: a string's characters by index, or an object's or an array's
