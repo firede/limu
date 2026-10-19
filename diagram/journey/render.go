@@ -58,7 +58,8 @@ func mood(score float64) scene.Shape {
 }
 
 // face is a face about x, y, as Pele's face draws it: a ring, two eyes and a mouth, in the
-// color of lines. Pele draws the mouth with a round cap.
+// color of lines. Pele draws the mouth with round caps; the face is given them whole, as
+// they show nowhere else on it: its ring is closed and its eyes are not stroked.
 func face(x, y float64, mood scene.Shape) scene.Item {
 	mouth := new(scene.Path)
 	switch mood {
@@ -78,7 +79,7 @@ func face(x, y float64, mood scene.Shape) scene.Item {
 			{Path: new(scene.Path).Ellipse(x+3.6, y+-2.8, 1.3, 1.3), Paint: scene.FillOnly},
 			{Path: mouth, Paint: scene.StrokeOnly},
 		},
-		Style: style.Style{Fill: style.Line, Stroke: style.Line},
+		Style: style.Style{Fill: style.Line, Stroke: style.Line, Cap: style.CapRound},
 	}
 }
 
@@ -315,10 +316,11 @@ func across(m *Model, o *layout.Options) *scene.Scene {
 			Style: style.Style{Stroke: style.Border, Dash: style.Dashes(2, 3)},
 		})
 		if n > 1 {
+			// Pele turns the line's corners round.
 			items = append(items, scene.Item{
 				Kind: scene.Edge, Role: "journey.line", Box: line.Bounds(), Route: route,
 				Parts: []scene.Part{{Path: line, Paint: scene.StrokeOnly}},
-				Style: style.Style{Stroke: style.Line},
+				Style: style.Style{Stroke: style.Line, Join: style.JoinRound},
 			})
 		}
 		items = append(items, faces...)

@@ -401,8 +401,12 @@ export function drawableDiagrams(rnd) {
       lines.push(`classDef hot fill:#f96,stroke:#333,stroke-width:${pick([1, 3])}px${pick(['', ',font-weight:bold', ',font-size:22px', ',font-style:italic', ',color:#fff'])}`);
       lines.push(`class ${pick(all)} hot`);
     }
-    if (chance(0.15)) lines.push(`style ${pick(all)} fill:#eef,stroke:#00f${pick(['', ',font-size:11px', ',font-weight:700'])}`);
-    for (const e of styled) if (chance(0.5)) lines.push(`style ${e} stroke:#f00,stroke-width:2px`);
+    if (chance(0.15))
+      lines.push(`style ${pick(all)} fill:#eef,stroke:#00f${pick(['', ',font-size:11px,stroke-linejoin:bevel', ',font-weight:700,stroke-linecap:square'])}`);
+    for (const e of styled) {
+      const ends = Number(e.slice(1)) % 2 ? ',stroke-linecap:square,stroke-linejoin:bevel' : ',stroke-linecap:BUTT,stroke-linejoin:miter-clip';
+      if (chance(0.5)) lines.push(`style ${e} stroke:#f00,stroke-width:2px${ends}`);
+    }
     if (chance(0.1)) lines.push('accTitle: Title for screen readers', 'accDescr: A description');
     return head + lines.join('\n') + '\n';
   };

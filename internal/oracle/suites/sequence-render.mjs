@@ -17,6 +17,23 @@ const attr = (s, name) => {
   return m ? unescape(m[1]) : undefined;
 };
 
+// A stroke's ends or corners as a browser takes them on an element: from its style attribute,
+// then from its attribute, as a keyword the browser knows, initial as SVG's initial value, and
+// otherwise what it inherits; a value it does not take is dropped.
+const keyword = (name, values, initial) => (e, inherited) => {
+  const style = [...(attr(e, 'style') ?? '').matchAll(new RegExp(`(?:^|;)\\s*${name}\\s*:([^;]*)`, 'g'))].pop();
+  for (const v of [style?.[1], attr(e, name)]) {
+    if (v === undefined) continue;
+    const k = v.trim().toLowerCase();
+    if (values.includes(k)) return k;
+    if (k === 'initial') return initial;
+    if (k === 'inherit' || k === 'unset') return inherited;
+  }
+  return inherited;
+};
+const linecap = keyword('stroke-linecap', ['butt', 'round', 'square'], 'butt');
+const linejoin = keyword('stroke-linejoin', ['miter', 'round', 'bevel'], 'miter');
+
 // The groups that hold one thing drawn, by the first of their classes; the others are the
 // layers things are drawn in, which give what is in them its paint.
 const OBJECTS = new Set(['pele-cluster', 'pele-frame', 'pele-edge', 'pele-sequence-number', 'pele-edge-label', 'pele-note', 'pele-node']);
@@ -74,7 +91,16 @@ export function readSvg(svg, num) {
     return out.map((s) => s.map(([op, ...p]) => (p.length ? `${op} ${pt(p[0], p[1])}` : op)).join(' '));
   };
 
-  const stack = [{ fill: 'var(--_fg)', stroke: 'none', width: '-' }];
+  const stack = [{ fill: 'var(--_fg)', stroke: 'none', width: '-', cap: undefined, join: undefined }];
+  // How a stroked thing ends and turns its corners, after what it is in: " cap=" and " join="
+  // with the value a browser draws, left out where it is SVG's initial butt or miter.
+  const ends = (e, stroke) => {
+    if (stroke === 'none') return '';
+    const up = stack[stack.length - 1];
+    const cap = linecap(e, up.cap);
+    const join = linejoin(e, up.join);
+    return `${cap && cap !== 'butt' ? ' cap=' + cap : ''}${join && join !== 'miter' ? ' join=' + join : ''}`;
+  };
   const paint = (e, straight = false) => {
     const up = stack[stack.length - 1];
     const opacity = attr(e, 'fill-opacity');
@@ -83,7 +109,8 @@ export function readSvg(svg, num) {
     const style = attr(e, 'style') ?? '';
     // A fill the author gave, as written in the style.
     const author = /(?:^|;)fill:([^;]*)/.exec(style);
-    return `${fill} ${attr(e, 'stroke') ?? up.stroke}${width === '-' ? '' : ' w=' + width}${author ? ' author=' + JSON.stringify(author[1]) : ''}`;
+    const stroke = attr(e, 'stroke') ?? up.stroke;
+    return `${fill} ${stroke}${width === '-' ? '' : ' w=' + width}${ends(e, stroke)}${author ? ' author=' + JSON.stringify(author[1]) : ''}`;
   };
   const id = (e) => {
     const v = attr(e, 'data-id');
@@ -100,7 +127,13 @@ export function readSvg(svg, num) {
     switch (m[2]) {
       case 'g': {
         const up = stack[stack.length - 1];
-        stack.push({ fill: attr(e, 'fill') ?? up.fill, stroke: attr(e, 'stroke') ?? up.stroke, width: attr(e, 'stroke-width') ?? up.width });
+        stack.push({
+          fill: attr(e, 'fill') ?? up.fill,
+          stroke: attr(e, 'stroke') ?? up.stroke,
+          width: attr(e, 'stroke-width') ?? up.width,
+          cap: linecap(e, up.cap),
+          join: linejoin(e, up.join),
+        });
         const cls = attr(e, 'class') ?? '';
         if (OBJECTS.has(cls.split(' ')[0])) lines.push(`g ${cls}${id(e)}`);
         break;

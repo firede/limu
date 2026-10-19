@@ -41,6 +41,8 @@ export function readSvg(svg, num) {
   };
   const pt = (x, y) => `${num(move(Number(x), 0))},${num(move(Number(y), 1))}`;
   const paint = (e) => `${paintName(attr(e, 'fill') ?? inherited('fill'))} ${paintName(attr(e, 'stroke'))}`;
+  // How a path's stroke ends and turns its corners: its own, or what it inherits, or "-".
+  const pen = (e) => `${attr(e, 'stroke-linecap') ?? inherited('cap') ?? '-'} ${attr(e, 'stroke-linejoin') ?? inherited('join') ?? '-'}`;
   const ellipse = (cx, cy, rx, ry) => {
     const x = move(Number(cx), 0);
     const y = move(Number(cy), 1);
@@ -123,7 +125,13 @@ export function readSvg(svg, num) {
     switch (name) {
       case 'g': {
         const t = TRANSLATE.exec(attr(whole, 'transform') ?? '');
-        stack.push({ move: t ? [Number(t[1]), Number(t[2])] : undefined, fill: attr(whole, 'fill'), anchor: attr(whole, 'text-anchor') });
+        stack.push({
+          move: t ? [Number(t[1]), Number(t[2])] : undefined,
+          fill: attr(whole, 'fill'),
+          anchor: attr(whole, 'text-anchor'),
+          cap: attr(whole, 'stroke-linecap'),
+          join: attr(whole, 'stroke-linejoin'),
+        });
         const cls = attr(whole, 'class') ?? '';
         const id = attr(whole, 'data-id');
         if (cls.includes('pele-face')) lines.push(`face ${cls.split(' ')[1].slice('pele-face-'.length)}`);
@@ -136,7 +144,7 @@ export function readSvg(svg, num) {
       case 'path': {
         const cls = attr(whole, 'class');
         if (cls) lines.push(`${cls.slice('pele-'.length)} ${attr(whole, 'stroke-dasharray') ?? '-'}`);
-        for (const p of subpaths(attr(whole, 'd'))) lines.push(`path ${p} ${paint(whole)}`);
+        for (const p of subpaths(attr(whole, 'd'))) lines.push(`path ${p} ${paint(whole)} ${pen(whole)}`);
         break;
       }
       case 'circle':

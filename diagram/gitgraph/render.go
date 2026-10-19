@@ -475,7 +475,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 		}
 
 		// Beside the lane the tags form a row; above it they stack, the first one furthest
-		// out.
+		// out. Pele turns a tag's corners round.
 		offset := dot + tagGap
 		t, dt := len(v.tags)-1, -1
 		if vertical {
@@ -502,7 +502,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 				Box:   scene.Rect{X: left, Y: cy - h/2, W: w, H: h},
 				Parts: []scene.Part{{Path: path, Paint: scene.FillAndStroke}},
 				Label: tag, At: scene.Point{X: left + notch + 4 + tag.Width/2, Y: cy},
-				Style: style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg},
+				Style: style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg, Join: style.JoinRound},
 			}, scene.Item{
 				Kind: scene.Mark, Role: "gitgraph.tag-hole", ID: c.ID,
 				Box:   scene.Rect{X: left + notch - 1.5, Y: cy - 1.5, W: 3, H: 3},
@@ -597,10 +597,10 @@ func (e *edgePath) cube(m1, c1, m2, c2, m, c float64) {
 
 // item is the connector as an edge of the scene: its shape is "merge" for the line that
 // brings in a merged branch, "cherry-pick" for the one from a picked commit, which is dashed,
-// and "" for others.
+// and "" for others. Its ends are round, as Pele's group of edges makes them.
 func (e *edgePath) item(shape string, color style.Paint, dashed bool) scene.Item {
 	path := e.path
-	st := style.Style{Stroke: color, StrokeWidth: style.N(2)}
+	st := style.Style{Stroke: color, StrokeWidth: style.N(2), Cap: style.CapRound}
 	if dashed {
 		st.Dash = style.Dashes(4, 3)
 	}
@@ -616,7 +616,8 @@ func (e *edgePath) item(shape string, color style.Paint, dashed bool) scene.Item
 // symbol is a commit drawn as its type, Pele's symbol: a dot, a dot crossed out for a
 // reverse, a square for a highlight, a ring about a dot for a merge, and a dot with a cherry
 // for a cherry-pick. The marks drawn over a dot, in the color of the background, are an item
-// of their own. A merge's role is gitgraph.merge whatever type it is drawn as.
+// of their own: a reverse's cross with round ends and a cherry-pick's stem with a round
+// corner, as Pele draws them. A merge's role is gitgraph.merge whatever type it is drawn as.
 func symbol(c *Commit, typ int, x, y float64, color style.Paint) []scene.Item {
 	role := scene.Role("gitgraph.commit")
 	if c.Type == MergeType {
@@ -660,7 +661,7 @@ func symbol(c *Commit, typ int, x, y float64, color style.Paint) []scene.Item {
 			Kind: scene.Mark, Role: "gitgraph.commit-mark", Shape: "reverse", ID: c.ID,
 			Box:   cross.Bounds(),
 			Parts: []scene.Part{{Path: cross, Paint: scene.StrokeOnly}},
-			Style: style.Style{Stroke: style.Bg, StrokeWidth: style.N(1.5)},
+			Style: style.Style{Stroke: style.Bg, StrokeWidth: style.N(1.5), Cap: style.CapRound},
 		}}
 	case CherryPick:
 		it.Parts = []scene.Part{dotPart}
@@ -673,7 +674,7 @@ func symbol(c *Commit, typ int, x, y float64, color style.Paint) []scene.Item {
 				{Path: new(scene.Path).Ellipse(x-2.6, y+2.2, 1.8, 1.8), Paint: scene.FillOnly},
 				{Path: new(scene.Path).Ellipse(x+2.6, y+2.2, 1.8, 1.8), Paint: scene.FillOnly},
 			},
-			Style: style.Style{Fill: style.Bg, Stroke: style.Bg},
+			Style: style.Style{Fill: style.Bg, Stroke: style.Bg, Join: style.JoinRound},
 		}}
 	}
 	it.Parts = []scene.Part{dotPart}

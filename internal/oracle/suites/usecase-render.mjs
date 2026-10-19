@@ -16,10 +16,54 @@ const attr = (s, name) => {
   const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
   return m ? unescape(m[1]) : undefined;
 };
-// How a shape is painted: its fill, with its opacity, and its stroke.
-const paint = (s) => {
+// A stroke's ends or corners as a browser takes them on an element: from its style attribute,
+// then from its attribute, as a keyword the browser knows, initial as SVG's initial value, and
+// otherwise what it inherits; a value it does not take is dropped.
+const keyword = (name, values, initial) => (e, inherited) => {
+  const style = [...(attr(e, 'style') ?? '').matchAll(new RegExp(`(?:^|;)\\s*${name}\\s*:([^;]*)`, 'g'))].pop();
+  for (const v of [style?.[1], attr(e, name)]) {
+    if (v === undefined) continue;
+    const k = v.trim().toLowerCase();
+    if (values.includes(k)) return k;
+    if (k === 'initial') return initial;
+    if (k === 'inherit' || k === 'unset') return inherited;
+  }
+  return inherited;
+};
+const linecap = keyword('stroke-linecap', ['butt', 'round', 'square'], 'butt');
+const linejoin = keyword('stroke-linejoin', ['miter', 'round', 'bevel'], 'miter');
+// How an element inside groups whose caps and joins are up ends and turns its corners, after
+// its own: " cap=" and " join=" with what a browser draws, left out where it is SVG's initial
+// butt or miter, and the join left out too where the element has no corners.
+const ends = (e, up, corners = true) => {
+  const cap = linecap(e, up.cap);
+  const join = corners ? linejoin(e, up.join) : undefined;
+  return `${cap && cap !== 'butt' ? ' cap=' + cap : ''}${join && join !== 'miter' ? ' join=' + join : ''}`;
+};
+// The caps and joins inside each group that opens in svg, by where it opens.
+function groupEnds(svg) {
+  const at = new Map();
+  const stack = [{}];
+  for (const m of svg.matchAll(/<(\/?)g\b[^>]*>/g)) {
+    if (m[1]) {
+      stack.pop();
+      continue;
+    }
+    const up = stack[stack.length - 1];
+    const inside = { cap: linecap(m[0], up.cap), join: linejoin(m[0], up.join) };
+    stack.push(inside);
+    at.set(m.index, inside);
+  }
+  return at;
+}
+
+// How a shape is painted: its fill, with its opacity, and its stroke, and when it has a
+// stroke, its caps and joins after those of up, the group it is in; its joins only where it
+// has corners, which a circle and a single straight line do not.
+const paint = (s, up, corners = true) => {
   const opacity = attr(s, 'fill-opacity');
-  return `${attr(s, 'fill') ?? '-'}${opacity ? '/' + opacity : ''} ${attr(s, 'stroke') ?? '-'}`;
+  const stroke = attr(s, 'stroke');
+  return `${attr(s, 'fill') ?? '-'}${opacity ? '/' + opacity : ''} ${stroke ?? '-'}${stroke && stroke !== 'none' ? ends(s, up, corners) : ''}`;
 };
 const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
@@ -117,14 +161,19 @@ function frame(num, moves) {
   return { pt, size, box, ellipse, textAt, subpaths, moves };
 }
 
-// Every element of a node or cluster, in order, as lines. A group inside, such as an actor's
-// figure, moves what is in it.
-function shapes(s, lines, f) {
+// Every element of a node or cluster, in order, as lines; up is the caps and joins inside its
+// group. A group inside, such as an actor's figure, moves what is in it.
+function shapes(s, lines, f, up) {
   const open = [];
+  const within = [up];
   for (const m of s.matchAll(/<(\/?)(circle|ellipse|path|rect|svg|text|g)\b[^>]*>/g)) {
     const e = m[0];
     if (m[1]) {
-      if (m[2] === 'g' && open.pop()) f.moves.pop();
+      if (m[2] === 'g') {
+        // What is read runs on past the end of the group it starts in.
+        if (within.length > 1) within.pop();
+        if (open.pop()) f.moves.pop();
+      }
       continue;
     }
     switch (m[2]) {
@@ -132,15 +181,18 @@ function shapes(s, lines, f) {
       case 'ellipse': {
         const rx = attr(e, 'r') ?? attr(e, 'rx');
         const ry = attr(e, 'r') ?? attr(e, 'ry');
-        lines.push(`${f.ellipse(attr(e, 'cx') ?? 0, attr(e, 'cy') ?? 0, rx, ry)} ${paint(e)}`);
+        lines.push(`${f.ellipse(attr(e, 'cx') ?? 0, attr(e, 'cy') ?? 0, rx, ry)} ${paint(e, within[within.length - 1], false)}`);
         break;
       }
       case 'path':
-        for (const p of f.subpaths(attr(e, 'd'))) lines.push(`${p.startsWith('ellipse') ? '' : 'path '}${p} ${paint(e)}`);
+        for (const p of f.subpaths(attr(e, 'd'))) {
+          const corners = !p.startsWith('ellipse') && !/^M \S+ L \S+$/.test(p);
+          lines.push(`${p.startsWith('ellipse') ? '' : 'path '}${p} ${paint(e, within[within.length - 1], corners)}`);
+        }
         break;
       case 'rect': {
         const rounded = attr(e, 'rx') !== undefined || (attr(e, 'style') ?? '').includes('rx:');
-        lines.push(`rect ${f.box(e)}${rounded ? ' r' : ''} ${paint(e)}`);
+        lines.push(`rect ${f.box(e)}${rounded ? ' r' : ''} ${paint(e, within[within.length - 1])}`);
         break;
       }
       case 'svg':
@@ -155,6 +207,8 @@ function shapes(s, lines, f) {
         const t = TRANSLATE.exec(attr(e, 'transform') ?? '');
         if (t) f.moves.push([Number(t[1]), Number(t[2])]);
         open.push(t !== null);
+        const top = within[within.length - 1];
+        within.push({ cap: linecap(e, top.cap), join: linejoin(e, top.join) });
         break;
       }
     }
@@ -181,6 +235,7 @@ export function readSvg(svg, num) {
   lines.push(`size ${page.size(attr(head, 'width'))},${page.size(attr(head, 'height'))}`);
   const title = svg.indexOf('<text class="pele-title"');
   if (title >= 0) lines.push('title ' + page.textAt(svg.slice(title)));
+  const inGroup = groupEnds(svg);
   const starts = [...svg.matchAll(GROUP)];
   for (let k = 0; k < starts.length; k++) {
     const kind = starts[k][1];
@@ -189,18 +244,21 @@ export function readSvg(svg, num) {
     s = s.slice(open.length);
     const id = attr(open, 'data-id');
     const cls = attr(open, 'class');
+    // The caps and joins inside the group.
+    const up = inGroup.get(starts[k].index);
     switch (kind) {
       case 'cluster':
         lines.push(`cluster ${id} [${classesAfter(cls, 2)}]`);
-        shapes(s, lines, page);
+        shapes(s, lines, page, up);
         break;
       case 'edge': {
         const type = cls.split(' ')[1].slice('pele-'.length);
         const path = /<path d="[^"]*"[^>]*>/.exec(s)[0];
         lines.push(`edge ${id} ${type} [${classesAfter(cls, 2)}] ${attr(path, 'stroke-dasharray') ?? '-'}`);
-        for (const p of page.subpaths(attr(path, 'd'))) lines.push('path ' + p);
+        for (const p of page.subpaths(attr(path, 'd'))) lines.push('path ' + p + ends(path, up));
         for (const m of s.matchAll(/<(path|circle) class="pele-marker"[^>]*>/g)) {
-          lines.push(m[1] === 'path' ? `m ${page.subpaths(attr(m[0], 'd')).join(' ')}` : `m o ${page.pt(attr(m[0], 'cx'), attr(m[0], 'cy'))}`);
+          const stroked = attr(m[0], 'stroke') !== 'none';
+          lines.push((m[1] === 'path' ? `m ${page.subpaths(attr(m[0], 'd')).join(' ')}` : `m o ${page.pt(attr(m[0], 'cx'), attr(m[0], 'cy'))}`) + (stroked ? ends(m[0], up) : ''));
         }
         break;
       }
@@ -212,7 +270,7 @@ export function readSvg(svg, num) {
         // is drawn: a scene holds no middle of its own for a node.
         const t = TRANSLATE.exec(attr(open, 'transform'));
         lines.push(`node ${id} [${classesAfter(cls, 2)}]`);
-        shapes(s, lines, frame(num, [[Number(t[1]), Number(t[2])]]));
+        shapes(s, lines, frame(num, [[Number(t[1]), Number(t[2])]]), up);
         break;
       }
     }

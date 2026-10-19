@@ -29,12 +29,13 @@ const (
 // priorities are the priorities Mermaid names, but Medium, which it gives no color, and the
 // style of the stripe each marks a card with, as Pele's PRIORITY has them: the high ones in
 // the critical color and the low ones in the muted one, the nearer to Medium the fainter.
-// They are not series colors, as a theme may put those in any order.
+// They are not series colors, as a theme may put those in any order. Each stripe ends
+// round, as Pele's does.
 var priorities = map[string]style.Style{
-	"very high": {Stroke: style.Critical, StrokeWidth: style.N(3)},
-	"high":      {Stroke: style.Critical, StrokeWidth: style.N(3), Opacity: style.N(0.5)},
-	"low":       {Stroke: style.Muted, StrokeWidth: style.N(3), Opacity: style.N(0.5)},
-	"very low":  {Stroke: style.Muted, StrokeWidth: style.N(3)},
+	"very high": {Stroke: style.Critical, StrokeWidth: style.N(3), Cap: style.CapRound},
+	"high":      {Stroke: style.Critical, StrokeWidth: style.N(3), Opacity: style.N(0.5), Cap: style.CapRound},
+	"low":       {Stroke: style.Muted, StrokeWidth: style.N(3), Opacity: style.N(0.5), Cap: style.CapRound},
+	"very low":  {Stroke: style.Muted, StrokeWidth: style.N(3), Cap: style.CapRound},
 }
 
 // fitLabel lays out text for a fixed width, as Pele's fitLabel does. A word too long for a

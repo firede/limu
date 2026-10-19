@@ -596,6 +596,8 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 				path := new(scene.Path).Polygon(cx, cy-r, cx+r, cy, cx, cy+r, cx-r, cy)
 				it.Box = path.Bounds()
 				it.Parts = []scene.Part{{Path: path}}
+				// Pele turns a milestone's corners round.
+				it.Style.Join = style.JoinRound
 			} else {
 				it.Shape = "rect"
 				it.Box = scene.Rect{X: b.x0, Y: cy - barHeight/2, W: b.x1 - b.x0, H: barHeight}

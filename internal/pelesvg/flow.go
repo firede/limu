@@ -5,8 +5,17 @@ import (
 	"strings"
 
 	"github.com/firede/limu/scene"
+	"github.com/firede/limu/style"
 	"github.com/firede/limu/text"
 )
+
+// CapJoin is the cap and the join an item is stroked with, its author's style laid over its
+// own, as the render oracles write them: "round miter".
+func CapJoin(it *scene.Item) string {
+	var look *style.Look
+	r := look.Resolve(string(it.Role), it.Style, it.Author)
+	return r.Cap.String() + " " + r.Join.String()
+}
 
 // FlowLines writes the scene of a flowchart or a swimlane diagram as the render oracle reads
 // Pele's SVG of one: a line for each thing drawn, in the order drawn, with numbers as Pele's
@@ -55,6 +64,7 @@ func FlowLines(sc *scene.Scene) []string {
 				flags += " dotted"
 			}
 			lines = append(lines, fmt.Sprintf("edge %s [%s]%s %s", id, classes, flags, D(it.Parts[0].Path)))
+			lines = append(lines, "stroke "+CapJoin(it))
 			for _, m := range it.Ends {
 				if s := Marker(m); s != "" {
 					lines = append(lines, "m "+s)

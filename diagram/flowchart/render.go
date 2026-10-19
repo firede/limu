@@ -509,7 +509,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 				}
 				path = draw.RoutePath(route, edgeCurve, start.Trim(), end.Trim(), leaves, arrives)
 			}
-			own := style.Style{Stroke: style.Line, Fill: style.None}
+			// Pele draws the edges in a group with round caps; what the author sets on the
+			// edge's own group is laid over them.
+			own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
 			switch edge.Thickness {
 			case "thick":
 				own.StrokeWidth = style.N(2.5)

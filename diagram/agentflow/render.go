@@ -527,7 +527,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			author.Style.Fill = style.Paint{}
 		}
 		kind := "sequence"
-		own := style.Style{Stroke: style.Line, Fill: style.None}
+		// Pele draws the edges in a group with round caps; what the author sets on the
+		// edge's own group is laid over them.
+		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
 		switch {
 		case edge.Thickness == "dotted":
 			kind = "reference"

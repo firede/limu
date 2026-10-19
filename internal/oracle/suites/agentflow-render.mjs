@@ -3,6 +3,7 @@
 // limu's test writes the same lines from its scene.
 import { FRAGMENTS, agentflowCorpus } from './agentflow.mjs';
 import { mutator } from './parse.mjs';
+import { capJoin } from './render.mjs';
 
 const H = 'agentflow-beta\n';
 
@@ -27,6 +28,8 @@ const WRITTEN = [
   H + 'a --> b\nclick a "https://example.com" "tip"\nclick b href "javascript:alert(1)"\n',
   H + 'a["Note"]:::internal-link --> b\nclassDef internal-link fill:#ffd\n',
   H + 'a --> b\nstyle a fill:#f9f,stroke:#333,stroke-width:4px,font-size:24px,font-weight:bold\nlinkStyle 0 stroke:#f00,color:#00f\n',
+  H + 'a --> b --> c --> a\nlinkStyle 0 stroke-linecap:butt,stroke-linejoin:bevel\nlinkStyle 1 stroke-linecap:SQUARE\nlinkStyle 2 stroke-linecap:inherit,stroke-linejoin:round\n',
+  'agentflow-beta LR\na --> b & c\nlinkStyle default stroke-linecap:initial,stroke-linejoin:miter\n',
   '---\ntitle: A titled flow with a long name\n---\nagentflow-beta\na --> b\n',
   '---\nconfig:\n  agentflow:\n    wrappingWidth: 60\n    minNodeWidth: 40\n    nodeSpacing: 10\n    rankSpacing: 100\n---\nagentflow-beta\na["A label that wraps"] --> b & c --> d\n',
   '---\nconfig:\n  flowchart:\n    curve: linear\n---\nagentflow-beta\na --> b & c --> d\na --> d\n',
@@ -123,6 +126,8 @@ export function readSvg(svg) {
         const path = tag(s, 'path');
         const flags = path.includes(' stroke-dasharray="3 4"') ? ' dotted' : '';
         lines.push(`edge ${id} [${classes}]${flags} ${attr(path, 'd')}`);
+        // The edge's line, in the group of all of them and its own.
+        lines.push(`stroke ${capJoin([tag(svg, 'g class="pele-edges"'), open, path])}`);
         for (const m of s.matchAll(/<(path|circle) class="pele-marker"[^>]*>/g)) {
           lines.push(m[1] === 'path' ? `m ${attr(m[0], 'd')}` : `m o ${attr(m[0], 'cx')},${attr(m[0], 'cy')}`);
         }

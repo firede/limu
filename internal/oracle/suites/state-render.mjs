@@ -3,6 +3,7 @@
 // writes the same lines from its scene.
 import { lone, mutator } from './parse.mjs';
 import { WRITTEN, stateCorpus } from './state.mjs';
+import { capJoin } from './render.mjs';
 
 // The fragments mutations splice in, for text that parses and still draws something odd.
 const FRAGMENTS = [
@@ -75,15 +76,19 @@ export function readSvg(svg, num) {
     return out;
   };
   const stack = [];
+  // The opening tags of the groups open, for the caps and joins they give what is in them.
+  const groups = [];
   let inNode = false;
   for (const m of svg.matchAll(TAG)) {
     const [whole, close, name, rest] = m;
     if (name === 'g') {
       if (close) {
         inNode = stack.pop() ?? false;
+        groups.pop();
         continue;
       }
       stack.push(inNode);
+      groups.push(whole);
       const cls = attr(rest, 'class') ?? '';
       const id = attr(rest, 'data-id');
       const t = attr(rest, 'transform');
@@ -136,6 +141,10 @@ export function readSvg(svg, num) {
         const cls = attr(rest, 'class');
         const kind = cls === 'pele-marker' ? 'm' : cls === 'pele-divider' ? 'divider' : 'path';
         lines.push(`${kind} ${path(attr(rest, 'd'), inNode)}`);
+        // An edge's line, with the cap and join it is stroked with.
+        if (kind === 'path' && (attr(groups[groups.length - 1] ?? '', 'class') ?? '').startsWith('pele-edge ')) {
+          lines.push(`stroke ${capJoin([...groups, whole])}`);
+        }
         break;
       }
       case 'text': {

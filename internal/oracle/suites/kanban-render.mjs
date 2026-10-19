@@ -70,9 +70,10 @@ export function readSvg(svg, num) {
         );
         break;
       case 'path': {
+        // A stripe's cap and join are its own: no group about it sets any.
         const d = attr(e, 'd');
         const p = /^M([^,]*),([^V]*)V(.*)$/.exec(d);
-        lines.push(`priority M ${pt(p[1], p[2])} L ${pt(p[1], p[3])} ${attr(e, 'stroke')} ${attr(e, 'opacity') ?? '-'} ${attr(e, 'stroke-width')}`);
+        lines.push(`priority M ${pt(p[1], p[2])} L ${pt(p[1], p[3])} ${attr(e, 'stroke')} ${attr(e, 'opacity') ?? '-'} ${attr(e, 'stroke-width')} ${attr(e, 'stroke-linecap') ?? '-'} ${attr(e, 'stroke-linejoin') ?? '-'}`);
         break;
       }
       case 'text':

@@ -18,7 +18,8 @@ const FRAGMENTS = [
   'Duck', '\nclass X {\n+int a\n-run() void\n}\n', '\nclass Y~T~\n', '\n<<interface>> A\n', '\nnote "a note"\n',
   '\nnote for A "for A"\n', '\nnamespace N {\nclass P\nclass Q\n}\n', '\nnamespace M.O {\nclass R\n}\n', '\nA --> A\n',
   '\nA "1" --> "2" A : self\n', '\ndirection LR\n', '\ndirection BT\n', '\ndirection RL\n', '\nclassDef k fill:#f96\n',
-  '\nclass A:::k\n', '\nstyle A font-size:20px\n', '\nstyle B font-style:italic\n', '\ncssClass "A,B" k\n',
+  '\nclass A:::k\n', '\nstyle A font-size:20px\n', '\nstyle A stroke:#333,stroke-linejoin:bevel,rx:0\n', '\nstyle B stroke:#333,stroke-linejoin:inherit\n',
+  '\nclassDef k stroke:#a00,stroke-linecap:square,stroke-linejoin:ROUND\n', '\nstyle B font-style:italic\n', '\ncssClass "A,B" k\n',
   '\nlink A "https://x.y/z" "tip"\n', '\nclick B call f() "t"\n', '\nA : +x$\n', '\nA : +y()*\n', '\nA : <<enum>>\n',
   '中文', '😀', '#quot;', '&amp;', '<br>', '~T~', '$', '*', '{', '}', '"',
 ];
@@ -31,6 +32,8 @@ const DRAWN = [
   'classDiagram\nclass A {\n+&lt;b&gt; x\n+&amp;lt;y&amp;gt;\n+run(&quot;q&quot;) &#35;\n}\n<<&lt;i&gt;>> A\nA "&lt;1&gt;" --> "&amp;" B',
   'classDiagram\nA --> B : a label long enough that Pele wraps it at its two hundred units of width, more than once\nnote "a note long enough that Pele wraps it at its width of two hundred and sixty units, which this note passes by some way, twice"',
   'classDiagram\nclass `A b`\nclass C["  spaced  "]\n`A b` <|-- C : `back` ticks\nnote for C "  spaced  "',
+  // Ends and corners an author sets, and some a browser does not take.
+  'classDiagram\nclass A\nclass B\nclass C\nclass D\nclassDef k stroke:#a00,stroke-linecap:square,stroke-linejoin:ROUND\nclass B:::k\nstyle A stroke:#333,stroke-linejoin:bevel,rx:0,stroke-width:4px\nstyle C stroke:#333,stroke-linejoin:inherit,stroke-linecap:flat\nstyle D stroke:#333,stroke-linejoin:round,stroke-linejoin:arcs\nA *-- B\nC <|-- D\nnote for A "n"',
 ];
 
 // A diagram of a few to a dozen classes, some in namespaces, some with members, notes and
@@ -84,6 +87,38 @@ const attr = (s, name) => {
   return m ? unescape(m[1]) : undefined;
 };
 const TAG = /<(\/?)([A-Za-z][\w-]*)([^>]*?)(\/?)>/g;
+
+// How a browser ends and turns a stroke: the keywords it takes of stroke-linecap and
+// stroke-linejoin, initial for the initial value and inherit or unset for the parent's.
+const CAPS = { butt: 'butt', round: 'round', square: 'square', initial: 'butt', inherit: null, unset: null };
+const JOINS = { miter: 'miter', round: 'round', bevel: 'bevel', initial: 'miter', inherit: null, unset: null };
+// What an element sets of a stroke property, from the keywords given: a declaration in its
+// style attribute, the last the browser takes, over its attribute of that name; null for the
+// parent's, undefined for none.
+function sets(tag, prop, values) {
+  let v;
+  for (const decl of (attr(tag, 'style') ?? '').split(';')) {
+    const at = decl.indexOf(':');
+    if (at < 0 || decl.slice(0, at).trim().toLowerCase() !== prop) continue;
+    const k = decl.slice(at + 1).trim().toLowerCase();
+    if (Object.hasOwn(values, k)) v = values[k];
+  }
+  if (v !== undefined) return v;
+  const a = attr(tag, prop);
+  return a !== undefined && Object.hasOwn(values, a) ? values[a] : undefined;
+}
+// How an element's stroke ends and turns, as "cap/join", taking from the elements it is in,
+// innermost first, what it does not set.
+function pen(tag, outer) {
+  const get = (prop, values, initial) => {
+    for (const t of [tag, ...outer]) {
+      const v = sets(t, prop, values);
+      if (v) return v;
+    }
+    return initial;
+  };
+  return `${get('stroke-linecap', CAPS, 'butt')}/${get('stroke-linejoin', JOINS, 'miter')}`;
+}
 const NUMBER = /[MLHVCQZ]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi;
 
 // The lines of a class diagram's SVG, drawn with numbers in full; num writes them as Pele does,
@@ -145,6 +180,8 @@ export function readSvg(svg, num, redraw) {
   };
   // The text of an element, its tags taken out and its escapes undone.
   const content = (s) => unescape(s.replace(/<[^>]*>/g, ''));
+  // How an element in the open ones strokes its ends and corners.
+  const penOf = (tag) => pen(tag, open.map((e) => e.tag ?? '').reverse());
   // Where a text's lines, and the runs in them, are drawn: each x and y in it.
   const at = (s) => [...s.matchAll(/ x="([^"]*)" y="([^"]*)"/g)].map((m) => pt(m[1], m[2])).join(' ');
   const marker = (tag) => {
@@ -195,7 +232,7 @@ export function readSvg(svg, num, redraw) {
       }
       continue;
     }
-    const element = { name };
+    const element = { name, tag: rest };
     if (name === 'svg' && cls === 'pele-icon') {
       lines.push(`icon ${attr(rest, 'data-icon')} ${box(rest)}`);
     } else if (name === 'svg') {
@@ -229,18 +266,18 @@ export function readSvg(svg, num, redraw) {
     } else if (name === 'rect' && k) {
       if (k.kind === 'ns') lines.push(`ns ${k.id} ${box(rest)}`);
       else if (k.kind === 'label') lines.push(`label ${k.id} ${box(rest)}`);
-      else if (k.kind === 'class') lines.push(`rect ${box(rest)}`);
+      else if (k.kind === 'class') lines.push(`rect ${box(rest)} ${penOf(rest)}`);
     } else if ((name === 'path' || name === 'circle') && k) {
       if (cls === 'pele-marker') {
-        lines.push(marker(rest));
+        lines.push(`${marker(rest)} ${penOf(rest)}`);
       } else if (k.kind === 'edge') {
         const dash = attr(rest, 'stroke-dasharray');
         const flag = dash === '6 4' ? ' dashed' : dash === '2 4' ? ' dotted' : '';
-        lines.push(`edge ${k.id} ${k.classes[1] === 'pele-note-edge' ? 'note' : 'relation'}${flag} ${d(attr(rest, 'd'))}`);
+        lines.push(`edge ${k.id} ${k.classes[1] === 'pele-note-edge' ? 'note' : 'relation'}${flag} ${d(attr(rest, 'd'))} ${penOf(rest)}`);
       } else if (k.kind === 'class') {
         lines.push(`divider ${d(attr(rest, 'd'))}`);
       } else if (k.kind === 'note') {
-        lines.push(`${k.paths ? 'fold' : 'path'} ${d(attr(rest, 'd'))}`);
+        lines.push(`${k.paths ? 'fold' : 'path'} ${d(attr(rest, 'd'))} ${penOf(rest)}`);
         k.paths = true;
       }
     }

@@ -12,6 +12,7 @@ import (
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
+	"github.com/firede/limu/style"
 	"github.com/firede/limu/text"
 )
 
@@ -115,10 +116,10 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Style.Dash.Set() {
 				dashed = " dashed"
 			}
-			lines = append(lines, "path "+pelesvg.D(it.Parts[0].Path)+dashed)
+			lines = append(lines, "path "+pelesvg.D(it.Parts[0].Path)+dashed+" "+pen(it, ""))
 			for _, m := range it.Ends {
 				for _, part := range m.Outline() {
-					lines = append(lines, "m "+markerPart(part.Path))
+					lines = append(lines, "m "+markerPart(part.Path)+" "+pen(it, m.Type))
 				}
 			}
 		case "requirement.relationship-label":
@@ -126,7 +127,7 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "labels "+num(it.Label.Size))
 				labels = true
 			}
-			lines = append(lines, "label "+peleText(it.ID), "rect "+box(it.Parts[0].Box, 0, 0))
+			lines = append(lines, "label "+peleText(it.ID), "rect "+box(it.Parts[0].Box, 0, 0)+" "+pen(it, ""))
 			text(it, "-", "", "", it.At.X, it.At.Y)
 		case "requirement.requirement", "requirement.element":
 			// Pele draws a box about its middle, which it moves to with a translate. The scene
@@ -146,7 +147,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			lines = append(lines,
 				fmt.Sprintf("node %s %s [%s] translate(%s)", peleText(it.ID), kind, strings.Join(it.Class, " "), pt(cx, cy)),
-				"rect "+pt(left, top)+","+num(w)+","+num(h))
+				"rect "+pt(left, top)+","+num(w)+","+num(h)+" "+pen(it, ""))
 			place("box", it.Box.X, it.Box.Y, left, top)
 			k := &sc.Items[i+1]
 			i++
@@ -167,7 +168,7 @@ func sceneLines(sc *scene.Scene) []string {
 				it.Parts[1].Path.Each(func(_ scene.Op, a []float64) { xs, ys = append(xs, a[0]), append(ys, a[1]) })
 				place("divider", xs[0], ys[0], left, divider)
 				place("divider's end", xs[1], ys[1], -left, divider)
-				lines = append(lines, "divider M"+pt(left, divider)+"H"+num(-left), "fields "+num(fields[0].Label.Size))
+				lines = append(lines, "divider M"+pt(left, divider)+"H"+num(-left)+" "+pen(it, ""), "fields "+num(fields[0].Label.Size))
 				keyWidth := 0.0
 				for f := 0; f < len(fields); f += 2 {
 					keyWidth = max(keyWidth, fields[f].Label.Width)
@@ -188,6 +189,22 @@ func sceneLines(sc *scene.Scene) []string {
 		}
 	}
 	return lines
+}
+
+// pen is how an item's lines end and turn their corners, as the oracle reads them, "cap/join":
+// the author's style over the diagram's own, and a marker's own join over both.
+func pen(it *scene.Item, marker scene.MarkerType) string {
+	s := it.Author.Over(it.Style)
+	if j := marker.Join(); j.Set() {
+		s.Join = j
+	}
+	if !s.Cap.Set() {
+		s.Cap = style.CapButt
+	}
+	if !s.Join.Set() {
+		s.Join = style.JoinMiter
+	}
+	return s.Cap.String() + "/" + s.Join.String()
 }
 
 // markerPart writes a part of a marker as the oracle reads Pele's: a circle by its middle and

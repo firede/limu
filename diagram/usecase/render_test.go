@@ -142,18 +142,47 @@ func paintName(p style.Paint) string {
 	return "?"
 }
 
-// partPaint is how a part of an item is painted, as the oracle reads Pele's fill and stroke.
-func partPaint(it *scene.Item, part *scene.Part) string {
+// partPaint is how a part of an item is painted, as the oracle reads Pele's fill and stroke,
+// and when it has a stroke, its ends, and its joins where it has corners.
+func partPaint(it *scene.Item, part *scene.Part, corners bool) string {
 	name := paintName
+	stroke := name(it.Style.Stroke)
+	var s string
 	switch part.Paint {
 	case scene.StrokeOnly:
-		return "none " + name(it.Style.Stroke)
+		s = "none " + stroke
 	case scene.FillOnly:
 		return name(it.Style.Fill) + " -"
 	case scene.Hollow:
-		return "var(--_bg) " + name(it.Style.Stroke)
+		s = "var(--_bg) " + stroke
+	default:
+		s = name(it.Style.Fill) + " " + stroke
 	}
-	return name(it.Style.Fill) + " " + name(it.Style.Stroke)
+	if stroke != "-" && stroke != "none" {
+		s += ends(it, 0, corners)
+	}
+	return s
+}
+
+// ends is how an item's strokes end and turn their corners, after its author's style, as the
+// oracle reads them: " cap=" and " join=" where they are not SVG's initial butt and miter. A
+// marker's own join, when it has one, is over the item's; without corners, there is no join.
+func ends(it *scene.Item, join style.Join, corners bool) string {
+	s := it.Author.Over(it.Style)
+	if join.Set() {
+		s.Join = join
+	}
+	if !corners {
+		s.Join = 0
+	}
+	out := ""
+	if s.Cap.Set() && s.Cap != style.CapButt {
+		out += " cap=" + s.Cap.String()
+	}
+	if s.Join.Set() && s.Join != style.JoinMiter {
+		out += " join=" + s.Join.String()
+	}
+	return out
 }
 
 // classes is the class attribute Pele writes on an item, after its pele- classes: the classes
@@ -253,14 +282,16 @@ func sceneLines(sc *scene.Scene) []string {
 			if part.Rounded {
 				s += " r"
 			}
-			lines = append(lines, s+" "+partPaint(it, part))
+			lines = append(lines, s+" "+partPaint(it, part, true))
 			return
 		}
 		for _, s := range subpaths(part.Path) {
+			// A circle and a single straight line have no corners.
+			corners := !strings.HasPrefix(s, "ellipse") && !(strings.HasPrefix(s, "M ") && strings.Count(s, " ") == 3 && strings.Contains(s, " L "))
 			if !strings.HasPrefix(s, "ellipse") {
 				s = "path " + s
 			}
-			lines = append(lines, s+" "+partPaint(it, part))
+			lines = append(lines, s+" "+partPaint(it, part, corners))
 		}
 	}
 	for i := 0; i < len(sc.Items); i++ {
@@ -289,10 +320,14 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			lines = append(lines, fmt.Sprintf("edge %s %s [%s] %s", id, it.Shape, classes(it), dash))
 			for _, s := range subpaths(it.Parts[0].Path) {
-				lines = append(lines, "path "+s)
+				lines = append(lines, "path "+s+ends(it, 0, true))
 			}
 			for _, m := range it.Ends {
 				if s := peleMarker(m); s != "" {
+					if m.Type == "arrow_cross" || m.Type == "usecase.extension" {
+						// The markers Pele strokes.
+						s += ends(it, m.Type.Join(), true)
+					}
 					lines = append(lines, "m "+s)
 				}
 			}

@@ -701,6 +701,11 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			top := -h / 2
 			it.Parts, it.Picture = figure(v, x, y+(top+figureH/2))
+			if n.ActorType == "hollow" {
+				// Pele turns the corners of a hollow body round; its head and a business
+				// actor's slash, a circle and a single stroke, have no corners to turn.
+				it.Style.Join = style.JoinRound
+			}
 			if !v.stereotype.Empty() {
 				stereotype = &scene.Item{
 					Kind: scene.Text, Role: "usecase.stereotype", ID: n.ID, Label: &v.stereotype,
@@ -757,6 +762,8 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				it.Role = "usecase.note"
 				it.Shape = "note"
 				it.Style.Fill = style.SurfaceAlt
+				// Pele turns the corners of the note and of its fold round.
+				it.Style.Join = style.JoinRound
 				r, b := w/2, h/2
 				outline := new(scene.Path).Polygon(x-r, y-b, x+(r-fold), y-b, x+r, y+(fold-b), x+r, y+b, x-r, y+b)
 				corner := new(scene.Path).MoveTo(x+(r-fold), y-b).LineTo(x+(r-fold), y+(fold-b)).LineTo(x+r, y+(fold-b))
@@ -855,7 +862,8 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			st, et := markerTrim(start), markerTrim(end)
 			path = draw.RoutePath(route, "", st, et, draw.OwnReach(st), draw.OwnReach(et))
 		}
-		own := style.Style{Stroke: style.Line, Fill: style.None}
+		// A line ends round, as Pele draws it in the group of edges, which sets round caps.
+		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
 		switch {
 		case edge.Internal:
 			own.Dash = style.Dashes(2, 3)

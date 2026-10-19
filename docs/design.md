@@ -92,7 +92,9 @@ with markers of its own adds them from an init function, in a file of its own
 A marker's parts are painted in the color of the edge's line, whatever its style's fill:
 `FillOnly` fills a part in it, `FillAndStroke` strokes it too, `StrokeOnly` strokes it only,
 and `Hollow` fills it with the background and strokes it, so that the line beneath does not
-show through. A marker is drawn solid on a dashed edge, as Pele draws it.
+show through. A marker is drawn solid on a dashed edge, as Pele draws it, with the edge's
+caps, and with its corners turned as the edge's are unless its type has a join of its own
+(`MarkerType.Join`), as Pele gives class diagrams' triangles and diamonds round ones.
 
 ## Style
 
@@ -112,6 +114,17 @@ Three levels, from the least to the most a host does:
 A part's style is cascaded, from under to over: the theme's measures, the diagram's own
 style for the part, the overrides for its role, and what its author set in the diagram's
 text.
+
+A style also says how a stroked line ends and turns its corners: its `Cap` (butt, round or
+square) and its `Join` (miter, round or bevel), as SVG's stroke-linecap and stroke-linejoin
+do. They change how a line looks and not where anything is, so they are style, not layout.
+Left unset all the way up, a line ends flat and its corners are mitred, as in SVG. Each
+diagram sets them in its own style where Pele does: the edges of every diagram end round,
+as Pele draws them in a group with round caps, and a few shapes turn their corners round,
+as a gantt chart's milestone. An author's `stroke-linecap` and `stroke-linejoin` in `style`
+and `classDef` lines are read, as Pele passes them on to the browser. The svg package
+writes them where they are set; the mygoui package strokes with MyGo's round ends and
+corners when both are round, and otherwise fills the outline SVG would stroke.
 
 ## Porting from Pele
 

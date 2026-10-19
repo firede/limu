@@ -666,7 +666,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 				Box:   scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
 				Parts: []scene.Part{{Path: outline}, {Path: corner, Paint: scene.StrokeOnly}},
 				Label: &v.label, At: scene.Point{X: x, Y: y},
-				Style: style.Style{Fill: style.SurfaceAlt, Stroke: style.Border},
+				// Pele turns the corners of both of a note's paths round.
+				Style: style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Join: style.JoinRound},
 			})
 		default:
 			nodeItems = append(nodeItems, scene.Item{
@@ -707,7 +708,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			}
 			path = draw.RoutePath(route, "", startTrim, endTrim, draw.OwnReach(startTrim), draw.OwnReach(endTrim))
 		}
-		own := style.Style{Stroke: style.Line, Fill: style.None}
+		// Pele draws the edges in a group that ends their lines round.
+		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
 		role := scene.Role("class.relation")
 		switch edge.Pattern {
 		case "dashed":

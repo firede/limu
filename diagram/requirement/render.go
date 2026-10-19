@@ -409,7 +409,8 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			route = append([]float64(nil), ce.Route...)
 			path = draw.RoutePath(route, "", startTrim, 0, draw.OwnReach(startTrim), 0)
 		}
-		own := style.Style{Stroke: style.Line, Fill: style.None}
+		// Pele draws the edges in a group that ends their lines round.
+		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
 		if !edge.Contains {
 			own.Dash = style.Dashes(5, 4)
 		}

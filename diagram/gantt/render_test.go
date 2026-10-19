@@ -120,6 +120,19 @@ func paintName(p style.Paint) string {
 	return "?"
 }
 
+// pen is how an item's lines end and turn their corners, as the oracle reads Pele's
+// stroke-linecap and stroke-linejoin: the author's or the diagram's, or "-" for neither.
+func pen(it *scene.Item) string {
+	s := it.Author.Over(it.Style)
+	name := func(v string) string {
+		if v == "" {
+			return "-"
+		}
+		return v
+	}
+	return name(s.Cap.String()) + " " + name(s.Join.String())
+}
+
 // quote is a string as JavaScript's JSON.stringify writes it.
 func quote(s string) string {
 	var b strings.Builder
@@ -223,10 +236,10 @@ func sceneLines(sc *scene.Scene) []string {
 			lines = append(lines, "excluded "+pt(r.X, r.Y)+","+pt(r.W, r.H))
 		case "gantt.grid", "gantt.axis":
 			lines = append(lines, strings.TrimPrefix(string(it.Role), "gantt."))
-			paths(it.Parts[0].Path, "- "+paintName(it.Style.Stroke))
+			paths(it.Parts[0].Path, "- "+paintName(it.Style.Stroke)+" "+pen(it))
 		case "gantt.vert":
 			lines = append(lines, "vert "+peleID(it.ID))
-			paths(it.Parts[0].Path, "- -")
+			paths(it.Parts[0].Path, "- - "+pen(it))
 		case "gantt.today":
 			// The author's style of the line, which Pele writes as it is, takes the place of the
 			// triangle.
@@ -235,9 +248,9 @@ func sceneLines(sc *scene.Scene) []string {
 			} else {
 				lines = append(lines, "today -")
 			}
-			paths(it.Parts[0].Path, "none "+paintName(it.Style.Stroke))
+			paths(it.Parts[0].Path, "none "+paintName(it.Style.Stroke)+" "+pen(it))
 			if len(it.Parts) > 1 {
-				paths(it.Parts[1].Path, paintName(it.Style.Fill)+" -")
+				paths(it.Parts[1].Path, paintName(it.Style.Fill)+" - "+pen(it))
 			}
 		case "gantt.task":
 			lines = append(lines, fmt.Sprintf("task %s [%s]", peleID(it.ID), strings.Join(it.Class, " ")))
@@ -247,7 +260,7 @@ func sceneLines(sc *scene.Scene) []string {
 			paint := paintName(it.Style.Fill) + " " + paintName(it.Style.Stroke)
 			for _, part := range it.Parts {
 				if part.Path != nil {
-					paths(part.Path, paint)
+					paths(part.Path, paint+" "+pen(it))
 					continue
 				}
 				r := part.Box
