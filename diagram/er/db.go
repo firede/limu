@@ -105,7 +105,7 @@ type DB struct {
 	claimed        map[string]bool
 }
 
-// NewDB is an empty ER diagram.
+// NewDB is an empty ER diagram, as Pele's new ErDb is.
 func NewDB() *DB {
 	return &DB{
 		Direction:      "TB",
@@ -116,13 +116,13 @@ func NewDB() *DB {
 	}
 }
 
-// Entity is the entity of a name, or nil.
+// Entity is the entity of a name, or nil, as Pele's entities.get gives it.
 func (d *DB) Entity(name string) *Entity { return d.entities[name] }
 
-// Class is the class of id, or nil.
+// Class is the class of id, or nil, as Pele's classes.get gives it.
 func (d *DB) Class(id string) *ClassDef { return d.classes[id] }
 
-// Subgraph is the subgraph of id, or nil.
+// Subgraph is the subgraph of id, or nil, as Pele's subgraphLookup.get gives it.
 func (d *DB) Subgraph(id string) *Subgraph { return d.subgraphLookup[id] }
 
 // AddEntity is the entity of a name, added if it is new, as Pele's addEntity does; an alias
@@ -171,7 +171,7 @@ func (d *DB) AddRelationship(entA, roleA, entB string, spec RelSpec) {
 	d.Relationships = append(d.Relationships, Relationship{EntityA: a, RoleA: roleA, EntityB: b, RelSpec: spec})
 }
 
-// SetDirection sets the direction the diagram runs in.
+// SetDirection sets the direction the diagram runs in, as Pele's setDirection does.
 func (d *DB) SetDirection(dir string) { d.Direction = dir }
 
 // AddCSSStyles adds styles to entities and subgraphs, as Pele's addCssStyles does.
@@ -259,7 +259,8 @@ func (d *DB) addSubGraph(idText string, list []docItem, title string) string {
 	return id
 }
 
-// SetAccTitle sets the title for assistive technology, its leading white space taken off.
+// SetAccTitle sets the title for assistive technology, its leading white space taken off, as
+// Pele's setAccTitle does.
 func (d *DB) SetAccTitle(text string) { d.AccTitle = chars.TrimStart(text) }
 
 // SetAccDescription sets the description for assistive technology, as Pele's

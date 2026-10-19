@@ -173,7 +173,8 @@ type DB struct {
 	active       map[string]int
 }
 
-// Actor is the participant of an id, or nil.
+// Actor is the participant of an id, or nil. It stands for Map.get on the actors of Pele's
+// SeqDb.
 func (db *DB) Actor(id string) *Actor { return db.actorIndex[id] }
 
 // Parse parses a sequence diagram's text, as the parse of Pele's sequence diagram does:
@@ -191,7 +192,8 @@ func Parse(source, title string, config diagram.Config) (*DB, error) {
 	return db, nil
 }
 
-// ParsePrepared parses a prepared sequence diagram.
+// ParsePrepared parses a prepared sequence diagram. It is limu's own: Pele's core hands its
+// parse the source, the config and the title itself.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
 	return Parse(p.Source(false), p.Title, p.Config)
 }

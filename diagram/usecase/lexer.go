@@ -21,7 +21,8 @@ const (
 	classPunctuation = 2
 )
 
-// class says of each ASCII character whether it is part of a word, or punctuation of CSS.
+// class says of each ASCII character whether it is part of a word, or punctuation of CSS:
+// Pele's CLASS.
 var class = func() (t [128]uint8) {
 	for c := '0'; c <= '9'; c++ {
 		t[c] = classWord
@@ -37,10 +38,11 @@ var class = func() (t [128]uint8) {
 	return
 }()
 
-// keywordLength is the length of each keyword, by its type of token.
+// keywordLength is the length of each keyword, by its type of token: Pele's KEYWORD_LENGTH.
 var keywordLength = [...]int{0, 12, 5, 14, 3, 9, 2, 2, 2, 2, 2, 4, 3, 4, 8, 5, 5, 7, 6, 4, 5}
 
-// at is the byte of s at i, or -1 past its end, as charCodeAt is for ASCII.
+// at is the byte of s at i, or -1 past its end, as charCodeAt is for ASCII. It stands for the
+// src.charCodeAt calls of Pele's lexer and parser.
 func at(s string, i int) int {
 	if i < 0 || i >= len(s) {
 		return -1
@@ -48,10 +50,12 @@ func at(s string, i int) int {
 	return int(s[i])
 }
 
+// isWord reports whether character c is part of a word, as Pele's isWord does.
 func isWord(c int) bool { return c >= 0 && c < 128 && class[c]&classWord != 0 }
 
 // startsWithNoCase reports whether word, in lower case, starts at byte i of s in any case:
-// Mermaid's INCLUDE and EXTEND are the only keywords matched without regard to case.
+// Mermaid's INCLUDE and EXTEND are the only keywords matched without regard to case. It is
+// Pele's startsWithNoCase.
 func startsWithNoCase(s string, i int, word string) bool {
 	for k := 0; k < len(word); k++ {
 		if at(s, i+k)|32 != int(word[k]) {
@@ -179,7 +183,8 @@ func locationText(s string, start, end int) string {
 		" [" + strconv.Itoa(unit(s, start)) + "," + strconv.Itoa(unit(s, end)) + ")"
 }
 
-// stringEnd is the end of a quoted string that opens at i, or -1 when the line ends first.
+// stringEnd is the end of a quoted string that opens at i, or -1 when the line ends first, as
+// Pele's stringEnd finds it.
 func stringEnd(s string, i int, quote byte) int {
 	for k := i + 1; k < len(s); k++ {
 		c := s[k]
@@ -193,7 +198,8 @@ func stringEnd(s string, i int, quote byte) int {
 	return -1
 }
 
-// startsToken reports whether a token starts at i: anything but a quote that opens no string.
+// startsToken reports whether a token starts at i: anything but a quote that opens no string,
+// as Pele's startsToken does.
 func startsToken(s string, i int) bool {
 	c := s[i]
 	if c != '"' && c != '\'' {

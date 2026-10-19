@@ -173,8 +173,8 @@ const (
 	// state, which hides what is beneath it.
 	Hollow
 	// Shade fills the part with the theme's background and does not stroke it: a stripe of
-	// an entity's table. Over a fill the item's author set, it is the background at 60% laid
-	// over that fill, a tint of it.
+	// an entity's table. When the item's author set a fill, it is the background at 60%
+	// opacity, laid over the parts drawn before it, as Pele draws an entity's stripes.
 	Shade
 )
 

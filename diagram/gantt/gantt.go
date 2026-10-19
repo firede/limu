@@ -33,9 +33,11 @@ type moment struct {
 	defined bool
 }
 
+// at is a defined moment at the time value ms, as Pele assigns a Date to a task's time.
 func at(ms float64) moment { return moment{ms, true} }
 
-// value is the moment as a number, as +date gives it: NaN when it is undefined.
+// value is the moment as a number, as +date gives it: NaN when it is undefined. Pele's
+// getStartDate and getEndDate compare tasks' times so.
 func (m moment) value() float64 {
 	if !m.defined {
 		return math.NaN()
@@ -43,7 +45,8 @@ func (m moment) value() float64 {
 	return m.ms
 }
 
-// Time is the moment as a time.Time, if it is a valid date.
+// Time is the moment as a time.Time, if it is a valid date. Pele has no such function; it
+// gives the Date itself.
 func (m moment) time(loc *time.Location) (time.Time, bool) {
 	if !m.defined || math.IsNaN(m.ms) {
 		return time.Time{}, false
@@ -75,13 +78,15 @@ type Task struct {
 	loc *time.Location
 }
 
-// Start is when the task starts, once scheduled; false when it has no valid start.
+// Start is when the task starts, once scheduled; false when it has no valid start. It is
+// Pele's GanttTask.startTime.
 func (t *Task) Start() (time.Time, bool) { return t.start.time(t.loc) }
 
-// End is when the task ends, once scheduled.
+// End is when the task ends, once scheduled, as Pele's GanttTask.endTime.
 func (t *Task) End() (time.Time, bool) { return t.end.time(t.loc) }
 
-// RenderEnd is where the task's bar ends, when excluded days pushed its end out.
+// RenderEnd is where the task's bar ends, when excluded days pushed its end out, as Pele's
+// GanttTask.renderEndTime.
 func (t *Task) RenderEnd() (time.Time, bool) { return t.renderEnd.time(t.loc) }
 
 // Parse parses a gantt chart's text, as the parse of Pele's gantt chart does: source is what
@@ -103,10 +108,10 @@ func Parse(source, title string, config diagram.Config) (*DB, error) {
 	return db, nil
 }
 
-// ParsePrepared parses a prepared gantt chart.
+// ParsePrepared parses a prepared gantt chart, giving Parse what Pele's parse is given.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
 	return Parse(p.Source(false), p.Title, p.Config)
 }
 
-// trim is JavaScript's trim.
+// trim is JavaScript's trim, as Pele's String.prototype.trim calls give it.
 func trim(s string) string { return chars.Trim(s) }
