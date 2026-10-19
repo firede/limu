@@ -1,0 +1,35 @@
+:where(.lede, .used-by-heading, .get-started-link, .markdown-doc, .site-header-links, .site-footer, .footer-nav) a,
+:where(.playground-link) {
+  --link-color: var(--link-default-color, var(--paper));
+  color: var(--link-color);
+  transition: color 150ms ease, text-decoration-color 150ms ease;
+
+  @media (hover: hover) {
+    &:hover {
+      --link-color: var(--link-hover-color, var(--paper-bright));
+      text-decoration-color: currentColor;
+    }
+  }
+}
+
+:where(.site-header-links, .site-footer, .footer-nav) a:focus-visible,
+:where(.playground-link):focus-visible {
+  --link-color: var(--link-hover-color, var(--paper-bright));
+  outline: 0;
+}
+
+// Keep inline links distinct without making their underline compete with the text.
+:where(.lede, .used-by-heading, .get-started-link, .markdown-doc) a {
+  text-decoration-line: underline;
+  text-decoration-color: var(--link-decoration-color, var(--faint));
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+// Links in running text are in the accent, limu kohu's red, so that they read as links in
+// either theme; the header's and the footer's stay in the text's color.
+:where(.lede, .markdown-doc) {
+  --link-default-color: var(--accent);
+  --link-hover-color: var(--accent);
+  --link-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}

@@ -1,0 +1,179 @@
+// Measures, the same in both themes.
+:root {
+  --font-size-title: clamp(2rem, 4vw, 2.5rem);
+  --font-size-heading: 1.25rem;
+  --font-size-body: clamp(1rem, 0.875rem + 0.2vw, 1.125rem);
+  --font-size-small: 0.875rem;
+  --font-size-xs: 0.75rem;
+  --font-size-menu: 0.8125rem;
+  --code-line-height: 1.72;
+  --code-gutter-width: 42px;
+  --radius-small: 6px;
+  --radius-panel: 12px;
+  --radius-pill: 999px;
+  --header-height: 64px;
+  --page-width: 88vw;
+  --desktop-navigation-left: max(24px, calc((100vw - var(--reading)) / 2 - 180px - clamp(40px, 3.5vw, 56px)));
+  --desktop-wordmark-top: calc((var(--header-height) - var(--font-size-heading)) / 2);
+  --font-sans: "Hanken Grotesk Variable", "Hanken Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", "Roboto Mono", "DejaVu Sans Mono", "Liberation Mono", Menlo, Monaco, Consolas, monospace;
+  --content: 960px;
+  --reading: calc(var(--font-size-body) * 42);
+}
+
+// The colors of Limu kohu (docs/website.md): the light theme here, the dark one below, as
+// the system has it or as the page's switch sets data-theme. The names are Pele's: ink is
+// the page, paper the strongest text.
+:root {
+  color-scheme: light;
+  --ink: #f1f6f5;
+  --panel: #e3edeb;
+  --line: #cddcda;
+  --line-background: var(--line);
+  --line-hover: #bdd0ce;
+  --line-active: #abc1bf;
+  --faint: #8aa3a5;
+  --muted: #536f72;
+  --body: #1d3539;
+  --paper: #0f262a;
+  --paper-bright: #061518;
+  --accent: #a92e4a;
+  --accent-ink: #f1f6f5;
+  --red: #b5435c;
+  --green: #4f8a3a;
+  --syntax-punctuation: #536f72;
+  --syntax-language: #a92e4a;
+  --syntax-keyword: #a92e4a;
+  --syntax-type: #6a4a92;
+  --syntax-constant: #8a5f10;
+  --syntax-number: #8a5f10;
+  --syntax-variable: #2f5d96;
+  --syntax-function: #2f5d96;
+  --syntax-string: #1c6e6a;
+  --syntax-comment: #4f686b;
+  --selection-background: rgb(169 46 74 / 16%);
+}
+
+@mixin dark {
+  color-scheme: dark;
+  --ink: #0c1618;
+  --panel: #132125;
+  --line: #213439;
+  --line-hover: #2a4247;
+  --line-active: #36545a;
+  --faint: #4f6b70;
+  --muted: #7f989b;
+  --body: #d0dddc;
+  --paper: #e6efee;
+  --paper-bright: #f5faf9;
+  --accent: #ee8494;
+  --accent-ink: #0c1618;
+  --red: #e37d90;
+  --green: #8cbf6a;
+  --syntax-punctuation: #7f989b;
+  --syntax-language: #ee8494;
+  --syntax-keyword: #ee8494;
+  --syntax-type: #ad92d1;
+  --syntax-constant: #d9a748;
+  --syntax-number: #d9a748;
+  --syntax-variable: #78a3d9;
+  --syntax-function: #78a3d9;
+  --syntax-string: #5cbcb3;
+  --syntax-comment: #6f8a8e;
+  --selection-background: rgb(238 132 148 / 22%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    @include dark;
+  }
+}
+:root[data-theme="dark"] {
+  @include dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+::selection {
+  background: var(--selection-background);
+}
+[hidden] {
+  display: none !important;
+}
+html {
+  background: var(--ink);
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--body);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+// The name beside the mark, as docs/website.md sets it: the plume as tall as the l, a fifth
+// of an em before it.
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2em;
+  color: var(--paper);
+  font-size: var(--font-size-heading);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.025em;
+
+  // The plume's ink starts 0.3em into its box; the mark moves left by about as much, so
+  // that the wordmark lines up with the text under it.
+  .mark {
+    width: 1.08em;
+    height: 1.08em;
+    margin-bottom: 0.04em;
+    margin-left: -0.28em;
+    color: var(--accent);
+  }
+}
+
+.button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--faint);
+  border-radius: var(--radius-pill);
+  padding: 8px 14px;
+  font-size: var(--font-size-small);
+  font-weight: 500;
+  transition: background 150ms ease, color 150ms ease;
+
+  &-primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  @media (hover: hover) {
+    &-primary:hover {
+      background: color-mix(in srgb, var(--accent), var(--ink) 12%);
+    }
+    &-secondary:hover {
+      background: var(--panel);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -11,14 +11,30 @@ and is served by Cloudflare as the static assets of a Worker, as mygo-platinum's
 It is in English only. The import path stays `github.com/firede/limu`: the site's domain is
 not a vanity import path.
 
-A Go program, run before Astro builds, writes what the site shows of limu's own work: the
-SVG of every example, and of every diagram in a page's Mermaid code blocks, drawn by the
-svg package. No page but the playground loads WebAssembly.
+A Go program, `website/gen`, run before Astro builds, writes what the site shows of limu's
+own work: the mark and the icon, the SVG of every example, and of every diagram in a
+page's Mermaid code blocks, drawn by the svg package, and `style.Kohu` and
+`style.KohuDark` as the `--limu-*` variables, so that the diagrams follow the site's theme
+and the theme's colors are written in one place. It is in a module of its own, as the
+`./...` of limu's would reach into `website/node_modules`. The PNG icons are drawn from
+its SVGs by headless Chrome and committed (`website/scripts/icons.mjs`). No page but the
+playground loads WebAssembly.
+
+The diagrams' text is set in Arial, or a font as wide, as layout measures it with
+`text.Arial`. Setting it in Hanken Grotesk, as the site's text is, would take a
+`text.Measurer` reading that font's advances; that is left open.
+
+The site's layout, navigation, code blocks and Markdown pages are adapted from Pele's
+website, under its MIT license, which `website/PELE-LICENSE` holds.
 
 ## Pages
 
-The header links to Docs, Examples, Playground and GitHub, with the mark and the name at
-its left. There is no search, and no page comparing limu with Pele or with Mermaid: limu
+As on Pele's site, the pages are listed in a sidebar, from the home page, Introduction,
+to the documents; on a narrow screen they are in a menu. The mark and the name head the
+sidebar, with the playground's button below them; the link to GitHub and the switch
+between light and dark are in the window's top right corner. The footer lists the pages
+again in three groups, Start, Guides and Project, with the playground and GitHub among
+them. There is no search, and no page comparing limu with Pele or with Mermaid: limu
 matches Pele number for number, so a comparison would show nothing.
 
 ### Home
@@ -66,7 +82,9 @@ The web playground and the desktop one are one program, so that the two do not d
 apart, and both are made simpler: the playground is a place for a user to try limu, not an
 application complete in features. It keeps the editor, the diagram, light and dark, a
 link to share, and the SVG and PNG to download. It drops opening and saving files and its
-page of examples, which the site's examples replace. A diagram comes in through the URL,
+page of examples, which the site's examples replace, and its appearances in GitHub's
+colors, which Kohu and KohuDark replace, the colors of its window, its code and its
+controls drawn from the site's. A diagram comes in through the URL,
 as Pele's playground takes one; without the page of examples the playground needs no
 router, which in a browser would own the URL's fragment. The shell of the browser and the
 desktop differ by build tags.
@@ -184,6 +202,10 @@ site's skeleton.
 The name and the site are set in Hanken Grotesk; the name in its weight 650, with a letter
 spacing of −0.025em, the plume as tall as the l and a fifth of an em before it. Code is set
 in the system's monospaced font.
+
+The font is preloaded and declared with `font-display: optional`, not fontsource's `swap`,
+so that a page is drawn once in it rather than first in the fallback font; `_headers` lets
+browsers keep the files under `/_astro`, which are named by their content, for a year.
 
 ## Order of work
 

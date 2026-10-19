@@ -1,0 +1,21 @@
+---
+import CopyButton from './CopyButton.astro';
+import { highlightCode, type CodeLanguage } from '../lib/highlight';
+
+interface Props {
+  code: string;
+  language: CodeLanguage;
+  label?: string;
+  showLineNumbers?: boolean;
+}
+
+const { code, language, label, showLineNumbers = false } = Astro.props;
+const renderedCode = highlightCode(code, language, showLineNumbers);
+---
+
+<figure class:list={['doc-code', !label && 'doc-code-unlabeled', showLineNumbers && 'doc-code-numbered']} data-code-block>
+  {label ? (
+    <figcaption><span>{label}</span><span class="doc-code-actions"><CopyButton /></span></figcaption>
+  ) : <span class="doc-code-actions"><CopyButton /></span>}
+  <pre><code data-language={language} set:html={renderedCode} /></pre>
+</figure>

@@ -1,0 +1,31 @@
+---
+import { navPages } from '../lib/nav';
+import { pageHref, repositoryUrl, type DocsPageId } from '../lib/site';
+
+// The footer groups the pages, so that each group is a short column. A page is listed once
+// it exists; the playground and the repository are not pages of the site's navigation.
+const groups: { title: string; pages: DocsPageId[]; extra?: { title: string; href: string; external?: boolean }[] }[] = [
+  { title: 'Start', pages: ['introduction', 'getting-started', 'examples'], extra: [{ title: 'Playground', href: '/playground' }] },
+  { title: 'Guides', pages: ['api', 'theming', 'mygo', 'svg'] },
+  { title: 'Project', pages: ['architecture', 'compatibility'], extra: [{ title: 'GitHub', href: repositoryUrl, external: true }] },
+];
+const listed = (id: DocsPageId) => navPages.find((page) => page.id === id);
+---
+
+<nav class="footer-nav" aria-label="Footer navigation">
+  {groups.map((group) => (
+    <div class="footer-nav-group">
+      <h2>{group.title}</h2>
+      <ul>
+        {group.pages.map(listed).filter((page) => page !== undefined).map((page) => <li><a href={pageHref(page.id)}>{page.title}</a></li>)}
+        {group.extra?.map((link) => (
+          <li>
+            {link.external
+              ? <a href={link.href} target="_blank" rel="noopener noreferrer">{link.title}</a>
+              : <a href={link.href}>{link.title}</a>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  ))}
+</nav>

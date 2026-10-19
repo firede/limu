@@ -1,0 +1,49 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import DocsNavigation from '../components/DocsNavigation.astro';
+import type { DocsPageId, Heading } from '../lib/site';
+
+interface Props {
+  current: DocsPageId;
+  title: string;
+  description: string;
+  headings?: Heading[];
+  markdownPath: string;
+  // The page's own title in the navigation, when it is one of the pages under `current`.
+  child?: string;
+  noindex?: boolean;
+}
+
+const { current, title, description, headings = [], markdownPath, child, noindex } = Astro.props;
+---
+
+<BaseLayout title={current === 'introduction' ? undefined : title} description={description} markdownPath={markdownPath} noindex={noindex}>
+  <main id="top" class="docs-page">
+    <SiteHeader current={current} headings={headings} child={child} />
+    <div class="docs-layout">
+      <DocsNavigation class="docs-toc" current={current} headings={headings} child={child} />
+
+      <article class="docs-content">
+        <header class="docs-title">
+          <h1>{title}</h1>
+          <p>{description}</p>
+          <div class="docs-title-actions">
+            <button class="docs-title-action text-action" type="button" data-copy-markdown={markdownPath} aria-live="polite">
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>
+              <span>Copy Markdown</span>
+            </button>
+            <a class="docs-title-action text-action" href={markdownPath}>
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" x2="8" y1="13" y2="13"></line><line x1="16" x2="8" y1="17" y2="17"></line><line x1="10" x2="8" y1="9" y2="9"></line></svg>
+              <span>View Markdown</span>
+            </a>
+          </div>
+        </header>
+        <div class="markdown-doc"><slot /></div>
+        <SiteFooter />
+      </article>
+
+    </div>
+  </main>
+</BaseLayout>

@@ -1,0 +1,256 @@
+const copyIcon = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>';
+const checkIcon = '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>';
+
+const copyTimers = new WeakMap<HTMLButtonElement, number>();
+
+function codeText(button: HTMLButtonElement) {
+  if (button.dataset.copyText !== undefined) return button.dataset.copyText;
+  const block = button.closest('[data-code-block]');
+  if (!block) return '';
+  const sourceLines = block.querySelectorAll<HTMLElement>('.doc-code-source');
+  if (sourceLines.length) return [...sourceLines].map((line) => line.textContent ?? '').join('\n');
+  return block.querySelector('code')?.textContent ?? '';
+}
+
+document.addEventListener('click', async (event) => {
+  const button = (event.target as Element).closest<HTMLButtonElement>('[data-copy-code]');
+  if (!button) return;
+  const label = button.dataset.copyLabel ?? 'Copy code';
+  try {
+    await navigator.clipboard.writeText(codeText(button));
+    button.dataset.copied = '';
+    button.title = 'Copied';
+    button.setAttribute('aria-label', 'Copied');
+    button.innerHTML = checkIcon;
+    const previous = copyTimers.get(button);
+    if (previous) window.clearTimeout(previous);
+    copyTimers.set(button, window.setTimeout(() => {
+      delete button.dataset.copied;
+      button.title = label;
+      button.setAttribute('aria-label', label);
+      button.innerHTML = copyIcon;
+    }, 2000));
+  } catch {
+    delete button.dataset.copied;
+  }
+});
+
+document.addEventListener('click', async (event) => {
+  const button = (event.target as Element).closest<HTMLButtonElement>('[data-copy-markdown]');
+  const markdownPath = button?.dataset.copyMarkdown;
+  if (!button || !markdownPath) return;
+
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  try {
+    const markdown = fetch(markdownPath, { headers: { Accept: 'text/markdown' } }).then(async (response) => {
+      if (!response.ok) throw new Error(`Unable to fetch ${markdownPath}`);
+      return response.text();
+    });
+    if ('ClipboardItem' in window && navigator.clipboard.write) {
+      const item = new ClipboardItem({ 'text/plain': markdown.then((value) => new Blob([value], { type: 'text/plain' })) });
+      await navigator.clipboard.write([item]);
+    } else {
+      await navigator.clipboard.writeText(await markdown);
+    }
+    button.dataset.copied = '';
+    button.innerHTML = `${checkIcon}<span>Copy Markdown</span>`;
+    const previous = copyTimers.get(button);
+    if (previous) window.clearTimeout(previous);
+    copyTimers.set(button, window.setTimeout(() => {
+      delete button.dataset.copied;
+      button.innerHTML = `${copyIcon}<span>Copy Markdown</span>`;
+    }, 2000));
+  } catch {
+    button.dataset.copyError = '';
+    button.innerHTML = `${copyIcon}<span>Copy failed</span>`;
+    const previous = copyTimers.get(button);
+    if (previous) window.clearTimeout(previous);
+    copyTimers.set(button, window.setTimeout(() => {
+      delete button.dataset.copyError;
+      button.innerHTML = `${copyIcon}<span>Copy Markdown</span>`;
+    }, 2000));
+  } finally {
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+  }
+});
+
+
+function setupMobileDocsMenu() {
+  const trigger = document.querySelector<HTMLButtonElement>('[data-docs-menu-trigger]');
+  const backdrop = document.querySelector<HTMLElement>('[data-docs-menu-backdrop]');
+  const header = trigger?.closest<HTMLElement>('[data-scroll-header]');
+  if (!trigger || !backdrop || !header) return;
+
+  const mobile = window.matchMedia('(max-width: 760px)');
+  const updateMenuTop = () => {
+    backdrop.style.top = `${header.getBoundingClientRect().bottom}px`;
+  };
+  new ResizeObserver(updateMenuTop).observe(header);
+  window.addEventListener('resize', updateMenuTop);
+  const close = () => {
+    if (backdrop.hidden) return;
+    if (backdrop.contains(document.activeElement)) trigger.focus({ preventScroll: true });
+    backdrop.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    trigger.setAttribute('aria-label', 'Open documentation menu');
+    document.documentElement.classList.remove('docs-menu-open');
+  };
+  const open = () => {
+    if (!mobile.matches) return;
+    document.dispatchEvent(new CustomEvent('limu:overlay-open', { detail: 'docs-menu' }));
+    backdrop.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    trigger.setAttribute('aria-label', 'Close documentation menu');
+    document.documentElement.classList.add('docs-menu-open');
+    updateMenuTop();
+  };
+
+  trigger.addEventListener('click', () => backdrop.hidden ? open() : close());
+  backdrop.addEventListener('click', (event) => {
+    if (event.target === backdrop) close();
+  });
+  header.addEventListener('click', (event) => {
+    if ((event.target as Element).closest('a')) close();
+  });
+  window.addEventListener('pagehide', close);
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') close();
+  });
+  mobile.addEventListener('change', (event) => {
+    if (!event.matches) close();
+  });
+  document.addEventListener('limu:overlay-open', (event) => {
+    if ((event as CustomEvent<string>).detail !== 'docs-menu') close();
+  });
+}
+
+function setupMobileHeader() {
+  const header = document.querySelector<HTMLElement>('[data-scroll-header]');
+  const slot = header?.closest<HTMLElement>('[data-scroll-header-slot]');
+  if (!header || !slot) return;
+
+  const mobile = window.matchMedia('(max-width: 760px)');
+  const transitionDuration = 240;
+  let previousScrollY = window.scrollY;
+  let frame = 0;
+  let revealFrame = 0;
+  let dismissTimer = 0;
+  let keepVisibleForHeading = false;
+
+  new ResizeObserver(() => {
+    document.documentElement.style.setProperty('--mobile-header-height', `${header.getBoundingClientRect().height}px`);
+  }).observe(header);
+
+  const reset = () => {
+    if (revealFrame) window.cancelAnimationFrame(revealFrame);
+    if (dismissTimer) window.clearTimeout(dismissTimer);
+    revealFrame = 0;
+    dismissTimer = 0;
+    header.classList.remove('is-header-floating', 'is-header-visible');
+    slot.style.removeProperty('height');
+  };
+  const reveal = () => {
+    if (!mobile.matches) return;
+    if (dismissTimer) window.clearTimeout(dismissTimer);
+    dismissTimer = 0;
+    if (!header.classList.contains('is-header-floating')) {
+      slot.style.height = `${slot.offsetHeight}px`;
+      header.classList.add('is-header-floating');
+      void header.offsetHeight;
+    }
+    if (revealFrame) window.cancelAnimationFrame(revealFrame);
+    revealFrame = window.requestAnimationFrame(() => {
+      revealFrame = 0;
+      header.classList.add('is-header-visible');
+    });
+  };
+  const dismiss = () => {
+    if (!header.classList.contains('is-header-floating')) return;
+    if (!header.classList.contains('is-header-visible') && dismissTimer) return;
+    if (revealFrame) window.cancelAnimationFrame(revealFrame);
+    revealFrame = 0;
+    header.classList.remove('is-header-visible');
+    if (dismissTimer) window.clearTimeout(dismissTimer);
+    dismissTimer = window.setTimeout(reset, transitionDuration);
+  };
+  const update = () => {
+    frame = 0;
+    const currentScrollY = window.scrollY;
+    const revealThreshold = slot.offsetTop + slot.offsetHeight + 24;
+    const reachedOriginalPosition = currentScrollY <= slot.offsetTop;
+    if (!mobile.matches || reachedOriginalPosition) {
+      reset();
+    } else if (keepVisibleForHeading) {
+      reveal();
+    } else if (currentScrollY > previousScrollY + 2) {
+      dismiss();
+    } else if (
+      currentScrollY < previousScrollY - 2
+      && (header.classList.contains('is-header-floating') || currentScrollY > revealThreshold)
+    ) {
+      reveal();
+    }
+    previousScrollY = currentScrollY;
+  };
+  const scheduleUpdate = () => {
+    if (!frame) frame = window.requestAnimationFrame(update);
+  };
+
+  window.addEventListener('scroll', scheduleUpdate, { passive: true });
+  header.addEventListener('click', (event) => {
+    const link = (event.target as Element).closest<HTMLAnchorElement>('[data-docs-menu-backdrop] a[href^="#"]');
+    if (!mobile.matches || !link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    if (!document.getElementById(decodeURIComponent(link.hash.slice(1)))) return;
+    keepVisibleForHeading = true;
+    reveal();
+  });
+  const resumeScrollBehavior = () => { keepVisibleForHeading = false; };
+  window.addEventListener('wheel', resumeScrollBehavior, { passive: true });
+  window.addEventListener('touchmove', resumeScrollBehavior, { passive: true });
+  window.addEventListener('keydown', (event) => {
+    if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) resumeScrollBehavior();
+  });
+  window.addEventListener('pageshow', () => {
+    keepVisibleForHeading = false;
+    previousScrollY = window.scrollY;
+    reset();
+  });
+  mobile.addEventListener('change', () => {
+    keepVisibleForHeading = false;
+    previousScrollY = window.scrollY;
+    reset();
+  });
+  document.addEventListener('limu:overlay-open', () => {
+    if (window.scrollY > slot.offsetTop + slot.offsetHeight + 24) reveal();
+  });
+}
+
+// The theme switch turns the page to the theme it is not in. A choice that matches the
+// system's is forgotten, so that the page follows the system again; another is kept, and set
+// before the page is drawn by the script in BaseLayout's head.
+function setupThemeSwitch() {
+  const system = window.matchMedia('(prefers-color-scheme: dark)');
+  const root = document.documentElement;
+  const isDark = () => (root.dataset.theme ? root.dataset.theme === 'dark' : system.matches);
+  document.querySelectorAll<HTMLButtonElement>('[data-theme-switch]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const dark = !isDark();
+      if (dark === system.matches) {
+        delete root.dataset.theme;
+        try { localStorage.removeItem('limu-theme'); } catch {}
+      } else {
+        root.dataset.theme = dark ? 'dark' : 'light';
+        try { localStorage.setItem('limu-theme', root.dataset.theme); } catch {}
+      }
+    });
+  });
+}
+
+import { setupOutline } from './outline';
+
+setupOutline();
+setupMobileHeader();
+setupMobileDocsMenu();
+setupThemeSwitch();

@@ -1,0 +1,16 @@
+---
+import DocsLayout from '../layouts/DocsLayout.astro';
+import { docs, getDoc } from '../lib/docs';
+import type { DocsPageId } from '../lib/site';
+
+export function getStaticPaths() {
+  return docs.map((doc) => ({ params: { page: doc.id } }));
+}
+
+const id = Astro.params.page as DocsPageId;
+const { Content, frontmatter, getHeadings } = getDoc(id).module;
+---
+
+<DocsLayout current={id} title={frontmatter.title} description={frontmatter.description} headings={getHeadings()} markdownPath={`/${id}.md`}>
+  <Content />
+</DocsLayout>

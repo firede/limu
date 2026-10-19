@@ -1,0 +1,8 @@
+---
+import DocsLayout from '../layouts/DocsLayout.astro';
+import { Content, frontmatter, getHeadings } from '../content/pages/index.md';
+---
+
+<DocsLayout current="introduction" title={frontmatter.title} description={frontmatter.description} headings={getHeadings()} markdownPath="/index.md">
+  <Content />
+</DocsLayout>

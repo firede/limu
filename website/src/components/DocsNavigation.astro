@@ -1,0 +1,41 @@
+---
+import { navPages } from '../lib/nav';
+import { pageHref, type DocsPageId, type Heading } from '../lib/site';
+
+interface Props {
+  class?: string;
+  current?: DocsPageId;
+  headings?: Heading[];
+  // The title of this page when it is one of the pages under `current`.
+  child?: string;
+  ariaLabel?: string;
+}
+
+const { class: className, current, headings = [], child, ariaLabel = 'Documentation' } = Astro.props;
+const toc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+const nested = child !== undefined;
+---
+
+<nav class:list={['docs-navigation', className]} aria-label={ariaLabel}>
+  {navPages.map((page) => (
+    <div class="docs-toc-page">
+      <a
+        class:list={['docs-toc-title', { 'is-current': page.id === current }]}
+        href={page.id === current && !nested ? '#top' : pageHref(page.id)}
+        aria-current={page.id === current && !nested ? 'page' : undefined}
+      >
+        {page.title}
+      </a>
+      {page.id === current && (nested || toc.length > 0) && (
+        <div class:list={{ 'docs-toc-children': nested }}>
+          {nested && <a class="docs-toc-title" href="#top" aria-current="page">{child}</a>}
+          {toc.length > 0 && (
+            <div class="docs-toc-outline">
+              {toc.map((item) => <a href={`#${item.slug}`} data-depth={item.depth}>{item.text}</a>)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  ))}
+</nav>

@@ -1,0 +1,5 @@
+# Astro names each file under /_astro by a hash of its content, so a file there never
+# changes and a browser can keep it: the font, above all, is then at hand on every page
+# without asking the server again.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
