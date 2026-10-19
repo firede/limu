@@ -11,6 +11,7 @@ import (
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
 	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
@@ -183,7 +184,7 @@ func Layout(db *DB, _ diagram.Config, o *layout.Options) *scene.Scene {
 func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	graph := BuildGraph(db)
 	size := o.Size()
-	small := math.Floor(size*0.875 + 0.5)
+	small := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
 	const padding = common.Padding
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {

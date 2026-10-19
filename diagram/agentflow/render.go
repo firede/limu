@@ -10,6 +10,7 @@ import (
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
 	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -111,7 +112,7 @@ type held struct {
 func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Scene {
 	graph := db.Graph(DefaultCurve(config))
 	size := o.Size()
-	edgeSize := math.Floor(size*0.875 + 0.5)
+	edgeSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
 	wrapWidth := numberOption(config, "wrappingWidth", 120)
 	minWidth := numberOption(config, "minNodeWidth", 120)

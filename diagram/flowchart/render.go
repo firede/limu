@@ -9,6 +9,7 @@ import (
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/draw"
 	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -124,7 +125,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		variant.Prepare(graph)
 	}
 	size := o.Size()
-	edgeSize := math.Floor(size*0.875 + 0.5)
+	edgeSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
 	wrapWidth := numberOption(flow, "wrappingWidth", 200)
 	groupMax := 4000.0
