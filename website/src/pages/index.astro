@@ -9,6 +9,7 @@ import SiteHeader from '../components/SiteHeader.astro';
 import home from '../generated/home.json';
 import { installs } from '../lib/home';
 import { repositoryUrl } from '../lib/site';
+import { renderPictures, scenePictures } from '../../lib/pictures.mjs';
 
 const headings = [
   { depth: 2, slug: 'how-it-works', text: 'How it works' },
@@ -48,7 +49,9 @@ const explore = [
             <figcaption>limu</figcaption>
             <Drawing drawing={home.limu} label="Mermaid text goes to a layout, then to a scene, which MyGo, SVG, or a backend of your own draws." />
           </figure>
-          <p>Because the scene holds no colors, switching themes redraws it without laying it out again. An app can also ask the scene which part is under the pointer.</p>
+          <p>Because the scene holds no colors, it's laid out once and can be drawn any number of ways. Switching themes only redraws it, and a backend can also draw each part its own way.</p>
+          <Fragment set:html={renderPictures(scenePictures)} />
+          <p>An app can also ask the scene which part is under the pointer.</p>
         </section>
 
         <section class="home-section" aria-labelledby="in-your-app">

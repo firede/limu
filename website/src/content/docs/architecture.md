@@ -53,6 +53,13 @@ Anything that changes where things go or how big they are belongs to layout, and
 
 That's why a scene holds no colors. Each part refers to colors by token, such as `Surface` or `Border`, and says what it is by its role, such as `flowchart.node`. The backend looks up the actual colors in the theme and the overrides for each role. The same scene can be drawn in a light theme, a dark theme, or an app's own look without being laid out again. See [Theming](/theming).
 
+![Boxes, paths and labels, with no style.](/pictures/scene.svg "The scene")
+![Drawn in limu’s light theme.](/pictures/kohu.png "Kohu")
+![Only the colors change.](/pictures/kohu-dark.png "KohuDark")
+![Each part drawn its own way, with MyGo’s glass.](/pictures/glass.png "Liquid Glass")
+
+The last picture keeps the scene's geometry and replaces only the drawing. Its nodes and edge labels are panes of MyGo's Liquid Glass, which bend what lies under them at the rim. That's hard to do with SVG in a browser. The program that draws these pictures is [limumygo/examples/pictures](https://github.com/firede/limu/tree/main/limumygo/examples/pictures).
+
 ## Writing a backend
 
 A backend walks the scene's items in order and draws each one. It fills and strokes the item's `Parts` as their `Paint` says, using the colors the look resolves for the item (`style.Look.Resolve`). It then draws the markers at an edge's ends (`Marker.Outline`), the item's picture, and its label, setting each span of each line in its face around `At`. A backend with its own look can instead draw items from their `Role`, `Shape`, `Box` and `Route`. The svg package is a complete backend in about 700 lines, and the [API](/api#the-scene) page describes what an item holds.

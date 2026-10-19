@@ -24,7 +24,14 @@ flowchart LR
   scene --> own[A backend of your own]
 ```
 
-Because the scene holds no colors, switching themes redraws it without laying it out again. An app can also ask the scene which part is under the pointer.
+Because the scene holds no colors, it's laid out once and can be drawn any number of ways. Switching themes only redraws it, and a backend can also draw each part its own way.
+
+![Boxes, paths and labels, with no style.](/pictures/scene.svg "The scene")
+![Drawn in limu’s light theme.](/pictures/kohu.png "Kohu")
+![Only the colors change.](/pictures/kohu-dark.png "KohuDark")
+![Each part drawn its own way, with MyGo’s glass.](/pictures/glass.png "Liquid Glass")
+
+An app can also ask the scene which part is under the pointer.
 
 ## limu in your app
 

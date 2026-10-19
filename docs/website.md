@@ -50,20 +50,27 @@ length:
 1. Where the pipeline branches. A renderer that writes SVG goes from text to a layout to an
    SVG string to a browser; limu goes from text to a layout to a scene, and branches there,
    to a backend: MyGo's GPU, SVG, or one of the host's own. This picture is drawn by limu.
-2. One scene, drawn four ways, side by side: the scene as a wireframe of its items' boxes,
-   paths and labels' bounds, with no style, written by a small Go program that walks the
-   scene; the scene in Kohu; in KohuDark, which changes colors and lays out nothing again;
-   and in mygo-platinum's Platinum look, which replaces the drawing through `Draw`. It
-   shows that a diagram is laid out once, that a change of style only redraws, and how far
-   the third level of style reaches.
+2. One scene, laid out once and drawn four ways, one over another so that its geometry
+   lines up: the scene as data, each item's box, parts, route and label's box with no
+   style; the scene in Kohu; in KohuDark, which changes only the colors; and as Liquid
+   Glass, an `Options.Draw` of its own that draws each node and edge label as a pane of
+   MyGo's glass, which bends what is under it at its rim, as SVG in a browser hardly can.
+   It shows that a diagram is laid out once, that a change of style only redraws, and how
+   far the third level of style reaches. The look of mygo-platinum, which the plan first
+   named, measures text in its own bitmap faces and so lays a diagram out again, and it
+   depends on limu; the glass is MyGo's own, and draws the same scene.
 
 A third picture may show `ItemAt` finding the item under the pointer in a MyGo window, as
 what a scene being data gives a native app.
 
 The first picture is drawn by `gen` with the svg package, as two diagrams, the renderer of
-SVG's and limu's, with limu's scene in the accent; the second waits for step 6. After the
-pictures come the code, a switch between MyGo and SVG with MyGo first, cards to the
-examples, the playground, Getting started and Theming, and a paragraph on limu and Pele.
+SVG's and limu's, with limu's scene in the accent. The second is drawn by
+`limumygo/examples/pictures` into `website/public/pictures`: the scene as SVG in
+currentColor, which takes the page's color, and the other three as PNG at twice their size.
+`lib/pictures.mjs` writes them as a figure, which the home page shows, and which a
+document shows where a paragraph holds nothing but their images, as Architecture does.
+After the pictures come the code, a switch between MyGo and SVG with MyGo first, cards to
+the examples, the playground, Getting started and Theming, and a paragraph on limu and Pele.
 
 The pictures drawn natively are rendered with `ui.Render`, as limumygo's tests render
 theirs, on a Mac, and committed: MyGo sets text with Pango on Linux, so CI would draw them

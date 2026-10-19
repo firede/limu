@@ -59,6 +59,57 @@
     font-weight: 700;
   }
 }
+// One scene drawn four ways, on the home page and in Architecture: a row for each picture,
+// its name and what it shows beside it, or over it where the figure is narrow. The pictures
+// line up, so that what stays the same from one to the next shows.
+.scene-picture {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+
+  & + & {
+    margin-top: 12px;
+  }
+}
+.scene-picture-name {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-size-small);
+  line-height: 1.4;
+
+  strong {
+    display: block;
+    color: var(--paper);
+    font-weight: 600;
+  }
+}
+.scene-picture-frame {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+
+  img, svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+}
+@media (max-width: 640px) {
+  .scene-picture {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+
+    & + & {
+      margin-top: 16px;
+    }
+  }
+  .scene-picture-name strong {
+    display: inline;
+  }
+}
 @media (max-width: 760px) {
   .diagram-figure {
     padding-inline: 12px;
