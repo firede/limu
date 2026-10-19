@@ -1,6 +1,11 @@
 package main
 
 import (
+	"bufio"
+	"fmt"
+	"math"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -10,51 +15,26 @@ import (
 
 func TestAppearances(t *testing.T) {
 	cases := []struct {
-		name         string
-		dark         bool
-		bg, fg, data string
+		name string
+		dark bool
+		look *style.Theme
 	}{
-		{appearanceLight, false, "#ffffff", "#1f2328", "#006edb"},
-		{appearanceDark, true, "#0d1117", "#f0f6fc", "#0576ff"},
-		{appearanceDarkDimmed, true, "#212830", "#d1d7e0", "#0576ff"},
+		{appearanceLight, false, style.Kohu()},
+		{appearanceDark, true, style.KohuDark()},
 	}
 	for _, tc := range cases {
 		ap := appearanceNamed(tc.name, !tc.dark)
-		th := ap.Diagram.Theme
 		if ap.Name != tc.name || ap.Dark != tc.dark || ap.UI.Dark != tc.dark {
 			t.Errorf("%s: named %q, dark %v and %v", tc.name, ap.Name, ap.Dark, ap.UI.Dark)
 		}
-		if th.Bg != style.Hex(tc.bg) || th.Fg != style.Hex(tc.fg) || th.Series[0] != style.Hex(tc.data) {
-			t.Errorf("%s: Bg %v, Fg %v, Series[0] %v", tc.name, th.Bg, th.Fg, th.Series[0])
+		// Diagrams are drawn in limu's own themes, as the website draws them.
+		if *ap.Diagram.Theme != *tc.look || ap.Diagram.Overrides != nil {
+			t.Errorf("%s: diagrams in %+v", tc.name, ap.Diagram)
 		}
-		// The window and the diagram are on one background, in one text color.
-		if ui.Hex(tc.bg) != ap.UI.Background || ui.Hex(tc.fg) != ap.UI.Text || ap.Code.Background != ap.UI.Background {
-			t.Errorf("%s: window %v on %v, code on %v", tc.name, ap.UI.Text, ap.UI.Background, ap.Code.Background)
-		}
-		// Every color of the theme is set, opaque, and the series are told apart.
-		colors := map[string]style.Color{
-			"Bg": th.Bg, "Fg": th.Fg, "Muted": th.Muted, "Line": th.Line, "Surface": th.Surface,
-			"SurfaceAlt": th.SurfaceAlt, "Border": th.Border, "Accent": th.Accent, "Critical": th.Critical,
-		}
-		seen := map[style.Color]bool{}
-		for i, c := range th.Series {
-			colors["Series"+string(rune('0'+i))] = c
-			if seen[c] {
-				t.Errorf("%s: series %d is %v, as one before it", tc.name, i, c)
-			}
-			seen[c] = true
-		}
-		for name, c := range colors {
-			if c.A != 255 {
-				t.Errorf("%s: %s is %v, not opaque", tc.name, name, c)
-			}
-		}
-		if len(colors) != 17 || th.Radius != 6 || th.StrokeWidth != 1 {
-			t.Errorf("%s: %d colors, radius %v, stroke %v", tc.name, len(colors), th.Radius, th.StrokeWidth)
-		}
-		// Groups stand apart from the canvas and from shapes.
-		if th.SurfaceAlt == th.Bg || th.SurfaceAlt == th.Surface {
-			t.Errorf("%s: SurfaceAlt %v", tc.name, th.SurfaceAlt)
+		// The window, the code and the diagram are on one background.
+		bg := tc.look.Bg
+		if ui.RGB(bg.R, bg.G, bg.B) != ap.UI.Background || ap.Code.Background != ap.UI.Background {
+			t.Errorf("%s: window on %v, code on %v, diagram on %v", tc.name, ap.UI.Background, ap.Code.Background, bg)
 		}
 		if ap.Code.Tokens[editor.TokenKeyword].Color == (ui.Color{}) || ap.Code.Tokens[editor.TokenString].Color == (ui.Color{}) {
 			t.Errorf("%s: code without colors of its own", tc.name)
@@ -63,17 +43,80 @@ func TestAppearances(t *testing.T) {
 	// System follows the system, and a name unknown is System.
 	if appearanceNamed(appearanceSystem, false) != appearanceNamed(appearanceLight, true) ||
 		appearanceNamed(appearanceSystem, true) != appearanceNamed(appearanceDark, false) ||
-		appearanceNamed("Solarized", true) != appearanceNamed(appearanceDark, false) {
-		t.Error("System is not GitHub Light or Dark as the system is")
+		appearanceNamed("GitHub Dark", true) != appearanceNamed(appearanceDark, false) {
+		t.Error("System is not Light or Dark as the system is")
 	}
-	if !knownAppearance(appearanceDarkDimmed) || knownAppearance("Solarized") {
+	if !knownAppearance(appearanceDark) || knownAppearance("GitHub Dark") {
 		t.Error("knownAppearance")
 	}
 }
 
-// A translucent color laid over another is the mix CSS draws.
-func TestOver(t *testing.T) {
-	if got := over(style.Hex("#818b981f"), style.Hex("#ffffff")); got != style.Hex("#f0f1f2") {
-		t.Errorf("over = %v", got)
+// The palettes are the website's colors, as website/src/styles/base.scss has them: the
+// light theme in the first :root that sets color-scheme, the dark one in its mixin.
+func TestPalettes(t *testing.T) {
+	f, err := os.Open("../../../website/src/styles/base.scss")
+	if err != nil {
+		t.Fatal(err)
 	}
+	defer f.Close()
+	vars := map[string]map[string]string{}
+	block := ""
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		switch {
+		case line == "color-scheme: light;":
+			block = "light"
+		case line == "@mixin dark {":
+			block = "dark"
+		case line == "}":
+			block = ""
+		case block != "" && strings.HasPrefix(line, "--"):
+			name, value, _ := strings.Cut(strings.TrimSuffix(line, ";"), ": ")
+			if vars[block] == nil {
+				vars[block] = map[string]string{}
+			}
+			vars[block][name[2:]] = value
+		}
+	}
+	for block, p := range map[string]palette{"light": kohu, "dark": kohuDark} {
+		want := vars[block]
+		got := map[string]string{
+			"ink": p.ink, "panel": p.panel, "line": p.line, "line-hover": p.lineHover,
+			"faint": p.faint, "muted": p.muted, "body": p.body, "paper": p.paper,
+			"accent": p.accent, "accent-ink": p.accentInk, "red": p.red, "green": p.green,
+			"selection-background": p.selection,
+			"syntax-punctuation":   p.syntaxPunctuation, "syntax-keyword": p.syntaxKeyword,
+			"syntax-type": p.syntaxType, "syntax-constant": p.syntaxConstant,
+			"syntax-number": p.syntaxNumber, "syntax-variable": p.syntaxVariable,
+			"syntax-function": p.syntaxFunction, "syntax-string": p.syntaxString,
+			"syntax-comment": p.syntaxComment,
+		}
+		for name, hex := range got {
+			css, ok := want[name]
+			if !ok {
+				t.Errorf("%s: base.scss has no --%s", block, name)
+				continue
+			}
+			if c, ok := cssRGBA(css); ok {
+				css = c
+			}
+			if css != hex {
+				t.Errorf("%s: --%s is %s, the palette's %s", block, name, css, hex)
+			}
+		}
+		if p.dark != (block == "dark") {
+			t.Errorf("%s: dark %v", block, p.dark)
+		}
+	}
+}
+
+// cssRGBA is a color written as rgb(r g b / a%) in hex, with its alpha, as the palettes
+// write translucent colors.
+func cssRGBA(s string) (string, bool) {
+	var r, g, b, a int
+	if _, err := fmt.Sscanf(s, "rgb(%d %d %d / %d%%)", &r, &g, &b, &a); err != nil {
+		return "", false
+	}
+	return fmt.Sprintf("#%02x%02x%02x%02x", r, g, b, int(math.Round(float64(a)*255/100))), true
 }

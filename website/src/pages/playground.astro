@@ -1,0 +1,124 @@
+---
+// The playground: limumygo/examples/playground compiled to WebAssembly, which fills the
+// window under a narrow bar of its own. scripts/playground.mjs builds it; this page loads
+// it. Until it starts, the page shows the text the playground will open, from the URL's
+// fragment or the first example, and how much of the WebAssembly has come.
+import { readFileSync, statSync } from 'node:fs';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import HeaderIcons from '../components/HeaderIcons.astro';
+import Mark from '../components/Mark.astro';
+import { exampleTypes } from '../lib/examples';
+
+interface Built {
+  wasm: string;
+  loader: string;
+  size: number;
+}
+
+// Cloudflare serves an asset of at most 25 MiB; scripts/playground.mjs stops at 24, and so
+// does the build, should the file have been put there otherwise.
+const maxSize = 24 * 1024 * 1024;
+
+let built: Built;
+try {
+  built = JSON.parse(readFileSync('src/generated/playground.json', 'utf8'));
+} catch {
+  throw new Error('The playground is not built: run pnpm playground first.');
+}
+const size = statSync(`public${built.wasm}`).size;
+if (size !== built.size) throw new Error(`public${built.wasm} is not the file scripts/playground.mjs wrote.`);
+if (size > maxSize) throw new Error(`The playground's WebAssembly is ${size} bytes, past the ${maxSize} the site allows.`);
+
+// The text the playground opens without one in the URL, as firstSample in its examples.go.
+const firstExample = exampleTypes.find((t) => t.type === 'flowchart')?.examples[0]?.source ?? '';
+---
+
+<BaseLayout title="Playground" description="Try limu on a Mermaid diagram of your own: the text, the diagram limu lays out and draws, and its SVG.">
+  <div class="playground-page">
+    <header class="playground-bar">
+      <a class="wordmark" href="/" aria-label="limu home"><Mark size={18} />limu</a>
+      <span class="playground-bar-title">Playground</span>
+      <nav class="playground-bar-links" aria-label="Main navigation">
+        <a href="/examples">Examples</a>
+        <a href="/getting-started">Docs</a>
+      </nav>
+      <div class="site-header-actions">
+        <HeaderIcons />
+      </div>
+    </header>
+    <main id="mygo" class="playground-app">
+      <div class="playground-loading" data-playground-loading>
+        <div class="playground-loading-toolbar"></div>
+        <div class="playground-loading-panes">
+          <pre class="playground-loading-source" data-playground-source>{firstExample}</pre>
+          <div class="playground-loading-status" role="status">
+            <p data-playground-status>Loading the playground</p>
+            <div class="playground-loading-meter" aria-hidden="true"><span data-playground-meter></span></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script is:inline src={built.loader}></script>
+  <script is:inline define:vars={{ wasmUrl: built.wasm, wasmSize: built.size }}>
+    (() => {
+      const root = document.documentElement;
+      const loading = document.querySelector('[data-playground-loading]');
+      const status = document.querySelector('[data-playground-status]');
+      const meter = document.querySelector('[data-playground-meter]');
+
+      // MyGo takes its appearance from data-mygo-theme, which follows the site's switch; with
+      // neither set, both follow the system.
+      const followTheme = () => {
+        if (root.dataset.theme) root.dataset.mygoTheme = root.dataset.theme;
+        else delete root.dataset.mygoTheme;
+      };
+      followTheme();
+      new MutationObserver(followTheme).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
+
+      // The text of the link, as the playground reads it (link.go).
+      const source = window.location.hash.startsWith('#') ? new URLSearchParams(window.location.hash.slice(1)).get('source') : null;
+      if (source !== null) document.querySelector('[data-playground-source]').textContent = source;
+
+      const show = (text, fraction) => {
+        status.textContent = text;
+        meter.style.transform = `scaleX(${fraction})`;
+      };
+
+      // Once the playground shows what the text made, what was shown while it loaded goes,
+      // after the frame it drew is on screen.
+      document.addEventListener('limu:playground-shown', () => {
+        requestAnimationFrame(() => requestAnimationFrame(() => loading.remove()));
+      }, { once: true });
+
+      const start = async () => {
+        const response = await fetch(wasmUrl);
+        if (!response.ok || !response.body) throw new Error(`${response.status} ${response.statusText}`);
+        // The bytes read are those of the file, whatever the server compressed it to for
+        // the way, and so are counted against its size.
+        const reader = response.body.getReader();
+        let received = 0;
+        const counted = new ReadableStream({
+          async pull(controller) {
+            const { done, value } = await reader.read();
+            if (done) {
+              show('Starting the playground', 1);
+              controller.close();
+              return;
+            }
+            received += value.length;
+            show(`Loading the playground · ${Math.min(99, Math.floor((received / wasmSize) * 100))}%`, Math.min(1, received / wasmSize));
+            controller.enqueue(value);
+          },
+        });
+        const go = new Go();
+        const { instance } = await WebAssembly.instantiateStreaming(new Response(counted, { headers: { 'Content-Type': 'application/wasm' } }), go.importObject);
+        go.run(instance);
+      };
+      start().catch((error) => {
+        loading.dataset.failed = '';
+        show(`The playground could not load (${error.message}). Reload the page to try again.`, 0);
+      });
+    })();
+  </script>
+</BaseLayout>

@@ -1,13 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	"image/png"
 	"math"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -23,11 +21,15 @@ import (
 // pad is the room about the diagram in its pane, in DIPs.
 const pad = 16
 
-// The font families the SVG names, Primer's stacks of the system's fonts: the diagram is
-// measured in the system's font, as limumygo draws it.
+// narrowWidth is the width of a window, in DIPs, under which the editor is above the
+// diagram rather than beside it, as on a phone.
+const narrowWidth = 640
+
+// The font families the SVG names: the system's, as limumygo draws the diagram in it, on
+// a desktop and in a browser alike, and measures it in it.
 const (
-	fontStack = `-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif`
-	monoStack = `ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace`
+	fontStack = `system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`
+	monoStack = `ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace`
 )
 
 // The views of the output pane.
@@ -37,7 +39,9 @@ const (
 )
 
 // app is the playground's state, kept across frames and read and changed on the main
-// thread.
+// thread. A desktop and a browser show the same app; what differs between them, how a
+// file is downloaded, the address a link goes to and whether the appearance is chosen in
+// the window, is in desktop.go and web.go.
 type app struct {
 	// win is the window, nil without one, as with -png and in tests.
 	win *mygo.Window
@@ -46,15 +50,13 @@ type app struct {
 	// window, where no other goroutine can hand a result back.
 	post func(func())
 
-	router *ui.Router
-	buf    *editor.Buffer
-	code   *editor.State
+	buf  *editor.Buffer
+	code *editor.State
 
 	plan       planner
 	split      float32 // the percentage of the window the editor takes
 	shows      int     // the output pane's view: viewDiagram or viewSVG
 	appearance string  // the name of the appearance chosen
-	path       string  // the file opened or saved last, "" for none
 
 	// What the newest result showed: the scene of the last text that read, kept while the
 	// text is in error, and the error.
@@ -77,25 +79,25 @@ type app struct {
 	notice      string // a message for a toast in the next frame
 	focusEditor bool   // give the editor the keyboard focus in the next frame
 
-	ex examples // the page of examples
-
-	saver *settingsWriter
+	// shown, when set, is called once, in the first frame that shows what the text made:
+	// a diagram, an error, or nothing for blank text. The page that loads the playground in
+	// a browser waits for it.
+	shown func()
+	// remember, when set, keeps the text and the appearance for the next run, as the
+	// desktop's settings do.
+	remember func(src, appearance string)
 }
 
-// newApp is the playground with a text and an appearance, which saves its settings with
-// saver, nil for not at all.
-func newApp(src, appearance string, saver *settingsWriter) *app {
+// newApp is the playground with a text and an appearance.
+func newApp(src, appearance string) *app {
 	a := &app{
-		router:     ui.NewRouter("/playground"),
 		buf:        editor.NewBuffer(src),
 		plan:       planner{delay: editDelay},
 		split:      42,
 		appearance: appearance,
-		saver:      saver,
 	}
-	a.router.Transition = ui.TransitionNone
 	a.buf.SetLanguage(mermaid.Language)
-	a.code = &editor.State{Buffer: a.buf, Label: "Mermaid text", Placeholder: "Type a Mermaid diagram, or choose one of the Samples."}
+	a.code = &editor.State{Buffer: a.buf, Label: "Mermaid text", Placeholder: "Type a Mermaid diagram, or choose one of the Examples."}
 	a.svgBuf = editor.NewBuffer("")
 	a.svgBuf.SetLanguage(editor.LanguageFor("diagram.svg"))
 	a.svgCode = &editor.State{Buffer: a.svgBuf, Label: "SVG", ReadOnly: true, SoftWrap: true}
@@ -111,6 +113,8 @@ func (a *app) look(c *ui.Context) *appearance {
 	return appearanceNamed(a.appearance, c.Theme().Dark)
 }
 
+// view is the playground: the toolbar; the text and what limu makes of it, side by side,
+// or the text above in a narrow window; and the status bar under them.
 func (a *app) view(c *ui.Context) {
 	ap := a.look(c)
 	c.SetTheme(ap.UI)
@@ -119,85 +123,12 @@ func (a *app) view(c *ui.Context) {
 		c.Toast(a.notice)
 		a.notice = ""
 	}
+	a.hovered = ""
 	root := ui.Column(c).Fill().Background(ap.UI.Background)
-	// A file dropped on the window, where nothing else takes it, is opened.
-	if files := root.DroppedFiles(); len(files) > 0 {
-		a.openFile(files[0])
-	}
+	w := root.LayoutBounds().W
 	root.Children(func() {
 		a.toolbar(c, ap)
-		a.router.View(c, func(r *ui.Route) {
-			switch {
-			case r.Match("/playground"):
-				r.Title("Playground")
-				a.playground(c, ap)
-			case r.Match("/examples"):
-				r.Title("Examples")
-				a.examplesPage(c, ap, featured)
-			case r.Match("/examples/{type}"):
-				r.Title("Examples")
-				a.examplesPage(c, ap, r.Param("type"))
-			default:
-				ui.Text(c, "There is no page at "+r.Path()+".")
-			}
-		}).Grow(1).FillWidth().MinHeight(0)
-	})
-}
-
-func (a *app) toolbar(c *ui.Context, ap *appearance) {
-	t := ap.UI
-	ui.Toolbar(c, func() {
-		page := 0
-		if strings.HasPrefix(a.router.Path(), "/examples") {
-			page = 1
-		}
-		if segmented(c, ap, &page, "Playground", "Examples").Label("Page").Changed() {
-			if page == 0 {
-				a.router.Push("/playground")
-			} else {
-				a.router.Push(examplesPath(a.ex.chosen))
-			}
-		}
-		ui.MenuButton(c, "Samples", func(m *ui.Menu) {
-			samplesMenu(m, func(src string) {
-				a.load(src, "")
-				a.router.Push("/playground")
-			})
-		})
-		if ui.Button(c, "Open…").Clicked() {
-			a.openDialog()
-		}
-		if ui.Button(c, "Save…").Clicked() {
-			a.saveDialog()
-		}
-		ui.MenuButton(c, "Export", func(m *ui.Menu) {
-			if m.Item("SVG…").Disabled(a.scene == nil).Chosen() {
-				a.exportSVG(ap)
-			}
-			if m.Item("PNG…").Disabled(a.scene == nil).Chosen() {
-				a.exportPNG(ap)
-			}
-		})
-		ui.Spacer(c)
-		ui.MenuButton(c, "Appearance", func(m *ui.Menu) {
-			for i, name := range appearanceNames {
-				if i == 1 {
-					m.Separator()
-				}
-				if m.Item(name).Checked(name == a.appearance).Chosen() {
-					a.setAppearance(name)
-				}
-			}
-		})
-	}).Label("Playground").FillWidth().Padding(4, 8).Background(ap.Chrome).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
-}
-
-// playground is the page of the playground: the text on the left, what limu makes of it on
-// the right, and the status bar under them.
-func (a *app) playground(c *ui.Context, ap *appearance) {
-	a.hovered = ""
-	ui.Column(c).Fill().Children(func() {
-		ui.SplitPercent(c, &a.split, func() {
+		text := func() {
 			ui.Column(c).Fill().Children(func() {
 				ed := editor.View(c, a.code).Grow(1).FillWidth()
 				if a.focusEditor {
@@ -205,11 +136,53 @@ func (a *app) playground(c *ui.Context, ap *appearance) {
 					a.focusEditor = false
 				}
 			})
-		}, func() {
-			a.output(c, ap)
-		}).Grow(1).FillWidth().MinHeight(0)
+		}
+		output := func() { a.output(c, ap) }
+		var split ui.Element
+		if w > 0 && w < narrowWidth {
+			split = ui.SplitVerticalPercent(c, &a.split, text, output)
+		} else {
+			split = ui.SplitPercent(c, &a.split, text, output)
+		}
+		split.Grow(1).FillWidth().MinHeight(0)
 		a.statusBar(c, ap)
 	})
+	if a.shown != nil && (a.scene != nil || a.blank || a.problem != nil) {
+		shown := a.shown
+		a.shown = nil
+		shown()
+	}
+}
+
+func (a *app) toolbar(c *ui.Context, ap *appearance) {
+	t := ap.UI
+	ui.Toolbar(c, func() {
+		ui.MenuButton(c, "Examples", func(m *ui.Menu) { examplesMenu(m, a.load) })
+		if ui.Button(c, "Copy link").Tooltip("Copy a link that opens this diagram in the playground").Clicked() {
+			a.share(c)
+		}
+		ui.MenuButton(c, "Download", func(m *ui.Menu) {
+			if m.Item("SVG").Disabled(a.scene == nil).Chosen() {
+				a.downloadSVG(ap)
+			}
+			if m.Item("PNG").Disabled(a.scene == nil).Chosen() {
+				a.downloadPNG(ap)
+			}
+		})
+		if appearanceMenu {
+			ui.Spacer(c)
+			ui.MenuButton(c, "Appearance", func(m *ui.Menu) {
+				for i, name := range appearanceNames {
+					if i == 1 {
+						m.Separator()
+					}
+					if m.Item(name).Checked(name == a.appearance).Chosen() {
+						a.setAppearance(name)
+					}
+				}
+			})
+		}
+	}).Label("Playground").FillWidth().Padding(4, 8).Background(t.Background).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
 }
 
 // output is the pane of what limu makes of the text: the diagram, or its SVG.
@@ -220,7 +193,7 @@ func (a *app) output(c *ui.Context, ap *appearance) {
 	// it. When it changes, the diagram is laid out again to fit it.
 	a.layout(c, math.Floor(float64(pane.LayoutBounds().W))-2*pad)
 	pane.Children(func() {
-		ui.Row(c).FillWidth().Padding(6, 12).Gap(8).Background(ap.Chrome).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
+		ui.Row(c).FillWidth().Padding(6, 12).Gap(8).AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
 			segmented(c, ap, &a.shows, "Diagram", "SVG").Label("Output")
 			ui.Box(c).Grow(1)
 			if a.shows == viewSVG {
@@ -237,7 +210,7 @@ func (a *app) output(c *ui.Context, ap *appearance) {
 				switch {
 				case a.blank:
 					ui.Text(c, "Nothing to draw yet").FontSize(t.Rem(1.15)).Bold()
-					ui.Text(c, "Type Mermaid text on the left, or choose one of the Samples.").TextColor(t.TextMuted)
+					ui.Text(c, "Type a diagram's text, or choose one of the Examples.").TextColor(t.TextMuted)
 				case a.problem != nil:
 					ui.Text(c, "No diagram").FontSize(t.Rem(1.15)).Bold()
 					ui.Text(c, "The diagram shows here once its text reads.").TextColor(t.TextMuted)
@@ -273,7 +246,7 @@ func (a *app) diagram(c *ui.Context, ap *appearance, paneWidth float32) {
 
 func (a *app) statusBar(c *ui.Context, ap *appearance) {
 	t := ap.UI
-	ui.Row(c).FillWidth().Padding(5, 12).Gap(16).Background(ap.Chrome).BorderWidth(1, 0, 0, 0).BorderColor(t.Border).Role(ui.RoleStatus).Children(func() {
+	ui.Row(c).FillWidth().Padding(5, 12).Gap(16).BorderWidth(1, 0, 0, 0).BorderColor(t.Border).Role(ui.RoleStatus).Children(func() {
 		switch p := a.problem; {
 		case p != nil && p.Located:
 			b := ui.Box(c).Role(ui.RoleButton).Label(p.Status).Focusable().Cursor(ui.CursorPointer).Tooltip(p.Detail).Shrink(1)
@@ -362,7 +335,7 @@ func (a *app) apply(r result) {
 		a.scene, a.typ, a.took = r.scene, r.typ, r.took
 	}
 	a.code.SetDiagnostics(r.version, diags)
-	a.saveSettings(r.src)
+	a.save(r.src)
 }
 
 // ensureSVG writes the SVG of the scene in the appearance, if it has not yet, and shows it
@@ -381,152 +354,59 @@ func svgOptions(ap *appearance) *svg.Options {
 	return &svg.Options{Look: ap.Diagram, FontFamily: fontStack, MonoFamily: monoStack}
 }
 
-// load shows a new text, laid out at once: a sample, or a file's.
-func (a *app) load(src, path string) {
+// load shows a new text, laid out at once: an example's, or a link's.
+func (a *app) load(src string) {
 	a.buf.Reset(src)
 	a.plan.urgent = true
-	a.path = path
 	a.code.GoTo(editor.Pos{})
-	if a.win != nil {
-		title := "limu playground"
-		if path != "" {
-			title = filepath.Base(path) + " — " + title
-		}
-		a.win.SetTitle(title)
-	}
 }
 
 // setAppearance changes the appearance. It only draws the diagram again: the scene stays
 // as it was laid out, as nothing of the look moves anything.
 func (a *app) setAppearance(name string) {
 	a.appearance = name
-	a.saveSettings(a.buf.String())
+	a.save(a.buf.String())
 }
 
-func (a *app) saveSettings(src string) {
-	a.saver.save(settings{Source: src, Appearance: a.appearance})
+func (a *app) save(src string) {
+	if a.remember != nil {
+		a.remember(src, a.appearance)
+	}
 }
 
-// run does the work of a dialog, which waits for the user, on a goroutine, and then
-// done with what it found on the main thread. Without a window there are no dialogs.
-func (a *app) run(work func() func()) {
-	if a.post == nil {
+// share copies a link that opens the text in the playground on the website, or in the
+// browser's playground, where it runs, or says that the text is too long for one.
+func (a *app) share(c *ui.Context) {
+	link, ok := shareLink(pageURL(), a.buf.String())
+	if !ok {
+		c.Toast("This diagram's text is too long for a link")
 		return
 	}
-	go func() {
-		if done := work(); done != nil {
-			a.post(done)
-		}
-	}()
+	c.WriteClipboard(link)
+	c.Toast("Copied a link to this diagram")
 }
 
-func (a *app) openDialog() {
-	a.run(func() func() {
-		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: a.win, Title: "Open a diagram", Filters: sourceFilters})
-		if err != nil || len(paths) == 0 {
-			return nil
-		}
-		src, err := readSource(paths[0])
-		return func() { a.opened(paths[0], src, err) }
-	})
+// fileName is the name a download of the diagram offers, after its type.
+func (a *app) fileName(ext string) string {
+	if a.typ == "" {
+		return "diagram" + ext
+	}
+	return string(a.typ) + ext
 }
 
-// openFile opens a file dropped on the window.
-func (a *app) openFile(path string) {
-	if a.post == nil {
-		src, err := readSource(path)
-		a.opened(path, src, err)
+func (a *app) downloadSVG(ap *appearance) {
+	a.download(a.fileName(".svg"), "image/svg+xml", []byte(svg.Render(a.scene, svgOptions(ap))))
+}
+
+// downloadPNG draws the diagram as limumygo draws it in the window, at twice its size, on
+// its background.
+func (a *app) downloadPNG(ap *appearance) {
+	var b bytes.Buffer
+	if err := png.Encode(&b, scenePNG(a.scene, ap, 2)); err != nil {
+		a.notice = "Could not draw the PNG: " + err.Error()
 		return
 	}
-	a.run(func() func() {
-		src, err := readSource(path)
-		return func() { a.opened(path, src, err) }
-	})
-}
-
-func (a *app) opened(path, src string, err error) {
-	if err != nil {
-		a.notice = "Could not open " + filepath.Base(path) + ": " + err.Error()
-		return
-	}
-	a.load(src, path)
-}
-
-// defaultName is the name a dialog that saves offers, with an extension.
-func (a *app) defaultName(ext string) string {
-	name := "diagram"
-	if a.path != "" {
-		name = strings.TrimSuffix(filepath.Base(a.path), filepath.Ext(a.path))
-	}
-	return name + ext
-}
-
-func (a *app) saveDialog() {
-	src := a.buf.String()
-	name := a.defaultName(".mmd")
-	if a.path != "" {
-		name = filepath.Base(a.path)
-	}
-	a.run(func() func() {
-		path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: a.win, Title: "Save the diagram", DefaultPath: name, Filters: sourceFilters})
-		if err != nil || path == "" {
-			return nil
-		}
-		err = writeSource(path, src)
-		return func() {
-			if err != nil {
-				a.notice = "Could not save: " + err.Error()
-				return
-			}
-			a.path = path
-			a.buf.MarkSaved()
-			a.notice = "Saved " + filepath.Base(path)
-		}
-	})
-}
-
-func (a *app) exportSVG(ap *appearance) {
-	doc := svg.Render(a.scene, svgOptions(ap))
-	a.export(".svg", "SVG", func(path string) error { return os.WriteFile(path, []byte(doc), 0o644) })
-}
-
-// exportPNG draws the diagram as limumygo draws it in the window, at twice its size, on its
-// background.
-func (a *app) exportPNG(ap *appearance) {
-	img := scenePNG(a.scene, ap, 2)
-	a.export(".png", "PNG", func(path string) error {
-		f, err := os.Create(path)
-		if err != nil {
-			return err
-		}
-		if err := png.Encode(f, img); err != nil {
-			f.Close()
-			return err
-		}
-		return f.Close()
-	})
-}
-
-// export asks where to save a file of a kind, and writes it there with write.
-func (a *app) export(ext, kind string, write func(path string) error) {
-	name := a.defaultName(ext)
-	a.run(func() func() {
-		path, err := mygo.Dialog.Save(mygo.SaveDialogOptions{
-			Parent: a.win, Title: "Export " + kind, DefaultPath: name,
-			Filters: []mygo.FileFilter{{Name: kind, Extensions: []string{ext[1:]}}},
-		})
-		if err != nil || path == "" {
-			return nil
-		}
-		err = write(path)
-		return func() {
-			if err != nil {
-				a.notice = "Could not export: " + err.Error()
-				return
-			}
-			a.notice = "Exported " + filepath.Base(path)
-		}
-	})
+	a.download(a.fileName(".png"), "image/png", b.Bytes())
 }
 
 // scenePNG draws a scene in an appearance, on its background, at scale device pixels to a

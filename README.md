@@ -66,9 +66,10 @@ What changes where things are goes to layout; everything else is style, and a
 change of it only redraws. [docs/design.md](docs/design.md) has the details and
 the roadmap.
 
-To try limu on a diagram of your own, run the playground, which shows the text
-beside its diagram, drawn by limumygo, and its SVG, and has a page of examples of
-every type of diagram, each of which opens in the playground:
+To try limu on a diagram of your own, open the
+[playground](https://limu.firede.com/playground), which shows the text beside its
+diagram, drawn by limumygo, and its SVG, and opens any of limu's examples from its
+Examples menu. The same program runs on a desktop:
 `cd limumygo && go run ./examples/playground`.
 
 ## Style

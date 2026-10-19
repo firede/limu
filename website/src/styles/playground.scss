@@ -1,0 +1,176 @@
+// The playground's page: a narrow bar, and under it the playground, which MyGo draws on a
+// canvas filling #mygo. Until it starts, #mygo shows the text it will open and how much of
+// it has loaded, laid out as the playground lays its panes out, so that little moves when
+// it takes their place.
+.playground-page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+}
+.playground-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  border-bottom: 1px solid var(--line);
+  padding: 0 12px 0 18px;
+  font-size: var(--font-size-small);
+
+  .wordmark {
+    font-size: 1rem;
+  }
+  .site-header-actions {
+    gap: 2px;
+    margin-left: 0;
+  }
+  .header-action.header-icon {
+    width: 32px;
+    min-height: 32px;
+    justify-content: center;
+    border-radius: var(--radius-small);
+    padding: 0;
+
+    @media (hover: hover) {
+      &:hover {
+        background: var(--panel);
+      }
+    }
+  }
+}
+.playground-bar-title {
+  border-left: 1px solid var(--line-hover);
+  color: var(--muted);
+  padding-left: 12px;
+  line-height: 1;
+}
+.playground-bar-links {
+  display: flex;
+  gap: 18px;
+  margin-left: auto;
+  padding-right: 6px;
+
+  a {
+    color: var(--muted);
+    transition: color 150ms ease;
+
+    @media (hover: hover) {
+      &:hover {
+        color: var(--paper);
+      }
+    }
+  }
+}
+.playground-app {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.playground-loading {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ink);
+}
+// As high as the playground's toolbar.
+.playground-loading-toolbar {
+  flex: 0 0 37px;
+  border-bottom: 1px solid var(--line);
+}
+.playground-loading-panes {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 42% 1fr;
+  min-height: 0;
+}
+.playground-loading-source {
+  overflow: hidden;
+  margin: 0;
+  border-right: 1px solid var(--line);
+  padding: 1px 12px 0 60px;
+  color: var(--body);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 20px;
+  white-space: pre;
+}
+.playground-loading-status {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--muted);
+  font-size: var(--font-size-small);
+  text-align: center;
+
+  p {
+    margin: 0;
+  }
+}
+.playground-loading-meter {
+  overflow: hidden;
+  width: min(240px, 100%);
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+
+  span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform 120ms linear;
+  }
+}
+.playground-loading[data-failed] {
+  .playground-loading-status {
+    color: var(--red);
+  }
+  .playground-loading-meter {
+    display: none;
+  }
+}
+
+// Under the playground's narrowWidth, the text is above the diagram.
+@media (max-width: 639px) {
+  .playground-loading-panes {
+    grid-template-columns: 1fr;
+    grid-template-rows: 42% 1fr;
+  }
+  .playground-loading-source {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+@media (max-width: 560px) {
+  .playground-bar-links {
+    display: none;
+  }
+  .playground-bar .site-header-actions {
+    margin-left: auto;
+  }
+}
+
+// MyGo shows the playground's menus as HTML, in macOS's colors as the system's appearance
+// has them; the page's switch does not reach them, so they take the site's colors here,
+// over MyGo's style sheet.
+html .mygo-menu {
+  color: var(--paper);
+  background: var(--panel);
+  box-shadow: 0 0 0 1px var(--line-hover), 0 8px 24px rgb(0 0 0 / 18%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html .mygo-menu-item.on {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+html .mygo-menu-separator {
+  background: var(--line-hover);
+}

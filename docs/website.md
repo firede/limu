@@ -92,45 +92,54 @@ narrower does rather than shrinking its text. A gantt chart takes 2026-01-15 in 
 present, so that the build writes the same SVG whenever it runs.
 
 "Open in playground" links to `/playground#source=…`, the source in the fragment encoded as
-a URL's query, as Pele's playground takes it; the playground reads it in step 4. A source
+a URL's query, as Pele's playground takes it, and as the playground reads it. A source
 whose link would pass 32,000 characters is not offered.
 
 ### Playground
 
-`/playground/` is the playground, compiled to WebAssembly, as an application of its own: it
-fills the window, has a narrow bar of its own with a link back to the site, and does not
-use the site's layout. It is built by a script of its own, which Astro's build copies, so
-that a change to the documents does not compile it again.
+`/playground` is the playground, compiled to WebAssembly, as an application of its own: it
+fills the window under a narrow bar of its own, with the wordmark, links to the examples
+and the documents, and the header's icons, and does not use the documents' layout.
+`pnpm playground` (`scripts/playground.mjs`) builds it into `public/playground`, which is
+not committed, and writes the files' names and size to `src/generated/playground.json`;
+`pnpm build` does not, so that a change to the documents does not compile it again, and
+fails when it has not been built. `pnpm deploy` builds both.
 
 The web playground and the desktop one are one program, so that the two do not drift
 apart, and both are made simpler: the playground is a place for a user to try limu, not an
-application complete in features. It keeps the editor, the diagram, light and dark, a
-link to share, and the SVG and PNG to download. It drops opening and saving files and its
-page of examples, which the site's examples replace, and its appearances in GitHub's
-colors, which Kohu and KohuDark replace, the colors of its window, its code and its
-controls drawn from the site's. A diagram comes in through the URL,
-as Pele's playground takes one; without the page of examples the playground needs no
-router, which in a browser would own the URL's fragment. The shell of the browser and the
-desktop differ by build tags.
+application complete in features. It keeps the editor, the diagram and its SVG, light and
+dark, a link to share, and the SVG and PNG to download, and an Examples menu of limu's
+gallery. It drops opening and saving files and its page of examples, which the site's
+examples replace, and its appearances in GitHub's colors, which Kohu and KohuDark replace,
+the colors of its window, its code and its controls the site's, from `base.scss`, which a
+test holds them to. A diagram comes in through the URL, as Pele's playground takes one,
+and Copy link writes one; without the page of examples the playground needs no router,
+which in a browser would own the URL's fragment. The shell of the browser and the desktop
+differ by build tags (`desktop.go`, `web.go`): a desktop downloads through a dialog, offers
+the appearance in a menu, remembers the text, and links to the site; a browser downloads
+as a link with `download` does, and is light or dark as the page's switch sets it, through
+`data-mygo-theme`. MyGo draws its menus in a browser as HTML in macOS's colors, as the
+system's appearance has them, which the switch does not reach, so the page restyles them
+in the site's. Under 640 pixels, the text is above the diagram.
 
 Its WebAssembly is heavy, and its first load is the cost: compiling it and starting limu
 take tens of milliseconds, downloading it takes seconds. So the page that loads it is plain
-HTML that shows the diagram's source from the URL at once, and the download's progress,
-and the file is named by its content and cached for good, so that a second visit starts at
-once. Measured on 2026-10-20, built with `GOOS=js GOARCH=wasm go build -trimpath -tags
-mygo_noinspector -ldflags="-s -w"`:
+HTML that shows the diagram's source from the URL at once, where the editor will have it,
+and the download's progress, and the files are named by their content and cached for good
+(`public/_headers`), so that a second visit starts at once. Measured on 2026-10-20, built
+with `GOOS=js GOARCH=wasm go build -trimpath -tags mygo_noinspector -ldflags="-s -w"`:
 
 | Build | Size | gzip | brotli |
 |---|---|---|---|
-| the playground | 24.4 MB (23.3 MiB) | 6.2 MB | 4.4 MB |
+| the playground before it was made simpler | 24.4 MB (23.3 MiB) | 6.2 MB | 4.4 MB |
+| the playground | 23.9 MB (22.8 MiB) | 6.1 MB | 4.4 MB |
 | limu and svg alone | 12.2 MB | 3.3 MB | 2.3 MB |
 
-Of the playground's code (16.7 MB, with 7.7 MB of data), limu's diagrams are 6.1 MB, Go's
-runtime and standard library 5.5 MB, MyGo 4.0 MB (its `ui` and `editor` 2.3 MB of it), and
-limu's other packages 0.7 MB. Dropping the page of examples saves about 0.3 MB.
-Cloudflare serves an asset of at most 25 MiB, and compresses `application/wasm`. The
-site's build fails when the WebAssembly passes 24 MiB; past 25 MiB, it would be served from
-R2.
+Of the playground's code (16.7 MB, with 7.7 MB of data, before it was made simpler),
+limu's diagrams are 6.1 MB, Go's runtime and standard library 5.5 MB, MyGo 4.0 MB (its `ui`
+and `editor` 2.3 MB of it), and limu's other packages 0.7 MB. Cloudflare serves an asset
+of at most 25 MiB, and compresses `application/wasm`. The playground's build and the
+site's fail when the WebAssembly passes 24 MiB; past 25 MiB, it would be served from R2.
 
 ### Documents
 

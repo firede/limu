@@ -22,8 +22,8 @@ export interface ExampleType {
   examples: Example[];
 }
 
-// The types, as the playground's gallery orders them: those Mermaid has first, then those
-// Pele adds, which it marks as beta.
+// The types, as limu's gallery, internal/gallery, orders them: those not in beta first, then
+// those Mermaid writes with -beta, each part by title.
 export const exampleTypes: ExampleType[] = gallery;
 
 export const examplesTitle = 'Examples';

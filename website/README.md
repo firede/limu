@@ -8,10 +8,11 @@ It needs Node 22.13 or later, pnpm, and Go.
 
 ```sh
 pnpm install
-pnpm dev      # writes what gen writes, then serves the site at localhost:4321
-pnpm build    # the same, then builds the site into dist
-pnpm check    # checks the site's types
-pnpm deploy   # builds it, and deploys it with wrangler
+pnpm playground  # builds the playground for browsers, which dev and build need
+pnpm dev         # writes what gen writes, then serves the site at localhost:4321
+pnpm build       # the same, then builds the site into dist
+pnpm check       # checks the site's types
+pnpm deploy      # builds the playground and the site, and deploys them with wrangler
 ```
 
 ## What is written, and from what
@@ -30,7 +31,19 @@ before Astro builds it:
 - `src/generated/home.json`: the home page's picture of where the pipeline branches, drawn
   the same way.
 
-`src/generated` is not committed; `public` is. `public/icon-180.png` and
+`scripts/playground.mjs`, which `pnpm playground` runs, compiles the playground,
+`limumygo/examples/playground`, to WebAssembly, and writes:
+
+- `public/playground/playground.<hash>.wasm` and `wasm_exec.<hash>.js`, Go's loader of it,
+  named by their content, which `public/_headers` has browsers keep for good.
+- `src/generated/playground.json`: their names and the WebAssembly's size, which the page
+  that loads them, `src/pages/playground.astro`, reads.
+
+It fails when the WebAssembly passes 24 MiB, as Cloudflare serves an asset of at most
+25 MiB. Run it again when the playground or limu changes; `pnpm build` does not, so that a
+change to the documents does not compile it again.
+
+`src/generated` and `public/playground` are not committed; the rest of `public` is. `public/icon-180.png` and
 `public/favicon.ico` are drawn from the SVGs by headless Chrome, as Go's standard library
 has no rasterizer; run `node scripts/icons.mjs` after the mark changes.
 

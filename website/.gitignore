@@ -3,3 +3,4 @@ dist/
 .astro/
 .wrangler/
 src/generated/
+public/playground/

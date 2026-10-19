@@ -61,8 +61,9 @@ sc, err := d.Layout(&layout.Options{MaxWidth: 480, Padding: new(0.0)})
 会改变位置的参数交给布局；其余都属于样式，改动后只需重画。细节和路线图见
 [docs/design.md](docs/design.md)。
 
-想用自己的图表试试 limu，可以运行 playground，它把文本和由 limumygo 绘制的图、
-以及它的 SVG 并排显示，还有一页各类图表的示例，每个都能在 playground 里打开：
+想用自己的图表试试 limu，可以打开 [playground](https://limu.firede.com/playground)，
+它把文本和由 limumygo 绘制的图、以及它的 SVG 并排显示，还能从 Examples 菜单打开 limu
+的任一示例。同一个程序也能在桌面上运行：
 `cd limumygo && go run ./examples/playground`。
 
 ## 样式

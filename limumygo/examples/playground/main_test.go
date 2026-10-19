@@ -13,7 +13,7 @@ import (
 // tester shows the playground with a text, as -png does, without a window.
 func tester(t *testing.T, src, look string) (*app, *ui.Tester) {
 	t.Helper()
-	a := newApp(src, look, nil)
+	a := newApp(src, look)
 	return a, testerFor(a)
 }
 
@@ -23,7 +23,7 @@ func testerFor(a *app) *ui.Tester {
 	return tt
 }
 
-// The playground lays out and draws every featured example, in each appearance, and says
+// The playground lays out and draws every featured example, in either appearance, and says
 // what it is in the status bar.
 func TestFeaturedExamples(t *testing.T) {
 	for i, typ := range gallery.All() {
@@ -31,7 +31,7 @@ func TestFeaturedExamples(t *testing.T) {
 			if !ex.Featured {
 				continue
 			}
-			look := appearanceNames[1+i%3]
+			look := appearanceNames[1+i%2]
 			a, tt := tester(t, ex.Source, look)
 			if a.scene == nil || a.problem != nil {
 				t.Errorf("%s %q in %s: no diagram (%+v)", typ.Type, ex.Title, look, a.problem)
@@ -100,11 +100,11 @@ func TestEditAndError(t *testing.T) {
 	}
 }
 
-// A text loaded, as a sample, is laid out at once.
+// A text loaded, as an example, is laid out at once.
 func TestLoad(t *testing.T) {
 	a, tt := tester(t, "flowchart LR\n  A --> B\n", appearanceLight)
 	pie, _ := gallery.Find("pie")
-	a.load(pie.Examples[0].Source, "")
+	a.load(pie.Examples[0].Source)
 	tt.Frame()
 	if a.typ != "pie" {
 		t.Errorf("loaded a %q", a.typ)
@@ -129,8 +129,8 @@ func TestWidthAndAppearance(t *testing.T) {
 	if a.plan.stamp != stamp || a.scene != sc {
 		t.Error("a change of appearance laid the diagram out again")
 	}
-	if got := tt.Image().RGBAAt(4, 4); got != (color.RGBA{0x01, 0x04, 0x09, 0xff}) {
-		t.Errorf("the toolbar is %v in GitHub Dark", got)
+	if got := tt.Image().RGBAAt(4, 4); got != (color.RGBA{0x0c, 0x16, 0x18, 0xff}) {
+		t.Errorf("the toolbar is %v in Dark", got)
 	}
 	tt.SetSize(700, height)
 	tt.Frame()
@@ -142,12 +142,12 @@ func TestWidthAndAppearance(t *testing.T) {
 // System follows the system's appearance.
 func TestSystemAppearance(t *testing.T) {
 	_, tt := tester(t, "flowchart LR\n  A --> B\n", appearanceSystem)
-	if got := tt.Image().RGBAAt(4, 4); got != (color.RGBA{0xf6, 0xf8, 0xfa, 0xff}) {
+	if got := tt.Image().RGBAAt(4, 4); got != (color.RGBA{0xf1, 0xf6, 0xf5, 0xff}) {
 		t.Errorf("the toolbar is %v in a light system", got)
 	}
 	tt.SetDark(true)
 	tt.Frame()
-	if got := tt.Image().RGBAAt(4, 4); got != (color.RGBA{0x01, 0x04, 0x09, 0xff}) {
+	if got := tt.Image().RGBAAt(4, 4); got != (color.RGBA{0x0c, 0x16, 0x18, 0xff}) {
 		t.Errorf("the toolbar is %v in a dark system", got)
 	}
 }
@@ -155,11 +155,11 @@ func TestSystemAppearance(t *testing.T) {
 // The SVG view shows the scene's SVG, indented, in the appearance, and Copy copies it as
 // the svg package wrote it.
 func TestSVGView(t *testing.T) {
-	a, tt := tester(t, "flowchart LR\n  A --> B\n", appearanceDarkDimmed)
+	a, tt := tester(t, "flowchart LR\n  A --> B\n", appearanceDark)
 	a.shows = viewSVG
 	tt.Frame()
 	text := a.svgBuf.String()
-	if !strings.HasPrefix(text, "<svg ") || !strings.Contains(text, "\n  <g ") || !strings.Contains(text, "#d1d7e0") {
+	if !strings.HasPrefix(text, "<svg ") || !strings.Contains(text, "\n  <g ") || !strings.Contains(text, "#d0dddc") {
 		t.Errorf("SVG view %.200q", text)
 	}
 	if err := tt.Click("Copy"); err != nil {
@@ -178,7 +178,7 @@ func TestScenePNG(t *testing.T) {
 	if b.Dx() != 2*int(math.Ceil(a.scene.Width)) || b.Dy() != 2*int(math.Ceil(a.scene.Height)) {
 		t.Errorf("image %v for a scene %v by %v", b, a.scene.Width, a.scene.Height)
 	}
-	if got := img.RGBAAt(1, 1); got != (color.RGBA{0x0d, 0x11, 0x17, 0xff}) {
+	if got := img.RGBAAt(1, 1); got != (color.RGBA{0x0c, 0x16, 0x18, 0xff}) {
 		t.Errorf("background %v", got)
 	}
 }
@@ -201,17 +201,17 @@ func TestHovered(t *testing.T) {
 	}
 }
 
-// The Samples menu has a submenu for each type, of its first examples, and choosing one
-// shows it; the Appearance menu changes the appearance.
+// The Examples menu has a submenu for each type, of its examples, and choosing one shows
+// it; the Appearance menu changes the appearance.
 func TestMenus(t *testing.T) {
 	a, tt := tester(t, "flowchart LR\n  A --> B\n", appearanceLight)
-	if err := tt.Click("Samples"); err != nil {
+	if err := tt.Click("Examples"); err != nil {
 		t.Fatal(err)
 	}
 	items := tt.Menu()
 	all := gallery.All()
 	if len(items) != len(all) {
-		t.Fatalf("Samples has %d items, want one for each of %d types", len(items), len(all))
+		t.Fatalf("Examples has %d items, want one for each of %d types", len(items), len(all))
 	}
 	for _, typ := range all {
 		if typ.Beta && !strings.Contains(strings.Join(items, "|"), typ.Title+" (beta)") {
@@ -219,26 +219,88 @@ func TestMenus(t *testing.T) {
 		}
 	}
 	pie, _ := gallery.Find("pie")
-	title := pie.Title
-	if pie.Beta {
-		title += " (beta)"
-	}
-	if err := tt.ChooseMenuItem(title, pie.Examples[0].Title); err != nil {
+	last := pie.Examples[len(pie.Examples)-1]
+	if err := tt.ChooseMenuItem(pie.Title, last.Title); err != nil {
 		t.Fatal(err)
 	}
-	if a.typ != "pie" || a.buf.String() != pie.Examples[0].Source {
+	if a.typ != "pie" || a.buf.String() != last.Source {
 		t.Errorf("chose a pie, showing a %q", a.typ)
 	}
 	if err := tt.Click("Appearance"); err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(tt.Menu(), "|"); got != "System|-|GitHub Light|GitHub Dark|GitHub Dark Dimmed" {
+	if got := strings.Join(tt.Menu(), "|"); got != "System|-|Light|Dark" {
 		t.Errorf("Appearance menu %q", got)
 	}
-	if err := tt.ChooseMenuItem(appearanceDarkDimmed); err != nil {
+	if err := tt.ChooseMenuItem(appearanceDark); err != nil {
 		t.Fatal(err)
 	}
-	if a.appearance != appearanceDarkDimmed {
+	if a.appearance != appearanceDark {
 		t.Errorf("appearance %q", a.appearance)
+	}
+}
+
+// Copy link copies a link to the website's playground with the text, which the playground
+// reads back; a text too long for a link is not copied.
+func TestCopyLink(t *testing.T) {
+	src := "flowchart LR\n  A[Start] --> B\n"
+	_, tt := tester(t, src, appearanceLight)
+	if err := tt.Click("Copy link"); err != nil {
+		t.Fatal(err)
+	}
+	link := tt.Clipboard()
+	hash, ok := strings.CutPrefix(link, siteURL)
+	if !ok {
+		t.Fatalf("copied %q", link)
+	}
+	if got, ok := linkedSource(hash); !ok || got != src {
+		t.Errorf("the link holds %q, %v", got, ok)
+	}
+	_, tt = tester(t, strings.Repeat("%%\n", maxLinkHash), appearanceLight)
+	tt.SetClipboard("")
+	if err := tt.Click("Copy link"); err != nil {
+		t.Fatal(err)
+	}
+	if tt.Clipboard() != "" || !tt.HasText("This diagram's text is too long for a link") {
+		t.Errorf("copied %.40q of a text too long", tt.Clipboard())
+	}
+}
+
+// A narrow window has the text above the diagram, rather than beside it.
+func TestNarrow(t *testing.T) {
+	_, tt := tester(t, "flowchart LR\n  A --> B\n", appearanceLight)
+	tt.SetSize(400, height)
+	tt.Frame()
+	tt.Frame()
+	code, ok1 := tt.Find("Mermaid text")
+	drawing, ok2 := tt.Find("Flowchart diagram")
+	if !ok1 || !ok2 || !(code.Y+code.H <= drawing.Y) {
+		t.Errorf("text at %+v, diagram at %+v", code, drawing)
+	}
+}
+
+// The page that loads the playground in a browser is told once that it shows what the
+// text made, a diagram or an error.
+func TestShown(t *testing.T) {
+	for _, src := range []string{"flowchart LR\n  A --> B\n", "flowchart LR\n  A -->\n", ""} {
+		a := newApp(src, appearanceLight)
+		n := 0
+		a.shown = func() { n++ }
+		tt := testerFor(a)
+		tt.Frame()
+		if n != 1 {
+			t.Errorf("%q: shown %d times", src, n)
+		}
+	}
+}
+
+// A download is named after the diagram's type.
+func TestFileName(t *testing.T) {
+	a, _ := tester(t, "pie\n  \"a\": 1\n", appearanceLight)
+	if got := a.fileName(".svg"); got != "pie.svg" {
+		t.Errorf("fileName = %q", got)
+	}
+	if got := newApp("", appearanceLight).fileName(".png"); got != "diagram.png" {
+		t.Errorf("fileName = %q", got)
 	}
 }

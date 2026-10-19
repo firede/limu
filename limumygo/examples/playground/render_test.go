@@ -42,7 +42,7 @@ func TestPlanner(t *testing.T) {
 
 // A result that comes back after a newer job started is dropped.
 func TestStaleResult(t *testing.T) {
-	a := newApp("flowchart LR\n  A --> B\n", appearanceLight, nil)
+	a := newApp("flowchart LR\n  A --> B\n", appearanceLight)
 	old := job{stamp: 1, version: a.buf.Version(), src: "pie\n  \"a\": 1\n", width: 500}.run()
 	a.plan.stamp = 2
 	a.apply(old)
@@ -57,7 +57,7 @@ func TestStaleResult(t *testing.T) {
 
 // Jobs run on other goroutines and hand their results back through post.
 func TestAsync(t *testing.T) {
-	a := newApp("flowchart LR\n  A --> B\n", appearanceLight, nil)
+	a := newApp("flowchart LR\n  A --> B\n", appearanceLight)
 	posted := make(chan func(), 4)
 	a.post = func(fn func()) { posted <- fn }
 	tt := testerFor(a)
