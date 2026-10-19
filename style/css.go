@@ -1,6 +1,7 @@
 package style
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -42,15 +43,19 @@ func Declarations(decls []string) Author {
 			a.Style.Stroke = paint(value)
 		case "color":
 			a.Style.Text = paint(value)
+		// Pele keeps the last value of a property alone, so one that cannot be read leaves
+		// the property unset, as a browser drops what it cannot take.
 		case "fill-opacity":
-			fill = fraction(value, fill)
+			fill = fraction(value, 1)
 		case "stroke-opacity":
-			stroke = fraction(value, stroke)
+			stroke = fraction(value, 1)
 		case "opacity":
+			a.Style.Opacity = Num{}
 			if f, ok := length(value); ok {
 				a.Style.Opacity = N(max(0, min(1, f)))
 			}
 		case "stroke-width":
+			a.Style.StrokeWidth = Num{}
 			if f, ok := length(value); ok && f >= 0 {
 				a.Style.StrokeWidth = N(f)
 			}
@@ -109,6 +114,55 @@ func LineDeclared(decls []string) bool {
 	return false
 }
 
+// ShapeCSS is the style Pele's resolveStyle writes on a shape of declarations, as it writes
+// it into an attribute: each property of a shape that is kept, with the last value given it,
+// in the order the properties first came, "fill:red;stroke:blue;", with &, <, > and " written
+// as entities and the control characters XML does not allow dropped; "" for none. A diagram
+// that decides by what the attribute holds, as a treemap does whether a class fills a
+// section, reads it here.
+func ShapeCSS(decls []string) string {
+	var props, values []string
+	for _, decl := range decls {
+		prop, value, ok := strings.Cut(decl, ":")
+		if !ok || prop == "" {
+			continue
+		}
+		prop = chars.ToLower(chars.Trim(prop))
+		value = chars.Trim(replaceFold(value, "!important", ""))
+		if value == "" || unsafe(value) {
+			continue
+		}
+		switch prop {
+		case "fill", "fill-opacity", "stroke", "stroke-width", "stroke-dasharray", "stroke-dashoffset",
+			"stroke-linecap", "stroke-linejoin", "stroke-opacity", "opacity", "rx", "ry":
+		default:
+			continue
+		}
+		if k := slices.Index(props, prop); k >= 0 {
+			values[k] = value
+		} else {
+			props, values = append(props, prop), append(values, value)
+		}
+	}
+	var b strings.Builder
+	for k, prop := range props {
+		b.WriteString(prop + ":")
+		for _, r := range values[k] {
+			switch {
+			case r == '&':
+				b.WriteString("&amp;")
+			case r == '"':
+				b.WriteString("&quot;")
+			case r <= 0x08 || r == 0x0b || r == 0x0c || r >= 0x0e && r <= 0x1f || r == 0x7f:
+			default:
+				b.WriteRune(r)
+			}
+		}
+		b.WriteByte(';')
+	}
+	return b.String()
+}
+
 // The keywords of stroke-linecap and stroke-linejoin, by the Cap or Join each is. Pele
 // passes the properties through to the browser, which takes these, initial for the
 // property's initial value, and inherit or unset for what the element would inherit, which
@@ -144,11 +198,11 @@ func paint(value string) Paint {
 	return Paint{}
 }
 
-// fraction reads an opacity, as 0.5 or 50%, or gives back what was there.
-func fraction(value string, was float64) float64 {
+// fraction reads an opacity, as 0.5 or 50%, or gives back fallback.
+func fraction(value string, fallback float64) float64 {
 	f, _, ok := number(value, 1)
 	if !ok {
-		return was
+		return fallback
 	}
 	return max(0, min(1, f))
 }
