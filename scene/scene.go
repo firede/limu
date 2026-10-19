@@ -50,8 +50,11 @@ type Item struct {
 	Kind  Kind
 	Role  Role
 	Shape Shape
-	ID    string   // the id the diagram's text gave it, if any
-	Class []string // classes its author gave it with classDef
+	ID    string // the id the diagram's text gave it, if any
+	// Class is the classes the diagram's text gives the part, as classDef does, or a gantt
+	// task's tags, and those a diagram sorts its parts into, as a gantt chart's sections.
+	// The svg backend writes them as the element's classes, for a host's CSS.
+	Class []string
 
 	// Box is where the part is. For an edge, it holds its route.
 	Box Rect

@@ -17,10 +17,11 @@ backend. Its tests compare what it does with what Pele does, number for
 number.
 
 > [!WARNING]
-> **An early, personal project.** It reads flowcharts and the diagrams laid out
-> as they are — state, class, entity relationship, requirement, use case, agent
-> flow and swimlane — and nothing else yet; the other diagrams follow, one family
-> at a time. The API will change in any 0.x release.
+> **An early, personal project.** It reads flowcharts; state, class, entity
+> relationship, requirement, use case, agent flow and swimlane diagrams; and
+> sequence, gantt, timeline, user journey, git graph, packet and kanban diagrams.
+> The charts and the rest follow, one family at a time. The API will change in
+> any 0.x release.
 
 ```go
 sc, err := limu.Layout("flowchart LR\n  A[Text] --> B[Scene] --> C{Backend}", nil)
@@ -43,7 +44,7 @@ text ──parse──▶ model ──layout──▶ scene ──backend──�
 | `text` | Measures text, through a `Measurer` the host gives, and lays out labels: lines, wrapping, emphasis, icons, entities. `text.Arial` measures with a table of Arial's advances, with no font at hand. |
 | `scene` | A diagram laid out: items, their roles and shapes, boxes, paths, markers, labels. |
 | `style` | How a scene looks, at three levels: a theme of colors by token, overrides by role, and a backend's drawing of its own. |
-| `layout` | What changes where things are: the measurer, the size of text, a grid to snap to, how edges are routed. The layered and compound layouts. |
+| `layout` | What changes where things are: the measurer, the size of text, a grid to snap to, how edges are routed, the present and the time zone of a gantt chart. The layered and compound layouts. |
 | `draw` | The geometry diagrams share: shapes' outlines and edges' paths. |
 | `svg` | Draws a scene as SVG, its theme as CSS variables. |
 | `mygoui` | Draws a scene with MyGo's native UI, and finds the item under the pointer. A module of its own, so that the rest needs only the standard library. |

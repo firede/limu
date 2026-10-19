@@ -12,7 +12,7 @@ text ──parse──▶ model ──layout──▶ scene.Scene ──backend�
 
 What changes where things are goes to layout, and a change of it lays the diagram out
 again: the measurer and its fonts, the size of text, a grid to snap to, how edges are
-routed. Everything else is style, settled only when a scene is drawn, and a change of it
+routed, and for a gantt chart the present and the time zone its dates are read in. Everything else is style, settled only when a scene is drawn, and a change of it
 only redraws.
 
 ## The scene
@@ -148,6 +148,6 @@ commit they were written from.
 | M0 | the stages and their types, text measured and laid out, styles, the svg backend, the oracle | done |
 | M1 | flowcharts from text to pixels: the parser, the layered and compound layouts, the shapes; a backend for MyGo's native UI; a look in the Platinum style in mygo-platinum | done |
 | M2 | the diagrams on the layered layout: state, class, entity relationship, requirement, use case, agent flow, swimlane | done |
-| M3 | sequence, gantt, timeline, journey, git graph, packet, kanban | |
+| M3 | sequence, gantt, timeline, journey, git graph, packet, kanban | done |
 | M4 | the charts: pie, xy, quadrant, radar, sankey, treemap, venn | |
 | M5 | the rest: mindmap, architecture, C4, block, wardley, railroad, ishikawa, cynefin, event modeling, tree view, info | |
