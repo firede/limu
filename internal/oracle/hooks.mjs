@@ -17,7 +17,9 @@ export async function resolve(spec, ctx, next) {
 // them whole; the suite rounds them as num would once it is done with them. While it is set,
 // classMarker also writes what it draws a marker from, so that the marker can be drawn again
 // where a group moves it, and a kanban board's textBlock writes, in place of each line of
-// text, where the line starts or ends and what is in it, as the scene holds a label.
+// text, where the line starts or ends and what is in it, as the scene holds a label; and a
+// pie's percentages write, as data-y, where they are before Pele adds the shift to their
+// baseline, as the scene holds a label about its middle.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -26,6 +28,9 @@ const NUM = 'export function num(value: number): string {';
 const EXACT = 'if ((globalThis as any).limuExactNumbers)';
 const CLASS_MARKER = 'export function classMarker(';
 const TEXT_BLOCK = 'function textBlock(';
+const PIE_OUTSIDE = 'outside += `<text x="${num(x)}"';
+const PIE_INSIDE = 'labels += `<text x="${num(Math.sin(mid) * r)}"';
+const dataY = (y) => `<text\${(globalThis as any).limuExactNumbers ? \` data-y="\${${y}}"\` : ''}`;
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -63,6 +68,13 @@ function textBlock(label: Label, x: number, y: number, attrs: string, icons: Ico
   return out;
 }
 `;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/pie/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = String(loaded.source);
+    source = patch(url, source, PIE_OUTSIDE, PIE_OUTSIDE.replace('<text', dataY('y')));
+    source = patch(url, source, PIE_INSIDE, PIE_INSIDE.replace('<text', dataY('-Math.cos(mid) * r')));
     return { ...loaded, source, shortCircuit: true };
   }
   if (url.endsWith('.json')) {
