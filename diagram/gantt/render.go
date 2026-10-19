@@ -35,7 +35,8 @@ func setting(config diagram.Config, key string, least, most float64) (float64, b
 	return min(most, max(least, v)), true
 }
 
-// settingOr is setting, or fallback when the config has none.
+// settingOr is setting, or fallback when the config has none, as Pele writes
+// setting(…) ?? fallback.
 func settingOr(config diagram.Config, key string, least, most, fallback float64) float64 {
 	if v, ok := setting(config, key, least, most); ok {
 		return v
@@ -57,7 +58,8 @@ func flag(config diagram.Config, key string) bool {
 	return ok && v
 }
 
-// breakAt is the length of a match of /<br\s*\/?>/i at i, or 0.
+// breakAt is the length of a match of /<br\s*\/?>/i at i, or 0: Pele's RE_BREAK, written out
+// by hand.
 func breakAt(s string, i int) int {
 	if i+3 > len(s) || s[i] != '<' || !chars.EqualFoldASCII(s[i+1:i+3], "br") {
 		return 0
@@ -249,6 +251,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		titleHeight = title.Height + 16
 	}
 	sc := &scene.Scene{Type: "gantt", FontSize: size, Title: db.AccTitle, Desc: db.AccDescr}
+	// titleItem is the chart's title, which Pele's renderGantt writes with labelSvg first.
 	titleItem := func() []scene.Item {
 		if title.Empty() {
 			return nil
@@ -284,6 +287,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			axisFormat = "%Y-%m-%d"
 		}
 	}
+	// tickLabel is Pele's tickLabel: a tick's time in the axis format.
 	tickLabel := func(t float64) string { return z.timeFormat(axisFormat, t) }
 	sampleWidth := max(measure.Width(tickLabel(start), tickSize, 0), measure.Width(tickLabel(stop), tickSize, 0))
 
@@ -304,6 +308,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	if stop > start {
 		scale = plotWidth / (stop - start)
 	}
+	// x is Pele's x: where a time falls on the plot, its middle when the chart spans no time.
 	x := func(t float64) float64 {
 		if scale == 0 {
 			return left + plotWidth/2
@@ -506,6 +511,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	if (len(db.Excludes) > 0 || len(db.Includes) > 0) && z.add(start, 6, "y") > stop {
 		from, to := math.NaN(), math.NaN()
 		have := false
+		// flush is Pele's flush: it marks the run of excluded days from from to to, if there is one.
 		flush := func() {
 			if !have {
 				return

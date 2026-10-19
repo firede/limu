@@ -27,16 +27,19 @@ const (
 
 var dayNames = [...]string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 
-// unitAt is the code unit JavaScript's charCodeAt reads at byte i of s, -1 past the end.
+// unitAt is the code unit JavaScript's charCodeAt reads at byte i of s, -1 past the end, as
+// Pele's tokenize reads src.charCodeAt.
 func unitAt(s string, i int) int {
 	c, _ := chars.UnitAt(s, i)
 	return c
 }
 
-// isSpaceAt reports whether the character at byte i of s is \s.
+// isSpaceAt reports whether the character at byte i of s is \s, as Pele's isSpace of its
+// charCodeAt does.
 func isSpaceAt(s string, i int) bool { return chars.IsSpace(unitAt(s, i)) }
 
-// spaceEnd is the end of a run of \s from byte i.
+// spaceEnd is the end of a run of \s from byte i, as the loops of Pele's tokenize over
+// isSpace find it.
 func spaceEnd(s string, i int) int {
 	for i < len(s) {
 		c, size := chars.UnitAt(s, i)
@@ -48,16 +51,18 @@ func spaceEnd(s string, i int) int {
 	return i
 }
 
-// foldAt reports whether word, in ASCII letters, is at byte i of s but for case.
+// foldAt reports whether word, in ASCII letters, is at byte i of s but for case, as the i flag
+// of Pele's patterns matches it.
 func foldAt(s string, i int, word string) bool { return chars.HasPrefixFold(s[i:], word) }
 
-// isWordByte is \w.
+// isWordByte is \w, as the \b of Pele's patterns tests the byte after a word.
 func isWordByte(s string, i int) bool { return i < len(s) && chars.IsWord(int(s[i])) }
 
 // The patterns the lexer matches where it stands, as Pele's sticky regular expressions, each
 // written out: the end of the match, or -1.
 
-// matchAcc is /word\s*sep\s*/iy, for accTitle and accDescr with ':' or '{'.
+// matchAcc is /word\s*sep\s*/iy, for accTitle and accDescr with ':' or '{': Pele's
+// RE_ACC_TITLE, RE_ACC_DESCR and RE_ACC_DESCR_ML.
 func matchAcc(s string, p int, word string, sep byte) int {
 	if !foldAt(s, p, word) {
 		return -1
@@ -69,7 +74,8 @@ func matchAcc(s string, p int, word string, sep byte) int {
 	return spaceEnd(s, e+1)
 }
 
-// matchSpaced is /word\s+/iy, and with quote set /word\s+"/iy.
+// matchSpaced is /word\s+/iy, and with quote set /word\s+"/iy: Pele's RE_CALL, RE_CLICK and
+// RE_HREF.
 func matchSpaced(s string, p int, word string, quote bool) int {
 	if !foldAt(s, p, word) {
 		return -1
@@ -87,7 +93,7 @@ func matchSpaced(s string, p int, word string, quote bool) int {
 	return e
 }
 
-// matchWord is /word\b/iy.
+// matchWord is /word\b/iy, as the keywords of Pele's KEYWORDS that take nothing after them.
 func matchWord(s string, p int, word string) int {
 	if !foldAt(s, p, word) || isWordByte(s, p+len(word)) {
 		return -1
@@ -96,7 +102,8 @@ func matchWord(s string, p int, word string) int {
 }
 
 // matchRest is /word\s[^stop]+/iy: the keyword, one white space character, and then all up to
-// the first of the stop bytes, of which there must be one or more.
+// the first of the stop bytes, of which there must be one or more. It is the keywords of
+// Pele's KEYWORDS that take a value.
 func matchRest(s string, p int, word, stop string) int {
 	if !foldAt(s, p, word) {
 		return -1
@@ -117,7 +124,8 @@ func matchRest(s string, p int, word, stop string) int {
 	return e
 }
 
-// matchDays is /prefix\s+(name|…)\b/iy: the end and the index of the name.
+// matchDays is /prefix\s+(name|…)\b/iy: the end and the index of the name. It is Pele's
+// RE_WEEKDAY and RE_WEEKEND.
 func matchDays(s string, p int, prefix string, names []string) (int, int) {
 	e := matchSpaced(s, p, prefix, false)
 	if e < 0 {
@@ -131,7 +139,7 @@ func matchDays(s string, p int, prefix string, names []string) (int, int) {
 	return -1, -1
 }
 
-// matchDate is /\d\d\d\d-\d\d-\d\d\b/y.
+// matchDate is /\d\d\d\d-\d\d-\d\d\b/y, Pele's RE_DATE.
 func matchDate(s string, p int) bool {
 	if p+10 > len(s) {
 		return false
@@ -154,10 +162,12 @@ type rule struct {
 	typ   token
 }
 
+// rest is the pattern of a keyword of Pele's KEYWORDS that takes a value up to a stop byte.
 func rest(word, stop string) func(string, int) int {
 	return func(s string, p int) int { return matchRest(s, p, word, stop) }
 }
 
+// bounded is the pattern of a keyword of Pele's KEYWORDS that ends at a word boundary.
 func bounded(word string) func(string, int) int {
 	return func(s string, p int) int { return matchWord(s, p, word) }
 }
@@ -186,6 +196,8 @@ func tokenize(src string) []tok {
 	state := sINITIAL
 	p := 0
 
+	// emit, until and keyword are Pele's closures of the same names; the at of Pele's tokenize
+	// is the match functions above.
 	emit := func(typ token, s, e int) {
 		toks = append(toks, tok{typ, src[s:e], s})
 		p = e

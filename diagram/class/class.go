@@ -20,7 +20,8 @@ func Parse(source, title string) (*DB, error) {
 	return db, nil
 }
 
-// ParsePrepared parses a prepared class diagram.
+// ParsePrepared parses a prepared class diagram, with the text and the title Pele's core passes
+// to the parse of its class diagram.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
 	return Parse(p.Source(false), p.Title)
 }

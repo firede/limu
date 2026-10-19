@@ -161,6 +161,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 	root := order[0]
 
 	minX, minY, maxX, maxY := 0.0, 0.0, root.w, root.h
+	// grow widens the bounds of the drawing to hold a box, as the grow of Pele's draw does.
 	grow := func(x0, y0, x1, y1 float64) {
 		minX = min(minX, x0)
 		minY = min(minY, y0)
@@ -204,6 +205,8 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 	}
 	rels := float64(len(db.Rels))
 	careful := float64(rels*(float64(len(nodes)+len(order))+float64(3*rels))) <= careBudget
+	// covered is how much of a box the taken boxes cover, as the covered of Pele's draw gives
+	// it.
 	covered := func(x0, y0, x1, y1 float64) float64 {
 		area := 0.0
 		for i := 0; i < len(taken); i += 4 {
@@ -217,6 +220,8 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		}
 		return area
 	}
+	// offset is a relation's offset kept within maxOffset, 0 for none, as the offset of Pele's
+	// draw gives it.
 	offset := func(v float64) float64 {
 		if !truthy(v) {
 			return 0

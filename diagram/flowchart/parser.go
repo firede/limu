@@ -7,6 +7,8 @@ import (
 	"github.com/firede/limu/internal/chars"
 )
 
+// tokenSet is the set of the token types ts, as the loops that fill Pele's ID, ALPHANUM,
+// NO_TAGS and STYLE_PART tables make one.
 func tokenSet(ts ...token) (set [t_EOF + 1]bool) {
 	for _, t := range ts {
 		set[t] = true
@@ -54,6 +56,7 @@ type parser struct {
 
 // braceTrail is source.replace(/}\s*\n/g, '}\n'): Mermaid trims the white space between a
 // closing brace and the end of its line before parsing.
+// Pele's parseFlowchart does this with RE_BRACE_TRAIL.
 func braceTrail(s string) string {
 	if !strings.Contains(s, "}") {
 		return s
@@ -99,21 +102,28 @@ func ParseInto(source string, db *DB) (err error) {
 	return nil
 }
 
+// typ and text are the type and the text of the token the parser is at, Pele's types[i] and
+// texts[i].
 func (p *parser) typ() token   { return p.toks[p.i].typ }
 func (p *parser) text() string { return p.toks[p.i].text }
 
+// next gives the text of the token the parser is at and moves past it, Pele's texts[i++].
 func (p *parser) next() string {
 	s := p.toks[p.i].text
 	p.i++
 	return s
 }
 
+// check stops the parse with err, if it is not nil. It is limu's own: Pele's db throws its
+// errors, where limu's DB returns them.
 func (p *parser) check(err error) {
 	if err != nil {
 		panic(parseError{err})
 	}
 }
 
+// fail stops the parse with a syntax error at the token the parser is at, saying what was
+// expected there, as Pele's fail does.
 func (p *parser) fail(expected string) {
 	t := p.toks[p.i]
 	if t.typ == t_ERROR {
@@ -122,6 +132,8 @@ func (p *parser) fail(expected string) {
 	panic(parseError{diagram.SyntaxError("flowchart", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 }
 
+// expect gives the text of the token the parser is at and moves past it, or fails if the
+// token is not of type typ, naming also among what was expected, as Pele's expect does.
 func (p *parser) expect(typ token, also string) string {
 	if p.typ() != typ {
 		exp := "'" + tokenNames[typ] + "'"
@@ -133,6 +145,8 @@ func (p *parser) expect(typ token, also string) string {
 	return p.next()
 }
 
+// separator moves past the newline, semicolon or end of text that ends a statement, as
+// Pele's separator does.
 func (p *parser) separator() {
 	t := p.typ()
 	if t != t_NEWLINE && t != t_SEMI && t != t_EOF {
@@ -141,6 +155,9 @@ func (p *parser) separator() {
 	p.i++
 }
 
+// run joins the texts of the run of tokens whose types are in set, which must have at least
+// one, failing with expected where it has none. It is the loop Pele's idString, alphaNum and
+// style each write out.
 func (p *parser) run(set *[t_EOF + 1]bool, expected string) string {
 	if !set[p.typ()] {
 		p.fail(expected)
@@ -152,14 +169,20 @@ func (p *parser) run(set *[t_EOF + 1]bool, expected string) string {
 	return s
 }
 
+// idString joins the run of tokens that make an id, as Pele's idString does.
 func (p *parser) idString() string { return p.run(&idTokens, "'NODE_STRING'") }
 
+// alphaNum joins the run of tokens that make a name, as Pele's alphaNum does.
 func (p *parser) alphaNum() string { return p.run(&alphaNumTokens, "'NODE_STRING'") }
 
+// isTextPart reports whether a token of type t goes on a node's label, the test Pele's text
+// makes of each token.
 func isTextPart(t token) bool {
 	return t == t_TEXT || t == t_TAGSTART || t == t_TAGEND || t == t_UNICODE_TEXT
 }
 
+// label reads a node's label, a string, a Markdown string or a run of text tokens, as Pele's
+// text does.
 func (p *parser) label() *Text {
 	var lt LabelType
 	switch t := p.typ(); {
@@ -179,8 +202,10 @@ func (p *parser) label() *Text {
 	return &Text{s, lt}
 }
 
+// closed expects the token of type typ that closes a label, as Pele's closed does.
 func (p *parser) closed(typ token) { p.expect(typ, textTokens) }
 
+// edgeText reads the label of a link written inside it, as Pele's edgeText does.
 func (p *parser) edgeText() *Text {
 	var lt LabelType
 	switch t := p.typ(); t {
@@ -200,6 +225,7 @@ func (p *parser) edgeText() *Text {
 	return &Text{s, lt}
 }
 
+// textNoTags reads a subgraph's id, which takes no tags, as Pele's textNoTags does.
 func (p *parser) textNoTags() *Text {
 	var lt LabelType
 	switch t := p.typ(); {
@@ -219,6 +245,7 @@ func (p *parser) textNoTags() *Text {
 	return &Text{s, lt}
 }
 
+// shapeData joins the run of a node's shape data, as Pele's shapeData does.
 func (p *parser) shapeData() string {
 	s := p.next()
 	for p.typ() == t_SHAPE_DATA {
@@ -227,14 +254,20 @@ func (p *parser) shapeData() string {
 	return s
 }
 
+// add adds a vertex with a label and a shape, the call to db.addVertex that each case of
+// Pele's vertex makes.
 func (p *parser) add(id string, label *Text, typ string) {
 	p.check(p.db.AddVertex(id, label, typ, nil, nil, "", nil, "", false))
 }
 
+// addData gives a vertex its shape data, the call to db.addVertex that Pele's node and
+// vertexStatement make.
 func (p *parser) addData(id, data string) {
 	p.check(p.db.AddVertex(id, nil, "", nil, nil, "", nil, data, true))
 }
 
+// vertex reads a node's id and its label in the brackets that give its shape, and adds the
+// vertex, as Pele's vertex does. It gives the id.
 func (p *parser) vertex() string {
 	id := p.idString()
 	var label *Text
@@ -335,6 +368,7 @@ func (p *parser) vertex() string {
 	return id
 }
 
+// styledVertex reads a vertex and the class after `:::`, if any, as Pele's styledVertex does.
 func (p *parser) styledVertex() string {
 	id := p.vertex()
 	if p.typ() == t_STYLE_SEPARATOR {
@@ -344,6 +378,9 @@ func (p *parser) styledVertex() string {
 	return id
 }
 
+// node reads a node or a group of them joined by `&`, as Pele's node does: shape data before
+// an `&` goes to the vertex it follows, and that after the last vertex is left in
+// p.pendingData for the caller.
 func (p *parser) node() []string {
 	ids := []string{p.styledVertex()}
 	p.hasPending = false
@@ -380,6 +417,7 @@ func (p *parser) node() []string {
 	}
 }
 
+// link reads a link, with its id and its label, as Pele's link does.
 func (p *parser) link() *LinkInfo {
 	id := ""
 	if p.typ() == t_LINK_ID {
@@ -411,6 +449,8 @@ func (p *parser) link() *LinkInfo {
 	return nil
 }
 
+// vertexStatement reads a chain of nodes and the links between them, adding the links, as
+// Pele's vertexStatement does. It gives the ids of the nodes, the last group first.
 func (p *parser) vertexStatement() []string {
 	stmt := p.node()
 	if p.hasPending {
@@ -433,10 +473,12 @@ func (p *parser) vertexStatement() []string {
 	}
 }
 
+// style joins the run of tokens of one style, as Pele's style does.
 func (p *parser) style() string {
 	return p.run(&stylePartTokens, "'NODE_STRING', 'NUM', 'COLON', 'BRKT'")
 }
 
+// stylesOpt reads a list of styles split by commas, as Pele's stylesOpt does.
 func (p *parser) stylesOpt() []string {
 	out := []string{p.style()}
 	for p.typ() == t_COMMA {
@@ -446,6 +488,8 @@ func (p *parser) stylesOpt() []string {
 	return out
 }
 
+// linkStyleStatement reads a linkStyle statement, setting the styles and the curve of the
+// links it names, as Pele's linkStyleStatement does.
 func (p *parser) linkStyleStatement() {
 	p.i++
 	p.expect(t_SPACE, "")
@@ -477,6 +521,8 @@ func (p *parser) linkStyleStatement() {
 	}
 }
 
+// linkTail reads what follows the url of a click statement, a tooltip and a target, and sets
+// the node's link, as Pele's linkTail does.
 func (p *parser) linkTail(id, url string) {
 	if p.typ() != t_SPACE {
 		p.db.SetLink(id, url, "")
@@ -497,6 +543,8 @@ func (p *parser) linkTail(id, url string) {
 	p.db.SetTooltip(id, tooltip)
 }
 
+// clickStatement reads a click statement, as Pele's clickStatement does. The callback's name
+// and arguments are read and left, as limu calls no callbacks.
 func (p *parser) clickStatement() {
 	id := p.next()
 	switch p.typ() {
@@ -532,6 +580,8 @@ func (p *parser) clickStatement() {
 	}
 }
 
+// subgraphHeader reads the line that opens a subgraph, its id and its title, as Pele's
+// subgraphHeader does.
 func (p *parser) subgraphHeader() *frame {
 	p.i++
 	t := p.typ()
@@ -556,6 +606,7 @@ func (p *parser) subgraphHeader() *frame {
 }
 
 // statement parses a statement, and gives what it adds to a subgraph's body, if anything.
+// It is Pele's statement, whose empty list of items is the false here.
 func (p *parser) statement() (docItem, bool) {
 	t := p.typ()
 	switch t {
@@ -619,6 +670,7 @@ func (p *parser) statement() (docItem, bool) {
 
 // document parses the statements. Subgraphs nest without recursion: each open one keeps the
 // list and collect flag of its parent.
+// It is Pele's document.
 func (p *parser) document() {
 	var open []*frame
 	var list []docItem
@@ -665,6 +717,8 @@ func (p *parser) document() {
 	}
 }
 
+// parse reads the header and its direction, then the statements, as the end of Pele's
+// parseFlowchart does after it defines its readers.
 func (p *parser) parse() {
 	for p.typ() == t_SPACE || p.typ() == t_NEWLINE {
 		p.i++

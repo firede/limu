@@ -16,11 +16,33 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-24.04
+    name: verify (${{ matrix.name }})
+    # Go fuses a product into the sum it is in on arm64, and on amd64 at GOAMD64=v3, and
+    # JavaScript never does: a product that must stay apart and is not written float64(x*y)
+    # passes at amd64's v1 and fails only where Go fuses it.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: amd64
+            runner: ubuntu-24.04
+            goamd64: v1
+          - name: amd64 v3
+            runner: ubuntu-24.04
+            goamd64: v3
+          - name: arm64
+            runner: ubuntu-24.04-arm
+            goamd64: v1
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
+    env:
+      GOAMD64: ${{ matrix.goamd64 }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache-dependency-path: mygoui/go.sum
+      # MyGo sets and measures text with Pango on Linux, which the mygoui tests need.
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libpangocairo-1.0-0
       - run: ./scripts/verify.sh

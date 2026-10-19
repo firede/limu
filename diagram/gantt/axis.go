@@ -21,7 +21,7 @@ const (
 	yearMs   = 365 * dayMs
 )
 
-// A tickCalendar is axis.ts's Calendar: an interval of time, as a floor and an offset of
+// A tickCalendar is Pele's Calendar: an interval of time, as a floor and an offset of
 // dates, which give the date they leave.
 type tickCalendar struct {
 	floor  func(d float64) float64
@@ -35,8 +35,11 @@ type tickCalendar struct {
 	ms    float64
 }
 
+// startOfDay is the start of the day d falls on, as Pele's startOfDay sets it.
 func (z zone) startOfDay(d float64) float64 { return z.SetHours(d, 0, 0, 0, 0) }
 
+// weekCalendar is Pele's weekCalendar: weeks that begin on the day weekStart numbers, 0 for
+// Sunday.
 func (z zone) weekCalendar(weekStart float64) tickCalendar {
 	return tickCalendar{
 		floor: func(d float64) float64 {
@@ -49,7 +52,7 @@ func (z zone) weekCalendar(weekStart float64) tickCalendar {
 	}
 }
 
-// calendarOf is axis.ts's CALENDARS, for every unit but the week.
+// calendarOf is Pele's CALENDARS, for every unit but the week.
 func (z zone) calendarOf(unit string) tickCalendar {
 	switch unit {
 	case "millisecond":
@@ -101,15 +104,16 @@ func (z zone) calendarOf(unit string) tickCalendar {
 	}
 }
 
-// span is axis.ts's span: whole units between two floored dates, discounting a change of UTC
+// span is Pele's span: whole units between two floored dates, discounting a change of UTC
 // offset between them.
 func (z zone) span(start, end, unit float64) float64 {
 	return math.Floor((end - start - float64((z.TimezoneOffset(end)-z.TimezoneOffset(start))*minuteMs)) / unit)
 }
 
+// mod is Pele's mod: a modulo b, taken to be at least 0.
 func mod(a, b float64) float64 { return math.Mod(math.Mod(a, b)+b, b) }
 
-// every is the interval d3's unit.every(step) gives, axis.ts's every.
+// every is the interval d3's unit.every(step) gives, as Pele's every gives it.
 func (z zone) every(unit string, step, weekStart float64) tickCalendar {
 	var base tickCalendar
 	if unit == "week" {
@@ -165,7 +169,7 @@ func (z zone) every(unit string, step, weekStart float64) tickCalendar {
 	return c
 }
 
-// ticks is axis.ts's range: ticks from start to stop inclusive, or false when there would be
+// ticks is Pele's range: ticks from start to stop inclusive, or false when there would be
 // more than limit.
 func ticks(c tickCalendar, start, stop float64, limit int) ([]float64, bool) {
 	d := jsdate.TimeClip(start - 1)
@@ -186,7 +190,7 @@ func ticks(c tickCalendar, start, stop float64, limit int) ([]float64, bool) {
 	return out, true
 }
 
-// tickStep is axis.ts's tickStep.
+// tickStep is Pele's tickStep.
 func tickStep(start, stop, count float64) float64 {
 	step := (stop - start) / max(0, count)
 	power := math.Floor(jsmath.Log10(step))
@@ -228,7 +232,7 @@ var autoSteps = [...]struct {
 	{"year", 1, yearMs},
 }
 
-// autoTicks is axis.ts's autoTicks: about count ticks at round times, chosen the way d3's time
+// autoTicks is Pele's autoTicks: about count ticks at round times, chosen the way d3's time
 // scale chooses them.
 func (z zone) autoTicks(start, stop, count float64) []float64 {
 	target := (stop - start) / count
@@ -259,6 +263,7 @@ func (z zone) autoTicks(start, stop, count float64) []float64 {
 var weekStarts = [...]string{"sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"}
 
 // readInterval reads a tick interval, /^([1-9]\d*)(millisecond|second|minute|hour|day|week|month)$/.
+// It is Pele's RE_INTERVAL, written out by hand, which Pele's intervalTicks executes.
 func readInterval(s string) (step float64, unit string, ok bool) {
 	i := 0
 	if i < len(s) && s[i] >= '1' && s[i] <= '9' {
@@ -277,12 +282,12 @@ func readInterval(s string) (step float64, unit string, ok bool) {
 	return 0, "", false
 }
 
-// parseIntDigits is parseInt(s, 10) of a string of digits.
+// parseIntDigits is parseInt(s, 10) of a string of digits, as Pele's intervalTicks takes it.
 func parseIntDigits(s string) float64 {
 	return number(s)
 }
 
-// intervalTicks is axis.ts's intervalTicks: ticks for a tickInterval such as 1week, or false
+// intervalTicks is Pele's intervalTicks: ticks for a tickInterval such as 1week, or false
 // when it is not one or asks for more than limit.
 func (z zone) intervalTicks(interval, weekday string, start, stop float64, limit int) ([]float64, bool) {
 	step, unit, ok := readInterval(interval)
@@ -302,7 +307,7 @@ func (z zone) intervalTicks(interval, weekday string, start, stop float64, limit
 	return ticks(c, start, stop, limit)
 }
 
-// padTime is axis.ts's pad.
+// padTime is Pele's pad.
 func padTime(value float64, fill string, width int) string {
 	sign := ""
 	if value < 0 {
@@ -316,9 +321,10 @@ func padTime(value float64, fill string, width int) string {
 	return sign + digits
 }
 
+// floored is Pele's floored: the date floored by the calendar.
 func (z zone) floored(date float64, c tickCalendar) float64 { return c.floor(date) }
 
-// weekOfYear is axis.ts's weekOfYear: weeks since the last weekStart day before the year
+// weekOfYear is Pele's weekOfYear: weeks since the last weekStart day before the year
 // began, which is d3's %U and %W.
 func (z zone) weekOfYear(date, weekStart float64) float64 {
 	week := z.weekCalendar(weekStart)
@@ -326,7 +332,7 @@ func (z zone) weekOfYear(date, weekStart float64) float64 {
 	return z.span(z.floored(jsdate.TimeClip(yearStart-1), week), z.floored(date, week), weekMs)
 }
 
-// isoThursday is axis.ts's isoThursday: the Thursday that decides which ISO week and ISO year
+// isoThursday is Pele's isoThursday: the Thursday that decides which ISO week and ISO year
 // a date belongs to.
 func (z zone) isoThursday(date float64) float64 {
 	thursday := z.weekCalendar(4)
@@ -344,7 +350,7 @@ func (z zone) isoThursday(date float64) float64 {
 	return d
 }
 
-// timeFormat is axis.ts's timeFormat: a date written with a d3 time format specifier such as
+// timeFormat is Pele's timeFormat: a date written with a d3 time format specifier such as
 // %Y-%m-%d.
 func (z zone) timeFormat(specifier string, date float64) string {
 	var b strings.Builder
@@ -387,7 +393,8 @@ func (z zone) timeFormat(specifier string, date float64) string {
 	return b.String()
 }
 
-// charAt is the character at byte i of s, and its length in bytes; "" and 0 past the end.
+// charAt is the character at byte i of s, and its length in bytes; "" and 0 past the end. It
+// is the specifier.charAt(i) of Pele's timeFormat.
 func charAt(s string, i int) (string, int) {
 	if i >= len(s) {
 		return "", 0
@@ -396,6 +403,8 @@ func charAt(s string, i int) (string, int) {
 	return s[i : i+size], size
 }
 
+// directive is Pele's directive: what one directive c of a d3 time format writes of date d,
+// p being the fill its numbers are padded with.
 func (z zone) directive(c string, d float64, p string) string {
 	switch c {
 	case "a":
