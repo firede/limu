@@ -102,12 +102,12 @@ func TestLargePaths(t *testing.T) {
 		},
 		{
 			Kind:  scene.Edge,
-			Parts: []scene.Part{{Path: new(scene.Path).MoveTo(-3000, 50).CubeTo(-1000, 50, 1000, 50, 3000, 50), Line: true}},
+			Parts: []scene.Part{{Path: new(scene.Path).MoveTo(-3000, 50).CubeTo(-1000, 50, 1000, 50, 3000, 50), Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.Of(style.Hex("#f00")), StrokeWidth: style.N(4)},
 		},
 		{
 			Kind:  scene.Edge,
-			Parts: []scene.Part{{Path: new(scene.Path).MoveTo(25, -3000).LineTo(25, 3000), Line: true}},
+			Parts: []scene.Part{{Path: new(scene.Path).MoveTo(25, -3000).LineTo(25, 3000), Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.Of(style.Hex("#0f0")), StrokeWidth: style.N(4), Dash: style.Dashes(1000, 1)},
 		},
 	}}

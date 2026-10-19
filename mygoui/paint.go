@@ -120,42 +120,52 @@ func Color(c style.Color, opacity float64) ui.Color {
 	return ui.Color{R: c.R, G: c.G, B: c.B, A: uint8(a)}
 }
 
-// Item draws an item as Paint does: its parts, its markers and its label.
+// Item draws an item as Paint does: its parts, its markers, its picture and its label.
 func (p *Painter) Item(it *scene.Item, s style.Resolved) {
 	p.Parts(it, s)
 	p.Ends(it, s)
+	p.Picture(it, s)
 	p.Label(it, s)
 }
 
-// Parts draws the parts of an item's outline: paths filled and stroked, boxes filled and
-// stroked with their corners rounded by the style's radius when they are Rounded, and
-// lines stroked only.
+// Parts draws the parts of an item's outline: paths and boxes, the boxes' corners rounded
+// by the style's radius when they are Rounded, each filled and stroked as its Paint says.
 func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
-	fill, stroke := Color(s.Fill, s.Opacity), Color(s.Stroke, s.Opacity)
 	for _, part := range it.Parts {
+		fill, stroke := Color(s.Fill, s.Opacity), Color(s.Stroke, s.Opacity)
+		switch part.Paint {
+		case scene.StrokeOnly:
+			fill = ui.Color{}
+		case scene.FillOnly:
+			stroke = ui.Color{}
+		case scene.Solid:
+			fill = Color(s.Line, s.Opacity)
+		}
 		if part.Rounded || part.Path == nil {
 			radius := 0.0
 			if part.Rounded {
 				radius = max(s.Radius, 0)
 			}
-			p.box(part.Box, radius, part.Line, fill, stroke, s)
+			p.box(part.Box, radius, fill, stroke, s)
 			continue
 		}
-		if !part.Line && fill.A > 0 {
+		if fill.A > 0 {
 			p.fill(part.Path, fill)
 		}
-		p.stroke(part.Path, stroke, s.StrokeWidth, s.Dash)
+		if stroke.A > 0 {
+			p.stroke(part.Path, stroke, s.StrokeWidth, s.Dash)
+		}
 	}
 }
 
 // box draws a box of an outline. MyGo strokes a box inside its edge, where SVG strokes it
 // about its edge: the box stroked is grown by half the stroke's width.
-func (p *Painter) box(b scene.Rect, radius float64, line bool, fill, stroke ui.Color, s style.Resolved) {
+func (p *Painter) box(b scene.Rect, radius float64, fill, stroke ui.Color, s style.Resolved) {
 	if b.W < 0 || b.H < 0 {
 		return
 	}
 	radius = min(radius, b.W/2, b.H/2)
-	if !line && fill.A > 0 {
+	if fill.A > 0 {
 		p.Fill(p.Rect(b), fill, p.Len(radius))
 	}
 	if stroke.A == 0 || !(s.StrokeWidth > 0) {
@@ -441,6 +451,7 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 	if c.A == 0 {
 		return
 	}
+	halo := Color(s.Halo, s.Opacity)
 	draw := func() {
 		cx, cy := it.At.X, it.At.Y
 		shift := l.Size * 0.35
@@ -466,6 +477,9 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 				case sp.Text != "":
 					glyphs, w := p.fonts.Shape(sp.Text, size, sp.Face)
 					gx, gy := p.Point(scene.Point{X: x + sp.Width/2, Y: y})
+					if halo.A > 0 && s.HaloWidth > 0 {
+						p.halo(glyphs, gx-w/2, gy, p.Len(s.HaloWidth/2), halo)
+					}
 					p.Glyphs(glyphs, gx-w/2, gy, c)
 				}
 				x += sp.Width
@@ -479,4 +493,23 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 		return
 	}
 	draw()
+}
+
+// halo draws glyphs about where they go, r away in sixteen directions, in a color: MyGo
+// strokes no text, and this is near what SVG's stroke of it looks like.
+func (p *Painter) halo(glyphs []ui.Glyph, x, y, r float32, c ui.Color) {
+	for i := range 16 {
+		a := float64(i) * math.Pi / 8
+		p.Glyphs(glyphs, x+r*float32(math.Cos(a)), y+r*float32(math.Sin(a)), c)
+	}
+}
+
+// Picture draws an item's picture: an icon, through Options.Icon, in the color of its text.
+// Images are left to an Options.Draw of the host's, which can load them.
+func (p *Painter) Picture(it *scene.Item, s style.Resolved) {
+	pic := it.Picture
+	if pic == nil || pic.Icon == "" || p.o.Icon == nil {
+		return
+	}
+	p.o.Icon(p.Painter, pic.Icon, p.Rect(pic.Box), Color(s.Text, s.Opacity))
 }

@@ -68,7 +68,7 @@ func hits(it *scene.Item, pt scene.Point, slop float64) bool {
 
 func linesOnly(it *scene.Item) bool {
 	for _, part := range it.Parts {
-		if !part.Line {
+		if part.Paint != scene.StrokeOnly {
 			return false
 		}
 	}

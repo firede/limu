@@ -135,3 +135,14 @@ func TestTextDefaultsToFg(t *testing.T) {
 		t.Errorf("got %+v", r)
 	}
 }
+
+func TestOver(t *testing.T) {
+	th := Default()
+	th.SurfaceAlt, th.Bg = Hex("#000"), Hex("#fff")
+	if c := SurfaceAlt.Alpha(0.75).Over(Bg).Color(th); c != (Color{64, 64, 64, 255}) {
+		t.Errorf("got %v", c)
+	}
+	if p := None.Over(Bg); p != None {
+		t.Errorf("none over anything is none: %v", p)
+	}
+}

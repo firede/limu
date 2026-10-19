@@ -71,8 +71,8 @@ func TitleCrossed(c Node, width, x float64, crossings Crossings) bool {
 // A title that an edge runs through is drawn over the edges, as Pele's struckTitle draws
 // it: the text on an outline StruckHalo wide, with round joins, in the color of the cluster
 // behind it, so that only the line is seen to stop short of the letters. Each cluster is
-// half its fill over what is behind it, so the color is the theme's accent, StruckTint
-// percent of it over the background.
+// half its fill over what is behind it, so the color is the theme's SurfaceAlt, StruckTint
+// percent of it over the background: style.SurfaceAlt.Alpha(StruckTint(d)/100).Over(style.Bg).
 const StruckHalo = 5
 
 // StruckDepth is how many clusters deep the cluster at index is, itself counted and no more
@@ -86,7 +86,7 @@ func StruckDepth(parent func(i int) int, index int) int {
 	return depth
 }
 
-// StruckTint is the percentage of the theme's accent in the outline of a struck title
+// StruckTint is the percentage of the theme's SurfaceAlt in the outline of a struck title
 // depth clusters deep.
 func StruckTint(depth int) float64 {
 	return 100 * (1 - math.Pow(0.5, float64(depth)))

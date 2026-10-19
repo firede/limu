@@ -28,30 +28,6 @@ const (
 // the label is drawn (above it, if DY is negative).
 type Size struct{ W, H, DY float64 }
 
-// Paint is how Pele paints a piece of a shape, where a scene.Part alone cannot say it.
-type Paint uint8
-
-const (
-	// PaintShape fills and strokes the piece in the shape's colors.
-	PaintShape Paint = iota
-	// PaintLine strokes the piece only: a detail on the shape, as the lid of a cylinder.
-	// Its Part has Line set.
-	PaintLine
-	// PaintSolid fills the piece in the color edges are drawn in, and strokes it in the
-	// shape's: the dot of a final state, the bar of a fork.
-	PaintSolid
-	// PaintFillOnly fills the piece and does not stroke it: the body of a datastore, which
-	// lines close at its top and bottom only.
-	PaintFillOnly
-)
-
-// A Piece is a part of a shape's outline and how it is painted. The scene's Part says
-// PaintShape and PaintLine; PaintSolid and PaintFillOnly need the item's style to say them.
-type Piece struct {
-	scene.Part
-	Paint Paint
-}
-
 // Kept clear at each end of a straight side, for the corner.
 const cornerClear = 12
 
@@ -171,7 +147,7 @@ func padded(extraW, extraH, dy float64) func(tw, th float64) Size {
 var shapes = map[string]*shapeDef{
 	"rect": {size: box, span: flat, draw: func(d *drawing, w, h float64) { d.rounded(-w/2, -h/2, w, h) }},
 	"rounded": {size: box, span: flat, draw: func(d *drawing, w, h float64) {
-		d.rect(-w/2, -h/2, w, h, min(12, h/2), PaintShape)
+		d.rect(-w/2, -h/2, w, h, min(12, h/2), scene.FillAndStroke)
 	}},
 	"stadium": {
 		inset: func(_, h float64, side int, t float64) float64 {
@@ -190,12 +166,12 @@ var shapes = map[string]*shapeDef{
 			h := th + 2*PadY
 			return Size{tw + float64(h*0.5) + 2*PadX - 8, h, 0}
 		},
-		draw: func(d *drawing, w, h float64) { d.rect(-w/2, -h/2, w, h, h/2, PaintShape) },
+		draw: func(d *drawing, w, h float64) { d.rect(-w/2, -h/2, w, h, h/2, scene.FillAndStroke) },
 	},
 	"fr-rect": {span: flat, size: padded(16, 0, 0), draw: func(d *drawing, w, h float64) {
 		x := w/2 - 8
 		d.rounded(-w/2, -h/2, w, h)
-		d.pen().M(-x, -h/2).V(h/2).M(x, -h/2).V(h / 2).done(PaintLine)
+		d.pen().M(-x, -h/2).V(h/2).M(x, -h/2).V(h / 2).done(scene.StrokeOnly)
 	}},
 	"cyl": {
 		inset: capInset,
@@ -213,8 +189,8 @@ var shapes = map[string]*shapeDef{
 		draw: func(d *drawing, w, h float64) {
 			rx, ry := w/2, capRY(w)
 			top, bottom := -h/2+ry, h/2-ry
-			d.pen().M(-rx, top).A(rx, ry, false, true, rx, top).V(bottom).A(rx, ry, false, true, -rx, bottom).Z().done(PaintShape)
-			d.pen().M(-rx, top).A(rx, ry, false, false, rx, top).done(PaintLine)
+			d.pen().M(-rx, top).A(rx, ry, false, true, rx, top).V(bottom).A(rx, ry, false, true, -rx, bottom).Z().done(scene.FillAndStroke)
+			d.pen().M(-rx, top).A(rx, ry, false, false, rx, top).done(scene.StrokeOnly)
 		},
 	},
 	"circle": {
@@ -224,7 +200,7 @@ var shapes = map[string]*shapeDef{
 			r := max(math.Sqrt(float64(tw*tw)+float64(th*th))+16, 44)
 			return Size{r, r, 0}
 		},
-		draw: func(d *drawing, w, _ float64) { d.circle(0, 0, w/2, PaintShape) },
+		draw: func(d *drawing, w, _ float64) { d.circle(0, 0, w/2, scene.FillAndStroke) },
 	},
 	"dbl-circ": {
 		inset: roundInset,
@@ -234,8 +210,8 @@ var shapes = map[string]*shapeDef{
 			return Size{r, r, 0}
 		},
 		draw: func(d *drawing, w, _ float64) {
-			d.circle(0, 0, w/2, PaintShape)
-			d.circle(0, 0, w/2-5, PaintLine)
+			d.circle(0, 0, w/2, scene.FillAndStroke)
+			d.circle(0, 0, w/2-5, scene.StrokeOnly)
 		},
 	},
 	"ellipse": {
@@ -244,7 +220,7 @@ var shapes = map[string]*shapeDef{
 		size: func(tw, th float64) Size {
 			return Size{float64(tw*1.3) + 2*PadX, float64(th*1.2) + 2*PadY, 0}
 		},
-		draw: func(d *drawing, w, h float64) { d.ellipse(0, 0, w/2, h/2, PaintShape) },
+		draw: func(d *drawing, w, h float64) { d.ellipse(0, 0, w/2, h/2, scene.FillAndStroke) },
 	},
 	"diam": {
 		inset: func(w, h float64, side int, t float64) float64 {
@@ -258,7 +234,7 @@ var shapes = map[string]*shapeDef{
 			a, b := tw+16, th+8
 			return Size{a + float64(1.6*b), a/1.6 + b, 0}
 		},
-		draw: func(d *drawing, w, h float64) { d.poly(PaintShape, 0, -h/2, w/2, 0, 0, h/2, -w/2, 0) },
+		draw: func(d *drawing, w, h float64) { d.poly(scene.FillAndStroke, 0, -h/2, w/2, 0, 0, h/2, -w/2, 0) },
 	},
 	"hex": {
 		inset: func(_, _ float64, side int, t float64) float64 {
@@ -279,7 +255,7 @@ var shapes = map[string]*shapeDef{
 		},
 		draw: func(d *drawing, w, h float64) {
 			m := h / 4
-			d.poly(PaintShape, -w/2+m, -h/2, w/2-m, -h/2, w/2, 0, w/2-m, h/2, -w/2+m, h/2, -w/2, 0)
+			d.poly(scene.FillAndStroke, -w/2+m, -h/2, w/2-m, -h/2, w/2, 0, w/2-m, h/2, -w/2+m, h/2, -w/2, 0)
 		},
 	},
 	"odd": {
@@ -296,20 +272,20 @@ var shapes = map[string]*shapeDef{
 		},
 		draw: func(d *drawing, w, h float64) {
 			notch := h / 4
-			d.poly(PaintShape, -w/2, -h/2, w/2, -h/2, w/2, h/2, -w/2, h/2, -w/2+notch, 0)
+			d.poly(scene.FillAndStroke, -w/2, -h/2, w/2, -h/2, w/2, h/2, -w/2, h/2, -w/2+notch, 0)
 		},
 	},
 	"lean-r": leaning(func(d *drawing, w, h, s float64) {
-		d.poly(PaintShape, -w/2+s, -h/2, w/2, -h/2, w/2-s, h/2, -w/2, h/2)
+		d.poly(scene.FillAndStroke, -w/2+s, -h/2, w/2, -h/2, w/2-s, h/2, -w/2, h/2)
 	}),
 	"lean-l": leaning(func(d *drawing, w, h, s float64) {
-		d.poly(PaintShape, -w/2, -h/2, w/2-s, -h/2, w/2, h/2, -w/2+s, h/2)
+		d.poly(scene.FillAndStroke, -w/2, -h/2, w/2-s, -h/2, w/2, h/2, -w/2+s, h/2)
 	}),
 	"trap-b": leaning(func(d *drawing, w, h, s float64) {
-		d.poly(PaintShape, -w/2+s, -h/2, w/2-s, -h/2, w/2, h/2, -w/2, h/2)
+		d.poly(scene.FillAndStroke, -w/2+s, -h/2, w/2-s, -h/2, w/2, h/2, -w/2, h/2)
 	}),
 	"trap-t": leaning(func(d *drawing, w, h, s float64) {
-		d.poly(PaintShape, -w/2, -h/2, w/2, -h/2, w/2-s, h/2, -w/2+s, h/2)
+		d.poly(scene.FillAndStroke, -w/2, -h/2, w/2, -h/2, w/2-s, h/2, -w/2+s, h/2)
 	}),
 	// Pele draws a text shape as a box with neither fill nor stroke, which shows nothing;
 	// here it has no pieces.
@@ -319,13 +295,13 @@ var shapes = map[string]*shapeDef{
 		draw: func(*drawing, float64, float64) {},
 	},
 	"sm-circ": {noLabel: true, inset: roundInset, span: roundSpan, size: fixed(14, 14),
-		draw: func(d *drawing, w, _ float64) { d.circle(0, 0, w/2, PaintShape) }},
+		draw: func(d *drawing, w, _ float64) { d.circle(0, 0, w/2, scene.FillAndStroke) }},
 	"f-circ": {noLabel: true, inset: roundInset, span: roundSpan, size: fixed(14, 14),
-		draw: func(d *drawing, w, _ float64) { d.circle(0, 0, w/2, PaintSolid) }},
+		draw: func(d *drawing, w, _ float64) { d.circle(0, 0, w/2, scene.Solid) }},
 	"fr-circ": {noLabel: true, inset: roundInset, span: roundSpan, size: fixed(18, 18),
 		draw: func(d *drawing, w, _ float64) {
-			d.circle(0, 0, w/2, PaintShape)
-			d.circle(0, 0, w/2-4, PaintSolid)
+			d.circle(0, 0, w/2, scene.FillAndStroke)
+			d.circle(0, 0, w/2-4, scene.Solid)
 		}},
 	"fork": {
 		noLabel: true,
@@ -336,23 +312,23 @@ var shapes = map[string]*shapeDef{
 			return w - 8
 		},
 		size: fixed(72, 8),
-		draw: func(d *drawing, w, h float64) { d.rect(-w/2, -h/2, w, h, 2, PaintSolid) },
+		draw: func(d *drawing, w, h float64) { d.rect(-w/2, -h/2, w, h, 2, scene.Solid) },
 	},
 	"notch-rect": {size: box, span: flat, draw: func(d *drawing, w, h float64) {
 		const c = 10
-		d.poly(PaintShape, -w/2+c, -h/2, w/2, -h/2, w/2, h/2, -w/2, h/2, -w/2, -h/2+c)
+		d.poly(scene.FillAndStroke, -w/2+c, -h/2, w/2, -h/2, w/2, h/2, -w/2, h/2, -w/2, -h/2+c)
 	}},
 	"lin-rect": {span: flat, size: padded(8, 0, 0), draw: func(d *drawing, w, h float64) {
 		d.rounded(-w/2, -h/2, w, h)
-		d.pen().M(-w/2+8, -h/2).V(h / 2).done(PaintLine)
+		d.pen().M(-w/2+8, -h/2).V(h / 2).done(scene.StrokeOnly)
 	}},
 	"div-rect": {span: flat, size: padded(0, 8, 4), draw: func(d *drawing, w, h float64) {
 		d.rounded(-w/2, -h/2, w, h)
-		d.pen().M(-w/2, -h/2+8).H(w / 2).done(PaintLine)
+		d.pen().M(-w/2, -h/2+8).H(w / 2).done(scene.StrokeOnly)
 	}},
 	"win-pane": {span: flat, size: padded(8, 8, 4), draw: func(d *drawing, w, h float64) {
 		d.rounded(-w/2, -h/2, w, h)
-		d.pen().M(-w/2+8, -h/2).V(h/2).M(-w/2, -h/2+8).H(w / 2).done(PaintLine)
+		d.pen().M(-w/2+8, -h/2).V(h/2).M(-w/2, -h/2+8).H(w / 2).done(scene.StrokeOnly)
 	}},
 	"tri": {
 		inset: func(w, _ float64, side int, _ float64) float64 {
@@ -362,7 +338,7 @@ var shapes = map[string]*shapeDef{
 			return 0
 		},
 		size: func(tw, th float64) Size { return triSize(tw, th, false) },
-		draw: func(d *drawing, w, h float64) { d.poly(PaintShape, 0, -h/2, w/2, h/2, -w/2, h/2) },
+		draw: func(d *drawing, w, h float64) { d.poly(scene.FillAndStroke, 0, -h/2, w/2, h/2, -w/2, h/2) },
 	},
 	"flip-tri": {
 		inset: func(w, _ float64, side int, _ float64) float64 {
@@ -372,14 +348,14 @@ var shapes = map[string]*shapeDef{
 			return 0
 		},
 		size: func(tw, th float64) Size { return triSize(tw, th, true) },
-		draw: func(d *drawing, w, h float64) { d.poly(PaintShape, -w/2, -h/2, w/2, -h/2, 0, h/2) },
+		draw: func(d *drawing, w, h float64) { d.poly(scene.FillAndStroke, -w/2, -h/2, w/2, -h/2, 0, h/2) },
 	},
 	"sl-rect": {inset: onSide(0, 5), size: padded(0, 10, 5), draw: func(d *drawing, w, h float64) {
-		d.poly(PaintShape, -w/2, -h/2+10, w/2, -h/2, w/2, h/2, -w/2, h/2)
+		d.poly(scene.FillAndStroke, -w/2, -h/2+10, w/2, -h/2, w/2, h/2, -w/2, h/2)
 	}},
 	"notch-pent": {span: flat, size: padded(0, 0, 0), draw: func(d *drawing, w, h float64) {
 		const c = 10
-		d.poly(PaintShape, -w/2+c, -h/2, w/2-c, -h/2, w/2, -h/2+c, w/2, h/2, -w/2, h/2, -w/2, -h/2+c)
+		d.poly(scene.FillAndStroke, -w/2+c, -h/2, w/2-c, -h/2, w/2, -h/2+c, w/2, h/2, -w/2, h/2, -w/2, -h/2+c)
 	}},
 	"hourglass": {
 		noLabel: true,
@@ -390,7 +366,9 @@ var shapes = map[string]*shapeDef{
 			return 0
 		},
 		size: fixed(32, 40),
-		draw: func(d *drawing, w, h float64) { d.poly(PaintShape, -w/2, -h/2, w/2, -h/2, -w/2, h/2, w/2, h/2) },
+		draw: func(d *drawing, w, h float64) {
+			d.poly(scene.FillAndStroke, -w/2, -h/2, w/2, -h/2, -w/2, h/2, w/2, h/2)
+		},
 	},
 	"delay": {
 		size: func(tw, th float64) Size {
@@ -399,7 +377,7 @@ var shapes = map[string]*shapeDef{
 		},
 		draw: func(d *drawing, w, h float64) {
 			r := h / 2
-			d.pen().M(-w/2, -r).H(w/2-r).A(r, r, false, true, w/2-r, r).H(-w / 2).Z().done(PaintShape)
+			d.pen().M(-w/2, -r).H(w/2-r).A(r, r, false, true, w/2-r, r).H(-w / 2).Z().done(scene.FillAndStroke)
 		},
 	},
 	"h-cyl": {
@@ -411,16 +389,16 @@ var shapes = map[string]*shapeDef{
 		draw: func(d *drawing, w, h float64) {
 			ry, rx := h/2, min(12, h/4)
 			l, r := -w/2+rx, w/2-rx
-			d.pen().M(l, -ry).H(r).A(rx, ry, false, true, r, ry).H(l).A(rx, ry, false, true, l, -ry).Z().done(PaintShape)
-			d.pen().M(r, -ry).A(rx, ry, false, false, r, ry).done(PaintLine)
+			d.pen().M(l, -ry).H(r).A(rx, ry, false, true, r, ry).H(l).A(rx, ry, false, true, l, -ry).Z().done(scene.FillAndStroke)
+			d.pen().M(r, -ry).A(rx, ry, false, false, r, ry).done(scene.StrokeOnly)
 		},
 	},
 	"cross-circ": {noLabel: true, inset: roundInset, span: roundSpan, size: fixed(44, 44),
 		draw: func(d *drawing, w, _ float64) {
 			r := w / 2
 			k := r * (math.Sqrt2 / 2)
-			d.circle(0, 0, r, PaintShape)
-			d.pen().M(-k, -k).L(k, k).M(k, -k).L(-k, k).done(PaintLine)
+			d.circle(0, 0, r, scene.FillAndStroke)
+			d.pen().M(-k, -k).L(k, k).M(k, -k).L(-k, k).done(scene.StrokeOnly)
 		}},
 	"st-rect": {
 		span: func(w, h float64, sideways bool) float64 {
@@ -440,18 +418,18 @@ var shapes = map[string]*shapeDef{
 	"doc": {inset: onSide(2, 10), size: padded(0, 10, -5), draw: func(d *drawing, w, h float64) { d.wave(w, h) }},
 	"flag": {inset: sides(0, 8), size: padded(0, 16, 0), draw: func(d *drawing, w, h float64) {
 		x, y, q := w/2, h/2-8, w/4
-		d.pen().M(-x, -y).q(q, -10, 2*q, 0).t(2*q, 0).V(y).q(-q, 10, -2*q, 0).t(-2*q, 0).Z().done(PaintShape)
+		d.pen().M(-x, -y).q(q, -10, 2*q, 0).t(2*q, 0).V(y).q(-q, 10, -2*q, 0).t(-2*q, 0).Z().done(scene.FillAndStroke)
 	}},
 	"datastore": {size: box, span: flat, draw: func(d *drawing, w, h float64) {
-		d.add(scene.Part{Box: scene.Rect{X: d.cx - w/2, Y: d.cy - h/2, W: w, H: h}}, PaintFillOnly)
-		d.pen().M(-w/2, -h/2).H(w/2).M(-w/2, h/2).H(w / 2).done(PaintLine)
+		d.add(scene.Part{Box: scene.Rect{X: d.cx - w/2, Y: d.cy - h/2, W: w, H: h}}, scene.FillOnly)
+		d.pen().M(-w/2, -h/2).H(w/2).M(-w/2, h/2).H(w / 2).done(scene.StrokeOnly)
 	}},
 	"folder": {
 		size: func(tw, th float64) Size { return Size{max(tw+2*PadX, 64), th + 2*PadY + 8, 4} },
 		draw: func(d *drawing, w, h float64) {
 			x, y := w/2, h/2
 			tab := min(w*0.4, 48)
-			d.pen().M(-x, -y).H(-x+tab).L(-x+tab+8, -y+8).H(x).V(y).H(-x).Z().done(PaintShape)
+			d.pen().M(-x, -y).H(-x+tab).L(-x+tab+8, -y+8).H(x).V(y).H(-x).Z().done(scene.FillAndStroke)
 		},
 	},
 	"bucket": {
@@ -466,8 +444,8 @@ var shapes = map[string]*shapeDef{
 			x, y := w/2, h/2
 			const ry = 5
 			taper := h / 6
-			d.pen().M(-x, -y+ry).A(x, ry, false, true, x, -y+ry).L(x-taper, y-ry).A(x-taper, ry, false, true, -x+taper, y-ry).Z().done(PaintShape)
-			d.pen().M(-x, -y+ry).A(x, ry, false, false, x, -y+ry).done(PaintLine)
+			d.pen().M(-x, -y+ry).A(x, ry, false, true, x, -y+ry).L(x-taper, y-ry).A(x-taper, ry, false, true, -x+taper, y-ry).Z().done(scene.FillAndStroke)
+			d.pen().M(-x, -y+ry).A(x, ry, false, false, x, -y+ry).done(scene.StrokeOnly)
 		},
 	},
 	"console": {
@@ -475,7 +453,7 @@ var shapes = map[string]*shapeDef{
 		size: func(tw, th float64) Size { return Size{max(tw+2*PadX, 72), th + 2*PadY + 12, 6} },
 		draw: func(d *drawing, w, h float64) {
 			d.rounded(-w/2, -h/2, w, h)
-			d.pen().M(-w/2, -h/2+12).H(w/2).M(-w/2+7, -h/2+4).l(3, 2.5).l(-3, 2.5).M(-w/2+13, -h/2+9).h(4).done(PaintLine)
+			d.pen().M(-w/2, -h/2+12).H(w/2).M(-w/2+7, -h/2+4).l(3, 2.5).l(-3, 2.5).M(-w/2+13, -h/2+9).h(4).done(scene.StrokeOnly)
 		},
 	},
 	"browser": {
@@ -483,9 +461,9 @@ var shapes = map[string]*shapeDef{
 		size: func(tw, th float64) Size { return Size{max(tw+2*PadX, 72), th + 2*PadY + 12, 6} },
 		draw: func(d *drawing, w, h float64) {
 			d.rounded(-w/2, -h/2, w, h)
-			d.pen().M(-w/2, -h/2+12).H(w / 2).done(PaintLine)
+			d.pen().M(-w/2, -h/2+12).H(w / 2).done(scene.StrokeOnly)
 			for i := range 3 {
-				d.circle(-w/2+8+float64(i*7), -h/2+6, 1.5, PaintLine)
+				d.circle(-w/2+8+float64(i*7), -h/2+6, 1.5, scene.StrokeOnly)
 			}
 		},
 	},
@@ -493,8 +471,8 @@ var shapes = map[string]*shapeDef{
 		size: func(tw, th float64) Size { return Size{max(tw+2*PadX, 56), th + 2*PadY + 26, 13} },
 		draw: func(d *drawing, w, h float64) {
 			top := -h / 2
-			d.rect(-w/2, top+26, w, h-26, 12, PaintShape)
-			d.circle(0, top+14, 13, PaintShape)
+			d.rect(-w/2, top+26, w, h-26, 12, scene.FillAndStroke)
+			d.circle(0, top+14, 13, scene.FillAndStroke)
 		},
 	},
 	"bang": {
@@ -511,7 +489,7 @@ var shapes = map[string]*shapeDef{
 				}
 				pts = append(pts, math.Cos(angle)*(w/2)*k, math.Sin(angle)*(h/2)*k)
 			}
-			d.poly(PaintShape, pts...)
+			d.poly(scene.FillAndStroke, pts...)
 		},
 	},
 	"cloud": {
@@ -524,7 +502,7 @@ var shapes = map[string]*shapeDef{
 				A(r, r, false, true, -x+r*0.6, -y*0.1).
 				A(x*0.42, y*0.7, false, true, -x*0.1, -y*0.72).
 				A(x*0.4, y*0.62, false, true, x*0.62, -y*0.42).
-				A(r*1.05, r*1.05, false, true, x-r, y).Z().done(PaintShape)
+				A(r*1.05, r*1.05, false, true, x-r, y).Z().done(scene.FillAndStroke)
 		},
 	},
 	// Pele draws the box of a brace with neither fill nor stroke; here it has no piece.
@@ -544,7 +522,7 @@ var shapes = map[string]*shapeDef{
 			return 0
 		},
 		draw: func(d *drawing, w, h float64) {
-			d.poly(PaintShape, w*0.15, -h/2, -w/2, h*0.08, -w*0.05, h*0.08, -w*0.15, h/2, w/2, -h*0.08, w*0.05, -h*0.08)
+			d.poly(scene.FillAndStroke, w*0.15, -h/2, -w/2, h*0.08, -w*0.05, h*0.08, -w*0.15, h/2, w/2, -h*0.08, w*0.05, -h*0.08)
 		},
 	},
 	"lin-cyl": {
@@ -563,8 +541,8 @@ var shapes = map[string]*shapeDef{
 		draw: func(d *drawing, w, h float64) {
 			rx, ry := w/2, capRY(w)
 			top, bottom := -h/2+ry, h/2-ry
-			d.pen().M(-rx, top).A(rx, ry, false, true, rx, top).V(bottom).A(rx, ry, false, true, -rx, bottom).Z().done(PaintShape)
-			d.pen().M(-rx, top).A(rx, ry, false, false, rx, top).M(-rx, top+8).A(rx, ry, false, false, rx, top+8).done(PaintLine)
+			d.pen().M(-rx, top).A(rx, ry, false, true, rx, top).V(bottom).A(rx, ry, false, true, -rx, bottom).Z().done(scene.FillAndStroke)
+			d.pen().M(-rx, top).A(rx, ry, false, false, rx, top).M(-rx, top+8).A(rx, ry, false, false, rx, top+8).done(scene.StrokeOnly)
 		},
 	},
 	"curv-trap": {
@@ -574,7 +552,7 @@ var shapes = map[string]*shapeDef{
 		},
 		draw: func(d *drawing, w, h float64) {
 			x, y, k := w/2, h/2, h*0.3
-			d.pen().M(-x+k, -y).H(x-k).A(k, y, false, true, x-k, y).H(-x+k).L(-x, 0).Z().done(PaintShape)
+			d.pen().M(-x+k, -y).H(x-k).A(k, y, false, true, x-k, y).H(-x+k).L(-x, 0).Z().done(scene.FillAndStroke)
 		},
 	},
 	"docs": {
@@ -601,20 +579,20 @@ var shapes = map[string]*shapeDef{
 		},
 		draw: func(d *drawing, w, h float64) {
 			x, y, k := w/2, h/2, h*0.2
-			d.pen().M(-x+k, -y).H(x).A(k, y, false, false, x, y).H(-x+k).A(k, y, false, true, -x+k, -y).Z().done(PaintShape)
+			d.pen().M(-x+k, -y).H(x).A(k, y, false, false, x, y).H(-x+k).A(k, y, false, true, -x+k, -y).Z().done(scene.FillAndStroke)
 		},
 	},
 	"tag-rect": {size: box, span: flat, draw: func(d *drawing, w, h float64) {
 		d.rounded(-w/2, -h/2, w, h)
-		d.pen().M(w/2-12, h/2).L(w/2, h/2-12).done(PaintLine)
+		d.pen().M(w/2-12, h/2).L(w/2, h/2-12).done(scene.StrokeOnly)
 	}},
 	"tag-doc": {size: padded(0, 10, -5), inset: onSide(2, 10), draw: func(d *drawing, w, h float64) {
 		d.wave(w, h)
-		d.pen().M(w/2-12, h/2-14).L(w/2, h/2-26).done(PaintLine)
+		d.pen().M(w/2-12, h/2-14).L(w/2, h/2-26).done(scene.StrokeOnly)
 	}},
 	"lin-doc": {size: padded(8, 10, -5), inset: onSide(2, 10), draw: func(d *drawing, w, h float64) {
 		d.wave(w, h)
-		d.pen().M(-w/2+8, -h/2).V(h/2 - 6).done(PaintLine)
+		d.pen().M(-w/2+8, -h/2).V(h/2 - 6).done(scene.StrokeOnly)
 	}},
 	"collapsedGroup": {size: padded(8, 8, -2), draw: func(d *drawing, w, h float64) {
 		d.rounded(-w/2+6, -h/2+8, w-12, h-8)
@@ -651,7 +629,7 @@ func ShapeSize(shape string, tw, th float64) Size {
 // each element Pele writes, in its order, but none for those it writes with neither fill
 // nor stroke, which show nothing. A text shape has no pieces. A shape of a name it does not
 // know is a rect.
-func Outline(shape string, cx, cy, w, h float64) []Piece {
+func Outline(shape string, cx, cy, w, h float64) []scene.Part {
 	s, ok := shapes[shape]
 	if !ok {
 		s = fallback
@@ -741,22 +719,22 @@ func InsetRoute(route []float64, at int, shape string, w, h float64, c Node) {
 // their own frame, centered on the origin, as Pele writes them.
 type drawing struct {
 	cx, cy float64
-	pieces []Piece
+	pieces []scene.Part
 }
 
-func (d *drawing) add(p scene.Part, paint Paint) {
-	p.Line = paint == PaintLine
-	d.pieces = append(d.pieces, Piece{p, paint})
+func (d *drawing) add(p scene.Part, paint scene.Painting) {
+	p.Paint = paint
+	d.pieces = append(d.pieces, p)
 }
 
 // rounded is a box with the corners of the theme's radius.
 func (d *drawing) rounded(x, y, w, h float64) {
-	d.add(scene.Part{Box: scene.Rect{X: d.cx + x, Y: d.cy + y, W: w, H: h}, Rounded: true}, PaintShape)
+	d.add(scene.Part{Box: scene.Rect{X: d.cx + x, Y: d.cy + y, W: w, H: h}, Rounded: true}, scene.FillAndStroke)
 }
 
 // rect is a box with corners rounded by rx, as SVG draws a rect with rx and no ry: the
 // corners are rx across and as much down, each made no larger than half the side.
-func (d *drawing) rect(x, y, w, h, rx float64, paint Paint) {
+func (d *drawing) rect(x, y, w, h, rx float64, paint scene.Painting) {
 	rx, ry := min(rx, w/2), min(rx, h/2)
 	if rx <= 0 {
 		d.poly(paint, x, y, x+w, y, x+w, y+h, x, y+h)
@@ -766,13 +744,13 @@ func (d *drawing) rect(x, y, w, h, rx float64, paint Paint) {
 		H(x+rx).A(rx, ry, false, true, x, y+h-ry).V(y+ry).A(rx, ry, false, true, x+rx, y).Z().done(paint)
 }
 
-func (d *drawing) circle(x, y, r float64, paint Paint) { d.ellipse(x, y, r, r, paint) }
+func (d *drawing) circle(x, y, r float64, paint scene.Painting) { d.ellipse(x, y, r, r, paint) }
 
-func (d *drawing) ellipse(x, y, rx, ry float64, paint Paint) {
+func (d *drawing) ellipse(x, y, rx, ry float64, paint scene.Painting) {
 	d.add(scene.Part{Path: new(scene.Path).Ellipse(d.cx+x, d.cy+y, rx, ry)}, paint)
 }
 
-func (d *drawing) poly(paint Paint, xy ...float64) {
+func (d *drawing) poly(paint scene.Painting, xy ...float64) {
 	at := make([]float64, len(xy))
 	for i, v := range xy {
 		if i%2 == 0 {
@@ -787,14 +765,14 @@ func (d *drawing) poly(paint Paint, xy ...float64) {
 // wave is a document: a box whose bottom runs in a wave, as Pele's wave draws it.
 func (d *drawing) wave(w, h float64) {
 	x, top, base, q := w/2, -h/2, h/2-10, w/4
-	d.pen().M(-x, top).H(x).V(base).q(-q, -12, -2*q, 0).t(-2*q, 0).Z().done(PaintShape)
+	d.pen().M(-x, top).H(x).V(base).q(-q, -12, -2*q, 0).t(-2*q, 0).Z().done(scene.FillAndStroke)
 }
 
 // brace is a curly brace at x, h high, opening to the right when dir is -1, as Pele's
 // brace draws it.
 func (d *drawing) brace(x, h, dir float64) {
 	y, k := h/2, 6*dir
-	d.pen().M(x, -y).q(k, 0, k, 6).V(-6).q(0, 6, k, 6).q(-k, 0, -k, 6).V(y-6).q(0, 6, -k, 6).done(PaintLine)
+	d.pen().M(x, -y).q(k, 0, k, 6).V(-6).q(0, 6, k, 6).q(-k, 0, -k, 6).V(y-6).q(0, 6, -k, 6).done(scene.StrokeOnly)
 }
 
 func (d *drawing) pen() *pen { return &pen{d: d, p: new(scene.Path)} }
@@ -867,7 +845,7 @@ func (p *pen) Z() *pen {
 	return p.at(p.x0, p.y0)
 }
 
-func (p *pen) done(paint Paint) { p.d.add(scene.Part{Path: p.p}, paint) }
+func (p *pen) done(paint scene.Painting) { p.d.add(scene.Part{Path: p.p}, paint) }
 
 // r2 is a number to hundredths, as Pele's num writes it.
 func r2(v float64) float64 { return jsRound(float64(v*100)) / 100 }

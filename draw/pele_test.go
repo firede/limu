@@ -424,7 +424,7 @@ func TestLabelPatchMatchesPele(t *testing.T) {
 type pt struct{ x, y float64 }
 
 type figure struct {
-	paint   Paint
+	paint   scene.Painting
 	rounded bool
 	box     scene.Rect
 	lines   [][]pt
@@ -614,16 +614,16 @@ func peleFigures(t *testing.T, svg string, x, y float64) []figure {
 			}
 			continue
 		}
-		f := figure{paint: PaintShape}
+		f := figure{paint: scene.FillAndStroke}
 		switch {
 		case a["fill"] == "none" && a["stroke"] == "none":
 			continue
 		case a["fill"] == "none":
-			f.paint = PaintLine
+			f.paint = scene.StrokeOnly
 		case a["fill"] == "var(--_l)":
-			f.paint = PaintSolid
+			f.paint = scene.Solid
 		case a["stroke"] == "none":
-			f.paint = PaintFillOnly
+			f.paint = scene.FillOnly
 		}
 		switch name {
 		case "rect":
@@ -662,7 +662,7 @@ func peleFigures(t *testing.T, svg string, x, y float64) []figure {
 }
 
 // pieceFigure flattens a piece of an outline.
-func pieceFigure(p Piece) figure {
+func pieceFigure(p scene.Part) figure {
 	f := figure{paint: p.Paint, rounded: p.Rounded, box: p.Box}
 	if p.Path == nil {
 		b := p.Box
@@ -755,8 +755,8 @@ func TestOutlinesMatchPele(t *testing.T) {
 		}
 		for i, piece := range pieces {
 			got, w := pieceFigure(piece), want[i]
-			if got.paint != w.paint || got.rounded != w.rounded || piece.Line != (w.paint == PaintLine) {
-				t.Errorf("%s: piece %d paint %v rounded %v line %v, Pele paint %v rounded %v", what, i, got.paint, got.rounded, piece.Line, w.paint, w.rounded)
+			if got.paint != w.paint || got.rounded != w.rounded {
+				t.Errorf("%s: piece %d paint %v rounded %v, Pele paint %v rounded %v", what, i, got.paint, got.rounded, w.paint, w.rounded)
 			}
 			if w.rounded {
 				b, wb := piece.Box, w.box

@@ -35,7 +35,7 @@ func Flowchart(m text.Measurer) *scene.Scene {
 			},
 			{
 				Kind: scene.Edge, Role: "flowchart.edge", ID: "L_A_B_0",
-				Parts: []scene.Part{{Path: edge, Line: true}},
+				Parts: []scene.Part{{Path: edge, Paint: scene.StrokeOnly}},
 				Ends:  [2]scene.Marker{{}, {Type: "arrow_point", At: scene.Point{X: 100, Y: 120}, DY: 1}},
 				Style: style.Style{Stroke: style.Line, Fill: style.None},
 			},
@@ -102,12 +102,12 @@ func Features(m text.Measurer) *scene.Scene {
 			},
 			{
 				Kind: scene.Mark, Role: "sequence.lifeline", ID: "life",
-				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(40, 40).LineTo(40, 296), Line: true}},
+				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(40, 40).LineTo(40, 296), Paint: scene.StrokeOnly}},
 				Style: style.Style{Stroke: style.Line, Dash: style.Dashes(3, 3)},
 			},
 			{
 				Kind: scene.Edge, Role: "test.edge", ID: "dashed",
-				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(70, 50).CubeTo(120, 30, 200, 80, 250, 50), Line: true}},
+				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(70, 50).CubeTo(120, 30, 200, 80, 250, 50), Paint: scene.StrokeOnly}},
 				Route: []scene.Point{{X: 70, Y: 50}, {X: 250, Y: 50}},
 				Ends: [2]scene.Marker{
 					{Type: "arrow_cross", At: scene.Point{X: 70, Y: 50}, DX: sdx, DY: sdy},
@@ -117,7 +117,7 @@ func Features(m text.Measurer) *scene.Scene {
 			},
 			{
 				Kind: scene.Edge, Role: "test.edge", ID: "arrow",
-				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(90, 100).CubeTo(90, 150, 180, 120, 180, 163), Line: true}},
+				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(90, 100).CubeTo(90, 150, 180, 120, 180, 163), Paint: scene.StrokeOnly}},
 				Route: []scene.Point{{X: 90, Y: 100}, {X: 180, Y: 163}},
 				Ends:  [2]scene.Marker{{}, {Type: "arrow_point", At: scene.Point{X: 180, Y: 170}, DY: 1}},
 				Style: style.Style{Stroke: style.Line, Fill: style.None},
@@ -152,7 +152,7 @@ func Features(m text.Measurer) *scene.Scene {
 			},
 			{
 				Kind: scene.Mark, Role: "test.guide",
-				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(120, 196).LineTo(120, 300), Line: true}},
+				Parts: []scene.Part{{Path: new(scene.Path).MoveTo(120, 196).LineTo(120, 300), Paint: scene.StrokeOnly}},
 				Style: style.Style{Stroke: style.Critical},
 			},
 			{

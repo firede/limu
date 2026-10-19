@@ -1,6 +1,7 @@
 package draw
 
 import (
+	"github.com/firede/limu/layout"
 	"math"
 	"slices"
 
@@ -79,13 +80,6 @@ func OwnReach(trim float64) float64 {
 		return trim + Lead
 	}
 	return 0
-}
-
-// ease is how far along the flow the handles of a plain S reach, as a share of the way it
-// travels along it. It is Pele's ease, of layout/layered.ts, copied here until the layout
-// package has it; then this should call layout.Ease.
-func ease(across, along float64) float64 {
-	return max(0.25, min(0.5, (4*math.Abs(along))/(jsOr1(math.Abs(across)))))
 }
 
 // RoutePath is the path of a route of x, y, axis triples, trimmed at each end to leave
@@ -212,7 +206,7 @@ func RoutePath(route []float64, curve string, startTrim, endTrim, startReach, en
 			if down {
 				run, across = across, run
 			}
-			k := float64(math.Abs(run) * ease(across, run))
+			k := float64(math.Abs(run) * layout.Ease(across, run))
 			var ux, uy float64
 			if down {
 				uy = float64(jsSign(run) * k)

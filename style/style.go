@@ -6,6 +6,7 @@ type Paint struct {
 	token Token
 	color Color   // when token is custom
 	alpha float32 // a factor on the color's alpha; 0 is 1
+	base  Token   // the color it is laid over, to be opaque, when set
 }
 
 // The colors of the theme, and None, which draws nothing.
@@ -38,6 +39,19 @@ func (p Paint) Alpha(a float64) Paint {
 	}
 	return p
 }
+
+// Over is the paint laid over a color of the theme: an opaque color, the paint's color at
+// its opacity mixed into base's, as CSS's color-mix does in sRGB. It is for what must hide
+// what is under it in the color it would seem to have there: a title's halo over a group.
+func (p Paint) Over(base Paint) Paint {
+	if p.Visible() && base.token > custom {
+		p.base = base.token
+	}
+	return p
+}
+
+// Base is the token of the color the paint is laid over, if it is.
+func (p Paint) Base() Token { return p.base }
 
 // Set reports whether the paint was set: an unset one takes what is under it.
 func (p Paint) Set() bool { return p.token != unset }
@@ -72,6 +86,12 @@ func (p Paint) Color(th *Theme) Color {
 	}
 	if p.alpha != 0 {
 		c.A = uint8(float32(c.A)*p.alpha + 0.5)
+	}
+	if p.base != unset {
+		b := th.Color(p.base)
+		t := float64(c.A) / 255
+		mix := func(x, y uint8) uint8 { return uint8(float64(x)*t + float64(y)*(1-t) + 0.5) }
+		c = Color{mix(c.R, b.R), mix(c.G, b.G), mix(c.B, b.B), 255}
 	}
 	return c
 }
@@ -123,6 +143,10 @@ type Style struct {
 	Radius      Num // of the corners of a box that takes the theme's
 	Dash        Dash
 	Opacity     Num // of the whole part
+	// Halo is drawn about the letters of the part's text, HaloWidth wide, so that lines
+	// under the text stop short of it: the title of a group an edge runs through.
+	Halo      Paint
+	HaloWidth Num
 }
 
 // Over is s laid over base: what s sets, and what base sets where s does not.
@@ -147,6 +171,12 @@ func (s Style) Over(base Style) Style {
 	}
 	if !s.Opacity.set {
 		s.Opacity = base.Opacity
+	}
+	if !s.Halo.Set() {
+		s.Halo = base.Halo
+	}
+	if !s.HaloWidth.set {
+		s.HaloWidth = base.HaloWidth
 	}
 	return s
 }
@@ -197,10 +227,13 @@ func (l *Look) ThemeOrDefault() *Theme {
 // Resolved is a style with its colors and measures settled, ready to draw.
 type Resolved struct {
 	Fill, Stroke, Text Color // alpha 0 draws nothing
+	Line               Color // the theme's color of lines, for parts painted solid
 	StrokeWidth        float64
 	Radius             float64
 	Dash               []float64 // none for a solid line
 	Opacity            float64
+	Halo               Color // alpha 0 draws none
+	HaloWidth          float64
 }
 
 // Resolve settles a part's style in the look.
@@ -211,9 +244,12 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 		Fill:        s.Fill.Color(th),
 		Stroke:      s.Stroke.Color(th),
 		Text:        s.Text.Color(th),
+		Line:        th.Line,
 		StrokeWidth: s.StrokeWidth.v,
 		Radius:      s.Radius.v,
 		Dash:        s.Dash.v,
 		Opacity:     s.Opacity.Or(1),
+		Halo:        s.Halo.Color(th),
+		HaloWidth:   s.HaloWidth.Or(0),
 	}
 }

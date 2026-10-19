@@ -56,7 +56,7 @@ func sample() *scene.Scene {
 			},
 			{
 				Kind: scene.Edge, Role: "flowchart.edge", ID: "L_A_B_0",
-				Parts: []scene.Part{{Path: edge, Line: true}},
+				Parts: []scene.Part{{Path: edge, Paint: scene.StrokeOnly}},
 				Ends:  [2]scene.Marker{{}, {Type: "arrow_point", At: scene.Point{X: 100, Y: 120}, DY: 1}},
 				Style: style.Style{Stroke: style.Line, Fill: style.None},
 			},

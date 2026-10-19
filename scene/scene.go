@@ -69,11 +69,22 @@ type Item struct {
 	Align  Align
 	Rotate float64
 
+	// Picture is an image or an icon the part shows, as a flowchart's node may.
+	Picture *Picture
+
 	Style  style.Style // the diagram's own
 	Author style.Style // what the author set with classDef and style lines
 
 	Link    string // where the part leads, when it is a link
 	Tooltip string
+}
+
+// A Picture is an image, or an icon by name, drawn in a box.
+type Picture struct {
+	Image string // the image's address, checked as the diagram's options allow
+	Icon  string // or the icon's name, as "fa:fa-car", drawn in the color of text
+	Box   Rect
+	Fit   bool // the image keeps its proportions in the box; it fills it otherwise
 }
 
 // Align is where a label's lines are about the point it is drawn at, across; down, the
@@ -92,9 +103,25 @@ type Part struct {
 	Path    *Path
 	Box     Rect
 	Rounded bool
-	// Line is drawn with the stroke only, as a detail on the shape: the lid of a cylinder.
-	Line bool
+	Paint   Painting
 }
+
+// Painting is how a part is painted in its item's style.
+type Painting uint8
+
+const (
+	// FillAndStroke fills the part and strokes its outline.
+	FillAndStroke Painting = iota
+	// StrokeOnly strokes the part only: an edge, or a detail on a shape, as the lid of a
+	// cylinder.
+	StrokeOnly
+	// FillOnly fills the part and does not stroke it: the body of a datastore, which lines
+	// close at its top and bottom only.
+	FillOnly
+	// Solid fills the part in the theme's color of lines, and strokes it: the dot of a final
+	// state, the bar of a fork.
+	Solid
+)
 
 // A MarkerType is the kind of marker at an end of an edge, by Mermaid's names:
 // "arrow_point", "arrow_circle", "arrow_cross"… The empty one is no marker.
