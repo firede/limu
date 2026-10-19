@@ -7,6 +7,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -289,7 +290,7 @@ func fillStyle(fill string, written bool) (style.Style, style.Style) {
 	if !written {
 		return style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5)}, style.Style{}
 	}
-	return style.Style{Fill: style.SurfaceAlt}, style.Declarations([]string{"fill:" + fill}).Style
+	return style.Style{Fill: style.SurfaceAlt}, css.Declarations([]string{"fill:" + fill}).Style
 }
 
 // Layout lays a sequence diagram out as a scene, as Pele's renderSequence draws it: loosely,

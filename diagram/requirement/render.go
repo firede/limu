@@ -7,6 +7,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
@@ -49,7 +50,7 @@ type row struct {
 // A view is a requirement or an element as it is drawn: Pele's NodeView.
 type view struct {
 	node       *GraphNode
-	author     style.Author
+	author     css.Author
 	kind, name text.Label
 	rows       []row
 	keyWidth   float64
@@ -194,7 +195,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for i := range graph.Nodes {
 		node := &graph.Nodes[i]
-		author := style.Declarations(node.CSSStyles)
+		author := css.Declarations(node.CSSStyles)
 		var base text.Face
 		if author.Bold {
 			base |= text.Bold
@@ -451,7 +452,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 
 // textItem is a text of a box beside its name: its kind, or a field's name or value, drawn
 // about x, y in the color own and the color of text its author gave the box.
-func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, own style.Paint, author style.Author) scene.Item {
+func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, own style.Paint, author css.Author) scene.Item {
 	box := scene.Rect{X: x - l.Width/2, Y: y - l.Height/2, W: l.Width, H: l.Height}
 	if align == scene.Start {
 		box.X = x

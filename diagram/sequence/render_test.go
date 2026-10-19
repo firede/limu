@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/layout"
@@ -124,7 +125,7 @@ func authorFill(line string) string {
 		return line
 	}
 	rest := line[at+len(" author=")+int(dec.InputOffset()):]
-	if fill := style.Declarations([]string{"fill:" + value}).Style.Fill; fill.Set() {
+	if fill := css.Declarations([]string{"fill:" + value}).Style.Fill; fill.Set() {
 		return line[:at] + " author=" + fmt.Sprint(fill) + rest
 	}
 	return line[:at] + rest

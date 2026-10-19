@@ -7,6 +7,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
@@ -48,7 +49,7 @@ const (
 type view struct {
 	node       *GraphNode
 	kind       int
-	author     style.Author
+	author     css.Author
 	label      text.Label
 	stereotype text.Label
 	w, h       float64
@@ -448,7 +449,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var base text.Face
 		if author.Bold {
 			base |= text.Bold
@@ -798,9 +799,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		ce := &cedges[i]
 		edge := drawn[i]
 		label := &edgeLabels[i]
-		var author style.Author
+		var author css.Author
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
-			author = style.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
+			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
 			// What styles an edge's line styles its markers, and fills nothing.
 			author.Style.Fill = style.Paint{}
 		}

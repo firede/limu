@@ -52,7 +52,7 @@ func Flowchart(m text.Measurer) *scene.Scene {
 				Parts: []scene.Part{{Rounded: true, Box: scene.Rect{X: 60, Y: 40, W: 80, H: 40}}},
 				Label: start, At: scene.Point{X: 100, Y: 60},
 				Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
-				Author: style.Declarations([]string{"fill:#f9f", "stroke-width:2px"}).Style,
+				Author: style.Style{Fill: style.Of(style.Hex("#f9f")), StrokeWidth: style.N(2)},
 				Link:   "https://example.com/?a=1&b=2", Tooltip: "Where it starts",
 			},
 			{

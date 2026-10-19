@@ -7,6 +7,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
@@ -79,7 +80,7 @@ var roles = [...]scene.Role{
 type view struct {
 	node     *GraphNode
 	kind     kind
-	author   style.Author
+	author   css.Author
 	hasStyle bool
 	label    text.Label
 	lines    []text.Label
@@ -325,7 +326,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold

@@ -6,6 +6,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
@@ -39,7 +40,7 @@ type Variant struct {
 	// DrawGroup, if set, draws a top-level group in place of a cluster: c is the group as it
 	// was laid out, label its title, author what its author set for it, and dir the
 	// direction the diagram was laid out in.
-	DrawGroup func(c *graphs.CNode, label *text.Label, author style.Author, classes []string, id string, dir graphs.Dir) scene.Item
+	DrawGroup func(c *graphs.CNode, label *text.Label, author css.Author, classes []string, id string, dir graphs.Dir) scene.Item
 }
 
 // Layout lays out a parsed flowchart as a scene, as Pele's renderFlowchart draws it: across
@@ -87,7 +88,7 @@ func assetSize(v *float64, fallback float64) float64 {
 // A view is a node as it is drawn: Pele's NodeView.
 type view struct {
 	node   *GraphNode
-	author style.Author
+	author css.Author
 	label  text.Label
 	shape  string
 	w, h   float64
@@ -143,7 +144,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold
@@ -480,9 +481,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		ce := &cedges[i]
 		edge := drawn[i]
 		label := &edgeLabels[i]
-		var author style.Author
+		var author css.Author
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
-			author = style.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
+			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
 			// What styles an edge's line styles its markers, and fills nothing.
 			author.Style.Fill = style.Paint{}
 		}

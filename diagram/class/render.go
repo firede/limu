@@ -7,6 +7,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/chars"
@@ -70,7 +71,7 @@ type line struct {
 // A view is a node as it is drawn: Pele's View.
 type view struct {
 	node        *GraphNode
-	author      style.Author
+	author      css.Author
 	label       text.Label
 	w, h        float64
 	loops       int
@@ -789,7 +790,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 // classStyle is what the author set for a class: the declarations of the classDefs of its
 // classes, and then its own. Pele's classStyle keeps the last declaration of each property
 // that has an effect and resolves those, which comes to the same.
-func classStyle(db *DB, cls *Class) style.Author {
+func classStyle(db *DB, cls *Class) css.Author {
 	var decls []string
 	for _, name := range strings.Split(cls.CSSClasses, " ") {
 		if def := db.styleClasses[name]; def != nil {
@@ -798,7 +799,7 @@ func classStyle(db *DB, cls *Class) style.Author {
 			}
 		}
 	}
-	return style.Declarations(append(decls, cls.Styles...))
+	return css.Declarations(append(decls, cls.Styles...))
 }
 
 // classItems draws a class centered on x, y, as Pele's classSvg does: the box, with its

@@ -7,6 +7,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
@@ -69,7 +70,7 @@ func userStyle(fill, stroke, color string) style.Style {
 	if decls == nil {
 		return style.Style{}
 	}
-	return style.Declarations(decls).Style
+	return css.Declarations(decls).Style
 }
 
 // unhide puts back the `#name;` that entity encoding hid in an address as ﬂ°°name¶ß, as

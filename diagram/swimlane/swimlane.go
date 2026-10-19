@@ -13,6 +13,7 @@ package swimlane
 import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/flowchart"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -89,7 +90,7 @@ func prepare(g *flowchart.Graph) {
 // drawLane draws a lane, as Pele's drawLane does: an outline the length of the diagram, with
 // its title in a band at the start. Where the lanes run across, the band is at their left
 // and the title is turned to read upwards.
-func drawLane(c *graphs.CNode, label *text.Label, author style.Author, classes []string, id string, dir graphs.Dir) scene.Item {
+func drawLane(c *graphs.CNode, label *text.Label, author css.Author, classes []string, id string, dir graphs.Dir) scene.Item {
 	left := c.X - c.W/2
 	top := c.Y - c.H/2
 	sideways := dir == graphs.LR || dir == graphs.RL

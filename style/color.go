@@ -218,3 +218,21 @@ var namedColors = map[string]Color{
 	"white": {255, 255, 255, 255}, "whitesmoke": {245, 245, 245, 255}, "yellow": {255, 255, 0, 255},
 	"yellowgreen": {154, 205, 50, 255},
 }
+
+// cssTrim is s without the white space of CSS about it: spaces, tabs, line feeds, carriage
+// returns and form feeds. A browser reads a value Pele writes with these and no others;
+// what JavaScript's trim takes off besides, as a no-break space, was taken off before.
+func cssTrim(s string) string { return strings.Trim(s, " \t\n\r\f") }
+
+// lowerASCII is s with its ASCII letters in lower case and its other letters as they are, as
+// CSS compares keywords, and as a regular expression's i flag without u compares the ASCII
+// letters of a pattern.
+func lowerASCII(s string) string {
+	b := []byte(s)
+	for i, c := range b {
+		if 'A' <= c && c <= 'Z' {
+			b[i] = c + 'a' - 'A'
+		}
+	}
+	return string(b)
+}

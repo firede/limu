@@ -7,6 +7,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
@@ -90,7 +91,7 @@ type row struct {
 // A view is an entity or a subgraph as it is drawn: Pele's NodeView.
 type view struct {
 	node   *GraphNode
-	author style.Author
+	author css.Author
 	label  text.Label
 	w, h   float64
 	headH  float64
@@ -203,7 +204,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold

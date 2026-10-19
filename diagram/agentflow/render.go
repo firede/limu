@@ -7,6 +7,7 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/flowchart"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
@@ -69,7 +70,7 @@ func numberOption(config diagram.Config, key string, fallback float64) float64 {
 // A view is a node as it is drawn: Pele's NodeView.
 type view struct {
 	node   *GraphNode
-	author style.Author
+	author css.Author
 	label  text.Label
 	shape  string
 	w, h   float64
@@ -134,7 +135,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold
@@ -184,7 +185,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			v = view{node: node, author: author, label: label, shape: shape, w: s.W, h: s.H, dy: s.DY}
 			c = graphs.NewCNode(s.W, s.H, -1)
 		}
-		v.filled = style.FillDeclared(decls)
+		v.filled = css.FillDeclared(decls)
 		c.Seq = float64(len(views))
 		views = append(views, v)
 		cnodes = append(cnodes, c)
@@ -526,9 +527,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 	// put adds an edge and its label, as Pele's put draws them; route, which Pele does not
 	// have, is the route the edge was laid out along.
 	put := func(edge *GraphEdge, label *text.Label, path draw.EdgePath, route []float64, x, y float64) {
-		var author style.Author
+		var author css.Author
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
-			author = style.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
+			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
 			// What styles an edge's line styles its marker, and fills nothing.
 			author.Style.Fill = style.Paint{}
 		}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
@@ -633,9 +634,9 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			Style: style.Style{Fill: style.Accent, Stroke: style.Accent, StrokeWidth: style.N(2)},
 		}
 		decls := strings.Split(db.TodayMarker, ",")
-		if db.TodayMarker != "" && style.LineDeclared(decls) {
+		if db.TodayMarker != "" && css.LineDeclared(decls) {
 			// The author's style is that of a line: it fills nothing and colors no text.
-			author := style.Declarations(decls).Style
+			author := css.Declarations(decls).Style
 			author.Fill, author.Text = style.Paint{}, style.Paint{}
 			it.Author = author
 		} else {
