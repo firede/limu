@@ -62,3 +62,37 @@ func TestAuthorOpacitiesAsPele(t *testing.T) {
 		}
 	}
 }
+
+// A self-loop has a route, as every edge has: the corners its curve is drawn about, from
+// where it leaves its node to where it comes back.
+func TestSelfLoopRoutes(t *testing.T) {
+	for _, src := range []string{
+		"flowchart LR\n  A --> A",
+		"stateDiagram-v2\n  a --> a",
+		"classDiagram\n  A --> A",
+		"erDiagram\n  A ||--o{ A : self",
+		"requirementDiagram\n  requirement r {\n  id: 1\n  }\n  r - contains -> r",
+		"block\n  a\n  a --> a",
+		"C4Context\n  Person(a, \"A\")\n  Rel(a, a, \"self\")",
+	} {
+		sc, err := limu.Layout(src, nil)
+		if err != nil {
+			t.Fatalf("%q: %v", src, err)
+		}
+		edges := 0
+		for i := range sc.Items {
+			it := &sc.Items[i]
+			if it.Kind != scene.Edge {
+				continue
+			}
+			edges++
+			p := it.Parts[0].Path
+			if len(it.Route) < 2 || it.Route[0] != (scene.Point{X: p.Args[0], Y: p.Args[1]}) || it.Route[len(it.Route)-1] != p.Last() {
+				t.Errorf("%q: %s route %v, path %v", src, it.Role, it.Route, p.Args)
+			}
+		}
+		if edges == 0 {
+			t.Errorf("%q: no edge", src)
+		}
+	}
+}

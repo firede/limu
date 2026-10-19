@@ -281,6 +281,10 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		for k := 0; k+1 < len(r.points); k += 2 {
 			it.Route = append(it.Route, scene.Point{X: r.points[k], Y: r.points[k+1]})
 		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
+		}
 		if startArrow {
 			it.Ends[0] = scene.Marker{Type: "arrow_point", At: scene.Point{X: r.sx, Y: r.sy}, DX: r.sdx, DY: r.sdy}
 		}

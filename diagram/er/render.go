@@ -546,6 +546,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if edge.Pattern == "dashed" {
 			own.Dash = style.Dashes(4, 3)
 		}
+		if len(route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			route = path.Corners()
+		}
 		edges = append(edges, scene.Item{
 			Kind: scene.Edge, Role: RoleRelationship, ID: edge.ID,
 			Box:   path.Bounds(),

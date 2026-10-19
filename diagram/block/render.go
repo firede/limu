@@ -844,6 +844,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		for k := 0; k+1 < len(r.points); k += 2 {
 			it.Route = append(it.Route, scene.Point{X: r.points[k], Y: r.points[k+1]})
 		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
+		}
 		edges = append(edges, it)
 		if r.label.Width > 0 {
 			x := r.lx + ox

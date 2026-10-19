@@ -213,3 +213,14 @@ func (p *Path) Bounds() Rect {
 	}
 	return Rect{x0, y0, x1 - x0, y1 - y0}
 }
+
+// Corners are the path's points and the control points of its curves, in order: the line
+// its curves are drawn about, which runs straight between them. It is the route of an edge
+// whose layout gives it none, as a self-loop: the curve out of its node and back.
+func (p *Path) Corners() []Point {
+	out := make([]Point, 0, len(p.Args)/2)
+	for i := 0; i+1 < len(p.Args); i += 2 {
+		out = append(out, Point{p.Args[i], p.Args[i+1]})
+	}
+	return out
+}
