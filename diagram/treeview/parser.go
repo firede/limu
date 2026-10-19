@@ -104,37 +104,6 @@ func wordRun(s string, i int) int {
 	return i
 }
 
-// accDescrScanner matches what common.AccDescrToken does, as Pele's accDescr scanner does:
-// once the braced form finds no closing brace, there is none further on, and later braced
-// descriptions fail without scanning the rest of the text again.
-func accDescrScanner() func(string, int) int {
-	unclosed := false
-	// braced reports whether the head of the braced form, [\t ]*accDescr\s*{, is at byte at,
-	// and not the head of the form with a colon.
-	braced := func(s string, at int) bool {
-		i := blanks(s, at)
-		if !strings.HasPrefix(s[i:], "accDescr") {
-			return false
-		}
-		i += len("accDescr")
-		if j := blanks(s, i); j < len(s) && s[j] == ':' {
-			return false
-		}
-		i = chars.SpaceRun(s, i)
-		return i < len(s) && s[i] == '{'
-	}
-	return func(s string, at int) int {
-		if unclosed && braced(s, at) {
-			return -1
-		}
-		end := common.AccDescrToken.Match(s, at)
-		if end < 0 && braced(s, at) {
-			unclosed = true
-		}
-		return end
-	}
-}
-
 // keyword is Pele's keyword('treeView-beta'), with a name that runs on longer taking its
 // place.
 var keyword = func() common.TokenType {
@@ -146,7 +115,7 @@ var keyword = func() common.TokenType {
 // treeViewTokens is Pele's TREEVIEW_TOKENS.
 var treeViewTokens = []common.TokenType{
 	keyword,
-	{Name: "ACC_DESCR", First: "\t a", Scanner: accDescrScanner},
+	common.AccDescr("ACC_DESCR"),
 	common.AccTitleToken,
 	common.TitleToken,
 	// /[ \t]+:::[ \t]*[A-Za-z_][\w-]*/y

@@ -32,22 +32,13 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	return common.TurnToFit(o, func(down bool) *scene.Scene { return draw(m, config, o, down) })
 }
 
-// line is a label of one line of text, measured, in a size of type.
-func line(s string, width, size float64) text.Label {
-	lh := jsmath.Round(size * text.LineHeight)
-	return text.Label{
-		Lines:  [][]text.Span{{{Text: s, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lh, Size: size, LineHeight: lh,
-	}
-}
-
 // draw lays the packet out across, or down, as Pele's draw does.
 func draw(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.Scene {
 	size := o.Size()
 	labelSize := jsmath.Round(size * 0.875)
 	bitSize := jsmath.Round(size * 0.625)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 
 	section, _ := config["packet"].(diagram.Config)
 	rowHeight := packetOption(config, "rowHeight", 32, 1, 400)
@@ -204,8 +195,8 @@ func draw(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.
 				l := labels[index][k]
 				field.Label = &l
 			} else if f, ok := fit(b.Label, w-6); ok && f.Size <= rowHeight {
-				l := line(f.Text, f.Width, f.Size)
-				field.Label = &l
+				l := common.Line(f.Text, f.Width, f.Size, 0)
+				field.Label = l
 			}
 			fields = append(fields, field)
 			if !showBits {
@@ -217,9 +208,9 @@ func draw(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.
 			}
 			number := func(n, at float64, align scene.Align) {
 				s := chars.NumberString(n)
-				l := line(s, measure.Width(s, bitSize, 0), bitSize)
+				l := common.Line(s, measure.Width(s, bitSize, 0), bitSize, 0)
 				bits = append(bits, scene.Item{
-					Kind: scene.Text, Role: RoleBit, Label: &l, Align: align,
+					Kind: scene.Text, Role: RoleBit, Label: l, Align: align,
 					// The number's baseline is 4 above the row.
 					At:    scene.Point{X: at, Y: y - 4 - float64(bitSize*0.35)},
 					Style: style.Style{Text: style.Muted},

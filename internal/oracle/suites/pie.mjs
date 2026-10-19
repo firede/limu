@@ -3,9 +3,9 @@
 // tree with the title the text's front matter gives. The cases are Mermaid's documentation and
 // specs, the inputs of Pele's own tests, cases written here, random charts, and all of those
 // mutated at random.
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/pie/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -192,36 +192,15 @@ export const WRITTEN = [
   'not a pie',
 ];
 
-// Strings in the sources of a folder of Pele's tests that hold the keyword, as Pele's
-// loadCorpus and loadTestStrings collect them, from files whose names match.
-function testStrings(pele, dir, files) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/pie/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
-
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests, its
 // seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/pie-docs.json'), 'utf8'));
   return [
     ...new Set([
-      ...docs,
-      ...testStrings(pele, 'tests/compat/pie', /\.spec\.[jt]s$/),
-      ...testStrings(pele, 'tests/compat/pie', /\.test\.[jt]s$/),
-      ...testStrings(pele, 'tests/render', /^pie.*\.test\.ts$/),
+      ...docs(pele, 'pie'),
+      ...testStrings(pele, 'tests/compat/pie', /\.spec\.[jt]s$/, /pie/),
+      ...testStrings(pele, 'tests/compat/pie', /\.test\.[jt]s$/, /pie/),
+      ...testStrings(pele, 'tests/render', /^pie.*\.test\.ts$/, /pie/),
       ...SEEDS,
       ...WRITTEN,
     ]),
@@ -245,7 +224,7 @@ const VALUES = [
 
 // Random pie charts, most of them well formed, with random configuration.
 export function randomDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const quote = (label) => (label.includes("'") || chance(0.8) ? `"${label}"` : `'${label}'`);
   return () => {

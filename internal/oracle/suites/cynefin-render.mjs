@@ -12,18 +12,15 @@
 // The fixture also holds the seeded numbers of the boundaries, seededRandom and hashString
 // of a range of seeds and strings, where JavaScript's conversions between doubles and 32-bit
 // integers matter.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n } from '../lib/svg.mjs';
+import { readLabel, readMarker } from '../lib/limu.mjs';
 import { BASIC, FRAGMENTS, corpus, hostile, randomDiagrams } from './cynefin.mjs';
 
 // The icons the host has, in the cases drawn with icons.
 export const ICONS = ['star', 'fa:fa-car', 'fa:fa-coffee'];
 
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (v) => String(v);
 const FACES = ['-', 'b', 'i', 'bi'];
 // A color of the series as limu's test names it.
 const paint = (v) => (v === undefined ? '-' : v.replace(/^var\(--pele-series-(\d),[^)]*\)$/, 'series-$1'));
@@ -47,13 +44,12 @@ export function readSvg(svg) {
     return `${fill} ${paint(v.stroke)} ${v['stroke-width'] ?? '-'} ${(v['stroke-dasharray'] ?? '-').replace(/ /g, ',')} ${v['stroke-linecap'] ?? 'butt'} ${v['stroke-linejoin'] ?? 'miter'}`;
   };
   const label = (e) => {
-    const attrs = decodeURIComponent(attr(e, 'attrs'));
-    const own = (name) => new RegExp(`\\s${name}="([^"]*)"`).exec(attrs)?.[1] ?? '-';
-    const d = JSON.parse(decodeURIComponent(attr(e, 'data')));
-    const spans = d.lines
-      .map((line, i) => n(d.widths[i]) + ': ' + line.map((s) => (s[0] !== null ? `i:${s[0]}` : `t:${FACES[s[1] & 3]}:${s[2]}`) + ' ' + n(s[3])).join(' + '))
+    const l = readLabel(e);
+    const own = (name) => new RegExp(`\\s${name}="([^"]*)"`).exec(l.attrs)?.[1] ?? '-';
+    const spans = l.lines
+      .map((line, i) => n(l.widths[i]) + ': ' + line.map((s) => (s.icon !== undefined ? `i:${s.icon}` : `t:${FACES[s.style & 3]}:${s.text}`) + ' ' + n(s.width)).join(' + '))
       .join(' | ');
-    return `label ${own('class')} ${own('font-size')} ${paint(own('fill') === '-' ? undefined : own('fill'))} ${own('font-weight')} ${own('font-style')} ${n(Number(attr(e, 'x')))},${n(Number(attr(e, 'y')))} ${n(d.w)},${n(d.h)} ${n(d.size)} ${n(d.lh)} | ${spans}`;
+    return `label ${own('class')} ${own('font-size')} ${paint(own('fill') === '-' ? undefined : own('fill'))} ${own('font-weight')} ${own('font-style')} ${n(l.x)},${n(l.y)} ${n(l.width)},${n(l.height)} ${n(l.size)} ${n(l.lineHeight)} | ${spans}`;
   };
 
   const tags = /<(\/?)(g|path|rect|svg|limu-label|limu-marker)\b[^>]*>/g;
@@ -89,9 +85,11 @@ export function readSvg(svg) {
       case 'limu-label':
         lines.push(label(e));
         break;
-      case 'limu-marker':
-        lines.push(`marker ${attr(e, 'type')} ${n(Number(attr(e, 'x')))},${n(Number(attr(e, 'y')))} ${n(Number(attr(e, 'dx')))},${n(Number(attr(e, 'dy')))} ${attr(e, 'color')}`);
+      case 'limu-marker': {
+        const k = readMarker(e);
+        lines.push(`marker ${k.type} ${n(k.x)},${n(k.y)} ${n(k.dx)},${n(k.dy)} ${k.color}`);
         break;
+      }
     }
   }
   return lines;
@@ -163,5 +161,8 @@ export default async function ({ pele, src, write, random }) {
   const randoms = seeds.filter((s) => Number.isFinite(s)).map((s) => [s, seededRandom(s)]);
   const strings = ['', 'pele', 'other', 'pele-0-1', 'pele-12-345', 'a', 'é', '😀', '中文', 'x'.repeat(100), 'the quick brown fox jumps over the lazy dog'];
   const hashes = strings.map((s) => [s, hashString(s)]);
-  write('diagram/cynefin/testdata/pele/render.json', { cases: out, randoms, hashes });
+  // The test reads the data of a path as the scene would draw it, which writes again what is
+  // not a move, a line, a curve or a close, as arcs, so the lines of such paths are kept in
+  // full: the data is what lies between the class and id and the six fields of the pen.
+  write('diagram/cynefin/testdata/pele/render.json', { cases: out, randoms, hashes }, { keep: (line) => line.startsWith('path ') && /[^MLQCZ0-9.,\s-]/.test(line.split(' ').slice(3, -6).join(' ')) });
 }

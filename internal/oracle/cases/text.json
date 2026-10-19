@@ -17,7 +17,10 @@
   {"text": "emoji 😀", "size": 16, "face": 4},
   {"text": "tab\there\u007f", "size": 16, "face": 0},
   {"text": "ｆｕｌｌ　ｗｉｄｔｈ", "size": 16, "face": 0},
-  {"text": "", "size": 16, "face": 0}
+  {"text": "", "size": 16, "face": 0},
+  {"text": "\ufffd", "size": 16, "face": 0},
+  {"text": "a\ufffdb", "size": 14, "face": 1},
+  {"text": "\ufffd\ufffd\ufffd", "size": 16, "face": 3}
  ],
  "label": [
   {"text": "Start", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
@@ -55,6 +58,8 @@
   {"text": "no break spaces here and a normal one", "markdown": false, "size": 16, "maxWidth": 80, "face": 0},
   {"text": "", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
   {"text": "   ", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
-  {"text": "<br>", "markdown": false, "size": 16, "maxWidth": 200, "face": 0}
+  {"text": "<br>", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
+  {"text": "a\ufffdb", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
+  {"text": "\ufffd\ufffd\ufffd word \ufffd", "markdown": true, "size": 14, "maxWidth": 30, "face": 0}
  ]
 }

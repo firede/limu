@@ -1,7 +1,6 @@
 package flowchart
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/firede/limu/diagram"
@@ -18,24 +17,22 @@ type peleRender struct {
 	Cases []struct {
 		Src      string   `json:"src"`
 		MaxWidth float64  `json:"maxWidth"`
-		Lines    []string `json:"lines"`
+		Padding  *float64 `json:"padding"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 1000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -46,10 +43,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := pelesvg.FlowLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		got := pelesvg.FlowLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, Padding: c.Padding}))
+		if msg := f.Diff(k, &c.Drawing, got, pelesvg.TagsLast("clickable")); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, padding %v), %s", c.Src, c.MaxWidth, (&layout.Options{Padding: c.Padding}).Pad(), msg)
 			}
 		}
 	}

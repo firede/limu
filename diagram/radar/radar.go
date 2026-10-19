@@ -12,6 +12,7 @@ import (
 	"math"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -50,7 +51,7 @@ type Model struct {
 const maxTicks = 32
 
 func invalid(message string) *diagram.Error {
-	return diagram.NewError(message, diagram.Semantic, "radar")
+	return common.NewError(message, diagram.Semantic, "radar")
 }
 
 // buildRadar makes the model of a radar chart's tree, as Pele's buildRadar does: a curve

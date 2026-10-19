@@ -86,28 +86,6 @@ func isLineEnd(s string, i int) bool {
 	return false
 }
 
-// lineBreak matches \r?\n at byte i, or gives -1.
-func lineBreak(s string, i int) int {
-	switch {
-	case strings.HasPrefix(s[i:], "\r\n"):
-		return i + 2
-	case strings.HasPrefix(s[i:], "\n"):
-		return i + 1
-	}
-	return -1
-}
-
-// closed matches (?:\r?\n|(?!\S)) at byte i, or gives -1.
-func closed(s string, i int) int {
-	if end := lineBreak(s, i); end >= 0 {
-		return end
-	}
-	if i == len(s) || chars.IsSpace(chars.Unit(s, i)) {
-		return i
-	}
-	return -1
-}
-
 // matchID is EM_ID, /[_a-zA-Z][\w_]*/y.
 func matchID(s string, at int) int {
 	if c := int(s[at]); c != '_' && !chars.IsLetter(c) {
@@ -163,7 +141,7 @@ func blockOpener(s string, at int) int {
 	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
 		i++
 	}
-	return lineBreak(s, i)
+	return common.LineBreak(s, i)
 }
 
 // matchBlock is EM_DATA_BLOCK, /\{[\t ]*\r?\n(?:[\S\s]*?\r?\n)?\}(?:\r?\n|(?!\S))/y. The
@@ -175,16 +153,16 @@ func matchBlock(s string, at int) int {
 		return -1
 	}
 	for k := q; k < len(s); k++ {
-		j := lineBreak(s, k)
+		j := common.LineBreak(s, k)
 		if j < 0 || j == len(s) || s[j] != '}' {
 			continue
 		}
-		if end := closed(s, j+1); end >= 0 {
+		if end := common.Closed(s, j+1); end >= 0 {
 			return end
 		}
 	}
 	if q < len(s) && s[q] == '}' {
-		return closed(s, q+1)
+		return common.Closed(s, q+1)
 	}
 	return -1
 }
@@ -226,11 +204,9 @@ func renamed(t common.TokenType, name string) common.TokenType {
 	return t
 }
 
-// eventModelingTokens is Pele's EVENTMODELING_TOKENS. Pele gives its EM_ACC_DESCR a scanner
-// that stops looking for the brace that closes a description once it has found none; the
-// pattern it answers for is ACC_DESCR's, whose search for a brace is quick, and here is that
-// pattern. A data block and a block comment that find no closer are not tried again, as
-// none is further on: a later one could close only where the first could.
+// eventModelingTokens is Pele's EVENTMODELING_TOKENS. A data block and a block comment that
+// find no closer are not tried again, as none is further on: a later one could close only
+// where the first could.
 var eventModelingTokens = func() []common.TokenType {
 	keyword := common.Keyword("eventmodeling")
 	keyword.Longer = []int{tID}
@@ -248,7 +224,7 @@ var eventModelingTokens = func() []common.TokenType {
 		common.TokenType{Name: "EM_FID", Match: matchFrameID},
 		common.TokenType{Name: "EM_DATA_INLINE", Match: matchInline},
 		common.TokenType{Name: "EM_DATA_BLOCK", Match: matchBlock, Opener: func(s string, at int) bool { return blockOpener(s, at) >= 0 }},
-		renamed(common.AccDescrToken, "EM_ACC_DESCR"),
+		common.AccDescr("EM_ACC_DESCR"),
 		renamed(common.AccTitleToken, "EM_ACC_TITLE"),
 		renamed(common.TitleToken, "EM_TITLE"),
 		common.TokenType{Name: "EM_WS", Match: matchSpace, Hidden: true},

@@ -7,7 +7,9 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
@@ -30,7 +32,6 @@ const (
 	noteWrap  = 320
 	corner    = 10
 	bar       = 8
-	padding   = common.Padding
 )
 
 // kind is what a node is drawn as, Pele's K.
@@ -63,15 +64,15 @@ var kinds = map[string]kind{
 
 // The roles of the items of a state diagram.
 var roles = [...]scene.Role{
-	kState:     "state.state",
-	kDescribed: "state.state",
-	kStart:     "state.start",
-	kEnd:       "state.end",
-	kChoice:    "state.choice",
-	kFork:      "state.fork",
-	kJoin:      "state.join",
-	kNote:      "state.note",
-	kComposite: "state.composite",
+	kState:     RoleState,
+	kDescribed: RoleState,
+	kStart:     RoleStart,
+	kEnd:       RoleEnd,
+	kChoice:    RoleChoice,
+	kFork:      RoleFork,
+	kJoin:      RoleJoin,
+	kNote:      RoleNote,
+	kComposite: RoleComposite,
 }
 
 // A view is a node as it is drawn, Pele's View. node is nil for the unseen helpers the
@@ -79,7 +80,7 @@ var roles = [...]scene.Role{
 type view struct {
 	node     *GraphNode
 	kind     kind
-	author   style.Author
+	author   css.Author
 	hasStyle bool
 	label    text.Label
 	lines    []text.Label
@@ -100,7 +101,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) *scene.Scene {
 	return common.TurnToFit(o, func(down bool) *scene.Scene { return lay(db, config, o, down) })
 }
 
-func vertical(dir layout.Dir) bool { return dir == layout.TB || dir == layout.BT }
+func vertical(dir graphs.Dir) bool { return dir == graphs.TB || dir == graphs.BT }
 
 // numberOption is a number of the state diagram's config, if it is one above 0, at most 2000,
 // as Pele's numberOption reads it.
@@ -129,8 +130,8 @@ func clamp(value, lo, hi float64) float64 {
 }
 
 // group is a cnode for a group, as Pele's group makes.
-func group(dir layout.Dir, padX, padTop, padBottom float64) layout.CNode {
-	c := layout.NewCNode(0, 0, -1)
+func group(dir graphs.Dir, padX, padTop, padBottom float64) graphs.CNode {
+	c := graphs.NewCNode(0, 0, -1)
 	c.IsGroup = true
 	c.Dir = dir
 	c.PadX = padX
@@ -150,9 +151,7 @@ func classNames(raw string) []string {
 			kept = append(kept, name)
 		}
 	}
-	return strings.FieldsFunc(strings.Join(kept, " "), func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
+	return common.ClassNames(strings.Join(kept, " "))
 }
 
 // lay lays the diagram out once, as Pele's draw does. turned lays out a diagram that runs
@@ -163,10 +162,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()
 	wrapWidth := numberOption(config, "wrappingWidth", 200)
-	const pad = padding
-	rootDir := layout.Direction(db.Direction())
+	pad := o.Pad()
+	rootDir := graphs.Direction(db.Direction())
 	if turned {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
 	labelOf := func(raw string, fontSize, wrap float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: fontSize, MaxWidth: wrap, Face: face, Markdown: true, Icons: o.Icons})
@@ -174,8 +173,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 
 	index := map[string]int{}
 	var views []view
-	var cnodes []layout.CNode
-	add := func(node *GraphNode, k kind, c *layout.CNode) int {
+	var cnodes []graphs.CNode
+	add := func(node *GraphNode, k kind, c *graphs.CNode) int {
 		views = append(views, view{node: node, kind: k})
 		if c != nil {
 			cnodes = append(cnodes, *c)
@@ -272,7 +271,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 
 	// As in Mermaid, a composite that sets no direction runs top to bottom whatever surrounds
 	// it.
-	innerDir := func(composite int) layout.Dir { return layout.Direction(views[composite].node.Dir) }
+	innerDir := func(composite int) graphs.Dir { return graphs.Direction(views[composite].node.Dir) }
 	// Whether the flow around a state runs top to bottom or bottom to top.
 	across := func(i int) bool {
 		if logical[i] == -1 {
@@ -327,7 +326,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold
@@ -340,7 +339,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			fontSize = author.FontSize
 		}
 		v.author, v.hasStyle = author, true
-		var c layout.CNode
+		var c graphs.CNode
 		made := false
 		switch v.kind {
 		case kComposite:
@@ -394,7 +393,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			v.h = height
 		}
 		if !made {
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		}
 		// The transitions on one side of a state's box spread along it, clear of its corners.
 		if v.kind == kState || v.kind == kDescribed {
@@ -407,7 +406,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		cnodes = append(cnodes, c)
 	}
 
-	var cedges []layout.CEdge
+	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
 	var drawn []*GraphEdge
 	// The transitions each state makes to itself: how many, their widest label, and their
@@ -436,7 +435,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		} else {
 			appear = append(appear, math.Inf(1))
 		}
-		c := layout.NewCNode(0, 0, composite)
+		c := graphs.NewCNode(0, 0, composite)
 		return add(nil, kHidden, &c)
 	}
 	for _, edge := range graph.Edges {
@@ -462,7 +461,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		}
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, label)
-		ce := layout.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: labelW}
+		ce := graphs.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: labelW}
 		if label.Height > 0 {
 			ce.LabelH = label.Height + 4
 		}
@@ -500,11 +499,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			cnodes[i].Parent = logical[i]
 			continue
 		}
-		var c layout.CNode
+		var c graphs.CNode
 		if across(i) {
-			c = group(layout.LR, room, 0, 0)
+			c = group(graphs.LR, room, 0, 0)
 		} else {
-			c = group(layout.TB, 0, room, room)
+			c = group(graphs.TB, 0, room, room)
 		}
 		c.Parent = logical[i]
 		appear = append(appear, appear[i])
@@ -565,14 +564,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	}
 
 	// Pele's transitions are smooth; the host may ask for them at right angles, or straight.
-	curve := ""
-	switch o.Routing {
-	case layout.Orthogonal:
-		curve = "step"
-	case layout.Straight:
-		curve = "linear"
-	}
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
+	curve := common.RoutingCurve(o.Routing)
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
 		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
 		EdgeSep:  edgeSep,
 		RankSep:  numberOption(config, "rankSpacing", rankSep),
@@ -664,7 +657,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 					p.MoveTo(left, at).LineTo(right, at)
 				}
 				dividers = append(dividers, scene.Item{
-					Kind: scene.Mark, Role: "state.divider", Box: p.Bounds(),
+					Kind: scene.Mark, Role: RoleDivider, Box: p.Bounds(),
 					Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}}, Style: dividerStyle,
 				})
 			}
@@ -675,7 +668,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			c := &cnodes[i]
 			box := scene.Rect{X: c.X - c.W/2 + pad, Y: c.Y - c.H/2 + pad, W: c.W, H: c.H}
 			dividers = append(dividers, scene.Item{
-				Kind: scene.Mark, Role: "state.divider", Box: box,
+				Kind: scene.Mark, Role: RoleDivider, Box: box,
 				Parts: []scene.Part{{Box: box, Rounded: true, Paint: scene.StrokeOnly}}, Style: dividerStyle,
 			})
 		}
@@ -707,7 +700,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			box := scene.Rect{X: left, Y: top, W: c.W, H: c.H}
 			it.Kind, it.Box = scene.Group, box
 			it.Parts = []scene.Part{{Box: box, Rounded: true}}
-			it.Style = style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Fg, Radius: style.N(corner)}
+			it.Style = style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Fg, Radius: style.N(corner)}
 			if v.titleH > 0 {
 				rule := new(scene.Path).MoveTo(left, top+v.titleH).LineTo(left+c.W, top+v.titleH)
 				it.Parts = append(it.Parts, scene.Part{Path: rule, Paint: scene.StrokeOnly})
@@ -757,7 +750,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			for k := range v.lines {
 				line := &v.lines[k]
 				extra = append(extra, scene.Item{
-					Kind: scene.Text, Role: "state.description", ID: node.ID, Label: line,
+					Kind: scene.Text, Role: RoleDescription, ID: node.ID, Label: line,
 					At:     scene.Point{X: x, Y: y + (at + line.Height/2)},
 					Style:  style.Style{Text: style.Fg},
 					Author: style.Style{Text: author.Text},
@@ -866,7 +859,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			// Offsets are given for a loop on the right and turned a quarter for one below.
 			px := func(dx, dy float64) float64 {
 				if side {
-					return a.X + pad + (out + dx)
+					return a.X + pad + (out + float64(dx))
 				}
 				return a.X + pad + -dy
 			}
@@ -874,7 +867,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				if side {
 					return a.Y + pad + dy
 				}
-				return a.Y + pad + (out + dx)
+				return a.Y + pad + (out + float64(dx))
 			}
 			p := new(scene.Path).MoveTo(px(0, -spread), py(0, -spread)).CubeTo(
 				px(reach, -2*spread), py(reach, -2*spread),
@@ -913,7 +906,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				if inward {
 					at = 0
 				}
-				near := (g.Dir == layout.TB || g.Dir == layout.LR) == inward
+				near := (g.Dir == graphs.TB || g.Dir == graphs.LR) == inward
 				var point []float64
 				if vertical(g.Dir) {
 					py := g.Y + pad + g.H/2
@@ -937,7 +930,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			path = draw.RoutePath(route, curve, 0, endType.Trim(), leaves, arrives)
 		}
 		it := scene.Item{
-			Kind: scene.Edge, Role: "state.transition", ID: edge.ID,
+			Kind: scene.Edge, Role: RoleTransition, ID: edge.ID,
 			Box:   path.Path.Bounds(),
 			Parts: []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 			Ends:  path.Ends("", endType),
@@ -945,17 +938,21 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			Style: style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound},
 		}
 		if note {
-			it.Role = "state.note-edge"
+			it.Role = RoleNoteEdge
 			it.Style = style.Style{Stroke: style.Border, Fill: style.None, Dash: style.Dashes(3, 4), Cap: style.CapRound}
 		}
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
 		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
+		}
 		edges = append(edges, it)
 		if label.Width > 0 {
 			lx, ly := ce.LabelX+pad, ce.LabelY+pad
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: "state.edge-label", ID: edge.ID,
+				Kind: scene.Text, Role: RoleEdgeLabel, ID: edge.ID,
 				Box:   scene.Rect{X: lx - (label.Width+8)/2, Y: ly - label.Height/2, W: label.Width + 8, H: label.Height},
 				Parts: []scene.Part{draw.LabelPatch(label, lx, ly)},
 				Label: label,
@@ -976,13 +973,13 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	for _, layer := range [][]scene.Item{clusters, dividers, edges, labels, nodes, notes} {
 		sc.Items = append(sc.Items, layer...)
 	}
-	common.WithTitle(sc, db.Title, "state.title", measure, size)
+	common.WithTitle(sc, db.Title, RoleTitle, measure, size, pad)
 	return sc
 }
 
 // titleX picks where a composite's title sits in its title bar so that edges entering from
 // above do not cross it, as Pele's titleX does.
-func titleX(c *layout.CNode, width float64, crossings map[float64][]float64) float64 {
+func titleX(c *graphs.CNode, width float64, crossings map[float64][]float64) float64 {
 	xs, ok := crossings[jsmath.Round(c.Y-c.H/2)]
 	if !ok || width == 0 {
 		return c.X

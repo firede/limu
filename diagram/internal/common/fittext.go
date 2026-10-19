@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/text"
 )
 
@@ -56,4 +57,19 @@ func FitText(s string, room, size, least float64, measure text.Measurer, face te
 		return Fitted{}, false
 	}
 	return Fitted{short, least, width}, true
+}
+
+// Line is a label of one line of plain text, as wide as it was measured, in a size and face
+// of type, a line of Pele's height for the size: text Pele writes as it is, with no markup
+// read, as a tick, a value or a name.
+func Line(s string, width, size float64, face text.Face) *text.Label {
+	return LineOf(s, width, size, jsmath.Round(float64(size*text.LineHeight)), face)
+}
+
+// LineOf is Line with a line height of its own.
+func LineOf(s string, width, size, lineHeight float64, face text.Face) *text.Label {
+	return &text.Label{
+		Lines:  [][]text.Span{{{Text: s, Face: face, Width: width}}},
+		Widths: []float64{width}, Width: width, Height: lineHeight, Size: size, LineHeight: lineHeight,
+	}
 }

@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -24,27 +23,24 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, skipped := 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		// A Go string cannot hold a surrogate with no partner, which JSON can write and
 		// JavaScript measures as wide; the parser holds U+FFFD in its place.
 		if loneSurrogate(c.Src) {
@@ -62,9 +58,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		if i := firstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i, lineAt(got, i), lineAt(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
 		}
 	}
@@ -102,22 +98,6 @@ func loneSurrogate(s string) bool {
 	return false
 }
 
-func firstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
-}
-
-func lineAt(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
-	}
-	return "(none)"
-}
-
 // paintNames are the theme's paints as Pele's SVG names them.
 var paintNames = map[style.Paint]string{
 	style.Bg:                    "var(--_bg)",
@@ -152,11 +132,11 @@ func partPaint(it *scene.Item, part *scene.Part, corners bool) string {
 	case scene.StrokeOnly:
 		s = "none " + stroke
 	case scene.FillOnly:
-		return name(it.Style.Fill) + " -"
+		return name(pelesvg.OwnFill(it)) + " -"
 	case scene.Hollow:
 		s = "var(--_bg) " + stroke
 	default:
-		s = name(it.Style.Fill) + " " + stroke
+		s = name(pelesvg.OwnFill(it)) + " " + stroke
 	}
 	if stroke != "-" && stroke != "none" {
 		s += ends(it, 0, corners)
@@ -194,19 +174,19 @@ func classes(it *scene.Item) string {
 	business := strings.HasSuffix(shape, "-business")
 	shape = strings.TrimSuffix(shape, "-business")
 	switch it.Role {
-	case "usecase.system":
+	case RoleSystem:
 		names = []string{"system-boundary", "system-boundary-" + shape}
-	case "usecase.actor":
+	case RoleActor:
 		kind := strings.TrimPrefix(strings.TrimPrefix(shape, "actor"), "-")
 		if kind == "" {
 			kind = "normal"
 		}
 		names = []string{"usecase-actor", "usecase-actor-" + kind}
-	case "usecase.usecase":
+	case RoleUsecase:
 		names = []string{"usecase-element", "usecase-" + shape}
-	case "usecase.note":
+	case RoleNote:
 		names = []string{"usecase-note"}
-	case "usecase.json":
+	case RoleJson:
 		names = []string{"usecase-json-table"}
 	}
 	if business {
@@ -298,15 +278,15 @@ func sceneLines(sc *scene.Scene) []string {
 		it := &sc.Items[i]
 		id := peleID(it.ID)
 		switch it.Role {
-		case "usecase.title":
+		case RoleTitle:
 			lines = append(lines, "title "+textAt(it, it.Label, it.At.X, it.At.Y))
-		case "usecase.system":
+		case RoleSystem:
 			lines = append(lines, fmt.Sprintf("cluster %s [%s]", id, classes(it)))
 			for k := range it.Parts {
 				shape(it, &it.Parts[k])
 			}
 			label(it, it.Label, it.At.X, it.At.Y)
-		case "usecase.relation", "usecase.note-link":
+		case RoleRelation, RoleNoteLink:
 			dash := "-"
 			if it.Style.Dash.Set() {
 				var parts []string
@@ -315,7 +295,7 @@ func sceneLines(sc *scene.Scene) []string {
 				}
 				dash = strings.Join(parts, " ")
 			}
-			if (it.Role == "usecase.note-link") != (it.Shape == "note") {
+			if (it.Role == RoleNoteLink) != (it.Shape == "note") {
 				lines = append(lines, "role "+string(it.Role)+" of a line of shape "+string(it.Shape))
 			}
 			lines = append(lines, fmt.Sprintf("edge %s %s [%s] %s", id, it.Shape, classes(it), dash))
@@ -331,14 +311,14 @@ func sceneLines(sc *scene.Scene) []string {
 					lines = append(lines, "m "+s)
 				}
 			}
-		case "usecase.label":
+		case RoleEdgeLabel:
 			r := it.Box
-			if it.Parts[0].Box != r {
+			if pelesvg.D(it.Parts[0].Path) != pelesvg.D(new(scene.Path).RoundRect(r, 3)) {
 				lines = append(lines, "patch not the label's box")
 			}
 			lines = append(lines, "label "+id+" "+pt(r.X, r.Y)+","+pt(r.W, r.H))
 			label(it, it.Label, it.At.X, it.At.Y)
-		case "usecase.actor", "usecase.usecase", "usecase.note", "usecase.json":
+		case RoleActor, RoleUsecase, RoleNote, RoleJson:
 			// Where the node's middle is, which Pele's SVG moves what is in the node by, is
 			// checked through where that is drawn.
 			lines = append(lines, fmt.Sprintf("node %s [%s]", id, classes(it)))
@@ -347,9 +327,9 @@ func sceneLines(sc *scene.Scene) []string {
 			var cells []*scene.Item
 			for i+1 < len(sc.Items) {
 				next := &sc.Items[i+1]
-				if next.Role == "usecase.stereotype" {
+				if next.Role == RoleStereotype {
 					stereotype = next
-				} else if next.Role == "usecase.json-key" || next.Role == "usecase.json-value" {
+				} else if next.Role == RoleJsonKey || next.Role == RoleJsonValue {
 					cells = append(cells, next)
 				} else {
 					break

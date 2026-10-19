@@ -1,7 +1,6 @@
 package gantt
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -23,23 +22,20 @@ import (
 type peleRender struct {
 	Zones []string `json:"zones"`
 	Cases []struct {
-		Src      string         `json:"src"`
-		Zone     string         `json:"zone"`
-		Now      int64          `json:"now"`
-		MaxWidth float64        `json:"maxWidth"`
-		FontSize float64        `json:"fontSize"`
-		Lines    []string       `json:"lines"`
-		Error    map[string]any `json:"error"`
+		Src      string  `json:"src"`
+		Zone     string  `json:"zone"`
+		Now      int64   `json:"now"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
+		Error map[string]any `json:"error"`
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
@@ -55,7 +51,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf(format, args...)
 		}
 	}
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			fail("Prepare(%q): %v", c.Src, err)
@@ -83,9 +79,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(sc)
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
-			fail("Layout(%q) in %s at %d, max %v, size %v, line %d\n got %s\nPele %s",
-				c.Src, c.Zone, c.Now, c.MaxWidth, c.FontSize, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
+			fail("Layout(%q) in %s at %d, max %v, size %v, %s",
+				c.Src, c.Zone, c.Now, c.MaxWidth, c.FontSize, msg)
 		}
 	}
 	if failed > 0 {
@@ -219,28 +215,28 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "gantt.title":
+		case RoleTitle:
 			lines = append(lines, "title "+textAt(it))
-		case "gantt.section":
+		case RoleSection:
 			r := it.Box
 			if len(it.Parts) != 1 || it.Parts[0].Box != r || it.Style.Stroke != style.None {
 				lines = append(lines, "band not one box")
 			}
-			index := strings.TrimPrefix(strings.Join(it.Class, " "), "section-")
-			lines = append(lines, fmt.Sprintf("band %s %s,%s %s -", index, pt(r.X, r.Y), pt(r.W, r.H), paintName(it.Style.Fill)))
-		case "gantt.excluded":
+			index := strings.TrimPrefix(strings.Join(it.Tags, " "), "section-")
+			lines = append(lines, fmt.Sprintf("band %s %s,%s %s -", index, pt(r.X, r.Y), pt(r.W, r.H), paintName(pelesvg.OwnFill(it))))
+		case RoleExcluded:
 			r := it.Box
 			if len(it.Parts) != 1 || it.Parts[0].Box != r || it.Style.Fill != style.SurfaceAlt {
 				lines = append(lines, "excluded not one box")
 			}
 			lines = append(lines, "excluded "+pt(r.X, r.Y)+","+pt(r.W, r.H))
-		case "gantt.grid", "gantt.axis":
+		case RoleGrid, RoleAxis:
 			lines = append(lines, strings.TrimPrefix(string(it.Role), "gantt."))
 			paths(it.Parts[0].Path, "- "+paintName(it.Style.Stroke)+" "+pen(it))
-		case "gantt.vert":
+		case RoleVert:
 			lines = append(lines, "vert "+peleID(it.ID))
 			paths(it.Parts[0].Path, "- - "+pen(it))
-		case "gantt.today":
+		case RoleToday:
 			// The author's style of the line, which Pele writes as it is, takes the place of the
 			// triangle.
 			if len(it.Parts) == 1 {
@@ -250,14 +246,14 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			paths(it.Parts[0].Path, "none "+paintName(it.Style.Stroke)+" "+pen(it))
 			if len(it.Parts) > 1 {
-				paths(it.Parts[1].Path, paintName(it.Style.Fill)+" - "+pen(it))
+				paths(it.Parts[1].Path, paintName(pelesvg.OwnFill(it))+" - "+pen(it))
 			}
-		case "gantt.task":
-			lines = append(lines, fmt.Sprintf("task %s [%s]", peleID(it.ID), strings.Join(it.Class, " ")))
+		case RoleTask:
+			lines = append(lines, fmt.Sprintf("task %s [%s]", peleID(it.ID), strings.Join(it.Tags, " ")))
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
 			}
-			paint := paintName(it.Style.Fill) + " " + paintName(it.Style.Stroke)
+			paint := paintName(pelesvg.OwnFill(it)) + " " + paintName(it.Style.Stroke)
 			for _, part := range it.Parts {
 				if part.Path != nil {
 					paths(part.Path, paint+" "+pen(it))
@@ -273,11 +269,11 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Label != nil {
 				lines = append(lines, sized(it))
 			}
-		case "gantt.section-label":
+		case RoleSectionLabel:
 			lines = append(lines, "section "+peleID(it.ID), sized(it))
-		case "gantt.vert-label":
+		case RoleVertLabel:
 			lines = append(lines, "vert-label "+peleID(it.ID), sized(it))
-		case "gantt.tick":
+		case RoleTick:
 			l := it.Label
 			if len(l.Lines) != 1 || len(l.Lines[0]) != 1 || it.Style.Text != style.Muted {
 				lines = append(lines, "tick not one span")

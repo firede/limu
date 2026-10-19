@@ -8,6 +8,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
@@ -35,7 +36,8 @@ func setting(config diagram.Config, key string, least, most float64) (float64, b
 	return min(most, max(least, v)), true
 }
 
-// settingOr is setting, or fallback when the config has none.
+// settingOr is setting, or fallback when the config has none, as Pele writes
+// setting(…) ?? fallback.
 func settingOr(config diagram.Config, key string, least, most, fallback float64) float64 {
 	if v, ok := setting(config, key, least, most); ok {
 		return v
@@ -57,7 +59,8 @@ func flag(config diagram.Config, key string) bool {
 	return ok && v
 }
 
-// breakAt is the length of a match of /<br\s*\/?>/i at i, or 0.
+// breakAt is the length of a match of /<br\s*\/?>/i at i, or 0: Pele's RE_BREAK, written out
+// by hand.
 func breakAt(s string, i int) int {
 	if i+3 > len(s) || s[i] != '<' || !chars.EqualFoldASCII(s[i+1:i+3], "br") {
 		return 0
@@ -156,26 +159,17 @@ type bar struct {
 	unscheduled bool
 }
 
-// tickText is a tick's label, which Pele writes as plain text centered on its point: one line
-// of one span, as wide as the measurer says.
-func tickText(s string, width, size float64) *text.Label {
-	lh := jsmath.Round(size * text.LineHeight)
-	return &text.Label{
-		Lines:  [][]text.Span{{{Text: s, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lh, Size: size, LineHeight: lh,
-	}
-}
-
 // Layout schedules a parsed gantt chart's tasks and lays the chart out as a scene, as Pele's
 // renderGantt draws it: a row for each task, on a time axis as wide as the chart may be. It
-// schedules in o.Location against o.Now; an error is a *diagram.Error, from scheduling.
+// schedules a copy of the tasks in o.Location against o.Now, and leaves db as it was; an
+// error is a *diagram.Error, from scheduling.
 func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, error) {
 	if o == nil {
 		o = &layout.Options{}
 	}
 	size := o.Size()
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	now := float64(o.Clock().UnixMilli())
 
 	labelSize := settingOr(config, "fontSize", 4, 72, jsmath.Round(size*0.8125))
@@ -188,6 +182,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	compact := db.DisplayMode == "compact"
 	topAxis := db.TopAxis || flag(config, "topAxis")
 
+	db = db.copied()
 	if err := db.Schedule(o.Clock(), o.Zone()); err != nil {
 		return nil, err
 	}
@@ -249,12 +244,13 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		titleHeight = title.Height + 16
 	}
 	sc := &scene.Scene{Type: "gantt", FontSize: size, Title: db.AccTitle, Desc: db.AccDescr}
+	// titleItem is the chart's title, which Pele's renderGantt writes with labelSvg first.
 	titleItem := func() []scene.Item {
 		if title.Empty() {
 			return nil
 		}
 		return []scene.Item{{
-			Kind: scene.Text, Role: "gantt.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: pad + title.Height/2},
 		}}
 	}
@@ -284,6 +280,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			axisFormat = "%Y-%m-%d"
 		}
 	}
+	// tickLabel is Pele's tickLabel: a tick's time in the axis format.
 	tickLabel := func(t float64) string { return z.timeFormat(axisFormat, t) }
 	sampleWidth := max(measure.Width(tickLabel(start), tickSize, 0), measure.Width(tickLabel(stop), tickSize, 0))
 
@@ -304,6 +301,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	if stop > start {
 		scale = plotWidth / (stop - start)
 	}
+	// x is Pele's x: where a time falls on the plot, its middle when the chart spans no time.
 	x := func(t float64) float64 {
 		if scale == 0 {
 			return left + plotWidth/2
@@ -325,7 +323,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	if hasTop && hasGrid {
 		gridLead = max(0, min(topPadding-gridStart, plotTop-headHeight))
 	}
-	plotHeight := float64(max(rowCount, 1)) * rowHeight
+	plotHeight := float64(float64(max(rowCount, 1)) * rowHeight)
 	plotBottom := plotTop + plotHeight
 
 	// Bars and where their labels go: inside when they fit, otherwise beside the bar on the
@@ -408,7 +406,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		lastLabel = label
 		extent = max(extent, lastRight)
 		tick := scene.Item{
-			Kind: scene.Text, Role: "gantt.tick", Label: tickText(label, width, tickSize),
+			Kind: scene.Text, Role: RoleTick, Label: common.Line(label, width, tickSize, 0),
 			At: scene.Point{X: tx, Y: bottomY}, Style: style.Style{Text: style.Muted},
 		}
 		axisBottom = append(axisBottom, tick)
@@ -448,13 +446,13 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		extent = max(extent, vertEnds[line])
 		path := new(scene.Path).MoveTo(vx, plotTop-gridLead).LineTo(vx, plotBottom)
 		vertLines = append(vertLines, scene.Item{
-			Kind: scene.Mark, Role: "gantt.vert", ID: t.ID, Box: path.Bounds(),
+			Kind: scene.Mark, Role: RoleVert, ID: t.ID, Box: path.Bounds(),
 			Parts: []scene.Part{{Path: path, Paint: scene.StrokeOnly}},
 			Style: style.Style{Fill: style.None, Stroke: style.Line, StrokeWidth: style.N(1.5), Dash: style.Dashes(4, 3)},
 		})
 		if !label.Empty() {
 			vertLabels = append(vertLabels, scene.Item{
-				Kind: scene.Text, Role: "gantt.vert-label", ID: t.ID, Label: &label,
+				Kind: scene.Text, Role: RoleVertLabel, ID: t.ID, Label: &label,
 				At: scene.Point{X: cx, Y: vertTop + float64(float64(line)*vertLine) + vertLine/2},
 			})
 		}
@@ -485,15 +483,15 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			}
 			box := scene.Rect{X: 0, Y: y, W: sc.Width, H: h}
 			bands = append(bands, scene.Item{
-				Kind: scene.Mark, Role: "gantt.section", Shape: "rect", ID: section,
-				Class: []string{"section-" + strconv.FormatFloat(index, 'f', -1, 64)},
-				Box:   box, Parts: []scene.Part{{Box: box}},
+				Kind: scene.Mark, Role: RoleSection, Shape: "rect", ID: section,
+				Tags: []string{"section-" + strconv.FormatFloat(index, 'f', -1, 64)},
+				Box:  box, Parts: []scene.Part{{Box: box}},
 				Style: style.Style{Fill: fill, Stroke: style.None},
 			})
 		}
 		if label := sectionLabels[section]; !label.Empty() {
 			sectionOut = append(sectionOut, scene.Item{
-				Kind: scene.Text, Role: "gantt.section-label", ID: section, Label: label,
+				Kind: scene.Text, Role: RoleSectionLabel, ID: section, Label: label,
 				At: scene.Point{X: pad + 8 + label.Width/2, Y: y + h/2},
 			})
 		}
@@ -506,6 +504,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	if (len(db.Excludes) > 0 || len(db.Includes) > 0) && z.add(start, 6, "y") > stop {
 		from, to := math.NaN(), math.NaN()
 		have := false
+		// flush is Pele's flush: it marks the run of excluded days from from to to, if there is one.
 		flush := func() {
 			if !have {
 				return
@@ -517,7 +516,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			if ex1 > ex0 {
 				box := scene.Rect{X: ex0, Y: plotTop, W: ex1 - ex0, H: plotHeight}
 				excluded = append(excluded, scene.Item{
-					Kind: scene.Mark, Role: "gantt.excluded", Shape: "rect", Box: box, Parts: []scene.Part{{Box: box}},
+					Kind: scene.Mark, Role: RoleExcluded, Shape: "rect", Box: box, Parts: []scene.Part{{Box: box}},
 					Style: style.Style{Fill: style.SurfaceAlt, Stroke: style.None},
 				})
 			}
@@ -552,7 +551,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		case t.Done:
 			state = "done"
 		}
-		// The classes Pele gives the task besides pele-task.
+		// The classes Pele gives the task besides pele-task, the task's tags.
 		var class []string
 		if state != "" {
 			class = append(class, state)
@@ -566,7 +565,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		if slices.Contains(t.Classes, "clickable") {
 			class = append(class, "clickable")
 		}
-		it := scene.Item{Kind: scene.Node, Role: "gantt.task", ID: t.ID}
+		it := scene.Item{Kind: scene.Node, Role: RoleTask, ID: t.ID}
 		if b.unscheduled {
 			class = append(class, "unscheduled")
 			it.Style.Text = style.Muted
@@ -581,7 +580,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			case "done":
 				it.Style.Fill = style.SurfaceAlt
 			case "active":
-				it.Style.Fill = color.Alpha(0.25)
+				it.Style.Fill, it.Style.FillOpacity = color, style.N(0.25)
 			default:
 				it.Style.Fill = color
 			}
@@ -611,7 +610,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 				it.Style.Text = style.Muted
 			}
 		}
-		it.Class = class
+		it.Tags = class
 		if !b.label.Empty() {
 			it.Label = &b.label
 		}
@@ -630,14 +629,14 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		top := plotTop - gridLead
 		line := new(scene.Path).MoveTo(tx, top).LineTo(tx, plotBottom)
 		it := scene.Item{
-			Kind: scene.Mark, Role: "gantt.today", Box: line.Bounds(),
+			Kind: scene.Mark, Role: RoleToday, Box: line.Bounds(),
 			Parts: []scene.Part{{Path: line, Paint: scene.StrokeOnly}},
 			Style: style.Style{Fill: style.Accent, Stroke: style.Accent, StrokeWidth: style.N(2)},
 		}
 		decls := strings.Split(db.TodayMarker, ",")
-		if db.TodayMarker != "" && style.LineDeclared(decls) {
+		if db.TodayMarker != "" && css.LineDeclared(decls) {
 			// The author's style is that of a line: it fills nothing and colors no text.
-			author := style.Declarations(decls).Style
+			author := css.Declarations(decls).Style
 			author.Fill, author.Text = style.Paint{}, style.Paint{}
 			it.Author = author
 		} else {
@@ -655,13 +654,13 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	var lines []scene.Item
 	if len(grid.Ops) > 0 {
 		lines = append(lines, scene.Item{
-			Kind: scene.Mark, Role: "gantt.grid", Box: grid.Bounds(),
+			Kind: scene.Mark, Role: RoleGrid, Box: grid.Bounds(),
 			Parts: []scene.Part{{Path: grid, Paint: scene.StrokeOnly}},
 			Style: style.Style{Fill: style.None, Stroke: style.Border, Dash: style.Dashes(1, 3)},
 		})
 	}
 	lines = append(lines, scene.Item{
-		Kind: scene.Mark, Role: "gantt.axis", Box: axisLine.Bounds(),
+		Kind: scene.Mark, Role: RoleAxis, Box: axisLine.Bounds(),
 		Parts: []scene.Part{{Path: axisLine, Paint: scene.StrokeOnly}},
 		Style: style.Style{Fill: style.None, Stroke: style.Border},
 	})

@@ -7,7 +7,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -339,13 +339,12 @@ func lay(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene.
 	}
 	small := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	half := iconSize / 2
 	layoutLabel := func(raw string, markdown bool, size, maxWidth float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: maxWidth, Bounded: true, Face: face,
 			Markdown: markdown, Icons: o.Icons})
 	}
-	host := func(name string) bool { return o.Icons != nil && o.Icons(text.DecodeEntities(name)) }
 
 	nodes := m.Nodes
 	groups := m.Groups
@@ -722,7 +721,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene.
 			patch := draw.LabelPatch(label, x, y)
 			labelItems = append(labelItems, scene.Item{
 				Kind: scene.Text, Role: RoleEdgeLabel, ID: id,
-				Box:   patch.Box,
+				Box:   draw.LabelPatchBox(label, x, y),
 				Parts: []scene.Part{patch},
 				Label: label,
 				At:    scene.Point{X: x, Y: y},
@@ -735,7 +734,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene.
 	// owner where the host draws it, or an item of its own for one of Pele's glyphs.
 	glyph := func(owner *scene.Item, name string, x, y, side float64) *scene.Item {
 		box := scene.Rect{X: x, Y: y, W: side, H: side}
-		if host(name) {
+		if common.HostIcon(o, name) {
 			owner.Picture = &scene.Picture{Icon: text.DecodeEntities(name), Box: box}
 			return nil
 		}
@@ -743,13 +742,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene.
 		if !ok {
 			return nil
 		}
-		return &scene.Item{
-			Kind: scene.Mark, Role: RoleIcon, Shape: scene.Shape(name), ID: owner.ID,
-			Box:   box,
-			Parts: []scene.Part{{Path: outline.Scaled(side/24, x, y), Paint: scene.StrokeOnly}},
-			Style: style.Style{Stroke: style.Fg, Fill: style.None, StrokeWidth: style.N(float64(glyphStroke*side) / 24),
-				Cap: style.CapRound, Join: style.JoinRound},
-		}
+		return common.Glyph(RoleIcon, name, owner.ID, outline, box, style.Fg)
 	}
 
 	var groupItems []scene.Item
@@ -762,7 +755,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene.
 			Kind: scene.Group, Role: RoleGroup, Shape: "rect", ID: group.ID,
 			Box:   box,
 			Parts: []scene.Part{{Box: box, Rounded: true}},
-			Style: style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+			Style: style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 		}
 		var icon *scene.Item
 		if headW[k] > 0 {

@@ -197,7 +197,7 @@ func dumpDB(db *DB) object {
 	return o
 }
 
-func dumpGraph(g *Graph) object {
+func dumpGraph(g *graph) object {
 	nodes := []any{}
 	for _, n := range g.Nodes {
 		v := object{"id": n.ID, "label": n.Label, "labelType": string(n.LabelType), "shape": n.Shape,
@@ -276,14 +276,10 @@ func compare(t *testing.T, what, src string, got, want any) bool {
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/agentflow.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Agentflows []peleCase `json:"agentflows"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/agentflow.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Agentflows
@@ -322,24 +318,24 @@ func TestParseMatchesPele(t *testing.T) {
 			t.Errorf("type of %q: %q, Pele %v", c.Src, typ, c.Type)
 			ok = false
 		case typ != diagram.AgentFlow:
-			db := NewDB(Options{MaxEdges: -1})
-			if err := ParseInto(c.Src, db); err != nil {
+			db := newDB(options{MaxEdges: -1})
+			if err := parseInto(c.Src, db); err != nil {
 				errors++
 				if c.Direct.Error == nil {
-					t.Errorf("ParseInto(%q): %v, Pele had none", c.Src, err)
+					t.Errorf("parseInto(%q): %v, Pele had none", c.Src, err)
 					ok = false
 				} else {
 					ok = compare(t, "direct error", c.Src, dumpError(err), c.Direct.Error)
 				}
 			} else if c.Direct.Error != nil {
-				t.Errorf("ParseInto(%q): no error, Pele %v", c.Src, c.Direct.Error)
+				t.Errorf("parseInto(%q): no error, Pele %v", c.Src, c.Direct.Error)
 				ok = false
 			} else {
 				parsed++
 				// Built twice, as the oracle builds it: the diagnostics of the second are not
 				// reported again.
-				BuildGraph(db, Palette, "")
-				g := BuildGraph(db, Palette, "")
+				buildGraph(db, palette, "")
+				g := buildGraph(db, palette, "")
 				ok = compare(t, "direct db", c.Src, dumpDB(db), c.Direct.DB) &&
 					compare(t, "direct graph", c.Src, dumpGraph(g), c.Direct.Graph)
 			}
@@ -359,7 +355,7 @@ func TestParseMatchesPele(t *testing.T) {
 			} else {
 				parsed++
 				ok = compare(t, "db", c.Src, dumpDB(db), c.DB) &&
-					compare(t, "graph", c.Src, dumpGraph(db.Graph(DefaultCurve(p.Config))), c.Graph)
+					compare(t, "graph", c.Src, dumpGraph(db.agentGraph(defaultCurve(p.Config))), c.Graph)
 			}
 		}
 		if !ok {

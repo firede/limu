@@ -12,6 +12,7 @@ package chars
 
 import (
 	"strings"
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -175,15 +176,71 @@ func DropIndents(s string) string {
 	return b.String()
 }
 
-// ToLower is String.prototype.toLowerCase, as far as the ports compare what it gives with
-// ASCII: Go's simple case mapping agrees with JavaScript's except for U+0130, which
-// JavaScript lowers to an i and a combining dot above, and a capital sigma that ends a word,
-// which it lowers to a final sigma, which is no ASCII either way.
+// ToLower is String.prototype.toLowerCase. Go's simple case mapping agrees with JavaScript's
+// full one except for U+0130, which JavaScript lowers to an i and a combining dot above, and
+// a capital sigma that ends a word, which it lowers to a final sigma by Unicode's
+// Final_Sigma condition.
 func ToLower(s string) string {
-	if !strings.ContainsRune(s, 0x130) {
+	if strings.ContainsRune(s, 0x130) {
+		s = strings.ReplaceAll(s, "\u0130", "i\u0307")
+	}
+	if !strings.ContainsRune(s, 0x3a3) {
 		return strings.ToLower(s)
 	}
-	return strings.ToLower(strings.ReplaceAll(s, "\u0130", "i\u0307"))
+	var b strings.Builder
+	b.Grow(len(s))
+	for i, r := range s {
+		if r == 0x3a3 && finalSigma(s, i) {
+			b.WriteRune(0x3c2)
+		} else {
+			b.WriteRune(unicode.ToLower(r))
+		}
+	}
+	return b.String()
+}
+
+// finalSigma reports whether the capital sigma at byte i of s ends a word, by Unicode's
+// Final_Sigma condition: a cased letter comes before it and none after it, with only
+// case-ignorable characters between. A character that is both is skipped as ignorable, as
+// ICU's ucase_toFullLower does, which V8 lowers strings with.
+func finalSigma(s string, i int) bool {
+	before := false
+	for j := i; j > 0; {
+		r, size := utf8.DecodeLastRuneInString(s[:j])
+		j -= size
+		if caseIgnorable(r) {
+			continue
+		}
+		before = cased(r)
+		break
+	}
+	if !before {
+		return false
+	}
+	for _, r := range s[i+utf8.RuneLen(0x3a3):] {
+		if caseIgnorable(r) {
+			continue
+		}
+		return !cased(r)
+	}
+	return true
+}
+
+// cased is Unicode's Cased property: the upper, lower and title case letters, and the
+// others Unicode counts as upper or lower case.
+func cased(r rune) bool {
+	return unicode.In(r, unicode.Lu, unicode.Ll, unicode.Lt, unicode.Other_Lowercase, unicode.Other_Uppercase)
+}
+
+// caseIgnorable is Unicode's Case_Ignorable property: marks, format characters, modifier
+// letters and symbols, and the characters that may sit inside a word, as an apostrophe or a
+// period does (Word_Break MidLetter, MidNumLet and Single_Quote).
+func caseIgnorable(r rune) bool {
+	switch r {
+	case '\'', '.', ':', 0xb7, 0x387, 0x55f, 0x5f4, 0x2018, 0x2019, 0x2024, 0x2027, 0xfe13, 0xfe52, 0xfe55, 0xff07, 0xff0e, 0xff1a:
+		return true
+	}
+	return unicode.In(r, unicode.Mn, unicode.Me, unicode.Cf, unicode.Lm, unicode.Sk)
 }
 
 // EqualFoldASCII reports whether a and b are the same but for the case of ASCII letters, as a

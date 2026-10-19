@@ -2,6 +2,7 @@ package c4
 
 import (
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -52,10 +53,14 @@ const (
 	pAfterDiagram
 )
 
+// isOther reports whether a token begins a statement other than a diagram's: a title or an
+// accessible title or description, as Pele's isOther does.
 func isOther(t int) bool {
 	return t == tTitle || t == tAccDescription || t == tAccTitle || t == tAccDescr || t == tAccDescrMultilineValue
 }
 
+// isDiagram reports whether a token begins a diagram statement, a shape, a boundary, a
+// relation or a style, as Pele's isDiagram does.
 func isDiagram(t int) bool { return t >= tPerson && t <= tUpdateLayoutConfig }
 
 // failure is a syntax error, carried out of the parser by a panic, as Pele throws it.
@@ -78,14 +83,17 @@ func parseC4(src string, db *DB) (err error) {
 	types, starts, ends := tk.types, tk.starts, tk.ends
 	i := 0
 
+	// text is the text of the token at index at, as Pele's text gives it.
 	text := func(at int) string { return src[starts[at]:ends[at]] }
+	// fail throws the syntax error at the token at i, as Pele's fail does.
 	fail := func(expected string) {
 		t := types[i]
 		if t == tError {
-			panic(failure{diagram.SyntaxError("c4", src, starts[i], "", true)})
+			panic(failure{common.SyntaxError("c4", src, starts[i], "", true)})
 		}
-		panic(failure{diagram.SyntaxError("c4", src, starts[i], "Expecting "+expected+", got '"+tokenNames[t]+"'", false)})
+		panic(failure{common.SyntaxError("c4", src, starts[i], "Expecting "+expected+", got '"+tokenNames[t]+"'", false)})
 	}
+	// expect steps past a token of typ, or fails, as Pele's expect does.
 	expect := func(typ int) {
 		if types[i] != typ {
 			fail("'" + tokenNames[typ] + "'")
@@ -93,6 +101,7 @@ func parseC4(src string, db *DB) (err error) {
 		i++
 	}
 
+	// attributes reads a statement's arguments, at least one, as Pele's attributes does.
 	attributes := func() []attr {
 		var attrs []attr
 	loop:
@@ -121,6 +130,7 @@ func parseC4(src string, db *DB) (err error) {
 		return attrs
 	}
 
+	// other reads a title or an accessible title or description, as Pele's other does.
 	other := func(t int) {
 		switch t {
 		case tTitle:
@@ -151,7 +161,8 @@ func parseC4(src string, db *DB) (err error) {
 		}
 	}
 
-	// diagram reads a diagram statement, and reports whether it opens a boundary.
+	// diagram reads a diagram statement, and reports whether it opens a boundary, as Pele's
+	// diagram does.
 	diagramStatement := func(t int) bool {
 		i++
 		attrs := attributes()
@@ -266,7 +277,7 @@ func parseC4(src string, db *DB) (err error) {
 }
 
 // insert is attrs with a put at index at, as JavaScript's splice(at, 0, a) puts it: at the end
-// when attrs is shorter.
+// when attrs is shorter. Pele's diagram calls splice so.
 func insert(attrs []attr, at int, a attr) []attr {
 	at = min(at, len(attrs))
 	out := make([]attr, 0, len(attrs)+1)
@@ -276,7 +287,8 @@ func insert(attrs []attr, at int, a attr) []attr {
 }
 
 // afterSpace is s past a word of n bytes and the one white space character after it, as
-// substring(n + 1) takes them: \s matches characters of one code unit only.
+// substring(n + 1) takes them: \s matches characters of one code unit only. It is the
+// substring that Pele's other takes of a title and an accDescription.
 func afterSpace(s string, n int) string {
 	_, size := chars.UnitAt(s, n)
 	return s[n+size:]

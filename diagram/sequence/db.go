@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/yaml"
 )
@@ -29,6 +30,8 @@ type boxData struct {
 	wrap  int
 }
 
+// newDB makes an empty DB that wraps text as the config's wrap and sequence.wrap say, as
+// Pele's SeqDb constructor does with the options its parse reads from the config.
 func newDB(config diagram.Config) *DB {
 	db := &DB{actorIndex: map[string]*Actor{}, active: map[string]int{}}
 	if w, ok := config["wrap"].(bool); ok {
@@ -43,15 +46,19 @@ func newDB(config diagram.Config) *DB {
 	return db
 }
 
+// semantic is a semantic error of a sequence diagram, the PeleError that Pele's fail throws.
 func semantic(message string) *diagram.Error {
-	return diagram.NewError(message, diagram.Semantic, "sequence")
+	return common.NewError(message, diagram.Semantic, "sequence")
 }
 
 // failure carries an error of the DB up through the parser, as Pele's throw does.
 type failure struct{ err *diagram.Error }
 
+// fail stops the parse with a semantic error, as Pele's fail does.
 func fail(message string) { panic(failure{semantic(message)}) }
 
+// autoWrap is whether text wraps when its statement does not say: the wrap setting if there is
+// one, else sequence.wrap, as Pele's autoWrap gives it.
 func (db *DB) autoWrap() bool {
 	if db.wrap != unset {
 		return db.wrap == yes
@@ -59,6 +66,8 @@ func (db *DB) autoWrap() bool {
 	return db.sequenceWrap
 }
 
+// wrapOr is whether text whose statement says w wraps, autoWrap when it does not say. It is
+// limu's own, for Pele's `wrap ?? this.autoWrap()`.
 func (db *DB) wrapOr(w int) bool {
 	if w != unset {
 		return w == yes
@@ -66,22 +75,26 @@ func (db *DB) wrapOr(w int) bool {
 	return db.autoWrap()
 }
 
+// setAccTitle keeps the accessible title without its leading white space, as Pele's
+// setAccTitle does.
 func (db *DB) setAccTitle(text string) {
 	db.AccTitle = chars.TrimStart(text)
 	db.HasAccTitle = true
 }
 
 // setAccDescription replaces each line break and the white space after it with a line
-// break, as text.replace(/\n\s+/g, '\n') does.
+// break, as text.replace(/\n\s+/g, '\n') does. It is Pele's setAccDescription.
 func (db *DB) setAccDescription(text string) {
 	db.AccDescr = chars.DropIndents(text)
 	db.HasAccDescr = true
 }
 
+// setDiagramTitle keeps the diagram's title, as Pele's setDiagramTitle does.
 func (db *DB) setDiagramTitle(text string) { db.Title = text }
 
 // wrapPrefix is the length of a leading wrap: or nowrap:, either after an optional colon,
-// and whether it says to wrap.
+// and whether it says to wrap. It stands for the RE_WRAP, RE_NOWRAP and RE_WRAP_PREFIX that
+// Pele's extractWrap tests and removes.
 func wrapPrefix(s string) (int, int) {
 	i := 0
 	if strings.HasPrefix(s, ":") {
@@ -106,6 +119,8 @@ func extractWrap(raw string) seqText {
 	return seqText{chars.Trim(text), wrap}
 }
 
+// parseMessage reads a message's text and whether it says to wrap, as Pele's parseMessage
+// does.
 func (db *DB) parseMessage(s string) seqText { return extractWrap(s) }
 
 // splitBox splits a box's line into a leading color and the rest, as Mermaid's
@@ -131,6 +146,7 @@ func splitBox(s string) (string, string, bool) {
 }
 
 // boxFunction is the length of what /^(?:rgba?|hsla?)\s*\(/ matches at the start of s, or 0.
+// It stands for Pele's RE_BOX_FUNCTION, which its splitBox executes.
 func boxFunction(s string) int {
 	i := 0
 	switch {
@@ -149,11 +165,14 @@ func boxFunction(s string) int {
 	return 0
 }
 
-// hasLineTerminator tests /[\r  ]/.
+// hasLineTerminator tests /[\r  ]/. It stands for Pele's RE_LINE_TERMINATOR, which its
+// splitBox tests.
 func hasLineTerminator(s string) bool {
 	return strings.ContainsAny(s, "\r  ")
 }
 
+// parseBoxData reads a box statement's line into its color, transparent unless a CSS color
+// leads it, and its title, as Pele's parseBoxData does.
 func (db *DB) parseBoxData(s string) boxData {
 	first, rest, ok := splitBox(s)
 	color := "transparent"
@@ -175,6 +194,8 @@ func (db *DB) parseBoxData(s string) boxData {
 	return boxData{t.text, color, t.wrap}
 }
 
+// addBox opens a box, which the participants declared until it closes are put in, as Pele's
+// addBox does.
 func (db *DB) addBox(data boxData) {
 	db.currentBox = &Box{Name: data.text, Wrap: db.wrapOr(data.wrap), Fill: data.color}
 	db.Boxes = append(db.Boxes, db.currentBox)
@@ -186,6 +207,9 @@ type description struct {
 	wrap int
 }
 
+// addActor declares a participant, or adds to one declared before, as Pele's addActor does:
+// the YAML of its config object may give its kind and its label, and a participant is in one
+// box at most.
 func (db *DB) addActor(id, name string, desc *description, typ string, hasType bool, metadata *string) {
 	assignedBox := db.currentBox
 	var doc *yaml.Map
@@ -196,7 +220,7 @@ func (db *DB) addActor(id, name string, desc *description, typ string, hasType b
 		}
 		parsed, err := yaml.Parse(src)
 		if err != nil {
-			panic(failure{diagram.NewError(`Config of participant "`+id+`" is not valid YAML. `+err.Error(), diagram.Syntax, "sequence")})
+			panic(failure{common.NewError(`Config of participant "`+id+`" is not valid YAML. `+err.Error(), diagram.Syntax, "sequence")})
 		}
 		if m, ok := parsed.(*yaml.Map); ok {
 			doc = m
@@ -260,7 +284,8 @@ func (db *DB) addActor(id, name string, desc *description, typ string, hasType b
 	db.prevActor = id
 }
 
-// boxName is a box's name as a template string writes it: "undefined" for none.
+// boxName is a box's name as a template string writes it: "undefined" for none. It is part of
+// the message of Pele's addActor.
 func boxName(b *Box) string {
 	if b.Name == "" {
 		return "undefined"
@@ -268,6 +293,8 @@ func boxName(b *Box) string {
 	return b.Name
 }
 
+// addSignal adds a message, or an activation, or a frame's start or end, to the messages, as
+// Pele's addSignal does, failing when it deactivates a participant that is not active.
 func (db *DB) addSignal(from, to string, message *seqText, typ int, activate bool, central int) {
 	// Mermaid recounts every earlier message here; a running count per participant says the
 	// same.
@@ -298,6 +325,8 @@ func (db *DB) addSignal(from, to string, message *seqText, typ int, activate boo
 	db.Messages = append(db.Messages, m)
 }
 
+// addNote adds a note, which is also kept among the messages so that it takes its place in the
+// order, as Pele's addNote does. pair is nil for a note on one participant.
 func (db *DB) addNote(actor string, pair []string, placement int, message seqText) {
 	wrap := db.wrapOr(message.wrap)
 	db.Notes = append(db.Notes, &Note{Actor: actor, Actors: pair, Placement: placement, Message: message.text, Wrap: wrap})
@@ -318,7 +347,7 @@ func (db *DB) addLinks(id string, text seqText) {
 		return
 	}
 	if v, ok := parseJSON(text.text); ok {
-		entriesOf(v, a.Links.Set)
+		entriesOf(v, a.Links.set)
 	}
 }
 
@@ -337,11 +366,11 @@ func (db *DB) addALink(id string, text seqText) {
 	}
 	key := chars.Trim(slice16(s, 0, sep16-1))
 	value := chars.Trim(slice16(s, sep16+1, chars.Len16(s)))
-	a.Links.Set(key, value)
+	a.Links.set(key, value)
 }
 
 // slice16 is s.slice(from, to) in code units, with JavaScript's negative ends counted from
-// the end.
+// the end. It stands for the slice of Pele's addALink.
 func slice16(s string, from, to int) string {
 	n := chars.Len16(s)
 	if from < 0 {
@@ -358,18 +387,20 @@ func slice16(s string, from, to int) string {
 	return decode16(u[from:to])
 }
 
+// addProperties reads a properties statement's JSON into the participant's properties,
+// ignoring text that is not JSON, as Pele's addProperties does.
 func (db *DB) addProperties(id string, text seqText) {
 	a := db.actorIndex[id]
 	if a == nil {
 		return
 	}
 	if v, ok := parseJSON(text.text); ok {
-		entriesOf(v, a.Properties.Set)
+		entriesOf(v, a.Properties.set)
 	}
 }
 
 // addDetails keeps the id of the page element Mermaid would read a participant's properties
-// and links from.
+// and links from. It is Pele's addDetails.
 func (db *DB) addDetails(id string, text seqText) {
 	if a := db.actorIndex[id]; a != nil {
 		a.Details, a.HasDetails = text.text, true
@@ -409,6 +440,7 @@ func (db *DB) apply(root item) {
 	}
 }
 
+// applyOne applies a statement to the DB, as Pele's applyOne does.
 func (db *DB) applyOne(p *stmt) {
 	actor := p.actor
 	switch p.typ {
@@ -466,7 +498,8 @@ func (db *DB) applyOne(p *stmt) {
 	}
 }
 
-// setPosition is Map.set on a list of positions.
+// setPosition is Map.set on a list of positions. It stands for the Map.set on Pele's
+// createdActors and destroyedActors in its applyOne.
 func setPosition(list []Position, id string, index int) []Position {
 	for i := range list {
 		if list[i].ID == id {

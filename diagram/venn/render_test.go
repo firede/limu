@@ -1,7 +1,6 @@
 package venn
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -31,27 +31,24 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 6000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, overlaps := 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -63,17 +60,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		want := make([]string, len(c.Lines))
-		for i, line := range c.Lines {
-			want[i] = peleLine(line)
+		for _, line := range got {
 			if strings.HasPrefix(line, "overlap ") {
 				overlaps++
 			}
 		}
-		if i := pelesvg.FirstDiff(got, want); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, peleLine); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i,
-					pelesvg.At(got, i), pelesvg.At(want, i))
+				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
 		}
 	}
@@ -145,6 +139,16 @@ func without(decls []string, prop string) []string {
 // view is a style as the test compares it.
 func view(s style.Style) string { return fmt.Sprintf("%+v", s) }
 
+// author writes the style an author gave a text: as "author=" and its view, or as "css=", as
+// Pele writes no style, where the author gave none. A text of Pele's with no style is so read
+// as it is, and the oracle keeps only the texts with one in full.
+func author(s style.Style) string {
+	if v := view(s); v != view(style.Style{}) {
+		return "author=" + v
+	}
+	return "css="
+}
+
 // peleLine is a line of the fixture with the style Pele writes on an element read as what a
 // browser draws: of a circle, its fill and stroke from the author's style or Pele's
 // attributes, each at the opacity the author's style or Pele's attributes give, under the
@@ -167,19 +171,22 @@ func peleLine(line string) string {
 			opacity = f
 		}
 		strokeOpacity, hasStrokeOpacity := lastOpacity(decls, "stroke-opacity")
-		s := style.Declarations(without(without(decls, "fill-opacity"), "stroke-opacity")).Style
+		s := css.Declarations(without(without(decls, "fill-opacity"), "stroke-opacity")).Style
 		s.Text = style.Paint{}
+		if _, ok := lastOpacity(decls, "fill-opacity"); !ok && !hasStrokeOpacity && view(s) == view(style.Style{}) {
+			// A style that sets nothing a browser draws is read as no style, and the line as
+			// Pele writes a set the author gave none, as sceneLines writes it too.
+			return strings.Join(fields[:n-1], " ") + " css="
+		}
 		if !s.Fill.Set() {
 			s.Fill = fill
 		}
-		if s.Fill.Visible() {
-			s.Fill = s.Fill.Alpha(opacity)
-		}
+		s.FillOpacity = style.N(opacity)
 		if !s.Stroke.Set() {
 			s.Stroke = stroke
 		}
-		if s.Stroke.Visible() && hasStrokeOpacity {
-			s.Stroke = s.Stroke.Alpha(strokeOpacity)
+		if hasStrokeOpacity {
+			s.StrokeOpacity = style.N(strokeOpacity)
 		}
 		return strings.Join(fields[:n-6], " ") + " " + strings.Join(fields[n-3:n-1], " ") + " style=" + view(s)
 	case "overlap":
@@ -187,10 +194,9 @@ func peleLine(line string) string {
 		bar := afterCSS(line)
 		head := strings.Split(line[:bar], " ")
 		n := len(head)
-		s := style.Declarations(declarations(head[n-1])).Style
+		s := css.Declarations(declarations(head[n-1])).Style
 		s.Text = style.Paint{}
-		// A fill or stroke of none at an opacity draws nothing, as none does.
-		s = plainNone(s).Over(style.Style{Fill: style.None, Stroke: style.None})
+		s = s.Over(style.Style{Fill: style.None, Stroke: style.None})
 		return strings.Join(head[:n-4], " ") + " " + strings.Join(head[n-3:n-1], " ") + " style=" + view(s) + " | " +
 			pathLine(peleOutline(line[bar+3:]))
 	case "title", "label", "text":
@@ -204,10 +210,36 @@ func peleLine(line string) string {
 				decls[i] = "color:" + d[len("fill:"):]
 			}
 		}
-		s := style.Declarations(decls).Style
-		return strings.Join(head[:n-1], " ") + " author=" + view(style.Style{Text: s.Text, Opacity: s.Opacity}) + line[bar:]
+		s := css.Declarations(decls).Style
+		return strings.Join(head[:n-1], " ") + " " + author(style.Style{Text: s.Text, Opacity: s.Opacity}) + line[bar:]
 	}
 	return line
+}
+
+// setAttributes is a set's fill, fill opacity and stroke as Pele writes them on its circle,
+// where the author gave the set no style and its own style is no more than those, and whether
+// it is. A set of Pele's with no style is so read as it is, and the oracle keeps only the
+// sets with one in full.
+func setAttributes(it *scene.Item) (string, bool) {
+	s := it.Style
+	opacity, ok := s.FillOpacity.Get()
+	if !ok || view(it.Author) != view(style.Style{}) ||
+		view(s) != view(style.Style{Fill: s.Fill, FillOpacity: s.FillOpacity, Stroke: s.Stroke}) {
+		return "", false
+	}
+	name := func(p style.Paint) string {
+		for k, hex := range series {
+			if p == style.Series(k) {
+				return fmt.Sprintf("var(--pele-series-%d,%s)", k+1, hex)
+			}
+		}
+		return ""
+	}
+	fill, stroke := name(s.Fill), name(s.Stroke)
+	if fill == "" || stroke == "" {
+		return "", false
+	}
+	return fill + " " + chars.NumberString(opacity) + " " + stroke, true
 }
 
 // afterCSS is where the part of a line after its style begins, as an id before it may hold
@@ -334,7 +366,7 @@ func sceneLines(sc *scene.Scene) []string {
 			content = append(content, s)
 		}
 		lines = append(lines, kind+" "+id+" t "+pt(it.At.X, y)+" "+textPaints[it.Style.Text]+" "+num(l.Size)+" "+weight+" "+italic+
-			" author="+view(it.Author)+" | "+strings.Join(content, " | "))
+			" "+author(it.Author)+" | "+strings.Join(content, " | "))
 	}
 	for i := range sc.Items {
 		it := &sc.Items[i]
@@ -348,6 +380,10 @@ func sceneLines(sc *scene.Scene) []string {
 			cx, cy, r := a[6], a[1], it.Box.W/2
 			if pathLine(it.Parts[0].Path) != pathLine(new(scene.Path).Ellipse(cx, cy, r, r)) {
 				lines = append(lines, "set drawn other than as its circle")
+			}
+			if attrs, ok := setAttributes(it); ok {
+				lines = append(lines, "set "+pelesvg.ID(it.ID)+" "+pt(cx, cy)+" "+num(r)+" "+attrs+" "+pelesvg.CapJoin(it)+" css=")
+				continue
 			}
 			lines = append(lines, "set "+pelesvg.ID(it.ID)+" "+pt(cx, cy)+" "+num(r)+" "+pelesvg.CapJoin(it)+
 				" style="+view(it.Author.Over(it.Style)))

@@ -9,9 +9,9 @@ package gitgraph
 
 import "github.com/firede/limu/diagram"
 
-// AST is a git graph's text as the parser reads it, Pele's GitGraphAst. A string Pele may
-// leave undefined is nil where it does.
-type AST struct {
+// gitGraphAst is a git graph's text as the parser reads it, Pele's GitGraphAst. A string
+// Pele may leave undefined is nil where it does.
+type gitGraphAst struct {
 	// Type is "GitGraph", or "Direction" when the header gives a direction, as Langium names
 	// the root.
 	Type       string
@@ -19,12 +19,12 @@ type AST struct {
 	Title      *string
 	AccTitle   *string
 	AccDescr   *string
-	Statements []Statement
+	Statements []statement
 }
 
-// Statement is a statement of a git graph, Pele's StatementAst: a commit, a branch, a merge,
+// statement is a statement of a git graph, Pele's StatementAst: a commit, a branch, a merge,
 // a checkout or a cherry-pick, by Kind, with the fields of its kind.
-type Statement struct {
+type statement struct {
 	// Kind is "Commit", "Branch", "Merge", "Checkout" or "CherryPicking".
 	Kind string
 	// ID, Message and Type are a commit's; ID and Type a merge's; ID a cherry-pick's. Type is
@@ -94,10 +94,6 @@ type Model struct {
 	Warnings      []string
 }
 
-// ParseAST parses a git graph's text into its tree, as Pele's parseGit does. An error is a
-// *diagram.Error.
-func ParseAST(src string) (*AST, error) { return parseGit(src) }
-
 // Parse parses a git graph's text, as the parse of Pele's git graph does: source is what
 // diagram.Prepared.Source gives, config the diagram's configuration and title the title its
 // front matter gives, "" for none. An error is a *diagram.Error.
@@ -106,7 +102,7 @@ func Parse(source string, config diagram.Config, title string) (*Model, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Build(ast, config, title)
+	return buildGit(ast, config, title)
 }
 
 // ParsePrepared parses a prepared git graph.

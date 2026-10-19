@@ -7,8 +7,8 @@ import (
 	"github.com/firede/limu/internal/chars"
 )
 
-// GraphNode is an entity or a subgraph as it is drawn, Pele's ErGraphNode.
-type GraphNode struct {
+// graphNode is an entity or a subgraph as it is drawn, Pele's ErGraphNode.
+type graphNode struct {
 	ID         string
 	Label      string
 	Alias      string
@@ -25,9 +25,9 @@ type GraphNode struct {
 	LabelType string
 }
 
-// GraphEdge is a relationship as it is drawn, Pele's ErGraphEdge: the marker types at its
+// graphEdge is a relationship as it is drawn, Pele's ErGraphEdge: the marker types at its
 // ends are Mermaid's cardinalities in lower case, and its pattern "solid" or "dashed".
-type GraphEdge struct {
+type graphEdge struct {
 	ID             string
 	Start          string
 	End            string
@@ -37,19 +37,21 @@ type GraphEdge struct {
 	Pattern        string
 }
 
-// Graph is what an ER diagram draws, Pele's ErGraph.
-type Graph struct {
-	Nodes []*GraphNode
-	Edges []*GraphEdge
+// graph is what an ER diagram draws, Pele's ErGraph.
+type graph struct {
+	Nodes []*graphNode
+	Edges []*graphEdge
 }
 
-// BuildGraph resolves a parsed ER diagram into what is drawn, as Pele's buildErGraph does:
+// buildGraph resolves a parsed ER diagram into what is drawn, as Pele's buildErGraph does:
 // subgraphs as groups, entities as nodes with their class styles, and relationships as
 // edges with a marker type at each end.
-func BuildGraph(db *DB) *Graph {
-	g := &Graph{}
+func buildGraph(db *DB) *graph {
+	g := &graph{}
 	subgraphs := db.Subgraphs
 
+	// compiled is the styles of the classes named, each trimmed, the text styles of each
+	// after its styles, as the compiled of Pele's buildErGraph gives them.
 	compiled := func(classNames []string) []string {
 		out := []string{}
 		for _, name := range classNames {
@@ -80,7 +82,7 @@ func BuildGraph(db *DB) *Graph {
 	for i := len(subgraphs) - 1; i >= 0; i-- {
 		s := subgraphs[i]
 		parent, has := parentOf[s.ID]
-		g.Nodes = append(g.Nodes, &GraphNode{
+		g.Nodes = append(g.Nodes, &graphNode{
 			ID:                s.ID,
 			Label:             s.Title,
 			IsGroup:           true,
@@ -104,7 +106,7 @@ func BuildGraph(db *DB) *Graph {
 			continue
 		}
 		parent, has := parentOf[e.Label]
-		g.Nodes = append(g.Nodes, &GraphNode{
+		g.Nodes = append(g.Nodes, &graphNode{
 			ID:                e.ID,
 			Label:             e.Label,
 			Alias:             e.Alias,
@@ -131,7 +133,7 @@ func BuildGraph(db *DB) *Graph {
 		if r.RelSpec.RelType == Identifying {
 			pattern = "solid"
 		}
-		g.Edges = append(g.Edges, &GraphEdge{
+		g.Edges = append(g.Edges, &graphEdge{
 			ID:             "id_" + r.EntityA + "_" + r.EntityB + "_" + strconv.Itoa(i),
 			Start:          start,
 			End:            end,

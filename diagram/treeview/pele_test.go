@@ -72,11 +72,11 @@ func dumpNode(n *Node, icons IconConfig) []any {
 		children = append(children, dumpNode(c, icons))
 	}
 	return []any{n.ID, n.Level, n.Name, string(n.Type), encOpt(n.Icon), encOpt(n.CSSClass), encOpt(n.Description),
-		encOpt(NodeIcon(n, icons)), children}
+		encOpt(getNodeIcon(n, icons)), children}
 }
 
 func dumpModel(m *Model, config diagram.Config) map[string]any {
-	icons := Icons(config)
+	icons := iconConfig(config)
 	s := settings(config)
 	out := map[string]any{
 		"count":    m.Count,
@@ -145,14 +145,10 @@ func compare(t *testing.T, what, src string, got, want any) bool {
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/treeview.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/treeview.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Cases

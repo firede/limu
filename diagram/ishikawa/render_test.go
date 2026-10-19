@@ -1,7 +1,6 @@
 package ishikawa
 
 import (
-	"encoding/json"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,11 +26,11 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Icons    bool     `json:"icons"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		Icons    bool    `json:"icons"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
@@ -39,12 +38,9 @@ type peleRender struct {
 var hostIcons = []string{"fa:fa-car", "fa:fa-user", "fab:fa-github"}
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
@@ -52,7 +48,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 	}
 	icons := func(name string) bool { return slices.Contains(hostIcons, name) }
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -68,14 +64,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			o.Icons = icons
 		}
 		got := sceneLines(Layout(m, pre.Config, o))
-		want := make([]string, len(c.Lines))
-		for i, line := range c.Lines {
-			want[i] = peleLine(line)
-		}
-		if i := pelesvg.FirstDiff(got, want); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, peleLine); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v, icons %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, c.Icons, i,
-					pelesvg.At(got, i), pelesvg.At(want, i))
+				t.Errorf("Layout(%q, max %v, size %v, icons %v), %s", c.Src, c.MaxWidth, c.FontSize, c.Icons, msg)
 			}
 		}
 	}
@@ -226,6 +217,10 @@ func sceneLines(sc *scene.Scene) []string {
 	rect := func(it *scene.Item) {
 		part := &it.Parts[0]
 		r := part.Box
+		if part.Path != nil {
+			// A box with corners of its own, a path in the item's box.
+			r = it.Box
+		}
 		radius := "?"
 		switch {
 		case part.Path == nil && part.Rounded:

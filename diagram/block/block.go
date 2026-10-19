@@ -58,7 +58,7 @@ type ClassDef struct {
 // what diagram.Prepared.Source gives, and title the title its front matter gives, "" for
 // none. An error is a *diagram.Error.
 func Parse(source, title string) (*DB, error) {
-	db := NewDB()
+	db := newDB()
 	db.Title = title
 	if err := parseBlock(source, db); err != nil {
 		return nil, err

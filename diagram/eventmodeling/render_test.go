@@ -1,7 +1,6 @@
 package eventmodeling
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -23,29 +22,26 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src                 string   `json:"src"`
-		MaxWidth            float64  `json:"maxWidth"`
-		FontSize            float64  `json:"fontSize"`
-		AutoDirection       *bool    `json:"autoDirection"`
-		DirectionBreakpoint float64  `json:"directionBreakpoint"`
-		Lines               []string `json:"lines"`
+		Src                 string  `json:"src"`
+		MaxWidth            float64 `json:"maxWidth"`
+		FontSize            float64 `json:"fontSize"`
+		AutoDirection       *bool   `json:"autoDirection"`
+		DirectionBreakpoint float64 `json:"directionBreakpoint"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, down := 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -66,10 +62,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			}
 		}
 		got := sceneLines(sc)
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v, auto %v, breakpoint %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize,
-					c.AutoDirection, c.DirectionBreakpoint, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v, auto %v, breakpoint %v), %s", c.Src, c.MaxWidth, c.FontSize,
+					c.AutoDirection, c.DirectionBreakpoint, msg)
 			}
 		}
 	}
@@ -231,7 +227,7 @@ func sceneLines(sc *scene.Scene) []string {
 		if part.Rounded {
 			radius = "r"
 		}
-		fill, opacity, stroke := it.Style.Fill, "-", paintName(it.Style.Stroke)
+		fill, opacity, stroke := pelesvg.OwnFill(it), "-", paintName(it.Style.Stroke)
 		switch part.Paint {
 		case scene.Shade:
 			fill, stroke = style.Bg, "-"
@@ -271,8 +267,8 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 		case "eventmodeling.ui", "eventmodeling.command", "eventmodeling.event", "eventmodeling.readmodel", "eventmodeling.processor":
 			s := "node " + it.ID + " " + strings.TrimPrefix(string(it.Role), "eventmodeling.")
-			if len(it.Class) > 0 {
-				s += " " + strings.Join(it.Class, " ")
+			if len(it.Tags) > 0 {
+				s += " " + strings.Join(it.Tags, " ")
 			}
 			lines = append(lines, s)
 			for k := range it.Parts {

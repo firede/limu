@@ -30,6 +30,17 @@ if err != nil {
 out := svg.Render(sc, nil)
 ```
 
+需要重新排布同一张图的宿主（比如可用宽度变了）只解析一次，解析时可以给出 Pele 的
+`parse` 接受的限制和配置，之后按需排布任意多次，也可以在多个 goroutine 里同时排布：
+
+```go
+d, err := limu.Parse(src, diagram.Options{Config: diagram.Config{"seed": 7.0}})
+if err != nil {
+	return err
+}
+sc, err := d.Layout(&layout.Options{MaxWidth: 480, Padding: new(0.0)})
+```
+
 ## 结构
 
 ```
@@ -38,13 +49,12 @@ out := svg.Render(sc, nil)
 
 | 包 | 作用 |
 |---|---|
-| `limu` | `Layout`：把图表文本变成场景。 |
-| `diagram` | 读取图表的 front matter 和指令，判断类型；每种类型有自己的包负责解析和排布。 |
+| `limu` | `Layout`：把图表文本变成场景；`Parse`：解析一次、排布多次；`Types` 和 `Supports`：能读哪些类型。 |
+| `diagram` | 读取图表的 front matter 和指令，判断类型；每种类型有自己的包负责解析和排布。各类图表共用的代码在 `diagram/internal` 下：`graphs` 是分层布局、复合布局和泳道布局，`draw` 是形状和边的几何，`css` 读取作者用 `classDef` 和 `style` 写下的样式，还有 `common`。 |
 | `text` | 通过宿主提供的 `Measurer` 测量文本，并排版标签：分行、换行、强调、图标、实体。`text.Arial` 用一张 Arial 字宽表测量，不需要字体。 |
 | `scene` | 排布好的图表：各个部件、它们的角色和形状、盒子、路径、箭头、标签。 |
 | `style` | 场景的外观，分三级：按 token 取色的主题、按角色的覆盖、后端自己的绘制。 |
-| `layout` | 会改变位置的参数：测量器、字号、对齐网格、边的走线方式，以及甘特图的当前时间和时区。还有分层布局和复合布局。 |
-| `draw` | 各类图表共用的几何：形状轮廓和边的路径。 |
+| `layout` | 会改变位置的参数：测量器、字号、宿主可用宽度、图表四周的留白、对齐网格、边的走线方式，以及甘特图的当前时间和时区。 |
 | `svg` | 把场景画成 SVG，主题写成 CSS 变量。 |
 | `mygoui` | 用 MyGo 的原生 UI 绘制场景，并找出指针下的部件。它是独立的 module，其余部分因此只依赖标准库。 |
 
@@ -66,7 +76,7 @@ out := svg.Render(sc, &svg.Options{Look: look})
 
 一个部件的样式从下到上依次叠加：主题、图表自身的样式、该角色的覆盖、作者用
 `classDef` 和 `style` 写下的样式。要用别的方式画某个部件，后端接受一个函数来
-代替默认画法：
+代替默认画法，并提供默认画法的各个部分供它调用：
 
 ```go
 svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.Style, next func()) {
@@ -74,7 +84,8 @@ svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.St
 		next()
 		return
 	}
-	// 用别的方式写出菱形
+	// 用别的方式写出菱形，再像默认画法那样写出它的标签
+	w.Label(it, s)
 }})
 ```
 
@@ -84,16 +95,18 @@ svg.Render(sc, &svg.Options{Draw: func(w *svg.Writer, it *scene.Item, s style.St
 ./scripts/verify.sh
 ```
 
-运行 `go vet`、`gofmt` 和全部测试，无需联网。测试比对的 fixture 由 Pele 自己的
-源码生成：
+在 limu 的 module 和 mygoui 的 module 里运行 `go vet`、`gofmt` 和全部测试；下载好
+mygoui 依赖的 module 后无需联网。CI 在 amd64（`GOAMD64` 为 v1 和 v3）和 arm64 上运行它。在 Linux 上，mygoui
+的测试需要 Pango（`libpangocairo-1.0-0`）。测试比对的 fixture 由 Pele 自己的源码
+生成：
 
 ```sh
 ./scripts/oracle.sh ../pele
 ```
 
 用 Node 24 直接运行 Pele 的 TypeScript，无需安装任何依赖，跑完
-`internal/oracle/cases` 里的用例，把结果写到各个包的 `testdata/pele`。添加用例
-后，或要跟进 Pele 的新版本时运行它。
+`internal/oracle/suites` 里各个套件的用例，把结果写到各个包的 `testdata/pele`。
+它只在 arm64 上运行。添加用例后，或要跟进 Pele 的新版本时运行它。
 
 ## 许可
 

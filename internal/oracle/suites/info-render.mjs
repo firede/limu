@@ -4,51 +4,37 @@
 // Pele draws its own name and version, where limu draws its own. The oracle's hooks have Pele
 // draw the text limuInfoText gives in their place, each case with one of the texts limu
 // draws, so that the two draw the same. Pele's SVG is drawn with its numbers written out in
-// full, and each label as the point it is centered on and all that is in it.
-import { lone, mutator } from './parse.mjs';
+// full, and each label as the point it is centered on and all that is in it, in place of
+// Pele's drawing of it.
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { attr, n, readHead } from '../lib/svg.mjs';
+import { readLabel, withoutPele } from '../lib/limu.mjs';
 import { FRAGMENTS, corpus, hostileCorpus, randomDiagrams } from './info.mjs';
 
 // What limu draws for its name and version: built from its own sources, and built as a
 // module of a program at a version, a prerelease and a pseudo-version.
 export const TEXTS = ['limu (devel)', 'limu v0.1.0', 'limu v1.12.0-rc.1+meta', 'limu v0.0.0-20261019120000-abcdef123456'];
 
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (v) => String(v);
-
 // The lines of an info diagram's SVG, drawn with its numbers in full.
 export function readSvg(svg) {
+  svg = withoutPele(svg);
   const lines = [];
-  const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${n(Number(attr(head, 'width')))},${n(Number(attr(head, 'height')))}`);
-  let body = svg.slice(svg.indexOf('>') + 1);
-  const title = /^<title id="[^"]*">([^<]*)<\/title>/.exec(body);
-  if (title) {
-    lines.push(`acc-title ${unescape(title[1])}`);
-    body = body.slice(title[0].length);
-  }
-  const desc = /^<desc id="[^"]*">([^<]*)<\/desc>/.exec(body);
-  if (desc) {
-    lines.push(`acc-desc ${unescape(desc[1])}`);
-    body = body.slice(desc[0].length);
-  }
+  const { open: head, body, acc } = readHead(svg);
+  lines.push(`size ${n(Number(attr(head, 'width')))},${n(Number(attr(head, 'height')))}`, ...acc);
   for (const m of body.matchAll(/<(limu-label|[a-z]+)\b[^>]*>/g)) {
     const e = m[0];
     if (m[1] !== 'limu-label') {
       lines.push(`element ${m[1]}`);
       continue;
     }
-    const attrs = decodeURIComponent(attr(e, 'attrs'));
-    const cls = /class="([^"]*)"/.exec(attrs)?.[1];
-    const fill = /fill="([^"]*)"/.exec(attrs)?.[1] ?? '-';
-    const d = JSON.parse(decodeURIComponent(attr(e, 'data')));
-    const spans = d.lines.map((line) => line.map(([icon, text, style, width]) => (icon !== null ? `i:${icon}:${n(width)}` : `t:${style}:${text}:${n(width)}`)).join('|'));
+    const l = readLabel(e);
+    const cls = /class="([^"]*)"/.exec(l.attrs)?.[1];
+    const fill = /fill="([^"]*)"/.exec(l.attrs)?.[1] ?? '-';
+    const spans = l.lines.map((line) => line.map((s) => (s.icon !== undefined ? `i:${s.icon}:${n(s.width)}` : `t:${s.style}:${s.text}:${n(s.width)}`)).join('|'));
     lines.push(
-      `label ${cls} ${fill} ${n(Number(attr(e, 'x')))},${n(Number(attr(e, 'y')))} ${n(d.size)},${n(d.lineHeight)},${n(d.width)},${n(d.height)} ` +
-        `| ${d.widths.map(n).join(',')} | ${spans.join(' / ')}`
+      `label ${cls} ${fill} ${n(l.x)},${n(l.y)} ${n(l.size)},${n(l.lineHeight)},${n(l.width)},${n(l.height)} ` +
+        `| ${l.widths.map(n).join(',')} | ${spans.join(' / ')}`
     );
   }
   return lines;

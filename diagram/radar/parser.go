@@ -202,15 +202,6 @@ func radarTokens(l *lexer) []common.TokenType {
 	}
 }
 
-// names are the names of the token types, by kind.
-var names = func() []string {
-	var out []string
-	for _, t := range radarTokens(&lexer{}) {
-		out = append(out, t.Name)
-	}
-	return out
-}()
-
 // lexRadar splits a radar chart's text into tokens, as Pele's lexRadar does. The types it
 // returns are those it tokenized with.
 func lexRadar(src string) (*common.Tokens, []common.TokenType, error) {

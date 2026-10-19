@@ -1,7 +1,6 @@
 package class
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -20,26 +19,23 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 2000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -51,31 +47,15 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
-		if i := firstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, pelesvg.TagsLast("clickable")); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, at(got, i), at(c.Lines, i))
+				t.Errorf("Layout(%q, max %v), %s", c.Src, c.MaxWidth, msg)
 			}
 		}
 	}
 	if failed > 0 {
 		t.Errorf("%d of %d differ", failed, len(p.Cases))
 	}
-}
-
-func firstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
-}
-
-func at(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
-	}
-	return "(none)"
 }
 
 // sceneLines writes a scene as the oracle reads Pele's SVG.
@@ -125,21 +105,21 @@ func sceneLines(sc *scene.Scene) []string {
 	var held []string
 	for i := range sc.Items {
 		it := &sc.Items[i]
-		if held != nil && it.Role != "class.annotation" {
+		if held != nil && it.Role != RoleAnnotation && it.Role != RoleDivider {
 			lines = append(lines, held...)
 			held = nil
 		}
 		// Pele's escText writes a data-id with its entities decoded.
 		id := peleText(text.DecodeEntities(it.ID))
 		switch it.Role {
-		case "class.title":
+		case RoleTitle:
 			lines = append(lines, "title "+textAt(it.Label, it.At.X, it.At.Y))
-		case "class.namespace":
+		case RoleNamespace:
 			lines = append(lines, "ns "+id+" "+box(it.Box))
 			label(it.Label, it.At.X, it.At.Y)
-		case "class.relation", "class.note-edge":
+		case RoleRelation, RoleNoteEdge:
 			kind := "relation"
-			if it.Role == "class.note-edge" {
+			if it.Role == RoleNoteEdge {
 				kind = "note"
 			}
 			if d := it.Style.Dash.Pattern(); len(d) == 2 && d[0] == 6 {
@@ -153,16 +133,16 @@ func sceneLines(sc *scene.Scene) []string {
 					lines = append(lines, peleMarker(m)+" "+pen(it, m.Type))
 				}
 			}
-		case "class.namespace-title":
+		case RoleNamespaceTitle:
 			lines = append(lines, "struck "+id)
 			label(it.Label, it.At.X, it.At.Y)
-		case "class.label":
+		case RoleEdgeLabel:
 			lines = append(lines, "label "+id+" "+box(it.Box))
 			label(it.Label, it.At.X, it.At.Y)
-		case "class.cardinality":
+		case RoleCardinality:
 			lines = append(lines, "card "+peleText(spans(it.Label))+" "+textAt(it.Label, it.At.X, it.At.Y))
-		case "class.class":
-			lines = append(lines, "class "+id+" ["+strings.Join(it.Class, " ")+"]")
+		case RoleClass:
+			lines = append(lines, "class "+id+" ["+pelesvg.Classes(it)+"]")
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
 			}
@@ -170,8 +150,10 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "tip "+peleText(it.Tooltip))
 			}
 			lines = append(lines, "rect "+box(it.Parts[0].Box)+" "+pen(it, ""))
-			if len(it.Parts) > 1 {
-				lines = append(lines, "divider "+pelesvg.D(it.Parts[1].Path))
+			// Pele draws the lines under the name and the attributes, an item of their own
+			// after the class, before its label.
+			if i+1 < len(sc.Items) && sc.Items[i+1].Role == RoleDivider {
+				lines = append(lines, "divider "+pelesvg.D(sc.Items[i+1].Parts[0].Path))
 			}
 			held = []string{}
 			if len(it.Label.Lines) > 0 {
@@ -179,9 +161,11 @@ func sceneLines(sc *scene.Scene) []string {
 				held = append(held, icons...)
 				icons = icons[:0]
 			}
-		case "class.annotation":
+		case RoleDivider:
+			// Written with its class.
+		case RoleAnnotation:
 			lines = append(lines, "annotation "+peleText(spans(it.Label))+" "+textAt(it.Label, it.At.X, it.At.Y))
-		case "class.attribute", "class.method":
+		case RoleAttribute, RoleMethod:
 			kind := strings.TrimPrefix(string(it.Role), "class.")
 			if len(it.Parts) > 0 {
 				kind += " static"
@@ -189,10 +173,10 @@ func sceneLines(sc *scene.Scene) []string {
 				kind += " abstract"
 			}
 			lines = append(lines, "member "+kind+" "+textAt(it.Label, it.At.X, it.At.Y)+" "+peleText(spans(it.Label)))
-		case "class.note":
+		case RoleNote:
 			lines = append(lines, "note "+id, "path "+pelesvg.D(it.Parts[0].Path)+" "+pen(it, ""), "fold "+pelesvg.D(it.Parts[1].Path)+" "+pen(it, ""))
 			label(it.Label, it.At.X, it.At.Y)
-		case "class.interface":
+		case RoleInterface:
 			lines = append(lines, "interface "+id)
 			label(it.Label, it.At.X, it.At.Y)
 		default:

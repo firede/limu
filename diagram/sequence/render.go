@@ -7,6 +7,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -37,6 +38,7 @@ type lineStyle struct {
 // lineStyles are the messages that are drawn as lines, by type, Pele's STYLES.
 var lineStyles = func() map[int]lineStyle {
 	out := map[int]lineStyle{}
+	// set is Pele's style: it records how messages of a type are drawn.
 	set := func(typ int, dotted bool, head, ends int, bottom bool) {
 		out[typ] = lineStyle{dotted, head, ends != 1, ends != 0, bottom}
 	}
@@ -98,7 +100,8 @@ const (
 	arrowLength  = scene.MarkerSize
 )
 
-// isLineMessage reports whether a message of a type is drawn as a line.
+// isLineMessage reports whether a message of a type is drawn as a line. It is Pele's
+// isLineMessage.
 func isLineMessage(typ int) bool {
 	_, ok := lineStyles[typ]
 	return ok
@@ -237,13 +240,6 @@ func trim(head int) float64 {
 	return 0
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // writesFill reports whether Pele's resolveStyle keeps a fill of the value: what is left of
 // it without !important and white space about it is not empty, and nothing in it could load
 // or run something.
@@ -288,12 +284,13 @@ func writesFill(value string) bool {
 
 // fillStyle is how a box or a shaded block whose author gave it a fill is painted: in the
 // theme's alternate surface, at half its opacity where no fill is written, and the author's
-// fill over it.
+// fill over it. Pele writes these as the fill-opacity and the resolveStyle of a fill in its
+// draw, for the boxes and the rect blocks alike.
 func fillStyle(fill string, written bool) (style.Style, style.Style) {
 	if !written {
-		return style.Style{Fill: style.SurfaceAlt.Alpha(0.5)}, style.Style{}
+		return style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5)}, style.Style{}
 	}
-	return style.Style{Fill: style.SurfaceAlt}, style.Declarations([]string{"fill:" + fill}).Style
+	return style.Style{Fill: style.SurfaceAlt}, css.Declarations([]string{"fill:" + fill}).Style
 }
 
 // Layout lays a sequence diagram out as a scene, as Pele's renderSequence draws it: loosely,
@@ -305,13 +302,17 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) *scene.Scene {
 	return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, tight) })
 }
 
+// lay lays the diagram out loosely, or tightly when tight is true, as Pele's draw does: the
+// participants in a row with their lifelines, the messages, notes and blocks down the page in
+// their order, the boxes about the participants they hold, and the participants again at the
+// foot when mirrorActors is not false.
 func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Scene {
 	conf, _ := config["sequence"].(diagram.Config)
 	size := o.Size()
 	small := jsmath.Round(float64(size * 0.875))
 	tiny := jsmath.Round(float64(size * 0.75))
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	inf := math.Inf(1)
 	mirror := conf["mirrorActors"] != false
 	rightAngles := conf["rightAngles"] == true
@@ -345,6 +346,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	messages := db.Messages
 	count := len(messages)
 	numbers := numberMessages(messages, conf["showSequenceNumbers"] == true)
+	// textOf lays a text out at a size, at most width wide where it wraps or the layout is tight,
+	// as the text of Pele's draw does.
 	textOf := func(raw string, fontSize float64, wrap bool, width float64, face text.Face) text.Label {
 		limit := inf
 		if tight || wrap {
@@ -356,6 +359,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		}
 		return label
 	}
+	// labelOf is textOf at the wrapping width in the regular face, the defaults of the text of
+	// Pele's draw.
 	labelOf := func(raw string, fontSize float64, wrap bool) text.Label { return textOf(raw, fontSize, wrap, wrapW, 0) }
 
 	var used map[string]bool
@@ -375,6 +380,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		}
 	}
 
+	// positionOf is the index of the message at which a participant is created or destroyed, as
+	// Map.get on Pele's createdActors and destroyedActors gives it in its draw.
 	positionOf := func(list []Position, id string) (int, bool) {
 		for _, p := range list {
 			if p.ID == id {
@@ -416,6 +423,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	// touches must be.
 	needs := map[int]float64{}
 	var needKeys []int
+	// need records that the lifelines lo and hi must be at least width apart, as the need of
+	// Pele's draw does.
 	need := func(lo, hi int, width float64) {
 		if lo < 0 || hi > last {
 			return
@@ -428,6 +437,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			needs[key] = width
 		}
 	}
+	// badgeWidth is the width of the number badge of message i, 0 where it has none, as the
+	// badgeWidth of Pele's draw gives it.
 	badgeWidth := func(i int) float64 {
 		if !numbers.shown[i] {
 			return 0
@@ -542,6 +553,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			gaps[i] += share
 		}
 	}
+	// place sets the participants across from the gaps between their lifelines, as the place of
+	// Pele's draw does.
 	place := func() {
 		for i := 1; i <= last; i++ {
 			cols[i].x = cols[i-1].x + gaps[i-1]
@@ -565,6 +578,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	place()
 
 	minX, maxX := inf, math.Inf(-1)
+	// extend widens the extent across of what is drawn to hold x0 to x1, as the extend of Pele's
+	// draw does.
 	extend := func(x0, x1 float64) {
 		if x0 < minX {
 			minX = x0
@@ -576,6 +591,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	for _, c := range cols {
 		extend(c.x-c.w/2, c.x+c.w/2)
 	}
+	// runEdges is the left and right of a box, as Pele's draw reckons them inline where it
+	// extends the drawing and where it draws the boxes.
 	runEdges := func(run *boxRun) (float64, float64) {
 		first, end := cols[run.first], cols[run.last]
 		return first.x - first.w/2 - boxPad - run.grow, end.x + end.w/2 + boxPad + run.grow
@@ -587,6 +604,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	// The extents across of every block, from what it holds.
 	frames := make([]*seqFrame, count)
 	var open []*seqFrame
+	// spanAll is the extent across of a block that holds no participant of its own, as the
+	// spanAll of Pele's draw gives it.
 	spanAll := func() (float64, float64) {
 		if last < 0 {
 			return 0, 120
@@ -731,7 +750,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		xs[i] = c.x
 	}
 	// crosses reports whether a lifeline runs between two places across, where text would
-	// be struck through.
+	// be struck through. It is the crosses of Pele's draw.
 	crosses := func(x0, x1 float64) bool {
 		lo, hi := 0, len(xs)
 		for lo < hi {
@@ -762,12 +781,16 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		it.Box = scene.Rect{X: l, Y: cy - label.Height/2, W: label.Width, H: label.Height}
 		return it, true
 	}
+	// leftEdge is the left of a participant's lifeline with extra more activations, at the side
+	// of its outer activation when it has one, as the leftEdge of Pele's draw gives it.
 	leftEdge := func(c *column, extra int) float64 {
 		if len(c.activations)+extra > 0 {
 			return c.x - actW/2
 		}
 		return c.x
 	}
+	// rightEdge is the right of a participant's lifeline with extra more activations, at the side
+	// of its inner activation when it has one, as the rightEdge of Pele's draw gives it.
 	rightEdge := func(c *column, extra int) float64 {
 		if depth := len(c.activations) + extra; depth > 0 {
 			return c.x + actW/2 + float64((depth-1)*actStep)
@@ -778,6 +801,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	// Shaded blocks and activations close from the inside out. They are listed in reverse,
 	// so that the inner ones are drawn over the outer.
 	var rects, activations, framesOut, edges, destroys, labels, notes, actors, lifelines, boxes []scene.Item
+	// endActivation closes a participant's inner activation at end, at least actMin below where
+	// it opened, and gives its bottom, as the endActivation of Pele's draw does.
 	endActivation := func(c *column, end float64) float64 {
 		start := c.activations[len(c.activations)-1]
 		c.activations = c.activations[:len(c.activations)-1]
@@ -786,25 +811,28 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		extend(x, x+actW)
 		box := scene.Rect{X: x, Y: start, W: actW, H: bottom - start}
 		activations = append(activations, scene.Item{
-			Kind: scene.Mark, Role: "sequence.activation", ID: c.id, Box: box,
+			Kind: scene.Mark, Role: RoleActivation, ID: c.id, Box: box,
 			Parts: []scene.Part{{Box: box, Rounded: true}},
 			Style: style.Style{Fill: style.Surface, Stroke: style.Border, Radius: style.N(2)},
 		})
 		return bottom
 	}
 	// The lifeline of a destroyed participant ends in a cross a little below the message
-	// that ends it, with round ends, as Pele draws its crosses in a group of them.
+	// that ends it, with round ends, as Pele draws its crosses in a group of them. It is the
+	// destroy of Pele's draw.
 	destroy := func(c *column, lineY float64) float64 {
 		cx, cy := c.x, lineY+16
 		c.lifeEnd = cy
 		p := new(scene.Path).MoveTo(cx-6, cy-6).LineTo(cx+6, cy+6).MoveTo(cx+6, cy-6).LineTo(cx-6, cy+6)
 		destroys = append(destroys, scene.Item{
-			Kind: scene.Mark, Role: "sequence.destroy", ID: c.id, Box: p.Bounds(),
+			Kind: scene.Mark, Role: RoleDestroy, ID: c.id, Box: p.Bounds(),
 			Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.Line, StrokeWidth: style.N(1.5), Cap: style.CapRound},
 		})
 		return cy + 6
 	}
+	// actorItem is a participant drawn with its box's top at top, with the classes its properties
+	// name, as the actorSvg of Pele's draw draws it.
 	actorItem := func(c *column, top float64) scene.Item {
 		parts, at := drawActor(c.kind, c.x, top, c.w, c.h, &c.label)
 		shape := scene.Shape(c.kind)
@@ -812,14 +840,14 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			shape = "rect"
 		}
 		it := scene.Item{
-			Kind: scene.Node, Role: "sequence.actor", Shape: shape, ID: c.id,
+			Kind: scene.Node, Role: RoleActor, Shape: shape, ID: c.id,
 			Box:   scene.Rect{X: c.x - c.w/2, Y: top, W: c.w, H: c.h},
 			Parts: parts, At: at,
 			Style: style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg},
 		}
 		if cls, ok := c.actor.Properties.Get("class"); ok {
 			if s, ok := cls.(string); ok {
-				it.Class = classNames(s)
+				it.Class = common.ClassNames(s)
 			}
 		}
 		if !c.label.Empty() {
@@ -828,11 +856,13 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		}
 		return it
 	}
+	// badge is the number of message i in a badge of width w about cx, cy, as the badge of Pele's
+	// draw draws it.
 	badge := func(i int, cx, cy, w float64) scene.Item {
 		label := text.Layout(chars.NumberString(numbers.index[i]), text.Options{Measurer: measure, Size: tiny})
 		box := scene.Rect{X: cx - w/2, Y: cy - badgeH/2, W: w, H: badgeH}
 		return scene.Item{
-			Kind: scene.Node, Role: "sequence.number", Shape: "rounded", Box: box,
+			Kind: scene.Node, Role: RoleNumber, Shape: "rounded", Box: box,
 			Parts: []scene.Part{{Box: box, Rounded: true}},
 			Label: &label, At: scene.Point{X: cx, Y: cy},
 			Style: style.Style{Fill: style.Line, Stroke: style.None, Text: style.Bg, Radius: style.N(badgeH / 2)},
@@ -870,22 +900,22 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			if f.kind == "rect" {
 				own, author := fillStyle(f.fill, f.fill != "" && writesFill(f.fill))
 				rects = append(rects, scene.Item{
-					Kind: scene.Group, Role: "sequence.rect", Shape: "rect", Box: box,
+					Kind: scene.Group, Role: RoleRect, Shape: "rect", Box: box,
 					Parts: []scene.Part{{Box: box, Rounded: true, Paint: scene.FillOnly}},
 					Style: own, Author: author,
 				})
 			} else {
 				framesOut = append(framesOut, scene.Item{
-					Kind: scene.Group, Role: "sequence.frame", Shape: scene.Shape(f.kind), Box: box,
+					Kind: scene.Group, Role: RoleFrame, Shape: scene.Shape(f.kind), Box: box,
 					Parts: []scene.Part{{Box: box, Rounded: true, Paint: scene.StrokeOnly}},
 					Style: style.Style{Stroke: style.Border},
 				})
-				condition := scene.Item{Kind: scene.Text, Role: "sequence.condition", Style: style.Style{Text: style.Muted}}
+				condition := scene.Item{Kind: scene.Text, Role: RoleCondition, Style: style.Style{Text: style.Muted}}
 				for k, dy := range f.dividerY {
 					label := f.dividerLabels[k]
 					p := new(scene.Path).MoveTo(f.x0, dy).LineTo(f.x1, dy)
 					framesOut = append(framesOut, scene.Item{
-						Kind: scene.Mark, Role: "sequence.divider", Box: p.Bounds(),
+						Kind: scene.Mark, Role: RoleDivider, Box: p.Bounds(),
 						Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}},
 						Style: style.Style{Stroke: style.Border, Dash: style.Dashes(4, 4)},
 					})
@@ -896,7 +926,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 				tab := scene.Rect{X: f.x0, Y: f.top, W: f.tabW, H: tabH}
 				kind := text.Layout(f.kind, text.Options{Measurer: measure, Size: tiny, Face: text.Bold})
 				framesOut = append(framesOut, scene.Item{
-					Kind: scene.Text, Role: "sequence.frame-kind", Shape: scene.Shape(f.kind), Box: tab,
+					Kind: scene.Text, Role: RoleFrameKind, Shape: scene.Shape(f.kind), Box: tab,
 					Parts: []scene.Part{{Box: tab, Rounded: true}},
 					Label: &kind, At: scene.Point{X: f.x0 + f.tabW/2, Y: f.top + tabH/2},
 					Style: style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Muted},
@@ -930,7 +960,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			extend(x, x+v.w)
 			box := scene.Rect{X: x, Y: top, W: v.w, H: h}
 			it := scene.Item{
-				Kind: scene.Node, Role: "sequence.note", Shape: "rect", ID: "i" + m.ID, Box: box,
+				Kind: scene.Node, Role: RoleNote, Shape: "rect", ID: "i" + m.ID, Box: box,
 				Parts: []scene.Part{{Box: box, Rounded: true}},
 				At:    scene.Point{X: x + v.w/2, Y: top + h/2},
 				Style: style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Fg},
@@ -971,13 +1001,14 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			// A message's line and heads end round, as Pele draws them in the group of
 			// edges, which sets round caps.
 			msg := scene.Item{
-				Kind: scene.Edge, Role: "sequence.message", ID: "i" + m.ID,
+				Kind: scene.Edge, Role: RoleMessage, ID: "i" + m.ID,
 				Style: style.Style{Stroke: style.Line, Fill: style.Line, Cap: style.CapRound},
 			}
 			if st.dotted {
 				msg.Style.Dash = style.Dashes(4, 4)
 			}
 			var circles []scene.Part
+			// addCircle adds a dot of a central connection, as the circle of Pele's draw draws one.
 			addCircle := func(cx, cy float64) { circles = append(circles, circle(cx, cy, centralR, scene.FillOnly)) }
 			var number *scene.Item
 			var lineY float64
@@ -1039,7 +1070,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 				if label.Width > 0 {
 					l := label
 					labels = append(labels, scene.Item{
-						Kind: scene.Text, Role: "sequence.message-label", ID: "i" + m.ID,
+						Kind: scene.Text, Role: RoleMessageLabel, ID: "i" + m.ID,
 						Box:   scene.Rect{X: out + 8, Y: (top+bottom)/2 - l.Height/2, W: l.Width, H: l.Height},
 						Label: &l, At: scene.Point{X: out + 8 + l.Width/2, Y: (top + bottom) / 2},
 						Style: style.Style{Text: style.Fg},
@@ -1131,7 +1162,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 						cx = r - msgPad - label.Width/2
 					}
 					extend(cx-label.Width/2, cx+label.Width/2)
-					it := scene.Item{Kind: scene.Text, Role: "sequence.message-label", ID: "i" + m.ID, Style: style.Style{Text: style.Fg}}
+					it := scene.Item{Kind: scene.Text, Role: RoleMessageLabel, ID: "i" + m.ID, Style: style.Style{Text: style.Fg}}
 					if it, ok := backed(it, label, cx, lineY-4-label.Height/2); ok {
 						labels = append(labels, it)
 					}
@@ -1182,7 +1213,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		if end > c.lifeStart {
 			p := new(scene.Path).MoveTo(c.x, c.lifeStart).LineTo(c.x, end)
 			lifelines = append(lifelines, scene.Item{
-				Kind: scene.Mark, Role: "sequence.lifeline", ID: c.id, Box: p.Bounds(),
+				Kind: scene.Mark, Role: RoleLifeline, ID: c.id, Box: p.Bounds(),
 				Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}},
 				Style: style.Style{Stroke: style.Border},
 			})
@@ -1195,7 +1226,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		own.Stroke, own.Text = style.Border, style.Muted
 		box := scene.Rect{X: x0, Y: 0, W: x1 - x0, H: bottom + boxPad}
 		it := scene.Item{
-			Kind: scene.Group, Role: "sequence.box", Shape: "rect", ID: run.box.Name, Box: box,
+			Kind: scene.Group, Role: RoleBox, Shape: "rect", ID: run.box.Name, Box: box,
 			Parts: []scene.Part{{Box: box, Rounded: true}},
 			At:    scene.Point{X: (x0 + x1) / 2, Y: boxPad/2 + 2 + run.title.Height/2},
 			Style: own, Author: author,
@@ -1225,7 +1256,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		extend(cx-title.Width/2, cx+title.Width/2)
 		minY = -title.Height - 12
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "sequence.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			Box:   scene.Rect{X: cx - title.Width/2, Y: minY, W: title.Width, H: title.Height},
 			At:    scene.Point{X: cx, Y: minY + title.Height/2},
 			Style: style.Style{Text: style.Fg},
@@ -1254,7 +1285,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	return sc
 }
 
-// routeBounds is the box a route's corners lie in.
+// routeBounds is the box a route's corners lie in. It is limu's own, for the box of a
+// message's item.
 func routeBounds(route []scene.Point) scene.Rect {
 	if len(route) == 0 {
 		return scene.Rect{}
@@ -1266,7 +1298,7 @@ func routeBounds(route []scene.Point) scene.Rect {
 	return scene.Rect{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}
 }
 
-// choose is a ? b : c.
+// choose is a ? b : c. It is limu's own, for JavaScript's conditional expression.
 func choose(cond bool, a, b float64) float64 {
 	if cond {
 		return a

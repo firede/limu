@@ -222,51 +222,6 @@ var nameToken = common.TokenType{Name: "NAME_WITH_SPACES", First: "ABCDEFGHIJKLM
 // wsToken is Pele's WS, /[ \t]+/y, which is hidden.
 var wsToken = common.TokenType{Name: "WS", First: "\t ", Hidden: true, Match: common.WhitespaceToken.Match}
 
-// accDescrToken is Pele's accDescr(): ACC_DESCR, matched by a scanner that, once a braced
-// description finds no closing brace, fails every later braced one without scanning the rest
-// of the text again, as there is no brace further on. It matches as ACC_DESCR does.
-var accDescrToken = func() common.TokenType {
-	t := common.AccDescrToken
-	match := t.Match
-	t.Match = nil
-	t.Scanner = func() func(string, int) int {
-		unclosed := false
-		return func(s string, at int) int {
-			if unclosed && bracedAt(s, at) {
-				return -1
-			}
-			end := match(s, at)
-			if end < 0 && bracedAt(s, at) {
-				unclosed = true
-			}
-			return end
-		}
-	}
-	return t
-}()
-
-// bracedAt reports whether the head of a braced description, /[\t ]*accDescr\s*{/y, is at
-// byte at, with no colon after the word to make it a description of one line.
-func bracedAt(s string, at int) bool {
-	i := at
-	for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
-		i++
-	}
-	if !strings.HasPrefix(s[i:], "accDescr") {
-		return false
-	}
-	i += len("accDescr")
-	j := i
-	for j < len(s) && (s[j] == ' ' || s[j] == '\t') {
-		j++
-	}
-	if j < len(s) && s[j] == ':' {
-		return false
-	}
-	i = chars.SpaceRun(s, i)
-	return i < len(s) && s[i] == '{'
-}
-
 // intToken is Pele's INT, /0|[1-9][0-9]*(?!\.)/y.
 var intToken = func() common.TokenType {
 	t := common.IntToken
@@ -325,7 +280,7 @@ var wardleyTokens = []common.TokenType{
 	word("KW_DEACCELERATOR", "deaccelerator"),
 	nameToken,
 	wsToken,
-	accDescrToken,
+	common.AccDescr("ACC_DESCR"),
 	common.AccTitleToken,
 	common.TitleToken,
 	intToken,

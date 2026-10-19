@@ -6,6 +6,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -87,7 +88,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	natural := jsmath.Round(max(100, length(config, "chartWidth", 500, 4000)))
 	width := jsmath.Round(common.CapWidth(o, natural, 280, 0))
 	height := jsmath.Round(max(100, length(config, "chartHeight", 500, 4000)) * width / natural)
-	outer := length(config, "quadrantPadding", common.Padding, 200)
+	outer := length(config, "quadrantPadding", o.Pad(), 200)
 	xPad := length(config, "xAxisLabelPadding", 5, 200)
 	yPad := length(config, "yAxisLabelPadding", 5, 200)
 	hasPoints := len(m.Points) > 0
@@ -273,7 +274,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			Box:    scene.Rect{X: cx - r, Y: cy - r, W: 2 * r, H: 2 * r},
 			Parts:  []scene.Part{{Path: new(scene.Path).Ellipse(cx, cy, r, r)}},
 			Style:  style.Style{Fill: style.Series(0), Stroke: style.None},
-			Author: style.Declarations(styles).Style,
+			Author: css.Declarations(styles).Style,
 		}
 		if point.Class != "" {
 			it.Class = []string{point.Class}

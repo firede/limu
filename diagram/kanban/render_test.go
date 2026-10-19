@@ -1,7 +1,6 @@
 package kanban
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -26,11 +25,11 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Icons    bool     `json:"icons"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		Icons    bool    `json:"icons"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
@@ -38,12 +37,9 @@ type peleRender struct {
 var hostIcons = []string{"star", "inbox", "phone", "fa:fa-car", "fa fa-x"}
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3500 {
@@ -51,7 +47,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 	}
 	icons := func(name string) bool { return slices.Contains(hostIcons, name) }
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -67,9 +63,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			o.Icons = icons
 		}
 		got := sceneLines(Layout(m, pre.Config, o))
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v, icons %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, c.Icons, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v, icons %v), %s", c.Src, c.MaxWidth, c.FontSize, c.Icons, msg)
 			}
 		}
 	}
@@ -102,10 +98,10 @@ func paintName(p style.Paint) string {
 
 // textClasses are the classes Pele gives the text of an item of each role.
 var textClasses = map[scene.Role]string{
-	"kanban.column":   "pele-cluster-label",
-	"kanban.card":     "pele-label",
-	"kanban.ticket":   "pele-ticket",
-	"kanban.assigned": "pele-assigned",
+	RoleColumn:   "pele-cluster-label",
+	RoleCard:     "pele-label",
+	RoleTicket:   "pele-ticket",
+	RoleAssigned: "pele-assigned",
 }
 
 // sceneLines writes a scene as the oracle reads Pele's SVG.
@@ -160,40 +156,40 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "kanban.title":
+		case RoleTitle:
 			l := it.Label
 			lines = append(lines, "title "+pt(it.At.X, it.At.Y-l.Height/2+l.LineHeight/2+float64(l.Size*0.35)))
-		case "kanban.column":
+		case RoleColumn:
 			lines = append(lines, fmt.Sprintf("column %s [%s]", pelesvg.ID(it.ID), strings.Join(it.Class, " ")))
 			rect(it)
 			block(it)
-		case "kanban.count":
+		case RoleCount:
 			l := it.Label
 			lines = append(lines, fmt.Sprintf("count %s %s %s", pt(it.At.X, it.At.Y-l.Height/2+l.LineHeight/2+float64(l.Size*0.35)),
 				paintName(it.Style.Text), num(l.Size)))
 			// Pele draws a column's icon after its count.
 			icon(&sc.Items[i-1])
-		case "kanban.card":
+		case RoleCard:
 			classes := it.Class
 			// Pele marks a card of a priority with a class, which the stripe after it says.
-			if i+1 < len(sc.Items) && sc.Items[i+1].Role == "kanban.priority" {
+			if i+1 < len(sc.Items) && sc.Items[i+1].Role == RolePriority {
 				classes = append([]string{"pele-priority-" + string(sc.Items[i+1].Shape)}, classes...)
 			}
 			lines = append(lines, fmt.Sprintf("card %s [%s]", pelesvg.ID(it.ID), strings.Join(classes, " ")))
 			rect(it)
 			// Pele draws the stripe of a priority before the card's text.
-			if i+1 < len(sc.Items) && sc.Items[i+1].Role == "kanban.priority" {
+			if i+1 < len(sc.Items) && sc.Items[i+1].Role == RolePriority {
 				stripe(&lines, &sc.Items[i+1])
 			}
 			block(it)
 			icon(it)
-		case "kanban.priority":
-		case "kanban.ticket":
+		case RolePriority:
+		case RoleTicket:
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
 			}
 			block(it)
-		case "kanban.assigned":
+		case RoleAssigned:
 			block(it)
 		default:
 			lines = append(lines, "unknown role "+string(it.Role))

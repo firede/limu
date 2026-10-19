@@ -1,7 +1,6 @@
 package treeview
 
 import (
-	"encoding/json"
 	"math"
 	"slices"
 	"strconv"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -23,11 +23,11 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Icons    bool     `json:"icons"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		Icons    bool    `json:"icons"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
@@ -35,12 +35,9 @@ type peleRender struct {
 var hostIcons = []string{"logos:react", "mdi:home", "material:typescript", "mermaid-treeview:folder", "fa:fa-car", "p:x", "material:docker"}
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
@@ -48,7 +45,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 	}
 	icons := func(name string) bool { return slices.Contains(hostIcons, name) }
 	failed, tight := 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -68,10 +65,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			tight++
 		}
 		got := sceneLines(t, sc)
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v, icons %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, c.Icons,
-					i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v, icons %v), %s", c.Src, c.MaxWidth, c.FontSize, c.Icons,
+					msg)
 			}
 		}
 	}
@@ -190,8 +187,8 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 		name := string(it.Shape)
 		lines = append(lines, "icon "+name+" "+box(b))
 		width := "?"
-		if w, ok := it.Style.StrokeWidth.Get(); ok && w == float64(glyphStroke*b.W)/24 {
-			width = n(glyphStroke)
+		if w, ok := it.Style.StrokeWidth.Get(); ok && w == float64(common.GlyphStroke*b.W)/24 {
+			width = n(common.GlyphStroke)
 		}
 		want := glyphPaths[name].Scaled(b.W/24, b.X, b.Y)
 		got := it.Parts[0].Path
@@ -228,7 +225,7 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 					r = "r"
 				}
 				lines = append(lines, "rect "+box(part.Box)+" "+r+" "+paintName(it.Style.Fill)+"/"+
-					strconv.FormatFloat(float64(it.Style.Fill.Factor()), 'g', -1, 32))
+					strconv.FormatFloat(it.Style.FillOpacity.Or(1), 'g', -1, 32))
 			}
 			if pic := it.Picture; pic != nil {
 				lines = append(lines, "icon "+pelesvg.ID(pic.Icon)+" "+box(pic.Box), "host")

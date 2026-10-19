@@ -2,6 +2,7 @@ package pelesvg
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/firede/limu/scene"
@@ -15,6 +16,48 @@ func CapJoin(it *scene.Item) string {
 	var look *style.Look
 	r := look.Resolve(string(it.Role), it.Style, it.Author)
 	return r.Cap.String() + " " + r.Join.String()
+}
+
+// Classes is an item's classes and then its tags, as the render oracles write the classes
+// Pele gives what it draws once TagsLast has moved its tags last.
+func Classes(it *scene.Item) string {
+	return strings.Join(append(append([]string(nil), it.Class...), it.Tags...), " ")
+}
+
+// TagsLast reads a line with the words of tags moved to the end of its first list in
+// brackets, "[a clickable b]" to "[a b clickable]": where Pele writes what the scene holds as
+// a tag among an author's classes, in the order they were given, the scene holds them apart.
+// A line with none of the tags in that list is read as it is.
+func TagsLast(tags ...string) func(line string) string {
+	return func(line string) string {
+		open := strings.Index(line, " [")
+		if open < 0 {
+			return line
+		}
+		end := strings.IndexByte(line[open:], ']')
+		if end < 0 {
+			return line
+		}
+		end += open
+		var class, tagged []string
+		for _, w := range strings.Fields(line[open+2 : end]) {
+			if slices.Contains(tags, w) {
+				tagged = append(tagged, w)
+			} else {
+				class = append(class, w)
+			}
+		}
+		if len(tagged) == 0 {
+			return line
+		}
+		return line[:open+2] + strings.Join(append(class, tagged...), " ") + line[end:]
+	}
+}
+
+// OwnFill is the item's own fill at its own fill opacity, one paint, as the render oracles
+// compare a fill Pele writes and the fill-opacity it writes beside it.
+func OwnFill(it *scene.Item) style.Paint {
+	return it.Style.Fill.Alpha(it.Style.FillOpacity.Or(1))
 }
 
 // FlowLines writes the scene of a flowchart or a swimlane diagram as the render oracle reads
@@ -40,7 +83,7 @@ func FlowLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		id := ID(it.ID)
-		classes := strings.Join(it.Class, " ")
+		classes := Classes(it)
 		switch it.Role {
 		case "flowchart.title":
 			if it.Label != nil && len(it.Label.Lines) > 0 {
@@ -130,22 +173,4 @@ func Marker(m scene.Marker) string {
 			"M" + num(cx-vx) + "," + num(cy-vy) + "L" + num(cx+vx) + "," + num(cy+vy)
 	}
 	return ""
-}
-
-// FirstDiff is the first line where two lists of lines differ, or -1 where they are the same.
-func FirstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
-}
-
-// At is the line i of lines, or "(none)" past their end.
-func At(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
-	}
-	return "(none)"
 }

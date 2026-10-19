@@ -72,7 +72,7 @@ func Prepare(types []TokenType) *Table {
 
 // Tokenize splits src into tokens with the types of a table, as Pele's tokenize does. Text
 // no type matches is a lexical error of the diagram type named.
-func Tokenize(src string, table *Table, typ string) (*Tokens, error) {
+func Tokenize(src string, table *Table, typ diagram.Type) (*Tokens, error) {
 	types := table.Types
 	out := &Tokens{Src: src}
 	dead := make([]bool, len(types))
@@ -128,7 +128,7 @@ scan:
 			p = end
 			continue scan
 		}
-		return nil, diagram.SyntaxError(typ, src, p, "", true)
+		return nil, SyntaxError(typ, src, p, "", true)
 	}
 	out.Kinds = append(out.Kinds, -1)
 	out.Starts = append(out.Starts, n)
@@ -158,8 +158,8 @@ func lineRest(s string, i int) int {
 	return len(s)
 }
 
-// lineBreak matches \r?\n at byte i, or gives -1.
-func lineBreak(s string, i int) int {
+// LineBreak matches \r?\n at byte i, or gives -1.
+func LineBreak(s string, i int) int {
 	switch {
 	case strings.HasPrefix(s[i:], "\r\n"):
 		return i + 2
@@ -169,10 +169,10 @@ func lineBreak(s string, i int) int {
 	return -1
 }
 
-// closed matches (?:\r?\n|(?!\S)) at byte i: a line break, or nothing before white space or
+// Closed matches (?:\r?\n|(?!\S)) at byte i: a line break, or nothing before white space or
 // the end of the text; -1 where neither is.
-func closed(s string, i int) int {
-	if end := lineBreak(s, i); end >= 0 {
+func Closed(s string, i int) int {
+	if end := LineBreak(s, i); end >= 0 {
 		return end
 	}
 	if i == len(s) || spaceAt(s, i) {
@@ -202,6 +202,42 @@ var AccDescrToken = TokenType{Name: "ACC_DESCR", First: "\t a", Match: func(s st
 	}
 	return i + 1 + end + 1
 }}
+
+// AccDescr is Pele's accDescr(name) (common/accDescr.ts): ACC_DESCR under the name given,
+// for grammars where lexing goes on after an `accDescr {` that never closes, because
+// accDescr is also a name there. It matches what AccDescrToken does, but once the braced form
+// finds no closing brace there is none further on, so later braced descriptions fail
+// without scanning the rest of the text again.
+func AccDescr(name string) TokenType {
+	return TokenType{Name: name, First: AccDescrToken.First, Scanner: accDescrScanner}
+}
+
+// accDescrScanner is the scanner of Pele's accDescr, which matches
+// /[\t ]*accDescr(?:[\t ]*:(?:[^\n\r]*?(?=%%)|[^\n\r]*)|\s*({))/y and then, for the braced
+// form, looks for the closing brace unless it has found none before.
+func accDescrScanner() func(string, int) int {
+	unclosed := false
+	return func(s string, at int) int {
+		i := blanks(s, at)
+		if !strings.HasPrefix(s[i:], "accDescr") {
+			return -1
+		}
+		i += len("accDescr")
+		if j := blanks(s, i); j < len(s) && s[j] == ':' {
+			return lineRest(s, j+1)
+		}
+		i = chars.SpaceRun(s, i)
+		if i == len(s) || s[i] != '{' || unclosed {
+			return -1
+		}
+		end := strings.IndexByte(s[i+1:], '}')
+		unclosed = end < 0
+		if end < 0 {
+			return -1
+		}
+		return i + 1 + end + 1
+	}
+}
 
 // AccTitleToken is Pele's ACC_TITLE, /[\t ]*accTitle[\t ]*:(?:[^\n\r]*?(?=%%)|[^\n\r]*)/y.
 var AccTitleToken = TokenType{Name: "ACC_TITLE", First: "\t a", Match: func(s string, at int) int {
@@ -256,7 +292,7 @@ var StringToken = TokenType{Name: "STRING", First: `"'`, Match: func(s string, a
 }}
 
 // NewlineToken is Pele's NEWLINE, /\r?\n/y.
-var NewlineToken = TokenType{Name: "NEWLINE", First: "\r\n", Match: lineBreak}
+var NewlineToken = TokenType{Name: "NEWLINE", First: "\r\n", Match: LineBreak}
 
 // WhitespaceToken is Pele's WHITESPACE, /[\t ]+/y, which is hidden.
 var WhitespaceToken = TokenType{Name: "WHITESPACE", First: "\t ", Hidden: true, Match: func(s string, at int) int {
@@ -271,7 +307,7 @@ func yamlOpener(s string, at int) int {
 	if !strings.HasPrefix(s[at:], "---") {
 		return -1
 	}
-	return lineBreak(s, blanks(s, at+3))
+	return LineBreak(s, blanks(s, at+3))
 }
 
 // YAMLToken is Pele's YAML, /---[\t ]*\r?\n(?:[\S\s]*?\r?\n)?---(?:\r?\n|(?!\S))/y, front
@@ -286,16 +322,16 @@ var YAMLToken = TokenType{
 			return -1
 		}
 		for k := q; k < len(s); k++ {
-			j := lineBreak(s, k)
+			j := LineBreak(s, k)
 			if j < 0 || !strings.HasPrefix(s[j:], "---") {
 				continue
 			}
-			if end := closed(s, j+3); end >= 0 {
+			if end := Closed(s, j+3); end >= 0 {
 				return end
 			}
 		}
 		if strings.HasPrefix(s[q:], "---") {
-			return closed(s, q+3)
+			return Closed(s, q+3)
 		}
 		return -1
 	},
@@ -324,7 +360,7 @@ var DirectiveToken = TokenType{
 			if !strings.HasPrefix(s[k:], "}%%") {
 				continue
 			}
-			if end := closed(s, k+3); end >= 0 {
+			if end := Closed(s, k+3); end >= 0 {
 				return end
 			}
 		}
@@ -539,7 +575,7 @@ type Reader struct {
 	I       int
 	Tokens  *Tokens
 	Types   []TokenType
-	Diagram string
+	Diagram diagram.Type
 }
 
 // Kind is the kind of the token being read.
@@ -577,5 +613,5 @@ func (r *Reader) Fail(expected string) {
 	if r.Kind() != -1 {
 		found = "`" + r.Text(r.I) + "`"
 	}
-	panic(diagram.SyntaxError(r.Diagram, r.Tokens.Src, r.Tokens.Starts[r.I], "Expecting "+expected+" but found "+found+".", false))
+	panic(SyntaxError(r.Diagram, r.Tokens.Src, r.Tokens.Starts[r.I], "Expecting "+expected+" but found "+found+".", false))
 }

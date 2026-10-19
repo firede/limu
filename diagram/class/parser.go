@@ -1,10 +1,11 @@
 package class
 
 import (
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
+// tokenSet is the set of the tokens ts, as the Uint8Arrays of Pele's parser mark them.
 func tokenSet(ts ...token) (set [t_PUNCTUATION + 1]bool) {
 	for _, t := range ts {
 		set[t] = true
@@ -12,6 +13,7 @@ func tokenSet(ts ...token) (set [t_PUNCTUATION + 1]bool) {
 	return
 }
 
+// alphaNumTokens and stylePartTokens are Pele's ALPHANUM and STYLE_PART.
 var (
 	alphaNumTokens  = tokenSet(t_UNICODE_TEXT, t_ALPHA, t_MINUS)
 	stylePartTokens = tokenSet(t_ALPHA, t_COLON, t_BRKT, t_STYLE, t_PCT, t_LABEL)
@@ -28,6 +30,7 @@ var endType = func() (t [t_PUNCTUATION + 1]int) {
 	return
 }()
 
+// nameTokens are the tokens a name may start with, as an error names them: Pele's NAME_TOKENS.
 const nameTokens = "'UNICODE_TEXT', 'NUM', 'ALPHA', 'MINUS', 'BQUOTE_STR'"
 
 // frame is an open namespace: its id, and the classes and notes declared in it. Pele's Frame.
@@ -48,9 +51,9 @@ type parser struct {
 	db   *DB
 }
 
-// ParseInto parses a class diagram's text into db, as Pele's parseClassDiagram does. An
+// parseInto parses a class diagram's text into db, as Pele's parseClassDiagram does. An
 // error is a *diagram.Error.
-func ParseInto(src string, db *DB) (err error) {
+func parseInto(src string, db *DB) (err error) {
 	p := &parser{src: src, toks: tokenize(src), db: db}
 	defer func() {
 		if r := recover(); r != nil {
@@ -65,27 +68,33 @@ func ParseInto(src string, db *DB) (err error) {
 	return nil
 }
 
+// typ is the kind of the token at i: types[i] in Pele's parseClassDiagram.
 func (p *parser) typ() token { return p.toks[p.i].typ }
 
+// typAt is the kind of the token at an index, as Pele's parseClassDiagram reads types[i + 1] to
+// look one token ahead.
 func (p *parser) typAt(i int) token { return p.toks[i].typ }
 
-func (p *parser) text() string { return p.toks[p.i].text }
-
-// next is the text of the token at i, and steps past it.
+// next is the text of the token at i, and steps past it: texts[i++] in Pele's
+// parseClassDiagram.
 func (p *parser) next() string {
 	s := p.toks[p.i].text
 	p.i++
 	return s
 }
 
+// fail stops the parse with a syntax error at the token at i, which expected names, as the
+// fail of Pele's parseClassDiagram does.
 func (p *parser) fail(expected string) {
 	t := p.toks[p.i]
 	if t.typ == t_ERROR {
-		panic(parseError{diagram.SyntaxError("class", p.src, t.start, "", true)})
+		panic(parseError{common.SyntaxError("class", p.src, t.start, "", true)})
 	}
-	panic(parseError{diagram.SyntaxError("class", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
+	panic(parseError{common.SyntaxError("class", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 }
 
+// expect is the text of the token at i, which must be of kind typ, and steps past it, as the
+// expect of Pele's parseClassDiagram does.
 func (p *parser) expect(typ token) string {
 	if p.typ() != typ {
 		p.fail("'" + tokenNames[typ] + "'")
@@ -93,6 +102,8 @@ func (p *parser) expect(typ token) string {
 	return p.next()
 }
 
+// alphaNum is the text of a word, a letter or a minus at i, and steps past it, as the alphaNum
+// of Pele's parseClassDiagram does.
 func (p *parser) alphaNum() string {
 	if !alphaNumTokens[p.typ()] {
 		p.fail("'UNICODE_TEXT', 'NUM', 'ALPHA', 'MINUS'")
@@ -101,7 +112,7 @@ func (p *parser) alphaNum() string {
 }
 
 // name reads a class's name: words joined by dots, or a name in backticks, and a generic
-// type after it if generic.
+// type after it if generic. It is the name of Pele's parseClassDiagram.
 func (p *parser) name(generic bool) string {
 	out := ""
 	for {
@@ -127,6 +138,8 @@ func (p *parser) name(generic bool) string {
 	return out
 }
 
+// classLabel reads a label in brackets, `["label"]`, as the classLabel of Pele's
+// parseClassDiagram does.
 func (p *parser) classLabel() string {
 	p.i++
 	label := p.expect(t_STR)
@@ -135,7 +148,8 @@ func (p *parser) classLabel() string {
 }
 
 // members reads the members of a class's body. The grammar collects them last to first and
-// addMembers turns them back, so here they are in the order written.
+// addMembers turns them back, so here they are in the order written. It is the members of
+// Pele's parseClassDiagram.
 func (p *parser) members() []string {
 	if p.typ() != t_MEMBER {
 		p.fail("'STRUCT_STOP', 'MEMBER'")
@@ -148,57 +162,63 @@ func (p *parser) members() []string {
 	return list
 }
 
+// classStatement reads a class statement, with its label, CSS class, annotation and body
+// where it has them, and gives the class's name, as the classStatement of Pele's
+// parseClassDiagram does.
 func (p *parser) classStatement() string {
 	p.i++
 	id := p.name(true)
-	p.db.AddClass(id)
+	p.db.addClass(id)
 	if p.typ() == t_SQS {
-		p.db.SetClassLabel(id, p.classLabel())
+		p.db.setClassLabel(id, p.classLabel())
 	}
 	switch p.typ() {
 	case t_STYLE_SEPARATOR:
 		p.i++
 		css := p.alphaNum()
-		p.db.SetCSSClass(id, css)
+		p.db.setCSSClass(id, css)
 		if p.typ() == t_STRUCT_START {
 			p.i++
-			p.db.AddMembers(id, p.members())
+			p.db.addMembers(id, p.members())
 		}
 	case t_STRUCT_START:
 		p.i++
 		if p.typ() == t_STRUCT_STOP {
 			p.i++
 		} else {
-			p.db.AddMembers(id, p.members())
+			p.db.addMembers(id, p.members())
 		}
 	case t_ANNOTATION_START:
 		p.i++
 		annotation := p.alphaNum()
 		p.expect(t_ANNOTATION_END)
-		p.db.AddAnnotation(id, annotation)
+		p.db.addAnnotation(id, annotation)
 		if p.typ() == t_STRUCT_START {
 			p.i++
 			if p.typ() == t_STRUCT_STOP {
 				p.i++
 			} else {
-				p.db.AddMembers(id, p.members())
+				p.db.addMembers(id, p.members())
 			}
 		}
 	}
 	return id
 }
 
+// noteStatement reads a note, on its own or for a class, and gives its id, as the
+// noteStatement of Pele's parseClassDiagram does.
 func (p *parser) noteStatement() string {
 	if p.typ() == t_NOTE {
 		p.i++
-		return p.db.AddNote(p.expect(t_STR), "")
+		return p.db.addNote(p.expect(t_STR), "")
 	}
 	p.i++
 	id := p.name(true)
-	return p.db.AddNote(p.expect(t_STR), id)
+	return p.db.addNote(p.expect(t_STR), id)
 }
 
-// namespaceStatement reads namespaces, which nest, with a stack of open ones.
+// namespaceStatement reads namespaces, which nest, with a stack of open ones, as the
+// namespaceStatement of Pele's parseClassDiagram does.
 func (p *parser) namespaceStatement() {
 	var open []*frame
 	for {
@@ -206,9 +226,9 @@ func (p *parser) namespaceStatement() {
 		ns := p.name(false)
 		var id string
 		if p.typ() == t_SQS {
-			id = p.db.AddNamespace(ns, p.classLabel())
+			id = p.db.addNamespace(ns, p.classLabel())
 		} else {
-			id = p.db.AddNamespace(ns, "")
+			id = p.db.addNamespace(ns, "")
 		}
 		p.expect(t_STRUCT_START)
 		if p.typ() == t_NEWLINE {
@@ -242,8 +262,8 @@ func (p *parser) namespaceStatement() {
 				p.expect(t_STRUCT_STOP)
 				done := open[len(open)-1]
 				open = open[:len(open)-1]
-				p.db.AddClassesToNamespace(done.id, done.classes, done.notes)
-				p.db.PopNamespace()
+				p.db.addClassesToNamespace(done.id, done.classes, done.notes)
+				p.db.popNamespace()
 				if len(open) == 0 {
 					item = false
 					break
@@ -256,6 +276,8 @@ func (p *parser) namespaceStatement() {
 	}
 }
 
+// relationEnd reads the marker at an end of a relation, or NoEnd where there is none, as the
+// relationEnd of Pele's parseClassDiagram does.
 func (p *parser) relationEnd() End {
 	t := endType[p.typ()]
 	if t == 0 {
@@ -265,17 +287,19 @@ func (p *parser) relationEnd() End {
 	return End(t - 1)
 }
 
+// classOrRelation reads a statement that starts with a class's name: a member given after a
+// colon, a relation, or the name alone, as the classOrRelation of Pele's parseClassDiagram
+// does.
 func (p *parser) classOrRelation() {
 	id1 := p.name(true)
 	t := p.typ()
 	if t == t_LABEL {
-		p.db.AddMember(id1, CleanupLabel(p.next()))
+		p.db.addMember(id1, cleanupLabel(p.next()))
 		return
 	}
 	title1 := "none"
 	if t == t_STR {
 		title1 = p.next()
-		t = p.typ()
 	} else if endType[t] == 0 && t != t_LINE && t != t_DOTTED_LINE {
 		return
 	}
@@ -298,12 +322,14 @@ func (p *parser) classOrRelation() {
 	r := &Relation{ID1: id1, ID2: id2, Type1: type1, Type2: type2, LineType: lineType,
 		RelationTitle1: title1, RelationTitle2: title2}
 	if p.typ() == t_LABEL {
-		r.Title = CleanupLabel(p.next())
+		r.Title = cleanupLabel(p.next())
 		r.HasTitle = true
 	}
-	p.db.AddRelation(r)
+	p.db.addRelation(r)
 }
 
+// styles reads a list of style declarations, separated by commas, as the styles of Pele's
+// parseClassDiagram does.
 func (p *parser) styles() []string {
 	var out []string
 	for {
@@ -322,12 +348,16 @@ func (p *parser) styles() []string {
 	}
 }
 
+// tooltip reads a tooltip where there is one, for the classes of id, as the tooltip of Pele's
+// parseClassDiagram does.
 func (p *parser) tooltip(id string) {
 	if p.typ() == t_STR {
-		p.db.SetTooltip(id, p.next())
+		p.db.setTooltip(id, p.next())
 	}
 }
 
+// linkStatement reads the link of the classes of id, with its tooltip and target where it has
+// them, as the linkStatement of Pele's parseClassDiagram does.
 func (p *parser) linkStatement(id string) {
 	href := p.expect(t_STR)
 	tip, hasTip := "", false
@@ -335,15 +365,17 @@ func (p *parser) linkStatement(id string) {
 		tip, hasTip = p.next(), true
 	}
 	if p.typ() == t_LINK_TARGET {
-		p.db.SetLink(id, href, p.next(), true)
+		p.db.setLink(id, href, p.next(), true)
 	} else {
-		p.db.SetLink(id, href, "", false)
+		p.db.setLink(id, href, "", false)
 	}
 	if hasTip {
-		p.db.SetTooltip(id, tip)
+		p.db.setTooltip(id, tip)
 	}
 }
 
+// statement reads one statement, as the statement of Pele's parseClassDiagram does. A
+// direction is set on the DB itself, where Pele calls setDirection.
 func (p *parser) statement() {
 	t := p.typ()
 	switch t {
@@ -363,12 +395,12 @@ func (p *parser) statement() {
 		p.i++
 		annotation := p.alphaNum()
 		p.expect(t_ANNOTATION_END)
-		p.db.AddAnnotation(p.name(true), annotation)
+		p.db.addAnnotation(p.name(true), annotation)
 		return
 	case t_CALLBACK:
 		p.i++
 		id := p.name(true)
-		p.db.SetClickEvent(id)
+		p.db.setClickEvent(id)
 		p.expect(t_STR)
 		p.tooltip(id)
 		return
@@ -388,18 +420,18 @@ func (p *parser) statement() {
 		if p.typ() == t_CALLBACK_ARGS {
 			p.i++
 		}
-		p.db.SetClickEvent(id)
+		p.db.setClickEvent(id)
 		p.tooltip(id)
 		return
 	case t_STYLE:
 		p.i++
 		id := p.expect(t_ALPHA)
-		p.db.SetCSSStyle(id, p.styles())
+		p.db.setCSSStyle(id, p.styles())
 		return
 	case t_CSSCLASS:
 		p.i++
 		ids := p.expect(t_STR)
-		p.db.SetCSSClass(ids, p.expect(t_ALPHA))
+		p.db.setCSSClass(ids, p.expect(t_ALPHA))
 		return
 	case t_NOTE, t_NOTE_FOR:
 		p.noteStatement()
@@ -411,7 +443,7 @@ func (p *parser) statement() {
 			p.i++
 			ids = append(ids, p.expect(t_ALPHA))
 		}
-		p.db.DefineClass(ids, p.styles())
+		p.db.defineClass(ids, p.styles())
 		return
 	case t_direction_tb, t_direction_bt, t_direction_rl, t_direction_lr:
 		p.i++
@@ -419,14 +451,14 @@ func (p *parser) statement() {
 		return
 	case t_acc_title:
 		p.i++
-		p.db.SetAccTitle(chars.Trim(p.expect(t_acc_title_value)))
+		p.db.setAccTitle(chars.Trim(p.expect(t_acc_title_value)))
 		return
 	case t_acc_descr:
 		p.i++
-		p.db.SetAccDescription(chars.Trim(p.expect(t_acc_descr_value)))
+		p.db.setAccDescription(chars.Trim(p.expect(t_acc_descr_value)))
 		return
 	case t_acc_descr_multiline_value:
-		p.db.SetAccDescription(chars.Trim(p.next()))
+		p.db.setAccDescription(chars.Trim(p.next()))
 		return
 	}
 	p.fail("'acc_title', 'acc_descr', 'acc_descr_multiline_value', 'NAMESPACE', 'ANNOTATION_START', 'CLASS', " +
@@ -434,6 +466,8 @@ func (p *parser) statement() {
 		"'CSSCLASS', 'ALPHA', 'MINUS', 'BQUOTE_STR'")
 }
 
+// diagram reads the whole text, its header and its statements: the body of Pele's
+// parseClassDiagram after its closures.
 func (p *parser) diagram() {
 	// Mermaid's grammar also accepts statements with no `classDiagram` line before them.
 	header := p.typ() == t_CLASS_DIAGRAM

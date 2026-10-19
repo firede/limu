@@ -1,6 +1,6 @@
 // Package usecase parses Mermaid's use case diagrams and lays them out, as Pele's
 // src/diagrams/usecase does: a lexer and a parser that make the decisions Mermaid's Chevrotain
-// parser makes, the resolution of what they read into a Model, BuildGraph, which turns the
+// parser makes, the resolution of what they read into a Model, buildGraph, which turns the
 // model into the nodes and edges that are drawn, and Layout, which lays them out as a scene.
 //
 // Offsets into the source, in a Span, are bytes of the Go string; the offsets and columns in
@@ -170,7 +170,8 @@ type Statement struct {
 	hasGroup   bool
 }
 
-// HasGroup reports whether the statement is of a system boundary, whose id may be "".
+// HasGroup reports whether the statement is of a system boundary, whose id may be "": whether
+// Pele's GraphStatement has its group set.
 func (s *Statement) HasGroup() bool { return s.hasGroup }
 
 // Model is a parsed use case diagram, Pele's UsecaseModel. Each list is in the order Pele's

@@ -1,7 +1,6 @@
 package er
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -23,26 +22,23 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 2000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -54,31 +50,15 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
-		if i := firstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, at(got, i), at(c.Lines, i))
+				t.Errorf("Layout(%q, max %v), %s", c.Src, c.MaxWidth, msg)
 			}
 		}
 	}
 	if failed > 0 {
 		t.Errorf("%d of %d differ", failed, len(p.Cases))
 	}
-}
-
-func firstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
-}
-
-func at(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
-	}
-	return "(none)"
 }
 
 // sceneLines writes a scene as the oracle reads Pele's SVG.
@@ -129,9 +109,12 @@ func sceneLines(sc *scene.Scene) []string {
 					lines = append(lines, "stripe "+box(part.Box)+" rounded")
 				case part.Paint == scene.Shade:
 					lines = append(lines, "stripe "+box(part.Box))
-				case part.Path != nil:
-					lines = append(lines, "divider "+pelesvg.D(part.Path))
 				default:
+					// Pele draws the line under the name, an item of its own after the
+					// entity, before the outline drawn again.
+					if i+1 < len(sc.Items) && sc.Items[i+1].Role == RoleDivider {
+						lines = append(lines, "divider "+pelesvg.D(sc.Items[i+1].Parts[0].Path))
+					}
 					lines = append(lines, "outline "+box(part.Box)+" "+pen(it, ""))
 				}
 			}
@@ -139,6 +122,8 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "link "+it.Link)
 			}
 			label(it.Label, it.At.X, it.At.Y)
+		case RoleDivider:
+			// Written with its entity.
 		case RoleAttributeType, RoleAttributeName, RoleAttributeKeys, RoleAttributeComment:
 			kind := strings.TrimPrefix(string(it.Role), "er.attribute-")
 			if it.Align != scene.Start {

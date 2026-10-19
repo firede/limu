@@ -246,7 +246,7 @@ func dumpModel(m *Model) object {
 	return o
 }
 
-func dumpGraph(g *Graph) object {
+func dumpGraph(g *graph) object {
 	nodes := []any{}
 	for _, n := range g.Nodes {
 		v := object{"id": n.ID, "label": n.Label, "labelType": string(n.LabelType), "shape": n.Shape, "isGroup": n.IsGroup,
@@ -332,19 +332,15 @@ func check(t *testing.T, what, src string, m *Model, err error, want peleResult)
 		return false
 	}
 	return compare(t, what+" model", src, dumpModel(m), want.Model) &&
-		compare(t, what+" graph", src, dumpGraph(BuildGraph(m)), want.Graph)
+		compare(t, what+" graph", src, dumpGraph(buildGraph(m)), want.Graph)
 }
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/usecase.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/usecase.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Cases

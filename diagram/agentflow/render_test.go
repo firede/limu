@@ -1,13 +1,12 @@
 package agentflow
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/layout"
@@ -23,26 +22,23 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 2000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, narrow := 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		if c.MaxWidth > 0 {
 			narrow++
 		}
@@ -57,9 +53,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
-		if i := firstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, pelesvg.TagsLast("clickable")); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, at(got, i), at(c.Lines, i))
+				t.Errorf("Layout(%q, max %v), %s", c.Src, c.MaxWidth, msg)
 			}
 		}
 	}
@@ -67,22 +63,6 @@ func TestLayoutMatchesPele(t *testing.T) {
 		t.Errorf("%d of %d differ", failed, len(p.Cases))
 	}
 	t.Logf("%d cases, %d of them narrow", len(p.Cases), narrow)
-}
-
-func firstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
-}
-
-func at(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
-	}
-	return "(none)"
 }
 
 // sceneLines writes a scene as the oracle reads Pele's SVG.
@@ -106,7 +86,7 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := 0; i < len(sc.Items); i++ {
 		it := &sc.Items[i]
 		id := peleID(it.ID)
-		classes := strings.Join(it.Class, " ")
+		classes := pelesvg.Classes(it)
 		kind, _ := strings.CutPrefix(string(it.Role), "agentflow.")
 		switch kind {
 		case "title":
@@ -141,7 +121,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if len(it.Parts) != 1 || it.Parts[0].Box != it.Box || !it.Parts[0].Rounded {
 				lines = append(lines, "parts differ from the box")
 			}
-			if i+2 >= len(sc.Items) || sc.Items[i+1].Role != "agentflow.collapsed-rule" || sc.Items[i+2].Role != "agentflow.collapsed-dots" {
+			if i+2 >= len(sc.Items) || sc.Items[i+1].Role != RoleCollapsedRule || sc.Items[i+2].Role != RoleCollapsedDots {
 				lines = append(lines, "no rule and dots")
 			} else {
 				d := ""

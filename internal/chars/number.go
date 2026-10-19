@@ -21,6 +21,10 @@ func NumberString(f float64) string {
 		return "-Infinity"
 	case f < 0:
 		return "-" + NumberString(-f)
+	case f < 1<<53 && f == math.Trunc(f):
+		// Below 2⁵³ doubles are no more than 1 apart, so a whole number reads back only from
+		// all of its digits.
+		return strconv.FormatInt(int64(f), 10)
 	}
 	e := strconv.FormatFloat(f, 'e', -1, 64)
 	mant, exp, _ := strings.Cut(e, "e")
@@ -36,22 +40,15 @@ func NumberString(f float64) string {
 	case -6 < n && n <= 0:
 		return "0." + strings.Repeat("0", -n) + digits
 	}
-	sign := "+"
-	if n-1 < 0 {
-		sign = "-"
+	sign, e10 := "+", n-1
+	if e10 < 0 {
+		sign, e10 = "-", -e10
 	}
-	exponent := strconv.Itoa(abs(n - 1))
+	exponent := strconv.Itoa(e10)
 	if k == 1 {
 		return digits + "e" + sign + exponent
 	}
 	return digits[:1] + "." + digits[1:] + "e" + sign + exponent
-}
-
-func abs(n int) int {
-	if n < 0 {
-		return -n
-	}
-	return n
 }
 
 // Number is JavaScript's Number() of a string: white space around it is ignored, an empty

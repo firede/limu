@@ -7,9 +7,9 @@
 //
 // It also writes what the date code gives on its own, in each zone: strict parsing and
 // formatting with dayjs's tokens, d3's axis formats, and the ticks of an axis.
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 export const ZONES = ['UTC', 'America/New_York', 'Europe/London', 'Asia/Kolkata'];
 
@@ -121,33 +121,16 @@ export const WRITTEN = [
 ];
 
 // The sources in Mermaid's specs as Pele ports them, as Pele's loadCorpus collects them.
-function specSources(pele) {
-  const out = new Set();
-  const dir = join(pele, 'tests/compat/gantt');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f))) {
-    const src = readFileSync(join(dir, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/gantt/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
+const specSources = (pele) => testStrings(pele, 'tests/compat/gantt', /\.spec\.[jt]s$/, /gantt/);
 
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/gantt-docs.json'), 'utf8'));
-  return [...new Set([...docs, ...specSources(pele), ...WRITTEN])].filter((s) => !lone(s));
+  return [...new Set([...docs(pele, 'gantt'), ...specSources(pele), ...WRITTEN])].filter((s) => !lone(s));
 }
 
 // Charts of whole statements, which mostly get through the grammar and then schedule in every
 // way the scheduler resolves.
 export function statementDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const formats = ['YYYY-MM-DD', 'YYYY-MM-DD', 'YYYY-MM-DD HH:mm', 'x', 'DD.MM.YYYY', 'MMM D YYYY', 'HH:mm', 'YYYY-MM-DDTHH:mm', 'D', 'X'];
   return () => {
     const format = pick(formats);
@@ -264,7 +247,7 @@ function schedules(m, now, caught) {
 function dates(rnd, mod) {
   const { parseStrict, format } = mod.dates;
   const { timeFormat, autoTicks, intervalTicks } = mod.axis;
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const tokens = ['YYYY', 'YY', 'Y', 'M', 'MM', 'MMM', 'MMMM', 'D', 'DD', 'Do', 'd', 'dd', 'ddd', 'dddd', 'H', 'HH', 'h', 'hh', 'a', 'A',
     'm', 'mm', 's', 'ss', 'S', 'SS', 'SSS', 'Z', 'ZZ', 'X', 'x', 'Q', 'k', 'kk', 'W', 'WW', 'GGGG', 'w', 'z', '[at]', '[W]', '-', '/', ':', ' ',
     '.', ',', 'T', 'L', 'é', '[', ']'];

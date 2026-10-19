@@ -1,7 +1,6 @@
 package cynefin
 
 import (
-	"encoding/json"
 	"strconv"
 	"strings"
 	"testing"
@@ -23,38 +22,35 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		FontSize float64  `json:"fontSize"`
-		Icons    bool     `json:"icons"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		FontSize float64 `json:"fontSize"`
+		Icons    bool    `json:"icons"`
+		fixture.Drawing
 	} `json:"cases"`
 	Randoms [][2]float64 `json:"randoms"`
 	Hashes  [][2]any     `json:"hashes"`
 }
 
-func loadRender(t *testing.T) *peleRender {
+func loadRender(t *testing.T) (*peleRender, *fixture.Drawings) {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/render.json")
+	var p peleRender
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
-		t.Fatal(err)
-	}
-	return &p
+	return &p, f
 }
 
 // hostIcons are the icons the oracle's host has, in the cases drawn with icons.
 var hostIcons = map[string]bool{"star": true, "fa:fa-car": true, "fa:fa-coffee": true}
 
 func TestLayoutMatchesPele(t *testing.T) {
-	p := loadRender(t)
+	p, f := loadRender(t)
 	if len(p.Cases) < 1800 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, items, transitions := 0, 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -79,11 +75,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			}
 		}
 		got := sceneLines(sc)
-		want := peleLines(t, c.Lines)
-		if i := pelesvg.FirstDiff(got, want); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, peleLine(t)); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, size %v, icons %v), line %d\n got %s\nPele %s", c.Src, c.FontSize, c.Icons, i,
-					pelesvg.At(got, i), pelesvg.At(want, i))
+				t.Errorf("Layout(%q, size %v, icons %v), %s", c.Src, c.FontSize, c.Icons, msg)
 			}
 		}
 	}
@@ -96,7 +90,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 }
 
 func TestSeedsMatchPele(t *testing.T) {
-	p := loadRender(t)
+	p, _ := loadRender(t)
 	if len(p.Randoms) < 2000 || len(p.Hashes) < 10 {
 		t.Fatalf("only %d seeds and %d strings", len(p.Randoms), len(p.Hashes))
 	}
@@ -129,14 +123,13 @@ func pathData(p *scene.Path) string {
 	return b.String()
 }
 
-// peleLines are the fixture's lines with the data of each path read as the scene would draw
-// it.
-func peleLines(t *testing.T, lines []string) []string {
-	out := make([]string, len(lines))
-	for i, line := range lines {
-		out[i] = line
+// peleLine reads a line of the fixture with the data of a path read as the scene would draw
+// it. The oracle keeps in full the lines of paths it reads otherwise than as they are written,
+// those with arcs among them.
+func peleLine(t *testing.T) func(string) string {
+	return func(line string) string {
 		if !strings.HasPrefix(line, "path ") {
-			continue
+			return line
 		}
 		// path, class, id, the data, and the six fields of the pen.
 		f := strings.Split(line, " ")
@@ -145,9 +138,8 @@ func peleLines(t *testing.T, lines []string) []string {
 		if err != nil {
 			t.Fatalf("path %q: %v", d, err)
 		}
-		out[i] = strings.Join(append(append(f[:3:3], pathData(p)), f[len(f)-6:]...), " ")
+		return strings.Join(append(append(f[:3:3], pathData(p)), f[len(f)-6:]...), " ")
 	}
-	return out
 }
 
 // paintNames are the theme's paints as Pele's SVG names them.
@@ -195,7 +187,7 @@ func sceneLines(sc *scene.Scene) []string {
 	}
 	// What a part is filled and stroked with, the stroke's width, its dash, cap and join.
 	pen := func(it *scene.Item, paint scene.Painting) string {
-		fill, stroke := paintName(it.Style.Fill), paintName(it.Style.Stroke)
+		fill, stroke := paintName(pelesvg.OwnFill(it)), paintName(it.Style.Stroke)
 		switch paint {
 		case scene.StrokeOnly:
 			fill = "none"

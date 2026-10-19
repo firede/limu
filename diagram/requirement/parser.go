@@ -3,7 +3,7 @@ package requirement
 import (
 	"strings"
 
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -49,10 +49,10 @@ type parser struct {
 	values []string
 }
 
-// ParseInto parses a requirement diagram's text into db, as Pele's parseRequirement does: a
+// parseInto parses a requirement diagram's text into db, as Pele's parseRequirement does: a
 // recursive-descent parser that agrees with Mermaid's requirementDiagram.jison. An error is
 // a *diagram.Error.
-func ParseInto(source string, db *DB) (err error) {
+func parseInto(source string, db *DB) (err error) {
 	p := &parser{src: source, toks: tokenize(source), db: db}
 	defer func() {
 		if r := recover(); r != nil {
@@ -76,7 +76,7 @@ func (p *parser) typ() token { return p.toks[p.i].typ }
 func (p *parser) fail(from, to token, others ...token) {
 	t := p.toks[p.i]
 	if t.typ == t_ERROR {
-		panic(parseError{diagram.SyntaxError("requirement", p.src, t.start, "", true)})
+		panic(parseError{common.SyntaxError("requirement", p.src, t.start, "", true)})
 	}
 	var b strings.Builder
 	b.WriteString("Expecting ")
@@ -95,7 +95,7 @@ func (p *parser) fail(from, to token, others ...token) {
 		name(k)
 	}
 	b.WriteString(", got '" + tokenNames[t.typ] + "'")
-	panic(parseError{diagram.SyntaxError("requirement", p.src, t.start, b.String(), false)})
+	panic(parseError{common.SyntaxError("requirement", p.src, t.start, b.String(), false)})
 }
 
 func (p *parser) expect(typ token) string {

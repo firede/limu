@@ -1,7 +1,6 @@
 package block
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -9,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -26,28 +25,25 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
-		Error    string   `json:"error"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
+		Error string `json:"error"`
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -73,10 +69,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			}
 			continue
 		}
-		got := sceneLines(sc, c.Lines)
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		got := sceneLines(sc, c.Line)
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
 		}
 	}
@@ -127,15 +123,19 @@ func paintName(p style.Paint) string {
 }
 
 // partPaint is how a part of an item is painted, as the oracle reads Pele's fill and stroke.
+// The diagram's fill and stroke are at the opacities the author's style laid over the
+// diagram's gives, as the oracle reads them from Pele's attributes and the author's style.
 func partPaint(it *scene.Item, part *scene.Part) string {
-	stroke := paintName(it.Style.Stroke)
+	s := it.Author.Over(it.Style)
+	stroke := paintName(it.Style.Stroke.Alpha(s.StrokeOpacity.Or(1)))
+	fill := paintName(it.Style.Fill.Alpha(s.FillOpacity.Or(1)))
 	switch part.Paint {
 	case scene.StrokeOnly:
 		return "none " + stroke
 	case scene.FillOnly:
-		return paintName(it.Style.Fill) + " -"
+		return fill + " -"
 	}
-	return paintName(it.Style.Fill) + " " + stroke
+	return fill + " " + stroke
 }
 
 // labelLine is the line the oracle writes of a label drawn about at: the point, the label's
@@ -276,16 +276,12 @@ func partsOf(parts []scene.Part) string {
 	return b.String()
 }
 
-// sceneLines writes a scene as the oracle reads Pele's SVG; want is Pele's lines, whose arcs
-// are hints for writing the scene's curves.
-func sceneLines(sc *scene.Scene, want []string) []string {
+// sceneLines writes a scene as the oracle reads Pele's SVG; want is the line Pele drew at an
+// index, or "" where the fixture does not hold it, and the arcs of its lines are hints for
+// writing the scene's curves. The oracle keeps the lines of paths with arcs in full.
+func sceneLines(sc *scene.Scene, want func(int) string) []string {
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
-	hint := func() string {
-		if len(lines) < len(want) {
-			return want[len(lines)]
-		}
-		return ""
-	}
+	hint := func() string { return want(len(lines)) }
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		id := pelesvg.ID(it.ID)
@@ -356,7 +352,7 @@ func sceneLines(sc *scene.Scene, want []string) []string {
 			}
 		case RoleEdgeLabel:
 			r := it.Box
-			if it.Parts[0].Box != r {
+			if pelesvg.D(it.Parts[0].Path) != pelesvg.D(new(scene.Path).RoundRect(r, draw.LabelPatchRadius)) {
 				lines = append(lines, "patch not the label's box")
 			}
 			lines = append(lines, "elabel "+id+" "+pt(r.X, r.Y)+","+pt(r.W, r.H)+" "+paintName(it.Style.Fill))

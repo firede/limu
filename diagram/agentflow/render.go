@@ -3,13 +3,14 @@ package agentflow
 import (
 	"math"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/flowchart"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
-	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -25,7 +26,6 @@ const (
 	groupPad = 20
 	loop     = 26
 	dots     = 14
-	padding  = common.Padding
 )
 
 // collapsed is the shape a collapsed flow is drawn with: a box with a dashed rule and three
@@ -34,7 +34,7 @@ const collapsed = "collapsed"
 
 // flowEnd is the side a flow runs toward, with sides numbered clockwise from the top, as
 // Pele's FLOW_END has it.
-var flowEnd = map[layout.Dir]int{layout.TB: 2, layout.RL: 3, layout.BT: 0, layout.LR: 1}
+var flowEnd = map[graphs.Dir]int{graphs.TB: 2, graphs.RL: 3, graphs.BT: 0, graphs.LR: 1}
 
 // Layout lays out a parsed agent flow as a scene, as Pele's renderAgentflow draws it: in its
 // own direction, or, when one that runs across does not fit o.MaxWidth, down instead if
@@ -67,26 +67,22 @@ func numberOption(config diagram.Config, key string, fallback float64) float64 {
 	return fallback
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // A view is a node as it is drawn: Pele's NodeView.
 type view struct {
-	node   *GraphNode
-	author style.Author
+	node   *graphNode
+	author css.Author
 	label  text.Label
 	shape  string
 	w, h   float64
 	dy     float64
 	loops  int
+	// filled is whether the author's style declares a fill, which replaces the wash of a tint.
+	filled bool
 }
 
 // slot is the palette slot of a flow, collapsed or not: its own, or the one past the kinds.
-func slot(n *GraphNode) int {
+// It is Pele's node.colorIndex ?? KIND_SLOT.size, in its draw.
+func slot(n *graphNode) int {
 	if n.ColorIndex >= 0 {
 		return n.ColorIndex
 	}
@@ -94,14 +90,20 @@ func slot(n *GraphNode) int {
 }
 
 // tint is a palette color as an outline with a light wash of the same color inside, as Pele's
-// tint draws it. A fill the author set replaces the wash, opaque, as it replaces any fill.
-func tint(slot int, wash float64) style.Style {
-	return style.Style{Fill: style.Series(slot).Alpha(wash), Stroke: style.Series(slot)}
+// tint draws it: the wash a fill opacity, which Pele writes only where the author declares no
+// fill, so that a fill the author sets is opaque, and a fill opacity the author sets with no
+// fill washes the palette color at it.
+func tint(slot int, wash float64, filled bool) style.Style {
+	s := style.Style{Fill: style.Series(slot), Stroke: style.Series(slot)}
+	if !filled {
+		s.FillOpacity = style.N(wash)
+	}
+	return s
 }
 
 // A held edge runs between a node and a flow around it, which the layout has no place for.
 type held struct {
-	edge     *GraphEdge
+	edge     *graphEdge
 	label    text.Label
 	src, dst int
 }
@@ -109,9 +111,10 @@ type held struct {
 // lay lays the agent flow out once, as Pele's draw does. down lays out one that runs across
 // as one that runs down.
 func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Scene {
-	graph := db.Graph(DefaultCurve(config))
+	padding := o.Pad()
+	graph := db.agentGraph(defaultCurve(config))
 	size := o.Size()
-	edgeSize := math.Floor(size*0.875 + 0.5)
+	edgeSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
 	wrapWidth := numberOption(config, "wrappingWidth", 120)
 	minWidth := numberOption(config, "minNodeWidth", 120)
@@ -119,26 +122,20 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
 	// The routing the options ask for, which Pele has no option for, overrides the curves.
-	curve := ""
-	switch o.Routing {
-	case layout.Orthogonal:
-		curve = "step"
-	case layout.Straight:
-		curve = "linear"
-	}
+	curve := common.RoutingCurve(o.Routing)
 
 	index := make(map[string]int, len(graph.Nodes))
 	for i, n := range graph.Nodes {
 		index[n.ID] = i
 	}
 	views := make([]view, 0, len(graph.Nodes))
-	cnodes := make([]layout.CNode, 0, len(graph.Nodes))
+	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for _, node := range graph.Nodes {
 		decls := node.CSSCompiledStyles
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold
@@ -152,15 +149,15 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			fontSize = author.FontSize
 		}
 		var v view
-		var c layout.CNode
+		var c graphs.CNode
 		switch {
 		case node.IsGroup:
 			label := labelOf(node.Label, markdown, fontSize, 4000, face)
 			v = view{node: node, author: author, label: label, shape: "group"}
-			c = layout.NewCNode(0, 0, -1)
+			c = graphs.NewCNode(0, 0, -1)
 			c.IsGroup = true
 			if node.Dir != "" {
-				c.Dir = layout.Direction(node.Dir)
+				c.Dir = graphs.Direction(node.Dir)
 			}
 			c.PadX = groupPad
 			if label.Height > 0 {
@@ -175,7 +172,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			w := max(label.Width, minWidth) + 2*draw.PadX
 			h := label.Height + 2*draw.PadY + dots
 			v = view{node: node, author: author, label: label, shape: collapsed, w: w, h: h, dy: -dots / 2}
-			c = layout.NewCNode(w, h, -1)
+			c = graphs.NewCNode(w, h, -1)
 		default:
 			shape := flowchart.CanonicalShape(node.Shape)
 			label := labelOf(node.Label, markdown, fontSize, wrapWidth, face)
@@ -186,8 +183,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			}
 			s := draw.ShapeSize(shape, tw, label.Height)
 			v = view{node: node, author: author, label: label, shape: shape, w: s.W, h: s.H, dy: s.DY}
-			c = layout.NewCNode(s.W, s.H, -1)
+			c = graphs.NewCNode(s.W, s.H, -1)
 		}
+		v.filled = css.FillDeclared(decls)
 		c.Seq = float64(len(views))
 		views = append(views, v)
 		cnodes = append(cnodes, c)
@@ -200,13 +198,13 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		}
 	}
 
-	rootDir := layout.Direction(db.Direction)
+	rootDir := graphs.Direction(db.Direction)
 	if down {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
 	// The direction of the level a node sits in.
-	flowOf := func(i int) layout.Dir {
-		var dir layout.Dir
+	flowOf := func(i int) graphs.Dir {
+		var dir graphs.Dir
 		for p, hops := cnodes[i].Parent, 0; p >= 0 && dir == "" && hops < 10000; p, hops = cnodes[p].Parent, hops+1 {
 			dir = cnodes[p].Dir
 		}
@@ -215,9 +213,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		}
 		return dir
 	}
+	// flowsSideways reports whether the level a node sits in runs across, as Pele's
+	// flowsSideways does.
 	flowsSideways := func(i int) bool {
 		dir := flowOf(i)
-		return dir == layout.LR || dir == layout.RL
+		return dir == graphs.LR || dir == graphs.RL
 	}
 
 	depth := make([]int, len(cnodes))
@@ -240,6 +240,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			d++
 		}
 	}
+	// contains reports whether node i is inside group, at any depth, as Pele's contains does.
 	contains := func(group, i int) bool {
 		j := i
 		for d := depth[i]; d > depth[group] && j >= 0; d-- {
@@ -248,9 +249,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		return j == group && i != group
 	}
 
-	var cedges []layout.CEdge
+	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	// Edges between a node and a flow around it. The layout has no place for them, so they
 	// are drawn afterwards, between the node and the flow's border.
 	var holds []held
@@ -289,7 +290,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		if edge.MinLen == 0 {
 			minlen = 1
 		}
-		ce := layout.CEdge{Src: src, Dst: dst, Minlen: minlen}
+		ce := graphs.CEdge{Src: src, Dst: dst, Minlen: minlen}
 		if label.Width > 0 {
 			ce.LabelW = label.Width + 12
 		}
@@ -299,7 +300,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		cedges = append(cedges, ce)
 	}
 
-	opt := layout.LayeredOptions{
+	opt := graphs.LayeredOptions{
 		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
 		EdgeSep:  edgeSep,
 		RankSep:  numberOption(config, "rankSpacing", rankSep),
@@ -307,7 +308,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		Tracks:   curve == "step",
 		Straight: curve == "linear",
 	}
-	result := layout.Compound(cnodes, cedges, rootDir, opt)
+	result := graphs.Compound(cnodes, cedges, rootDir, opt)
 
 	title := labelOf(db.Title, false, size, 4000, text.Bold)
 	titleHeight := 0.0
@@ -317,7 +318,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 	inner := max(result.Width, title.Width)
 	ox := padding + (inner-result.Width)/2
 	oy := padding + titleHeight
-	layout.Shift(cnodes, cedges, ox, oy)
+	graphs.Shift(cnodes, cedges, ox, oy)
 	sc := &scene.Scene{
 		Type:     "agentflow",
 		Width:    math.Ceil(inner + 2*padding),
@@ -356,6 +357,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		if out {
 			first = end
 		}
+		// toward is the straight route between the node and the side of its flow, as Pele's
+		// toward gives it.
 		toward := func(side int) []float64 {
 			upright := side&1 == 0
 			sign := 1.0
@@ -376,6 +379,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			}
 			return []float64{bx, by, axis, nx, ny, axis}
 		}
+		// blocked reports whether another node that is not a flow lies across route r, as
+		// Pele's blocked does.
 		blocked := func(r []float64) bool {
 			for k := range cnodes {
 				c := &cnodes[k]
@@ -427,7 +432,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 	var titles, clusters, nodes, edges, labels []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "agentflow.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: padding + title.Height/2},
 		})
 	}
@@ -436,14 +441,14 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		c := &cnodes[i]
 		n := v.node
 		x, y := c.X, c.Y
-		classes := classNames(trimDefault(n.CSSClasses))
+		classes, tags := common.Clickable(common.ClassNames(common.TrimDefault(n.CSSClasses)))
 		if c.IsGroup {
 			titleX := draw.ClusterTitleX(node(i), v.label.Width, crossings, groupPad)
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
-			own := tint(slot(n), 0.06)
+			own := tint(slot(n), 0.06, v.filled)
 			own.Text = style.Muted
 			cluster := scene.Item{
-				Kind: scene.Group, Role: "agentflow.flow", ID: n.ID, Class: classes, Box: box,
+				Kind: scene.Group, Role: RoleFlow, ID: n.ID, Class: classes, Tags: tags, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
 				Style:  own,
 				Author: v.author.Style,
@@ -459,7 +464,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		w, h := v.w, v.h
 		box := scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h}
 		it := scene.Item{
-			Kind: scene.Node, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Box: box,
+			Kind: scene.Node, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Tags: tags, Box: box,
 			Author: v.author.Style,
 			Label:  &v.label, At: scene.Point{X: x, Y: y + v.dy},
 			Tooltip: n.Tooltip,
@@ -467,16 +472,16 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		var marks []scene.Item
 		if v.shape == collapsed {
 			s := slot(n)
-			it.Role = "agentflow.collapsed"
+			it.Role = RoleCollapsed
 			it.Parts = []scene.Part{{Box: box, Rounded: true}}
-			it.Style = tint(s, 0.06)
+			it.Style = tint(s, 0.06, v.filled)
 			// What the author set for lines styles the rule, and fills nothing.
 			line := v.author.Style
 			line.Fill = style.Paint{}
 			rule := h/2 - dots - 2
 			mid := rule + (dots+2)/2
 			marks = []scene.Item{{
-				Kind: scene.Mark, Role: "agentflow.collapsed-rule", ID: n.ID,
+				Kind: scene.Mark, Role: RoleCollapsedRule, ID: n.ID,
 				Box: scene.Rect{X: x - w/2 + 10, Y: y + rule, W: w - 20},
 				Parts: []scene.Part{{
 					Path:  new(scene.Path).MoveTo(x+(-w/2+10), y+rule).LineTo(x+(w/2-10), y+rule),
@@ -485,7 +490,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 				Style:  style.Style{Stroke: style.Series(s), Fill: style.None, Dash: style.Dashes(3, 3)},
 				Author: line,
 			}, {
-				Kind: scene.Mark, Role: "agentflow.collapsed-dots", ID: n.ID,
+				Kind: scene.Mark, Role: RoleCollapsedDots, ID: n.ID,
 				Box:   scene.Rect{X: x - 9 - 1.75, Y: y + mid - 1.75, W: 18 + 3.5, H: 3.5},
 				Parts: []scene.Part{{Path: dot(dot(dot(new(scene.Path), x, y, -9, mid), x, y, 0, mid), x, y, 9, mid)}},
 				Style: style.Style{Fill: style.Series(s), Stroke: style.None},
@@ -501,7 +506,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			}
 			it.Role = scene.Role("agentflow." + kind)
 			it.Parts = draw.Outline(v.shape, x, y, w, h)
-			it.Style = tint(s, 0.14)
+			it.Style = tint(s, 0.14, v.filled)
 		}
 		if hasClass(classes, "internal-link") && n.Label != "" && !o.NoLinks {
 			// The label is a note's name, but it ends up a link, so it is checked as an address.
@@ -519,10 +524,12 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		nodes = append(nodes, marks...)
 	}
 
-	put := func(edge *GraphEdge, label *text.Label, path draw.EdgePath, route []float64, x, y float64) {
-		var author style.Author
+	// put adds an edge and its label, as Pele's put draws them; route, which Pele does not
+	// have, is the route the edge was laid out along.
+	put := func(edge *graphEdge, label *text.Label, path draw.EdgePath, route []float64, x, y float64) {
+		var author css.Author
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
-			author = style.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
+			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
 			// What styles an edge's line styles its marker, and fills nothing.
 			author.Style.Fill = style.Paint{}
 		}
@@ -539,7 +546,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		}
 		it := scene.Item{
 			Kind: scene.Edge, Role: scene.Role("agentflow." + kind), ID: edge.ID,
-			Class:  classNames(edgeClassNoise.Replace(edge.Classes)),
+			Class:  common.ClassNames(edgeClassNoise.Replace(edge.Classes)),
 			Box:    path.Path.Bounds(),
 			Parts:  []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 			Ends:   path.Ends("", scene.MarkerType(edge.ArrowTypeEnd)),
@@ -549,10 +556,14 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
 		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
+		}
 		edges = append(edges, it)
 		if label.Width > 0 {
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: "agentflow.edge-label", ID: edge.ID,
+				Kind: scene.Text, Role: RoleEdgeLabel, ID: edge.ID,
 				Box:    scene.Rect{X: x - (label.Width+8)/2, Y: y - label.Height/2, W: label.Width + 8, H: label.Height},
 				Parts:  []scene.Part{draw.LabelPatch(label, x, y)},
 				Label:  label,
@@ -614,18 +625,8 @@ func dot(p *scene.Path, x, y, dx, dy float64) *scene.Path {
 // The classes Mermaid gives every edge, which say nothing.
 var edgeClassNoise = strings.NewReplacer("edge-thickness-normal", "", "edge-pattern-solid", "", "flowchart-link", "")
 
-// trimDefault takes /^default\s?/ off a node's classes: the class every node has.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
-}
-
+// hasClass reports whether name is one of classes, the test Pele's draw makes for
+// internal-link with / internal-link(?: |$)/ on the joined class names.
 func hasClass(classes []string, name string) bool {
 	for _, c := range classes {
 		if c == name {

@@ -1,7 +1,6 @@
 package swimlane
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/firede/limu/diagram"
@@ -17,29 +16,26 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src        string   `json:"src"`
-		MaxWidth   float64  `json:"maxWidth"`
-		Keep       bool     `json:"keep"`
-		Breakpoint float64  `json:"breakpoint"`
-		Unlimited  bool     `json:"unlimited"`
-		Lines      []string `json:"lines"`
+		Src        string  `json:"src"`
+		MaxWidth   float64 `json:"maxWidth"`
+		Keep       bool    `json:"keep"`
+		Breakpoint float64 `json:"breakpoint"`
+		Unlimited  bool    `json:"unlimited"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		opt := diagram.Options{}
 		if c.Unlimited {
 			opt.Limit = -1
@@ -64,9 +60,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("Layout(%q) is a scene of a %s", c.Src, sc.Type)
 		}
 		got := pelesvg.FlowLines(sc)
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, pelesvg.TagsLast("clickable")); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v), %s", c.Src, c.MaxWidth, msg)
 			}
 		}
 	}

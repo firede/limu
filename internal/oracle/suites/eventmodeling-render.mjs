@@ -14,17 +14,10 @@
 //
 // Cases whose example data or notes Pele's hardWrap would cut between the two halves of a
 // character past the Basic Multilingual Plane are left out: a Go string holds no half of one.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n, pt, readHead } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './eventmodeling.mjs';
-
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (s) => String(Number(s));
-const pt = (x, y) => `${n(x)},${n(y)}`;
 
 // The subpaths of a path's d, each as one string of absolute commands, with H and V written
 // as L.
@@ -69,19 +62,9 @@ function subpaths(d) {
 // The lines of an event model's SVG, drawn with its numbers in full.
 export function readSvg(svg, fontSize) {
   const lines = [];
-  const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`);
-  let body = svg.slice(svg.indexOf('>') + 1, svg.lastIndexOf('</svg>'));
-  const title = /^<title id="[^"]*">([^<]*)<\/title>/.exec(body);
-  if (title) {
-    lines.push(`acc-title ${unescape(title[1])}`);
-    body = body.slice(title[0].length);
-  }
-  const desc = /^<desc id="[^"]*">([^<]*)<\/desc>/.exec(body);
-  if (desc) {
-    lines.push(`acc-desc ${unescape(desc[1])}`);
-    body = body.slice(desc[0].length);
-  }
+  const { open: head, body: all, acc } = readHead(svg);
+  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`, ...acc);
+  const body = all.slice(0, all.lastIndexOf('</svg>'));
   // Whether the group being read is a frame's.
   const groups = [];
   const text = (s, open) => {

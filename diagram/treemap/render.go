@@ -2,10 +2,10 @@ package treemap
 
 import (
 	"math"
-	"strings"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -43,15 +43,6 @@ func option(config diagram.Config, key string, fallback, lo, hi float64) float64
 	return fallback
 }
 
-// line is a label of one line of text, measured, in a size and face of type.
-func line(s string, width, size float64, face text.Face) *text.Label {
-	lh := jsmath.Round(size * text.LineHeight)
-	return &text.Label{
-		Lines:  [][]text.Span{{{Text: s, Face: face, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lh, Size: size, LineHeight: lh,
-	}
-}
-
 // classes is the class a node's text gives it, as Pele's classNames writes it: a name of a
 // class is an ID2 token, which holds no character it would take out.
 func classes(class string) []string {
@@ -59,13 +50,6 @@ func classes(class string) []string {
 		return nil
 	}
 	return []string{class}
-}
-
-// fillsShape reports whether declarations give a shape a fill of its own, as Pele finds it
-// with /[";]fill:/ in the style it writes on the shape.
-func fillsShape(decls []string) bool {
-	css := style.ShapeCSS(decls)
-	return strings.HasPrefix(css, "fill:") || strings.Contains(css, ";fill:")
 }
 
 // Layout lays a treemap out as a scene, as Pele's renderTreemap does: the tree squarified into
@@ -83,7 +67,11 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	least := jsmath.Round(size * 0.5625)
 	measure := o.Measure()
 	section, _ := config["treemap"].(diagram.Config)
+	// The host's padding, or the diagram's own.
 	pad := option(config, "diagramPadding", 8, 0, 2000)
+	if o.Padding != nil {
+		pad = *o.Padding
+	}
 
 	// Mermaid sizes the diagram as ten times nodeWidth by ten times nodeHeight.
 	width := jsmath.Round(common.CapWidth(o, option(config, "nodeWidth", 64, 1, 400)*10, 200, float64(2*pad)))
@@ -107,7 +95,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	var sections, leaves []scene.Item
 	for _, b := range boxes {
 		node := b.node
-		author := style.Declarations(node.CSS)
+		author := css.Declarations(node.CSS)
 		// The value's text takes what of the author's style a text does.
 		valueAuthor := style.Style{Text: author.Style.Text, Opacity: author.Style.Opacity}
 		color := style.Series(b.series)
@@ -128,12 +116,11 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 
 		if node.Section {
 			// A section is a tint of its color, unless a class gives it a fill of its own.
-			fill := color.Alpha(0.12)
-			if fillsShape(node.CSS) {
-				fill = color
-			}
 			it.Kind, it.Role = scene.Group, RoleSection
-			it.Style = style.Style{Fill: fill, Stroke: color, Text: style.Fg}
+			it.Style = style.Style{Fill: color, Stroke: color, Text: style.Fg}
+			if !css.FillDeclared(node.CSS) {
+				it.Style.FillOpacity = style.N(0.12)
+			}
 			var shown *scene.Item
 			if b.h >= header {
 				room := b.w - 2*sideInset - 4
@@ -148,14 +135,14 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 				}
 				baseline := y + header/2 + 1
 				if f, ok := common.FitText(name, fit, small, small, measure, text.Bold); ok {
-					it.Label = line(f.Text, f.Width, f.Size, text.Bold)
+					it.Label = common.Line(f.Text, f.Width, f.Size, text.Bold)
 					it.At = scene.Point{X: x + sideInset + 2, Y: baseline}
 					it.Align = scene.Start
 				}
 				if withValue {
 					shown = &scene.Item{
 						Kind: scene.Text, Role: RoleValue, ID: node.Name,
-						Label: line(value, valueWidth, tiny, 0), Align: scene.End,
+						Label: common.Line(value, valueWidth, tiny, 0), Align: scene.End,
 						At:     scene.Point{X: x + b.w - sideInset - 2, Y: baseline},
 						Style:  style.Style{Text: style.Muted},
 						Author: valueAuthor,
@@ -180,7 +167,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 				cy := y + b.h/2
 				valueSize := max(least, jsmath.Round(f.Size*0.8))
 				lines := (f.Size + valueSize) * lineSpacing
-				it.Label = line(f.Text, f.Width, f.Size, 0)
+				it.Label = common.Line(f.Text, f.Width, f.Size, 0)
 				it.At = scene.Point{X: cx, Y: cy}
 				valueWidth := 0.0
 				if value != "" && lines <= b.h-4 {
@@ -190,7 +177,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 					it.At.Y = cy - lines/2 + (f.Size*lineSpacing)/2
 					shown = &scene.Item{
 						Kind: scene.Text, Role: RoleValue, ID: node.Name,
-						Label:  line(value, valueWidth, valueSize, 0),
+						Label:  common.Line(value, valueWidth, valueSize, 0),
 						At:     scene.Point{X: cx, Y: cy + lines/2 - (valueSize*lineSpacing)/2},
 						Style:  style.Style{Text: style.Bg},
 						Author: valueAuthor,

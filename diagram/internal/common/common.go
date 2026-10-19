@@ -1,5 +1,21 @@
 // Package common holds what the diagrams share beyond layout and drawing, as Pele's
-// diagrams/common does: fitting a diagram to the host's width, and reading generic types.
+// diagrams/common does:
+//
+//   - fitting a diagram to the width the host has (Tighten, TurnToFit, FitWidth), and the
+//     curve the host's routing asks for (RoutingCurve);
+//   - laying out labels: plain and fitted ones (fit.go), text cut to fit a room and
+//     one-line labels (fittext.go: FitText, Line, LineOf), labels taken literally
+//     (literallabel.go), and a diagram's title (title.go);
+//   - reading generic types (generics.go) and class lists (classes.go: ClassNames,
+//     TrimDefault);
+//   - the icons a host can draw, and the glyphs drawn for them (icons.go);
+//   - the lexer and reader of the Langium grammars, with the token types they share
+//     (tokens.go: Tokenize, Reader, Keyword, AccDescr and the rest);
+//   - the scanning helpers of the hand-written Jison lexers (scan.go: KeywordAt, WordAt,
+//     Accessibility and the rest);
+//   - the indented outlines of kanban boards and mindmaps (outline.go);
+//   - the errors of diagrams' text, as Pele's src/errors.ts makes them (errors.go: NewError,
+//     SyntaxError, Locate).
 package common
 
 import (
@@ -7,8 +23,18 @@ import (
 	"github.com/firede/limu/scene"
 )
 
-// Padding is the room about a diagram, as Pele's default padding.
-const Padding = 8
+// RoutingCurve is the curve, by Mermaid's name, that the host's routing asks edges to be
+// drawn with: "step" for layout.Orthogonal, "linear" for layout.Straight, and "" for
+// layout.Auto, which leaves the diagram's own curve. Pele has no such setting; it is limu's.
+func RoutingCurve(r layout.Routing) string {
+	switch r {
+	case layout.Orthogonal:
+		return "step"
+	case layout.Straight:
+		return "linear"
+	}
+	return ""
+}
 
 // RunsAcross reports whether a direction runs across, as Pele's runsAcross does.
 func RunsAcross(dir string) bool { return dir == "LR" || dir == "RL" }
@@ -70,7 +96,7 @@ func FitWidth(o *layout.Options, natural, least float64, lay func(plot float64, 
 // TitleRoom is the width a title may take before it wraps, as Pele's titleRoom gives it.
 func TitleRoom(o *layout.Options) float64 {
 	if o.MaxWidth > 0 {
-		return max(80, o.MaxWidth-2*Padding)
+		return max(80, o.MaxWidth-2*o.Pad())
 	}
 	return 4000
 }

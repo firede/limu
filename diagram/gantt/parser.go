@@ -1,10 +1,12 @@
 package gantt
 
 import (
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
+// lineTokens is Pele's LINE: the tokens Mermaid's parser names as expected at the start of a
+// line.
 const lineTokens = "'EOF', 'SPACE', 'NL', 'weekday_monday', 'weekday_tuesday', 'weekday_wednesday', 'weekday_thursday', " +
 	"'weekday_friday', 'weekday_saturday', 'weekday_sunday', 'weekend_friday', 'weekend_saturday', 'dateFormat', " +
 	"'inclusiveEndDates', 'topAxis', 'axisFormat', 'tickInterval', 'excludes', 'includes', 'todayMarker', 'title', " +
@@ -24,7 +26,7 @@ var startsLine = func() [tEOF + 1]bool {
 	return s
 }()
 
-// parseError carries an error out of the parser's depths.
+// parseError carries an error out of the parser's depths, as Pele's fail throws one.
 type parseError struct{ err error }
 
 // parseInto is Pele's parseGantt: it reads the statements of src into db, accepting what
@@ -42,14 +44,16 @@ func parseInto(src string, db *DB) (err error) {
 		}
 	}()
 
+	// fail is Pele's fail: the syntax error of a token where the parser expected others.
 	fail := func(expected string) {
 		t := toks[i].typ
 		got := "1"
 		if t != tEND {
 			got = tokenNames[t]
 		}
-		panic(parseError{diagram.SyntaxError("gantt", src, toks[i].start, "Expecting "+expected+", got '"+got+"'", false)})
+		panic(parseError{common.SyntaxError("gantt", src, toks[i].start, "Expecting "+expected+", got '"+got+"'", false)})
 	}
+	// end is Pele's end.
 	// Mermaid's parser runs a statement's action only after seeing that the next token can
 	// follow it.
 	end := func(also string) {

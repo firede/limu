@@ -143,9 +143,9 @@ var detectors = []struct {
 	})},
 }
 
-// Detect is the type of diagram a preprocessed text is, as Pele's detect finds it, or "" when
+// detect is the type of diagram a preprocessed text is, as Pele's detect finds it, or "" when
 // it is none.
-func Detect(cleaned string) Type {
+func detect(cleaned string) Type {
 	for _, d := range detectors {
 		if d.match(cleaned) {
 			return d.typ
@@ -155,11 +155,12 @@ func Detect(cleaned string) Type {
 }
 
 // DetectType is the type of diagram a text is, or "" when it is none, as Pele's detectType
-// finds it. Its error is one of its front matter.
+// finds it. Its error is one of its front matter. Bytes that are not UTF-8 are read as
+// Prepare reads them.
 func DetectType(text string) (Type, error) {
-	pre, err := Preprocess(text)
+	pre, err := preprocess(chars.Decode(text))
 	if err != nil {
 		return "", err
 	}
-	return Detect(pre.Text), nil
+	return detect(pre.Text), nil
 }

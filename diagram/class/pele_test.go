@@ -136,7 +136,7 @@ func dumpDB(db *DB) object {
 	return o
 }
 
-func dumpGraph(g *Graph) object {
+func dumpGraph(g *graph) object {
 	nodes := []any{}
 	for _, n := range g.Nodes {
 		v := object{"id": n.ID, "label": n.Label, "isGroup": n.IsGroup, "shape": n.Shape, "parent": n.Parent}
@@ -207,12 +207,8 @@ type peleFixture struct {
 
 func loadFixture(t *testing.T) peleFixture {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/class.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleFixture
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/class.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p
@@ -223,12 +219,12 @@ func loadFixture(t *testing.T) peleFixture {
 func checkParsed(t *testing.T, what, src string, db *DB, hierarchical bool, wantDB, wantGraph, wantFlat any) bool {
 	t.Helper()
 	if !compare(t, what+" db", src, dumpDB(db), wantDB) ||
-		!compare(t, what+" graph", src, dumpGraph(BuildGraph(db, hierarchical)), wantGraph) {
+		!compare(t, what+" graph", src, dumpGraph(buildGraph(db, hierarchical)), wantGraph) {
 		return false
 	}
 	var flat any
 	if hierarchical && len(db.Namespaces) > 0 {
-		flat = dumpGraph(BuildGraph(db, false))
+		flat = dumpGraph(buildGraph(db, false))
 	}
 	return compare(t, what+" flat graph", src, flat, wantFlat)
 }
@@ -260,16 +256,16 @@ func TestParseMatchesPele(t *testing.T) {
 			t.Errorf("type of %q: %q, Pele %v", c.Src, typ, c.Type)
 			ok = false
 		case typ != diagram.Class:
-			db := NewDB()
-			if err := ParseInto(c.Src, db); err != nil {
+			db := newDB()
+			if err := parseInto(c.Src, db); err != nil {
 				if c.Direct.Error == nil {
-					t.Errorf("ParseInto(%q): %v, Pele had none", c.Src, err)
+					t.Errorf("parseInto(%q): %v, Pele had none", c.Src, err)
 					ok = false
 				} else {
 					ok = compare(t, "direct error", c.Src, dumpError(err), c.Direct.Error)
 				}
 			} else if c.Direct.Error != nil {
-				t.Errorf("ParseInto(%q): no error, Pele %v", c.Src, c.Direct.Error)
+				t.Errorf("parseInto(%q): no error, Pele %v", c.Src, c.Direct.Error)
 				ok = false
 			} else {
 				ok = checkParsed(t, "direct", c.Src, db, true, c.Direct.DB, c.Direct.Graph, c.Direct.Flat)
@@ -287,7 +283,7 @@ func TestParseMatchesPele(t *testing.T) {
 				t.Errorf("Parse(%q): no error, Pele %v", c.Src, c.Error)
 				ok = false
 			} else {
-				ok = checkParsed(t, "parsed", c.Src, db, Hierarchical(pre.Config), c.DB, c.Graph, c.Flat)
+				ok = checkParsed(t, "parsed", c.Src, db, hierarchical(pre.Config), c.DB, c.Graph, c.Flat)
 			}
 		}
 		if !ok {
@@ -305,7 +301,7 @@ func TestMembersMatchPele(t *testing.T) {
 	}
 	failed := 0
 	for _, m := range p.Members {
-		if !compare(t, m.Kind, m.Input, dumpMember(NewMember(m.Input, m.Kind)), m.Member) {
+		if !compare(t, m.Kind, m.Input, dumpMember(newMember(m.Input, m.Kind)), m.Member) {
 			if failed++; failed >= 10 {
 				t.Fatal("too many failures")
 			}

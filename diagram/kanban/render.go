@@ -113,13 +113,6 @@ type card struct {
 	height float64
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // labelOf is a label to put on an item: nil for one with nothing to draw.
 func labelOf(l *text.Label) *text.Label {
 	if l.Empty() {
@@ -141,7 +134,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	line := jsmath.Round(size * 1.5)
 	smallLine := jsmath.Round(small * 1.5)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	conf, _ := config["kanban"].(diagram.Config)
 	ownWidth := 200.0
 	if w, ok := conf["sectionWidth"].(float64); ok && w > 0 {
@@ -166,7 +159,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	cardWidth := columnWidth - 2*columnPad
 	textWidth := cardWidth - 2*cardPad
 	glyph := small * 1.25
-	has := func(name string) bool { return name != "" && o.Icons != nil && o.Icons(text.DecodeEntities(name)) }
+	has := func(name string) bool { return name != "" && common.HostIcon(o, name) }
 	iconRoom := func(name string) float64 {
 		if has(name) {
 			return glyph + iconGap
@@ -245,7 +238,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	}
 	if !title.Empty() {
 		sc.Items = append(sc.Items, scene.Item{
-			Kind: scene.Text, Role: "kanban.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At:    scene.Point{X: sc.Width / 2, Y: pad + title.Height/2},
 			Style: style.Style{Text: style.Fg},
 		})
@@ -256,7 +249,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		gy := pad + titleHeight + rowTops[row]
 		box := scene.Rect{X: gx, Y: gy, W: columnWidth, H: rowHeights[row]}
 		column := scene.Item{
-			Kind: scene.Group, Role: "kanban.column", Shape: "rect", ID: section.ID, Class: classNames(section.CSSClasses),
+			Kind: scene.Group, Role: RoleColumn, Shape: "rect", ID: section.ID, Class: common.ClassNames(section.CSSClasses),
 			Box:   box,
 			Parts: []scene.Part{{Box: box, Rounded: true, Paint: scene.FillOnly}},
 			Label: labelOf(&titles[index]),
@@ -272,7 +265,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		}
 		number := text.Layout(strconv.Itoa(len(section.Items)), text.Options{Measurer: measure, Size: small})
 		sc.Items = append(sc.Items, column, scene.Item{
-			Kind: scene.Text, Role: "kanban.count", ID: section.ID, Label: &number,
+			Kind: scene.Text, Role: RoleCount, ID: section.ID, Label: &number,
 			At:    scene.Point{X: gx + edge, Y: gy + (columnPad + line/2)},
 			Align: scene.End,
 			Style: style.Style{Text: style.Muted},
@@ -285,7 +278,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			cx, cy := gx+columnPad, gy+y
 			box := scene.Rect{X: cx, Y: cy, W: cardWidth, H: c.height}
 			it := scene.Item{
-				Kind: scene.Node, Role: "kanban.card", Shape: "rect", ID: item.ID, Class: classNames(item.CSSClasses),
+				Kind: scene.Node, Role: RoleCard, Shape: "rect", ID: item.ID, Class: common.ClassNames(item.CSSClasses),
 				Box:   box,
 				Parts: []scene.Part{{Box: box, Rounded: true}},
 				Label: labelOf(&c.label),
@@ -304,7 +297,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			if own, ok := priorities[priority]; ok {
 				stripe := new(scene.Path).MoveTo(cx+2.5, cy+5).LineTo(cx+2.5, cy+(c.height-5))
 				sc.Items = append(sc.Items, scene.Item{
-					Kind: scene.Mark, Role: "kanban.priority", Shape: scene.Shape(strings.Replace(priority, " ", "-", 1)), ID: item.ID,
+					Kind: scene.Mark, Role: RolePriority, Shape: scene.Shape(strings.Replace(priority, " ", "-", 1)), ID: item.ID,
 					Box:   stripe.Bounds(),
 					Parts: []scene.Part{{Path: stripe, Paint: scene.StrokeOnly}},
 					Style: own,
@@ -314,7 +307,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			if item.Ticket != "" {
 				top := bottom - c.meta
 				ticket := scene.Item{
-					Kind: scene.Text, Role: "kanban.ticket", ID: item.ID, Label: labelOf(&c.ticket),
+					Kind: scene.Text, Role: RoleTicket, ID: item.ID, Label: labelOf(&c.ticket),
 					At:    scene.Point{X: cx + cardPad, Y: cy + (top + c.ticket.Height/2)},
 					Align: scene.Start,
 					Style: style.Style{Text: style.Muted},
@@ -330,7 +323,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			}
 			if item.Assigned != "" {
 				sc.Items = append(sc.Items, scene.Item{
-					Kind: scene.Text, Role: "kanban.assigned", ID: item.ID, Label: labelOf(&c.assigned),
+					Kind: scene.Text, Role: RoleAssigned, ID: item.ID, Label: labelOf(&c.assigned),
 					At:    scene.Point{X: cx + (cardWidth - cardPad), Y: cy + (bottom - c.assigned.Height + c.assigned.Height/2)},
 					Align: scene.End,
 					Style: style.Style{Text: style.Muted},

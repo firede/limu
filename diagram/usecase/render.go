@@ -7,7 +7,9 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -45,9 +47,9 @@ const (
 // A view is a node as it is drawn: Pele's View. w and h are the size of what is drawn; the
 // layout's box is larger when the node carries a self-relationship.
 type view struct {
-	node       *GraphNode
+	node       *graphNode
 	kind       int
-	author     style.Author
+	author     css.Author
 	label      text.Label
 	stereotype text.Label
 	w, h       float64
@@ -95,7 +97,7 @@ func literal(s string) string {
 // anchor is the point of a node's outline on one of its four sides (0 top, 1 right, 2
 // bottom, 3 left), along away from the middle of that side, as Pele's anchor finds it. Lines
 // meet an actor at its figure, not at its label.
-func anchor(v *view, c *layout.CNode, side int, along float64) (float64, float64) {
+func anchor(v *view, c *graphs.CNode, side int, along float64) (float64, float64) {
 	sign := -1.0
 	if side == 1 || side == 2 {
 		sign = 1
@@ -150,7 +152,7 @@ func sideLength(v *view, side int) float64 {
 // attachEnds spaces the edges that end on one side of a node along the side, in the order
 // they fan out, and puts each on the node's outline, as Pele's attachEnds does: the layout
 // brings them all to the middle of the side.
-func attachEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
+func attachEnds(cedges []graphs.CEdge, cnodes []graphs.CNode, views []view) {
 	type end struct {
 		route  []float64
 		at     int
@@ -160,6 +162,8 @@ func attachEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
 	// Pele's Map gives them in.
 	sides := map[int][]end{}
 	var keys []int
+	// add files the end of a route at point at, which leaves toward point next, under the side
+	// of node index it meets, as the add closure of Pele's attachEnds does.
 	add := func(index int, route []float64, at, next int) {
 		c := &cnodes[index]
 		if c.IsGroup {
@@ -258,13 +262,6 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	return common.TurnToFit(o, func(down bool) *scene.Scene { return lay(m, config, o, down) })
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(names []string) []string {
-	return strings.FieldsFunc(strings.Join(names, " "), func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // figure is the parts of an actor's figure, drawn about fx, fy, as Pele's figure draws them:
 // a head and limbs, a hollow body, a solid silhouette, or a box for an icon, with the slash
 // of a business actor across its head.
@@ -330,7 +327,7 @@ func figure(v *view, fx, fy float64) (parts []scene.Part, picture *scene.Picture
 // titleX is where a boundary's title sits along its top, as Pele's titleX places it: in the
 // middle, unless edges enter through the top there, and then in the stretch between them
 // that is nearest the middle, or the widest if none has room.
-func titleX(c *layout.CNode, width float64, crossings draw.Crossings) float64 {
+func titleX(c *graphs.CNode, width float64, crossings draw.Crossings) float64 {
 	xs, ok := crossings[jsmath.Round(c.Y-c.H/2)]
 	if width == 0 || !ok {
 		return c.X
@@ -401,17 +398,19 @@ func leftLabel(l *text.Label, x, y, left, cy float64, it scene.Item) []scene.Ite
 // lay lays the diagram out once, as Pele's draw does. turned lays out a diagram that runs
 // across as one that runs down.
 func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
-	graph := BuildGraph(m)
+	graph := buildGraph(m)
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	tiny := jsmath.Round(size * 0.8125)
 	measure := o.Measure()
-	const pad = common.Padding
-	rootDir := layout.Direction(m.Direction)
+	pad := o.Pad()
+	rootDir := graphs.Direction(m.Direction)
 	if turned {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
-	sideways := rootDir == layout.LR || rootDir == layout.RL
+	sideways := rootDir == graphs.LR || rootDir == graphs.RL
+	// labelOf lays a label out, a plain one handed over as literal makes it, as Pele's text
+	// does.
 	labelOf := func(raw string, markdown bool, size, wrap float64, face text.Face) text.Label {
 		if raw != "" && !markdown {
 			raw = literal(raw)
@@ -434,7 +433,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	for _, b := range m.SystemBoundaries {
 		boundaryClasses[b.ID] = b.Classes
 	}
-	relationClasses := map[*GraphEdge][]string{}
+	relationClasses := map[*graphEdge][]string{}
 	for i, r := range m.Relationships {
 		relationClasses[graph.Edges[i]] = r.Classes
 	}
@@ -444,13 +443,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		index[n.ID] = i
 	}
 	views := make([]view, 0, len(graph.Nodes))
-	cnodes := make([]layout.CNode, 0, len(graph.Nodes))
+	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for _, node := range graph.Nodes {
 		decls := node.CSSCompiledStyles
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var base text.Face
 		if author.Bold {
 			base |= text.Bold
@@ -468,13 +467,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			stereotype = labelOf("«"+node.Stereotype+"»", false, tiny, 200, base)
 		}
 		v := view{node: node, kind: kindBox, author: author, label: stereotype, stereotype: stereotype}
-		var c layout.CNode
+		var c graphs.CNode
 		switch {
 		case node.IsGroup:
 			v.kind = kindBoundary
 			v.label = labelOf(node.Label, markdown, fontSize, 4000, base)
 			titleH := v.label.Height
-			c = layout.NewCNode(0, 0, -1)
+			c = graphs.NewCNode(0, 0, -1)
 			c.IsGroup = true
 			c.PadX = groupPad
 			c.PadBottom = groupPad
@@ -511,13 +510,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			v.w = max(v.label.Width+2*cellPad, rowsW, 72)
 			v.h += v.headH
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		case node.ActorType != "":
 			v.kind = kindActor
 			v.label = labelOf(node.Label, markdown, fontSize, 140, base)
 			v.w = max(figureW, v.label.Width, stereotype.Width)
 			v.h = figureH + figureGap + stereotype.Height + v.label.Height
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		default:
 			labelSize := fontSize
 			if node.Shape == "note" {
@@ -544,7 +543,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				v.w = max(tw+2*node.Padding+12, 80)
 				v.h = max(th+24, 44)
 			}
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		}
 		c.Seq = float64(len(views))
 		views = append(views, v)
@@ -559,9 +558,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		}
 	}
 
-	var cedges []layout.CEdge
+	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	for _, edge := range graph.Edges {
 		src, ok1 := index[edge.Start]
 		dst, ok2 := index[edge.End]
@@ -594,7 +593,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		}
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, label)
-		ce := layout.CEdge{Src: src, Dst: dst, Minlen: float64(edge.MinLen)}
+		ce := graphs.CEdge{Src: src, Dst: dst, Minlen: float64(edge.MinLen)}
 		if label.Width > 0 {
 			ce.LabelW = label.Width + 12
 		}
@@ -604,11 +603,15 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		cedges = append(cedges, ce)
 	}
 
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: numberOption(config, "nodeSpacing", nodeSep),
-		EdgeSep: edgeSep,
-		RankSep: numberOption(config, "rankSpacing", rankSep),
-		PortSep: 20,
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
+		EdgeSep:  edgeSep,
+		RankSep:  numberOption(config, "rankSpacing", rankSep),
+		PortSep:  20,
 	})
 
 	title := text.Layout(m.Title, text.Options{Measurer: measure, Size: size, MaxWidth: 4000, Face: text.Bold, Icons: o.Icons})
@@ -619,7 +622,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	inner := max(result.Width, title.Width)
 	ox := pad + (inner-result.Width)/2
 	oy := pad + titleHeight
-	layout.Shift(cnodes, cedges, ox, oy)
+	graphs.Shift(cnodes, cedges, ox, oy)
 	sc := &scene.Scene{
 		Type:     "usecase",
 		Width:    math.Ceil(inner + 2*pad),
@@ -640,7 +643,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	var titles, clusters, edges, labels, nodes []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "usecase.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: pad + title.Height/2},
 		})
 	}
@@ -652,9 +655,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		if v.kind == kindBoundary {
 			left, top := x-c.W/2, y-c.H/2
 			it := scene.Item{
-				Kind: scene.Group, Role: "usecase.system", Shape: "rect", ID: n.ID, Class: classNames(boundaryClasses[n.ID]),
+				Kind: scene.Group, Role: RoleSystem, Shape: "rect", ID: n.ID, Class: common.ClassNames(strings.Join(boundaryClasses[n.ID], " ")),
 				Box:    scene.Rect{X: left, Y: top, W: c.W, H: c.H},
-				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
 			}
 			if n.BoundaryType == "package" {
@@ -679,7 +682,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 
 		w, h := v.w, v.h
 		it := scene.Item{
-			Kind: scene.Node, ID: n.ID, Class: classNames(classes[n.ID]),
+			Kind: scene.Node, ID: n.ID, Class: common.ClassNames(strings.Join(classes[n.ID], " ")),
 			Box:    scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
 			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
 			Author: v.author.Style,
@@ -688,7 +691,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		var cells []scene.Item
 		switch v.kind {
 		case kindActor:
-			it.Role = "usecase.actor"
+			it.Role = RoleActor
 			it.Shape = "actor"
 			if n.ActorType != "normal" {
 				it.Shape += scene.Shape("-" + n.ActorType)
@@ -708,14 +711,14 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			if !v.stereotype.Empty() {
 				stereotype = &scene.Item{
-					Kind: scene.Text, Role: "usecase.stereotype", ID: n.ID, Label: &v.stereotype,
+					Kind: scene.Text, Role: RoleStereotype, ID: n.ID, Label: &v.stereotype,
 					At:    scene.Point{X: x, Y: y + (top + figureH + figureGap + v.stereotype.Height/2)},
 					Style: style.Style{Text: style.Muted},
 				}
 			}
 			it.At = scene.Point{X: x, Y: y + (h/2 - v.label.Height/2)}
 		case kindJSON:
-			it.Role = "usecase.json"
+			it.Role = RoleJson
 			it.Shape = "table"
 			x0 := -w / 2
 			ry := -h/2 + v.headH
@@ -730,18 +733,18 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				key, value := &v.rows[k][0], &v.rows[k][1]
 				rowH := max(value.Height, jsmath.Round(small*1.5)) + rowPad
 				cells = append(cells, scene.Item{
-					Kind: scene.Text, Role: "usecase.json-key", ID: n.ID, Label: key,
+					Kind: scene.Text, Role: RoleJsonKey, ID: n.ID, Label: key,
 					At:    scene.Point{X: x + (x0 + cellPad + key.Width/2), Y: y + (ry + rowH/2)},
 					Style: style.Style{Text: style.Muted},
 				})
 				cells = append(cells, leftLabel(value, x, y, x0+v.keyW+cellPad, ry+rowH/2, scene.Item{
-					Kind: scene.Text, Role: "usecase.json-value", ID: n.ID,
+					Kind: scene.Text, Role: RoleJsonValue, ID: n.ID,
 					Author: style.Style{Text: v.author.Style.Text},
 				})...)
 				ry += rowH
 			}
 		default:
-			it.Role = "usecase.usecase"
+			it.Role = RoleUsecase
 			switch {
 			case v.kind == kindEllipse:
 				it.Shape = "ellipse"
@@ -753,13 +756,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 					from, to := w/2-15, w/2-5
 					arc := func(at float64) float64 {
 						q := at / (w / 2)
-						return (h / 2) * math.Sqrt(1-float64(q*q))
+						return float64((h / 2) * math.Sqrt(1-float64(q*q)))
 					}
 					slash := new(scene.Path).MoveTo(x+from, y+arc(from)).LineTo(x+to, y+(-arc(to)))
 					it.Parts = append(it.Parts, scene.Part{Path: slash, Paint: scene.StrokeOnly})
 				}
 			case n.Shape == "note":
-				it.Role = "usecase.note"
+				it.Role = RoleNote
 				it.Shape = "note"
 				it.Style.Fill = style.SurfaceAlt
 				// Pele turns the corners of the note and of its fold round.
@@ -774,7 +777,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			if !v.stereotype.Empty() {
 				stereotype = &scene.Item{
-					Kind: scene.Text, Role: "usecase.stereotype", ID: n.ID, Label: &v.stereotype,
+					Kind: scene.Text, Role: RoleStereotype, ID: n.ID, Label: &v.stereotype,
 					At:    scene.Point{X: x, Y: y + (-v.label.Height / 2)},
 					Style: style.Style{Text: style.Muted},
 				}
@@ -796,9 +799,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		ce := &cedges[i]
 		edge := drawn[i]
 		label := &edgeLabels[i]
-		var author style.Author
+		var author css.Author
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
-			author = style.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
+			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
 			// What styles an edge's line styles its markers, and fills nothing.
 			author.Style.Fill = style.Paint{}
 		}
@@ -860,7 +863,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			route = ce.Route
 			st, et := markerTrim(start), markerTrim(end)
-			path = draw.RoutePath(route, "", st, et, draw.OwnReach(st), draw.OwnReach(et))
+			path = draw.RoutePath(route, curve, st, et, draw.OwnReach(st), draw.OwnReach(et))
 		}
 		// A line ends round, as Pele draws it in the group of edges, which sets round caps.
 		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
@@ -872,13 +875,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		case edge.Animate:
 			own.Dash = style.Dashes(9, 5)
 		}
-		role := scene.Role("usecase.relation")
+		role := RoleRelation
 		if edge.Internal {
-			role = "usecase.note-link"
+			role = RoleNoteLink
 		}
 		it := scene.Item{
 			Kind: scene.Edge, Role: role, Shape: scene.Shape(edge.RelationshipType), ID: edge.ID,
-			Class:  classNames(relationClasses[edge]),
+			Class:  common.ClassNames(strings.Join(relationClasses[edge], " ")),
 			Box:    path.Path.Bounds(),
 			Parts:  []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 			Ends:   path.Ends(markerType(start), markerType(end)),
@@ -888,6 +891,10 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
 		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
+		}
 		edges = append(edges, it)
 		if label.Width > 0 {
 			lx, ly := ce.LabelX, ce.LabelY
@@ -896,7 +903,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				own.Text = style.Muted
 			}
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: "usecase.label", ID: edge.ID,
+				Kind: scene.Text, Role: RoleEdgeLabel, ID: edge.ID,
 				Box:    scene.Rect{X: lx - (label.Width+8)/2, Y: ly - label.Height/2, W: label.Width + 8, H: label.Height},
 				Parts:  []scene.Part{draw.LabelPatch(label, lx, ly)},
 				Label:  label,

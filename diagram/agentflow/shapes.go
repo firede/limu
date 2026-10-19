@@ -29,40 +29,40 @@ var allowedShapes = map[string]bool{
 	"connector": true, "collapsedGroup": true,
 }
 
-// DefaultShape is the shape of a node that names none, or one agent flows do not draw.
-const DefaultShape = "roundedRect"
+// defaultShape is the shape of a node that names none, or one agent flows do not draw.
+const defaultShape = "roundedRect"
 
-// ResolveShapeAlias is the shape an author-facing name stands for, or the name itself, as
+// resolveShapeAlias is the shape an author-facing name stands for, or the name itself, as
 // Pele's resolveShapeAlias gives it.
-func ResolveShapeAlias(shape string) string {
+func resolveShapeAlias(shape string) string {
 	if s, ok := shapeAliases[shape]; ok {
 		return s
 	}
 	return shape
 }
 
-// IsValidShape reports whether a node's metadata may name a shape so, as Pele's isValidShape
+// isValidShape reports whether a node's metadata may name a shape so, as Pele's isValidShape
 // does: a flowchart's shape, or "constructor", which Mermaid finds with `in` on a plain object.
-func IsValidShape(name string) bool {
+func isValidShape(name string) bool {
 	return flowchart.IsValidShape(name) || name == "constructor"
 }
 
 // normaliseNodeShapes reduces every node's shape to one agent flows draw, reporting the
 // removed and unsupported ones, as Pele's normaliseNodeShapes does.
-func normaliseNodeShapes(nodes []*GraphNode, d *DB) {
+func normaliseNodeShapes(nodes []*graphNode, d *DB) {
 	for _, node := range nodes {
 		if node.IsGroup {
 			continue
 		}
 		if node.Shape == "" || node.Shape == "squareRect" || node.Shape == "rect" {
-			node.Shape = DefaultShape
+			node.Shape = defaultShape
 		}
 		if removedShapes[node.Shape] {
-			d.EmitError(ShapeRemoved, `shape "`+node.Shape+`" was removed in v0.8.1, using "`+DefaultShape+`"`, node.ID)
-			node.Shape = DefaultShape
+			d.emitError(ShapeRemoved, `shape "`+node.Shape+`" was removed in v0.8.1, using "`+defaultShape+`"`, node.ID)
+			node.Shape = defaultShape
 		} else if !allowedShapes[node.Shape] {
-			d.EmitWarning(ShapeUnsupported, `shape "`+node.Shape+`" is not supported, using "`+DefaultShape+`"`, node.ID)
-			node.Shape = DefaultShape
+			d.emitWarning(ShapeUnsupported, `shape "`+node.Shape+`" is not supported, using "`+defaultShape+`"`, node.ID)
+			node.Shape = defaultShape
 		}
 	}
 }

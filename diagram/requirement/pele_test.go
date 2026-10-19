@@ -87,7 +87,7 @@ func dumpDB(db *DB) object {
 	return o
 }
 
-func dumpGraph(g *Graph) object {
+func dumpGraph(g *graph) object {
 	nodes := []any{}
 	for _, n := range g.Nodes {
 		v := object{"id": n.ID, "cssStyles": strs(n.CSSStyles), "cssClasses": n.CSSClasses}
@@ -162,19 +162,15 @@ func result(t *testing.T, src string, tokens, wantDB, wantGraph any, wantErr map
 		t.Errorf("parse of %q: no error, Pele %v", src, wantErr)
 		return false
 	}
-	return compare(t, "db", src, dumpDB(db), wantDB) && compare(t, "graph", src, dumpGraph(BuildGraph(db)), wantGraph) && ok
+	return compare(t, "db", src, dumpDB(db), wantDB) && compare(t, "graph", src, dumpGraph(buildGraph(db)), wantGraph) && ok
 }
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/requirement.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/requirement.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Cases
@@ -209,8 +205,8 @@ func TestParseMatchesPele(t *testing.T) {
 		case typ != diagram.Requirement:
 			d := c.Direct
 			ok = result(t, c.Src, d.Tokens, d.DB, d.Graph, d.Error, func() (*DB, error) {
-				db := NewDB()
-				return db, ParseInto(c.Src, db)
+				db := newDB()
+				return db, parseInto(c.Src, db)
 			})
 		default:
 			ok = result(t, p.Source(false), c.Tokens, c.DB, c.Graph, c.Error, func() (*DB, error) { return ParsePrepared(p) })

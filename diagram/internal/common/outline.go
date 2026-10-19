@@ -36,8 +36,8 @@ var tokenNames = [...]string{
 	"NODE_ID", "NODE_DESCR", "NODE_DEND", "SHAPE_DATA",
 }
 
-// OutlineTokenName is a token as the generated parser prints it, as Pele's tokenName does.
-func OutlineTokenName(typ int, kanban bool) string {
+// outlineTokenName is a token as the generated parser prints it, as Pele's tokenName does.
+func outlineTokenName(typ int, kanban bool) string {
 	if typ == TokKeyword {
 		if kanban {
 			return "KANBAN"
@@ -358,10 +358,10 @@ const stopNames = "'SPACELINE', 'NL', 'EOF'"
 // ParseOutline makes the calls on db that the grammar's actions make, in the same order, and
 // reports errors in the state where the generated parser would, as Pele's parseOutline does.
 func ParseOutline(src string, db OutlineDB, kanban bool) error {
-	typ := "mindmap"
+	typ := diagram.Mindmap
 	data := ""
 	if kanban {
-		typ = "kanban"
+		typ = diagram.Kanban
 		data = ", 'SHAPE_DATA'"
 	}
 	tok := TokenizeOutline(src, kanban)
@@ -371,12 +371,12 @@ func ParseOutline(src string, db OutlineDB, kanban bool) error {
 	fail := func(expected string) error {
 		t := types[i]
 		if t == TokError {
-			return diagram.SyntaxError(typ, src, starts[i], "", true)
+			return SyntaxError(typ, src, starts[i], "", true)
 		}
-		return diagram.SyntaxError(typ, src, starts[i], "Expecting "+expected+", got '"+OutlineTokenName(t, kanban)+"'", false)
+		return SyntaxError(typ, src, starts[i], "Expecting "+expected+", got '"+outlineTokenName(t, kanban)+"'", false)
 	}
 
-	keyword := "'" + OutlineTokenName(TokKeyword, kanban) + "'"
+	keyword := "'" + outlineTokenName(TokKeyword, kanban) + "'"
 	if types[i] == TokSpaceLine {
 		i++
 		for types[i] == TokSpaceLine || types[i] == TokNL {

@@ -1,7 +1,6 @@
 package gitgraph
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -22,27 +21,24 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -54,31 +50,15 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		if i := firstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i, lineAt(got, i), lineAt(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
 		}
 	}
 	if failed > 0 {
 		t.Errorf("%d of %d differ", failed, len(p.Cases))
 	}
-}
-
-func firstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
-}
-
-func lineAt(lines []string, i int) string {
-	if i < len(lines) {
-		return lines[i]
-	}
-	return "(none)"
 }
 
 // paintName is a paint as the oracle names Pele's: a token of the theme by its name.
@@ -181,25 +161,25 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := 0; i < len(sc.Items); i++ {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "gitgraph.title":
+		case RoleTitle:
 			lines = append(lines, "title")
 			label(it)
-		case "gitgraph.lane":
+		case RoleLane:
 			lines = append(lines, "branch "+peleID(it.ID))
 			shape(it, &it.Parts[0])
-		case "gitgraph.branch":
+		case RoleBranch:
 			shape(it, &it.Parts[0])
 			label(it)
-		case "gitgraph.edge":
+		case RoleEdge:
 			cls := "pele-edge"
 			if it.Shape != "" {
 				cls += " pele-edge-" + string(it.Shape)
 			}
 			lines = append(lines, "edge "+cls)
 			shape(it, &it.Parts[0])
-		case "gitgraph.commit", "gitgraph.merge":
+		case RoleCommit, RoleMerge:
 			cls := "pele-commit pele-commit-" + string(it.Shape)
-			if it.Role == "gitgraph.merge" && it.Shape != "merge" {
+			if it.Role == RoleMerge && it.Shape != "merge" {
 				cls += " pele-commit-merge"
 			}
 			lines = append(lines, "commit "+peleID(it.ID)+" "+cls)
@@ -209,11 +189,11 @@ func sceneLines(sc *scene.Scene) []string {
 			for k := range it.Parts {
 				shape(it, &it.Parts[k])
 			}
-		case "gitgraph.commit-mark", "gitgraph.tag-hole":
+		case RoleCommitMark, RoleTagHole:
 			for k := range it.Parts {
 				shape(it, &it.Parts[k])
 			}
-		case "gitgraph.commit-label":
+		case RoleCommitLabel:
 			lines = append(lines, "label")
 			for k := range it.Parts {
 				shape(it, &it.Parts[k])
@@ -223,11 +203,11 @@ func sceneLines(sc *scene.Scene) []string {
 			} else {
 				label(it)
 			}
-		case "gitgraph.tag":
+		case RoleTag:
 			lines = append(lines, "tag")
 			shape(it, &it.Parts[0])
 			// Pele draws the hole, an item of its own after the tag, before the tag's text.
-			if i+1 < len(sc.Items) && sc.Items[i+1].Role == "gitgraph.tag-hole" {
+			if i+1 < len(sc.Items) && sc.Items[i+1].Role == RoleTagHole {
 				hole := &sc.Items[i+1]
 				shape(hole, &hole.Parts[0])
 				i++

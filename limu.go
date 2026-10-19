@@ -1,6 +1,8 @@
 package limu
 
 import (
+	"slices"
+
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/agentflow"
 	"github.com/firede/limu/diagram/architecture"
@@ -39,232 +41,199 @@ import (
 	"github.com/firede/limu/scene"
 )
 
-// Layout reads a diagram's text and lays it out as a scene, for a backend to draw. Its
-// errors are *diagram.Error: a diagram of a type limu does not read yet, text it cannot
-// parse, or text past a limit.
-func Layout(src string, o *layout.Options) (*scene.Scene, error) {
-	if o == nil {
-		o = &layout.Options{}
+// A kind is what limu does with a type of diagram, as Pele's Diagram is: parse, the parser
+// of the type, and layout, its layout. They take and give its model as any, so that one
+// table holds every type; kindOf and kindOfErr adapt a package's ParsePrepared and Layout to
+// them, the second for a Layout that can fail.
+type kind struct {
+	parse  func(*diagram.Prepared) (any, error)
+	layout func(model any, config diagram.Config, o *layout.Options) (*scene.Scene, error)
+}
+
+func kindOf[M any](parse func(*diagram.Prepared) (M, error), lay func(M, diagram.Config, *layout.Options) *scene.Scene) kind {
+	return kindOfErr(parse, func(m M, config diagram.Config, o *layout.Options) (*scene.Scene, error) {
+		return lay(m, config, o), nil
+	})
+}
+
+func kindOfErr[M any](parse func(*diagram.Prepared) (M, error), lay func(M, diagram.Config, *layout.Options) (*scene.Scene, error)) kind {
+	return kind{
+		parse: func(p *diagram.Prepared) (any, error) {
+			m, err := parse(p)
+			if err != nil {
+				return nil, err
+			}
+			return m, nil
+		},
+		layout: func(m any, config diagram.Config, o *layout.Options) (*scene.Scene, error) {
+			return lay(m.(M), config, o)
+		},
 	}
-	p, err := diagram.Prepare(src, diagram.Options{})
+}
+
+// kinds are the types of diagram limu reads, each with its package's parser and layout.
+var kinds = map[diagram.Type]kind{
+	diagram.Flowchart:     kindOf(flowchart.ParsePrepared, flowchart.Layout),
+	diagram.Pie:           kindOf(pie.ParsePrepared, pie.Layout),
+	diagram.ER:            kindOf(er.ParsePrepared, er.Layout),
+	diagram.Mindmap:       kindOf(mindmap.ParsePrepared, mindmap.Layout),
+	diagram.Kanban:        kindOf(kanban.ParsePrepared, kanban.Layout),
+	diagram.Timeline:      kindOf(timeline.ParsePrepared, timeline.Layout),
+	diagram.Journey:       kindOf(journey.ParsePrepared, journey.Layout),
+	diagram.Class:         kindOf(class.ParsePrepared, class.Layout),
+	diagram.QuadrantChart: kindOf(quadrant.ParsePrepared, quadrant.Layout),
+	diagram.XYChart:       kindOfErr(xychart.ParsePrepared, xychart.Layout),
+	diagram.State:         kindOf(state.ParsePrepared, state.Layout),
+	diagram.Gantt:         kindOfErr(gantt.ParsePrepared, gantt.Layout),
+	diagram.Architecture:  kindOf(architecture.ParsePrepared, architecture.Layout),
+	diagram.Requirement:   kindOf(requirement.ParsePrepared, requirement.Layout),
+	diagram.Sankey:        kindOfErr(sankey.ParsePrepared, sankey.Layout),
+	diagram.Packet:        kindOf(packet.ParsePrepared, packet.Layout),
+	diagram.Radar:         kindOf(radar.ParsePrepared, radar.Layout),
+	diagram.Treemap:       kindOf(treemap.ParsePrepared, treemap.Layout),
+	diagram.Info:          kindOf(info.ParsePrepared, info.Layout),
+	diagram.Sequence:      kindOf(sequence.ParsePrepared, sequence.Layout),
+	diagram.GitGraph:      kindOf(gitgraph.ParsePrepared, gitgraph.Layout),
+	diagram.C4:            kindOfErr(c4.ParsePrepared, c4.Layout),
+	diagram.Block:         kindOfErr(block.ParsePrepared, block.Layout),
+	diagram.Railroad:      kindOf(railroad.ParsePrepared, railroad.Layout),
+	diagram.AgentFlow:     kindOf(agentflow.ParsePrepared, agentflow.Layout),
+	diagram.TreeView:      kindOf(treeview.ParsePrepared, treeview.Layout),
+	diagram.Cynefin:       kindOf(cynefin.ParsePrepared, cynefin.Layout),
+	diagram.Wardley:       kindOf(wardley.ParsePrepared, wardley.Layout),
+	diagram.EventModeling: kindOf(eventmodeling.ParsePrepared, eventmodeling.Layout),
+	diagram.UseCase:       kindOf(usecase.ParsePrepared, usecase.Layout),
+	diagram.Venn:          kindOf(venn.ParsePrepared, venn.Layout),
+	diagram.Ishikawa:      kindOf(ishikawa.ParsePrepared, ishikawa.Layout),
+	diagram.Swimlane:      kindOf(swimlane.ParsePrepared, swimlane.Layout),
+}
+
+// types are the keys of kinds, in the order Pele's registry lists them.
+var types = []diagram.Type{
+	diagram.Flowchart,
+	diagram.Pie,
+	diagram.ER,
+	diagram.Mindmap,
+	diagram.Kanban,
+	diagram.Timeline,
+	diagram.Journey,
+	diagram.Class,
+	diagram.QuadrantChart,
+	diagram.XYChart,
+	diagram.State,
+	diagram.Gantt,
+	diagram.Architecture,
+	diagram.Requirement,
+	diagram.Sankey,
+	diagram.Packet,
+	diagram.Radar,
+	diagram.Treemap,
+	diagram.Info,
+	diagram.Sequence,
+	diagram.GitGraph,
+	diagram.C4,
+	diagram.Block,
+	diagram.Railroad,
+	diagram.AgentFlow,
+	diagram.TreeView,
+	diagram.Cynefin,
+	diagram.Wardley,
+	diagram.EventModeling,
+	diagram.UseCase,
+	diagram.Venn,
+	diagram.Ishikawa,
+	diagram.Swimlane,
+}
+
+// Types are the types of diagram limu reads, in the order Pele's registry lists them: every
+// type Pele draws.
+func Types() []diagram.Type { return slices.Clone(types) }
+
+// Supports reports whether limu reads the type of diagram src is, as Pele's supports does:
+// its type is detected, and it is one limu reads. Text whose front matter does not read is
+// not supported. It does not parse the diagram, which may still be in error.
+func Supports(src string) bool {
+	typ, err := diagram.DetectType(src)
+	if err != nil {
+		return false
+	}
+	_, ok := kinds[typ]
+	return ok
+}
+
+// A Diagram is a diagram's text read into a model, ready to be laid out. Laying it out
+// changes neither its model nor its configuration, so one Diagram may be laid out many
+// times, with other options, and from many goroutines at once: a host that lays a diagram
+// out again when its width changes parses it once.
+type Diagram struct {
+	typ    diagram.Type
+	config diagram.Config
+	model  any
+	kind   kind
+}
+
+// Parse reads a diagram's text, as Pele's parse does: its front matter and directives, its
+// type, and then its body, with the parser of its type. opt holds what Pele's ParseOptions
+// do, the limits the text is held to and the configuration under its own; what changes where
+// things are is given to Layout. Its errors are *diagram.Error: text of no type limu reads,
+// text it cannot parse, or text past a limit.
+func Parse(src string, opt diagram.Options) (*Diagram, error) {
+	p, err := diagram.Prepare(src, opt)
 	if err != nil {
 		return nil, err
 	}
-	var sc *scene.Scene
-	switch p.Type {
-	case diagram.Flowchart:
-		db, err := flowchart.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = flowchart.Layout(db, p.Config, o)
-	case diagram.Swimlane:
-		db, err := swimlane.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = swimlane.Layout(db, p.Config, o)
-	case diagram.Requirement:
-		db, err := requirement.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = requirement.Layout(db, p.Config, o)
-	case diagram.State:
-		db, err := state.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = state.Layout(db, p.Config, o)
-	case diagram.ER:
-		db, err := er.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = er.Layout(db, p.Config, o)
-	case diagram.AgentFlow:
-		db, err := agentflow.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = agentflow.Layout(db, p.Config, o)
-	case diagram.Class:
-		db, err := class.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = class.Layout(db, p.Config, o)
-	case diagram.UseCase:
-		m, err := usecase.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = usecase.Layout(m, p.Config, o)
-	case diagram.Timeline:
-		m, err := timeline.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = timeline.Layout(m, p.Config, o)
-	case diagram.Journey:
-		m, err := journey.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = journey.Layout(m, p.Config, o)
-	case diagram.Packet:
-		m, err := packet.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = packet.Layout(m, p.Config, o)
-	case diagram.Pie:
-		m, err := pie.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = pie.Layout(m, p.Config, o)
-	case diagram.QuadrantChart:
-		m, err := quadrant.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = quadrant.Layout(m, p.Config, o)
-	case diagram.Radar:
-		m, err := radar.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = radar.Layout(m, p.Config, o)
-	case diagram.Kanban:
-		m, err := kanban.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = kanban.Layout(m, p.Config, o)
-	case diagram.GitGraph:
-		m, err := gitgraph.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = gitgraph.Layout(m, p.Config, o)
-	case diagram.Sequence:
-		db, err := sequence.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = sequence.Layout(db, p.Config, o)
-	case diagram.Treemap:
-		m, err := treemap.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = treemap.Layout(m, p.Config, o)
-	case diagram.Gantt:
-		db, err := gantt.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		if sc, err = gantt.Layout(db, p.Config, o); err != nil {
-			return nil, err
-		}
-	case diagram.XYChart:
-		m, err := xychart.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		if sc, err = xychart.Layout(m, p.Config, o); err != nil {
-			return nil, err
-		}
-	case diagram.Block:
-		db, err := block.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		if sc, err = block.Layout(db, p.Config, o); err != nil {
-			return nil, err
-		}
-	case diagram.Sankey:
-		m, err := sankey.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		if sc, err = sankey.Layout(m, p.Config, o); err != nil {
-			return nil, err
-		}
-	case diagram.Venn:
-		m, err := venn.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = venn.Layout(m, p.Config, o)
-	case diagram.Architecture:
-		m, err := architecture.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = architecture.Layout(m, p.Config, o)
-	case diagram.EventModeling:
-		m, err := eventmodeling.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = eventmodeling.Layout(m, p.Config, o)
-	case diagram.Wardley:
-		m, err := wardley.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = wardley.Layout(m, p.Config, o)
-	case diagram.Railroad:
-		m, err := railroad.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = railroad.Layout(m, p.Config, o)
-	case diagram.C4:
-		db, err := c4.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		if sc, err = c4.Layout(db, p.Config, o); err != nil {
-			return nil, err
-		}
-	case diagram.Ishikawa:
-		m, err := ishikawa.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = ishikawa.Layout(m, p.Config, o)
-	case diagram.Mindmap:
-		m, err := mindmap.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = mindmap.Layout(m, p.Config, o)
-	case diagram.Info:
-		m, err := info.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = info.Layout(m, p.Config, o)
-	case diagram.TreeView:
-		m, err := treeview.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = treeview.Layout(m, p.Config, o)
-	case diagram.Cynefin:
-		m, err := cynefin.ParsePrepared(p)
-		if err != nil {
-			return nil, err
-		}
-		sc = cynefin.Layout(m, p.Config, o)
-	default:
+	k, ok := kinds[p.Type]
+	if !ok {
 		return nil, diagram.Unsupported(p.Type)
+	}
+	m, err := k.parse(p)
+	if err != nil {
+		return nil, err
+	}
+	return &Diagram{typ: p.Type, config: p.Config, model: m, kind: k}, nil
+}
+
+// Type is the diagram's type.
+func (d *Diagram) Type() diagram.Type { return d.typ }
+
+// Config is the diagram's configuration: its own, over the Options.Config it was parsed
+// with. It is not a copy; a host that changes it must not lay the diagram out meanwhile.
+func (d *Diagram) Config() diagram.Config { return d.config }
+
+// Model is the model the diagram's package parsed it into, as *flowchart.DB or *pie.Model:
+// what that package's Layout takes. It is not a copy, as Config is not.
+func (d *Diagram) Model() any { return d.model }
+
+// Layout lays the diagram out as a scene, for a backend to draw, with the layout of its
+// type; nil options are the zero Options. It snaps the scene to o.Snap, which the diagram
+// packages' own Layout functions leave to their caller. Its errors are *diagram.Error: one a
+// layout gives, as a sankey diagram's circular link, or one of Code diagram.Limit for a
+// scene that would hold a number that is not finite, as numbers at the edge of what a
+// float64 holds can give, where Pele draws NaN.
+func (d *Diagram) Layout(o *layout.Options) (*scene.Scene, error) {
+	if o == nil {
+		o = &layout.Options{}
+	}
+	sc, err := d.kind.layout(d.model, d.config, o)
+	if err != nil {
+		return nil, err
 	}
 	if o.Snap > 0 {
 		sc.Snap(o.Snap)
 	}
+	if !sc.Finite() {
+		return nil, &diagram.Error{Code: diagram.Limit, Message: "Diagram cannot be laid out in finite numbers.", Type: d.typ}
+	}
 	return sc, nil
+}
+
+// Layout reads a diagram's text and lays it out as a scene, for a backend to draw: Parse,
+// with the default limits and no configuration of the host's, and then Diagram.Layout. Its
+// errors are theirs.
+func Layout(src string, o *layout.Options) (*scene.Scene, error) {
+	d, err := Parse(src, diagram.Options{})
+	if err != nil {
+		return nil, err
+	}
+	return d.Layout(o)
 }

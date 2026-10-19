@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/layout"
@@ -24,27 +25,24 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -56,14 +54,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		want := make([]string, len(c.Lines))
-		for k, l := range c.Lines {
-			want[k] = authorFill(l)
-		}
-		if i := pelesvg.FirstDiff(got, want); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, authorFill); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i,
-					pelesvg.At(got, i), pelesvg.At(want, i))
+				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
 		}
 	}
@@ -96,7 +89,7 @@ func paintName(p style.Paint) string {
 // with the width of the stroke where it is not the theme's, its ends and corners, and whether
 // the author set a fill.
 func partPaint(it *scene.Item, paint scene.Painting) string {
-	fill, stroke := paintName(it.Style.Fill), paintName(it.Style.Stroke)
+	fill, stroke := paintName(pelesvg.OwnFill(it)), paintName(it.Style.Stroke)
 	switch paint {
 	case scene.StrokeOnly:
 		fill = "none"
@@ -128,7 +121,7 @@ func authorFill(line string) string {
 		return line
 	}
 	rest := line[at+len(" author=")+int(dec.InputOffset()):]
-	if fill := style.Declarations([]string{"fill:" + value}).Style.Fill; fill.Set() {
+	if fill := css.Declarations([]string{"fill:" + value}).Style.Fill; fill.Set() {
 		return line[:at] + " author=" + fmt.Sprint(fill) + rest
 	}
 	return line[:at] + rest
@@ -209,7 +202,7 @@ func sceneLines(sc *scene.Scene) []string {
 		}
 		shift := float64(l.Size * 0.35)
 		y := it.At.Y - l.Height/2 + l.LineHeight/2 + shift
-		if it.Role == "sequence.frame-kind" || it.Role == "sequence.number" {
+		if it.Role == RoleFrameKind || it.Role == RoleNumber {
 			y = it.At.Y + shift
 		}
 		lines = append(lines, "text "+pt(it.At.X, y)+" "+paintName(it.Style.Text)+" "+content(l))
@@ -290,9 +283,9 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "sequence.title":
+		case RoleTitle:
 			label(it)
-		case "sequence.box":
+		case RoleBox:
 			box := ""
 			if it.ID != "" {
 				box = id(it.ID)
@@ -300,19 +293,19 @@ func sceneLines(sc *scene.Scene) []string {
 			lines = append(lines, "g pele-cluster pele-box"+box)
 			part(it, &it.Parts[0], "")
 			label(it)
-		case "sequence.rect", "sequence.divider":
+		case RoleRect, RoleDivider:
 			part(it, &it.Parts[0], "")
-		case "sequence.lifeline", "sequence.activation", "sequence.destroy":
+		case RoleLifeline, RoleActivation, RoleDestroy:
 			part(it, &it.Parts[0], id(it.ID))
-		case "sequence.frame":
+		case RoleFrame:
 			lines = append(lines, "g pele-frame pele-frame-"+string(it.Shape))
 			part(it, &it.Parts[0], "")
-		case "sequence.condition", "sequence.frame-kind":
+		case RoleCondition, RoleFrameKind:
 			for k := range it.Parts {
 				part(it, &it.Parts[k], "")
 			}
 			label(it)
-		case "sequence.message":
+		case RoleMessage:
 			lines = append(lines, "g pele-edge pele-message"+id(it.ID))
 			part(it, &it.Parts[0], "")
 			for _, m := range it.Ends {
@@ -325,21 +318,21 @@ func sceneLines(sc *scene.Scene) []string {
 			for k := 1; k < len(it.Parts); k++ {
 				part(it, &it.Parts[k], "")
 			}
-		case "sequence.number":
+		case RoleNumber:
 			lines = append(lines, "g pele-sequence-number")
 			part(it, &it.Parts[0], "")
 			label(it)
-		case "sequence.message-label":
+		case RoleMessageLabel:
 			lines = append(lines, "g pele-edge-label"+id(it.ID))
 			for k := range it.Parts {
 				part(it, &it.Parts[k], "")
 			}
 			label(it)
-		case "sequence.note":
+		case RoleNote:
 			lines = append(lines, "g pele-note"+id(it.ID))
 			part(it, &it.Parts[0], "")
 			label(it)
-		case "sequence.actor":
+		case RoleActor:
 			kind := string(it.Shape)
 			if kind == "rect" {
 				kind = "participant"
@@ -348,7 +341,7 @@ func sceneLines(sc *scene.Scene) []string {
 			// A participant drawn at the foot of its lifeline comes before the one at its
 			// head.
 			for k := i + 1; k < len(sc.Items); k++ {
-				if sc.Items[k].Role == "sequence.actor" && sc.Items[k].ID == it.ID {
+				if sc.Items[k].Role == RoleActor && sc.Items[k].ID == it.ID {
 					cls += " pele-actor-footer"
 					break
 				}

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -32,7 +32,6 @@ const (
 	radius      = 100
 	maxGrowth   = 1.6
 	fillOpacity = 0.2
-	pad         = common.Padding
 )
 
 // line is a line of what is written in a region, its label first, then its texts; id is that
@@ -72,6 +71,7 @@ func keyOf(ids []string) string {
 // reads nothing of the config for a venn diagram, and draws it at its own size whatever the
 // width of the host.
 func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
+	pad := o.Pad()
 	if o == nil {
 		o = &layout.Options{}
 	}
@@ -154,7 +154,7 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 			}
 		}
 		decls := declsOf(key)
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var raw string
 		has := false
 		if subset.Label != nil {
@@ -296,7 +296,9 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 		if r := regions[c.id]; r != nil {
 			decls = r.decls
 		}
-		own, author := setPaint(i, decls)
+		// Pele fills a circle in its series color at an opacity of 0.2, and strokes it in it.
+		own := style.Style{Fill: style.Series(i), FillOpacity: style.N(fillOpacity), Stroke: style.Series(i)}
+		author := shapeStyle(decls)
 		sc.Items = append(sc.Items, scene.Item{
 			Kind: scene.Mark, Role: RoleSet, Shape: "circle", ID: c.id,
 			Box:    scene.Rect{X: c.x - c.r, Y: c.y - c.r, W: 2 * c.r, H: 2 * c.r},
@@ -309,7 +311,7 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 	for _, r := range all {
 		// An overlap is only drawn when a style gives it a look of its own; otherwise the
 		// circles show it.
-		if len(r.sets) < 2 || style.ShapeCSS(r.decls) == "" {
+		if len(r.sets) < 2 || css.ShapeCSS(r.decls) == "" {
 			continue
 		}
 		shared := make([]circle, len(r.inside))
@@ -320,8 +322,7 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 		if path == nil {
 			continue
 		}
-		author := plainNone(style.Declarations(r.decls).Style)
-		author.Text = style.Paint{}
+		author := shapeStyle(r.decls)
 		sc.Items = append(sc.Items, scene.Item{
 			Kind: scene.Mark, Role: RoleOverlap, ID: strings.Join(r.sets, "|"),
 			Box:    path.Bounds(),
@@ -364,42 +365,16 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 	return sc
 }
 
-// setPaint is the style of the ith set's circle, Pele's fill and stroke in the set's series
-// color with a fill-opacity of 0.2, and what the author's declarations set over it. A browser
-// takes a fill, a fill-opacity, a stroke and a stroke-opacity the author set over those Pele
-// writes on the circle each on its own, so the author's fill is drawn at Pele's opacity, and
-// the series color at the author's.
-func setPaint(i int, decls []string) (own, author style.Style) {
-	a := style.Declarations(decls)
-	author = a.Style
-	author.Text = style.Paint{}
-	opacity := fillOpacity
-	if f, ok := a.FillOpacity.Get(); ok {
-		opacity = f
-	} else if author.Fill.Visible() {
-		author.Fill = author.Fill.Alpha(fillOpacity)
-	}
-	own = style.Style{Fill: style.Series(i).Alpha(opacity), Stroke: style.Series(i)}
-	if f, ok := a.StrokeOpacity.Get(); ok {
-		own.Stroke = own.Stroke.Alpha(f)
-	}
-	return own, plainNone(author)
-}
-
-// plainNone is a style with a fill or stroke of none at an opacity, which draws nothing,
-// as none.
-func plainNone(s style.Style) style.Style {
-	if s.Fill.Set() && !s.Fill.Visible() {
-		s.Fill = style.None
-	}
-	if s.Stroke.Set() && !s.Stroke.Visible() {
-		s.Stroke = style.None
-	}
+// shapeStyle is what of an author's declarations a set's circle or an overlap takes: all
+// but the color of text.
+func shapeStyle(decls []string) style.Style {
+	s := css.Declarations(decls).Style
+	s.Text = style.Paint{}
 	return s
 }
 
 // textStyle is what of an author's declarations a text takes: its color and its opacity.
 func textStyle(decls []string) style.Style {
-	s := style.Declarations(decls).Style
+	s := css.Declarations(decls).Style
 	return style.Style{Text: s.Text, Opacity: s.Opacity}
 }

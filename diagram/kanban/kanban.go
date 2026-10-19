@@ -8,8 +8,8 @@ import (
 	"github.com/firede/limu/diagram/internal/common"
 )
 
-// Tokenize reads a kanban board's tokens, as Pele's tokenize does.
-func Tokenize(src string) common.OutlineTokens {
+// tokenize reads a kanban board's tokens, as Pele's tokenize does.
+func tokenize(src string) common.OutlineTokens {
 	return common.TokenizeOutline(src, true)
 }
 

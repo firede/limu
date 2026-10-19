@@ -3,11 +3,12 @@ package er
 import (
 	"strings"
 
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
-// cardinality is the cardinality of a token, or "" for a token that is none.
+// cardinality is the cardinality of a token, or "" for a token that is none: Pele's
+// CARDINALITY, a map there.
 func cardinality(t token) string {
 	switch t {
 	case t_ZERO_OR_ONE:
@@ -24,8 +25,11 @@ func cardinality(t token) string {
 	return ""
 }
 
+// directions are the directions of the direction tokens, in their order, as Pele's DIRECTIONS.
 var directions = [4]string{"TB", "BT", "RL", "LR"}
 
+// The tokens a name, a cardinality and a statement may start with, as an error lists them:
+// Pele's NAME, CARDS and LINE.
 const (
 	nameTokens = "'UNICODE_TEXT', 'NUM', 'ENTITY_NAME', 'DECIMAL_NUM', 'ENTITY_ONE'"
 	cardTokens = "'ZERO_OR_ONE', 'ZERO_OR_MORE', 'ONE_OR_MORE', 'ONLY_ONE', 'MD_PARENT'"
@@ -44,6 +48,8 @@ type frame struct {
 // parseError carries an error out of the parser's depths.
 type parseError struct{ err error }
 
+// parser is the state of Pele's parseEr: its tokens, the index i of the next, and the
+// database it fills.
 type parser struct {
 	src  string
 	toks []tok
@@ -51,9 +57,9 @@ type parser struct {
 	db   *DB
 }
 
-// ParseInto parses an ER diagram's text into db, as Pele's parseEr does. An error is a
+// parseInto parses an ER diagram's text into db, as Pele's parseEr does. An error is a
 // *diagram.Error.
-func ParseInto(src string, db *DB) (err error) {
+func parseInto(src string, db *DB) (err error) {
 	p := &parser{src: src, toks: tokenize(src), db: db}
 	defer func() {
 		if r := recover(); r != nil {
@@ -68,26 +74,32 @@ func ParseInto(src string, db *DB) (err error) {
 	return nil
 }
 
+// typ is the type of the next token, Pele's types[i].
 func (p *parser) typ() token { return p.toks[p.i].typ }
 
+// next is the text of the next token, which it steps past: Pele's texts[i++].
 func (p *parser) next() string {
 	s := p.toks[p.i].text
 	p.i++
 	return s
 }
 
+// fail stops the parse with a syntax error at the next token, saying what was expected, as
+// the fail of Pele's parseEr does.
 func (p *parser) fail(expected string) {
 	t := p.toks[p.i]
 	if t.typ == t_ERROR {
-		panic(parseError{diagram.SyntaxError("er", p.src, t.start, "", true)})
+		panic(parseError{common.SyntaxError("er", p.src, t.start, "", true)})
 	}
 	got := tokenNames[t.typ]
 	if t.typ == t_CHAR {
 		got = t.text
 	}
-	panic(parseError{diagram.SyntaxError("er", p.src, t.start, "Expecting "+expected+", got '"+got+"'", false)})
+	panic(parseError{common.SyntaxError("er", p.src, t.start, "Expecting "+expected+", got '"+got+"'", false)})
 }
 
+// expect steps past a token of type typ and gives its text, or fails, as the expect of Pele's
+// parseEr does.
 func (p *parser) expect(typ token) string {
 	if p.typ() != typ {
 		p.fail("'" + tokenNames[typ] + "'")
@@ -95,6 +107,8 @@ func (p *parser) expect(typ token) string {
 	return p.next()
 }
 
+// separator steps past the newline, semicolon or end of input that ends a statement, or
+// fails, as the separator of Pele's parseEr does.
 func (p *parser) separator() {
 	if t := p.typ(); t != t_NEWLINE && t != t_SEMI && t != t_EOF {
 		p.fail("'EOF', 'NEWLINE', 'SEMI'")
@@ -102,13 +116,17 @@ func (p *parser) separator() {
 	p.i++
 }
 
+// isName reports whether a token of type t may be an entity's name, as the isName of Pele's
+// parseEr does.
 func isName(t token) bool {
 	return t == t_UNICODE_TEXT || t == t_ENTITY_NAME || t == t_NUM || t == t_DECIMAL_NUM || t == t_ENTITY_ONE
 }
 
-// unquote is a quoted token's text without its quotes.
+// unquote is a quoted token's text without its quotes, Pele's text.slice(1, -1).
 func unquote(s string) string { return s[1 : len(s)-1] }
 
+// entityName reads an entity's name, without the quotes of a quoted one, or fails, as the
+// entityName of Pele's parseEr does.
 func (p *parser) entityName() string {
 	t := p.typ()
 	if !isName(t) {
@@ -121,6 +139,7 @@ func (p *parser) entityName() string {
 	return text
 }
 
+// idList reads a list of ids that commas separate, as the idList of Pele's parseEr does.
 func (p *parser) idList() []string {
 	var ids []string
 	for {
@@ -135,10 +154,14 @@ func (p *parser) idList() []string {
 	}
 }
 
+// isStyleComponent reports whether a token of type t may be part of a style, as the
+// isStyleComponent of Pele's parseEr does.
 func isStyleComponent(t token) bool {
 	return t == t_STYLE_TEXT || t == t_NUM || t == t_COLON || t == t_BRKT
 }
 
+// stylesOpt reads a list of styles that commas separate, each the text of the run of style
+// components it is made of, as the stylesOpt of Pele's parseEr does.
 func (p *parser) stylesOpt() []string {
 	var styles []string
 	for {
@@ -157,6 +180,8 @@ func (p *parser) stylesOpt() []string {
 	}
 }
 
+// relSpec reads a relationship's two cardinalities and its line, the next token being a
+// cardinality, as the relSpec of Pele's parseEr does.
 func (p *parser) relSpec() RelSpec {
 	cardB := cardinality(p.typ())
 	p.i++
@@ -177,6 +202,8 @@ func (p *parser) relSpec() RelSpec {
 	return RelSpec{CardA: cardA, RelType: relType, CardB: cardB}
 }
 
+// role reads a relationship's label, without the quotes of a quoted one, as the role of
+// Pele's parseEr does.
 func (p *parser) role() string {
 	t := p.typ()
 	if t != t_WORD && t != t_ENTITY_NAME && t != t_UNICODE_TEXT {
@@ -189,12 +216,13 @@ func (p *parser) role() string {
 	return unquote(text)
 }
 
+// isChar reports whether the next token is the CHAR ch, as the isChar of Pele's parseEr does.
 func (p *parser) isChar(ch string) bool {
 	return p.typ() == t_CHAR && p.toks[p.i].text == ch
 }
 
 // attributes parses the attributes of a block and gives them last to first, as Mermaid's
-// right-recursive rule builds them.
+// right-recursive rule builds them, as the attributes of Pele's parseEr does.
 func (p *parser) attributes() []Attribute {
 	var list []Attribute
 	for {
@@ -231,7 +259,8 @@ func (p *parser) attributes() []Attribute {
 	return list
 }
 
-// block parses an optional `{ ... }` block; nil when there is none or it is empty.
+// block parses an optional `{ ... }` block; nil when there is none or it is empty. It is the
+// block of Pele's parseEr.
 func (p *parser) block() []Attribute {
 	if p.typ() != t_BLOCK_START {
 		return nil
@@ -246,6 +275,9 @@ func (p *parser) block() []Attribute {
 	return list
 }
 
+// entityStatement parses a statement that starts with an entity's name: an entity with an
+// alias, a relationship, or an entity alone, each with its classes and attributes, and gives
+// the names of the entities it names, as the entityStatement of Pele's parseEr does.
 func (p *parser) entityStatement() []string {
 	db := p.db
 	a := p.entityName()
@@ -260,12 +292,12 @@ func (p *parser) entityStatement() []string {
 			classes = p.idList()
 		}
 		attrs := p.block()
-		db.AddEntity(a, alias)
+		db.addEntity(a, alias)
 		if attrs != nil {
-			db.AddAttributes(a, attrs)
+			db.addAttributes(a, attrs)
 		}
 		if classes != nil {
-			db.SetClass([]string{a}, classes)
+			db.setClass([]string{a}, classes)
 		}
 		return []string{a}
 	}
@@ -285,28 +317,30 @@ func (p *parser) entityStatement() []string {
 		}
 		p.expect(t_COLON)
 		label := p.role()
-		db.AddEntity(a, "")
-		db.AddEntity(b, "")
-		db.AddRelationship(a, label, b, spec)
+		db.addEntity(a, "")
+		db.addEntity(b, "")
+		db.addRelationship(a, label, b, spec)
 		if classes != nil {
-			db.SetClass([]string{a}, classes)
+			db.setClass([]string{a}, classes)
 		}
 		if classesB != nil {
-			db.SetClass([]string{b}, classesB)
+			db.setClass([]string{b}, classesB)
 		}
 		return []string{a, b}
 	}
 	attrs := p.block()
-	db.AddEntity(a, "")
+	db.addEntity(a, "")
 	if attrs != nil {
-		db.AddAttributes(a, attrs)
+		db.addAttributes(a, attrs)
 	}
 	if classes != nil {
-		db.SetClass([]string{a}, classes)
+		db.setClass([]string{a}, classes)
 	}
 	return []string{a}
 }
 
+// parse parses the diagram's statements into the database, as the body of Pele's parseEr
+// does.
 func (p *parser) parse() {
 	db := p.db
 	p.expect(t_ER_DIAGRAM)
@@ -315,6 +349,8 @@ func (p *parser) parse() {
 	frames := []*frame{{}}
 	f := frames[0]
 	nested := false
+	// push adds a statement's value to the open subgraph's list, as Pele's
+	// `if (nested) frame.list.push(...)` does after each statement.
 	push := func(name string) {
 		if nested {
 			f.list = append(f.list, docItem{name: name})
@@ -360,16 +396,16 @@ func (p *parser) parse() {
 		case t_acc_title:
 			p.i++
 			value := chars.Trim(p.expect(t_acc_title_value))
-			db.SetAccTitle(value)
+			db.setAccTitle(value)
 			push(value)
 		case t_acc_descr:
 			p.i++
 			value := chars.Trim(p.expect(t_acc_descr_value))
-			db.SetAccDescription(value)
+			db.setAccDescription(value)
 			push(value)
 		case t_acc_descr_multiline_value:
 			value := chars.Trim(p.next())
-			db.SetAccDescription(value)
+			db.setAccDescription(value)
 			push(value)
 		case t_direction_tb, t_direction_bt, t_direction_rl, t_direction_lr:
 			p.i++
@@ -377,26 +413,26 @@ func (p *parser) parse() {
 			if nested {
 				f.list = append(f.list, docItem{dir: value})
 			} else {
-				db.SetDirection(value)
+				db.setDirection(value)
 			}
 		case t_CLASSDEF:
 			keyword := p.next()
 			ids := p.idList()
 			styles := p.stylesOpt()
 			p.separator()
-			db.AddClass(ids, styles)
+			db.addClass(ids, styles)
 			push(keyword)
 		case t_CLASS:
 			keyword := p.next()
 			ids := p.idList()
-			db.SetClass(ids, p.idList())
+			db.setClass(ids, p.idList())
 			push(keyword)
 		case t_STYLE:
 			keyword := p.next()
 			ids := p.idList()
 			styles := p.stylesOpt()
 			p.separator()
-			db.AddCSSStyles(ids, styles)
+			db.addCSSStyles(ids, styles)
 			push(keyword)
 		default:
 			if !isName(t) {

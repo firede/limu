@@ -1,7 +1,6 @@
 package mindmap
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"slices"
@@ -10,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -28,13 +27,13 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src        string   `json:"src"`
-		MaxWidth   float64  `json:"maxWidth"`
-		FontSize   float64  `json:"fontSize"`
-		Breakpoint float64  `json:"breakpoint"`
-		Keep       bool     `json:"keep"`
-		Icons      bool     `json:"icons"`
-		Lines      []string `json:"lines"`
+		Src        string  `json:"src"`
+		MaxWidth   float64 `json:"maxWidth"`
+		FontSize   float64 `json:"fontSize"`
+		Breakpoint float64 `json:"breakpoint"`
+		Keep       bool    `json:"keep"`
+		Icons      bool    `json:"icons"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
@@ -42,12 +41,9 @@ type peleRender struct {
 var hostIcons = []string{"fa fa-book", "star", "phone", "fa:fa-car", "mdi:home", "fa fa-x"}
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
@@ -55,7 +51,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 	}
 	icons := func(name string) bool { return slices.Contains(hostIcons, name) }
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -71,9 +67,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			o.Icons = icons
 		}
 		got := sceneLines(t, Layout(m, pre.Config, o))
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, %+v), line %d\n got %s\nPele %s", c.Src, *o, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, %+v), %s", c.Src, *o, msg)
 			}
 		}
 	}
@@ -159,9 +155,9 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 		it := &sc.Items[i]
 		// Pele draws each first-level branch in a group of its own, its links first.
 		if it.Role == RoleEdge || it.Role == RoleNode {
-			s, err := strconv.Atoi(strings.TrimPrefix(it.Class[0], "section-"))
+			s, err := strconv.Atoi(strings.TrimPrefix(it.Tags[0], "section-"))
 			if err != nil {
-				t.Errorf("item %d has no section: %v", i, it.Class)
+				t.Errorf("item %d has no section: %v", i, it.Tags)
 			}
 			if s != section || it.Role == RoleEdge && i > 0 && sc.Items[i-1].Role == RoleNode {
 				lines = append(lines, "branch "+strconv.Itoa(s))
@@ -194,8 +190,6 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 			classes := it.Class
 			if it.Role == RoleRoot {
 				root = " root"
-			} else {
-				classes = classes[1:]
 			}
 			b := it.Box
 			lines = append(lines, fmt.Sprintf("node %s %s%s [%s] %s,%s", pelesvg.ID(it.ID), shape, root, strings.Join(classes, " "), pt(b.X, b.Y), pt(b.W, b.H)))
@@ -208,7 +202,7 @@ func sceneLines(t *testing.T, sc *scene.Scene) []string {
 				if part.Rounded {
 					r = "r"
 				}
-				lines = append(lines, "part "+r+" "+paintName(it.Style.Fill)+" "+paintName(it.Style.Stroke)+" "+width(it)+" "+pelesvg.CapJoin(it))
+				lines = append(lines, "part "+r+" "+paintName(pelesvg.OwnFill(it))+" "+paintName(it.Style.Stroke)+" "+width(it)+" "+pelesvg.CapJoin(it))
 			}
 			frame := scene.Item{Parts: draw.Outline(string(it.Shape), 0, 0, b.W, b.H)}
 			frame.Move(b.X+b.W/2, b.Y+b.H/2)

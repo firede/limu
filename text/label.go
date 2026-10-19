@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 )
 
@@ -61,7 +62,7 @@ func Layout(raw string, o Options) Label {
 	lineHeight := jsmath.Round(o.Size * LineHeight)
 
 	if !hasMarkup(raw) && !strings.Contains(raw, "&") && !strings.Contains(raw, "ﬂ") {
-		text := trim(raw)
+		text := chars.Trim(raw)
 		width := o.Measurer.Width(text, o.Size, o.Face)
 		if width <= o.MaxWidth || !(strings.Contains(text, " ") || hasCJK(text)) {
 			return Label{
@@ -85,16 +86,16 @@ func Layout(raw string, o Options) Label {
 		return Label{Lines: lines, Widths: widths, Width: widest, Height: float64(len(lines)) * lineHeight, Size: o.Size, LineHeight: lineHeight}
 	}
 
-	source := trim(raw)
+	source := chars.Trim(raw)
 	if o.Markdown {
-		source = trim(dedent(strings.ReplaceAll(strings.ReplaceAll(raw, "\r\n", "\n"), "\r", "\n")))
+		source = chars.Trim(dedent(strings.ReplaceAll(strings.ReplaceAll(raw, "\r\n", "\n"), "\r", "\n")))
 	}
 	var lines [][]Span
 	var widths []float64
 	width := 0.0
 	for _, part := range splitBreaks(source) {
 		var line []Span
-		inline(&line, trim(part), o.Markdown, o.Face, &o)
+		inline(&line, chars.Trim(part), o.Markdown, o.Face, &o)
 		w := measureSpans(line, &o)
 		if w > o.MaxWidth {
 			wrap(line, &o, &lines, &widths)
@@ -201,14 +202,14 @@ func pieces(s string) []string {
 			}
 		}
 		// [^\sCJK]+[CLOSE]*
-		k = runAt(j, func(r rune) bool { return !isSpace(r) && !isCJK(r) })
+		k = runAt(j, func(r rune) bool { return !chars.IsSpaceRune(r) && !isCJK(r) })
 		if k == j {
 			return 0, false
 		}
 		return runAt(k, isClosing), true
 	}
 	for i := 0; i < len(s); {
-		lead := runAt(i, isSpace)
+		lead := runAt(i, chars.IsSpaceRune)
 		end, ok := word(lead)
 		if !ok {
 			// Only white space is left. The regular expression would give the spaces back one
@@ -216,7 +217,7 @@ func pieces(s string) []string {
 			// trailing spaces would take the rest: the piece is the same.
 			end = lead
 		} else {
-			end = runAt(end, isSpace)
+			end = runAt(end, chars.IsSpaceRune)
 		}
 		if end == i {
 			// Every character is a space, a CJK character or another, so this is not reached.
@@ -236,7 +237,7 @@ func dedent(text string) string {
 	lines := strings.Split(text, "\n")
 	least := -1
 	for _, line := range lines {
-		if trim(line) == "" {
+		if chars.Trim(line) == "" {
 			continue
 		}
 		if indent := indentOf(line); least == -1 || indent < least {
@@ -259,7 +260,7 @@ func dedent(text string) string {
 }
 
 func indentOf(line string) int {
-	return utf8.RuneCountInString(line) - utf8.RuneCountInString(trimStart(line))
+	return utf8.RuneCountInString(line) - utf8.RuneCountInString(chars.TrimStart(line))
 }
 
 // splitBreaks splits text at /<br\s*\/?>|\\n|\n/gi: a tag, a backslash and an n, of either
@@ -283,7 +284,7 @@ func splitBreaks(s string) []string {
 			j := i + 3
 			for j < len(s) {
 				r, n := utf8.DecodeRuneInString(s[j:])
-				if !isSpace(r) {
+				if !chars.IsSpaceRune(r) {
 					break
 				}
 				j += n
@@ -332,7 +333,7 @@ func iconAt(s string, i int) int {
 	}
 	j += 4
 	k := j
-	for k < len(s) && (isWord(s[k]) || s[k] == '-') {
+	for k < len(s) && (chars.IsWord(int(s[k])) || s[k] == '-') {
 		k++
 	}
 	if k == j {
@@ -363,7 +364,7 @@ func pushIcons(line *[]Span, text string, f Face, o *Options) {
 			last++
 		case last == len(text):
 			if n := len(*line); n > 0 && (*line)[n-1].Icon == "" {
-				(*line)[n-1].Text = trimEnd((*line)[n-1].Text)
+				(*line)[n-1].Text = chars.TrimEnd((*line)[n-1].Text)
 			}
 		}
 		i = end - 1
@@ -382,12 +383,12 @@ func tagAt(s string, i int) (name string, end int) {
 		return "", -1
 	}
 	k := j + 1
-	for k < len(s) && (isWord(s[k]) || s[k] == '-') {
+	for k < len(s) && (chars.IsWord(int(s[k])) || s[k] == '-') {
 		k++
 	}
 	name = s[j:k]
 	if k < len(s) {
-		if r, n := utf8.DecodeRuneInString(s[k:]); isSpace(r) {
+		if r, n := utf8.DecodeRuneInString(s[k:]); chars.IsSpaceRune(r) {
 			m := k + n
 			for m < len(s) && s[m] != '<' && s[m] != '>' {
 				m++
@@ -459,9 +460,9 @@ func inline(line *[]Span, source string, markdown bool, base Face, o *Options) {
 				_, w := utf8.DecodeRuneInString(source[i+size:])
 				next = source[i+size : i+size+w]
 			}
-			canOpen := open && trim(next) != "" && strings.Contains(source[i+size:], marker)
-			canClose := !open && trim(prev) != ""
-			wordy := ch == '_' && len(prev) == 1 && isWord(prev[0]) && len(next) == 1 && isWord(next[0])
+			canOpen := open && chars.Trim(next) != "" && strings.Contains(source[i+size:], marker)
+			canClose := !open && chars.Trim(prev) != ""
+			wordy := ch == '_' && len(prev) == 1 && chars.IsWord(int(prev[0])) && len(next) == 1 && chars.IsWord(int(next[0]))
 			if (canOpen || canClose) && !wordy {
 				flush()
 				if canOpen {
@@ -501,7 +502,7 @@ func wrap(line []Span, o *Options, out *[][]Span, widths *[]float64) {
 	commit := func() {
 		if n := len(current); n > 0 && current[n-1].Icon == "" {
 			last := &current[n-1]
-			if trimmed := trimEnd(last.Text); trimmed != last.Text {
+			if trimmed := chars.TrimEnd(last.Text); trimmed != last.Text {
 				last.Text = trimmed
 				w := o.Measurer.Width(trimmed, o.Size, last.Face)
 				width += w - last.Width
@@ -525,9 +526,9 @@ func wrap(line []Span, o *Options, out *[][]Span, widths *[]float64) {
 			continue
 		}
 		for _, part := range pieces(span.Text) {
-			if width > 0 && width+o.Measurer.Width(trimEnd(part), o.Size, span.Face) > o.MaxWidth {
+			if width > 0 && width+o.Measurer.Width(chars.TrimEnd(part), o.Size, span.Face) > o.MaxWidth {
 				commit()
-				part = trimStart(part)
+				part = chars.TrimStart(part)
 			}
 			if n := len(current); n > 0 && current[n-1].Face == span.Face && current[n-1].Icon == "" {
 				last := &current[n-1]

@@ -9,15 +9,11 @@
 // A commit's label that Pele turns about a point with rotate() is held in the scene by its
 // middle, turned, and the box behind it by its outline, a path turned point by point. Both are
 // worked out here from Pele's numbers as limu works them out.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, histories } from './gitgraph.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 const TOKENS = { 'var(--_bg)': 'bg', 'var(--_fg)': 'fg', 'var(--_m)': 'muted', 'var(--_s)': 'surface', 'var(--_b)': 'border', none: 'none' };
 // A paint as the test names a token of the theme.
 const paintName = (v) => {

@@ -4,9 +4,10 @@
 // Mermaid's documentation and specs, the inputs of Pele's own tests, its hostile templates
 // filled with its payloads, cases written here, random diagrams, and all of those mutated at
 // random.
-import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { arrayIn, lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/info/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -64,36 +65,6 @@ export const WRITTEN = [
   'info\ttitle tabbed',
 ];
 
-// Strings in the sources of a folder of Pele's tests that hold the keyword, as Pele's
-// loadCorpus and loadTestStrings collect them, from files whose names match.
-function testStrings(pele, dir, files) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/info/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
-
-// An array literal of a test's source, evaluated.
-function arrayIn(file, start) {
-  const src = readFileSync(file, 'utf8');
-  const from = src.indexOf(start);
-  if (from < 0) throw new Error(`no ${start} in ${file}`);
-  const open = from + start.length;
-  const end = src.indexOf('\n];', open);
-  return new Function('return [' + src.slice(open, end) + '\n];')();
-}
-
 // Pele's hostile templates, tests/render/info-security.test.ts, filled with its payloads.
 export function hostileCorpus(pele) {
   const payloads = arrayIn(join(pele, 'tests/support/inert.ts'), 'export const PAYLOADS = [');
@@ -106,13 +77,12 @@ export function hostileCorpus(pele) {
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests and the
 // cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/info-docs.json'), 'utf8'));
   return [
     ...new Set([
-      ...docs,
-      ...testStrings(pele, 'tests/compat/info', /\.(spec|test)\.[jt]s$/),
-      ...testStrings(pele, 'tests/info', /oracle\.test\.ts$/),
-      ...testStrings(pele, 'tests/render', /^info.*\.test\.ts$/),
+      ...docs(pele, 'info'),
+      ...testStrings(pele, 'tests/compat/info', /\.(spec|test)\.[jt]s$/, /info/),
+      ...testStrings(pele, 'tests/info', /oracle\.test\.ts$/, /info/),
+      ...testStrings(pele, 'tests/render', /^info.*\.test\.ts$/, /info/),
       ...WRITTEN,
     ]),
   ].filter((s) => !lone(s) && s.length <= 4000);
@@ -122,7 +92,7 @@ const TITLES = ['T', 'Pele', 'A title', 'A title much wider than the version und
 
 // Random info diagrams, most of them well formed.
 export function randomDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   return () => {
     let s = '';

@@ -159,7 +159,7 @@ func buildEventModel(tree *ast, title string) (*Model, error) {
 	ids := map[string]bool{}
 	for _, frame := range tree.frames {
 		if ids[frame.name] {
-			line := diagram.Locate(tree.source, frame.offset).Line
+			line := common.Locate(tree.source, frame.offset).Line
 			return nil, semantic(`Duplicate event modeling frame ID "`+frame.name+`" on line `+strconv.Itoa(line), line)
 		}
 		ids[frame.name] = true

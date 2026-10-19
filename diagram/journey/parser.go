@@ -1,7 +1,7 @@
 package journey
 
 import (
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -16,7 +16,7 @@ func parse(src string, db *db) error {
 		if t.Types[i] != tEnd {
 			got = tokenNames[t.Types[i]]
 		}
-		return diagram.SyntaxError("journey", src, t.Starts[i], "Expecting "+expected+", got '"+got+"'", false)
+		return common.SyntaxError("journey", src, t.Starts[i], "Expecting "+expected+", got '"+got+"'", false)
 	}
 
 	if t.Types[0] != tJourney {

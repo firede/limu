@@ -138,7 +138,7 @@ func check(t *testing.T, what, src string, m *Model, err error, want peleResult)
 // tokens writes a source's tokens as the oracle writes Pele's, with offsets in UTF-16 code
 // units.
 func tokens(src string) peleTokens {
-	tok := Tokenize(src)
+	tok := tokenize(src)
 	out := peleTokens{Types: tok.Types, Texts: tok.Texts, Starts: make([]int, len(tok.Starts))}
 	for i, s := range tok.Starts {
 		out.Starts[i] = chars.Len16(src[:s])
@@ -147,14 +147,10 @@ func tokens(src string) peleTokens {
 }
 
 func TestParseMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/mindmap.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/mindmap.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 5500 {

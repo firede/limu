@@ -3,12 +3,13 @@ package flowchart
 import (
 	"math"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
-	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -23,7 +24,6 @@ const (
 	rankSep  = 48
 	groupPad = 20
 	loop     = 26
-	padding  = 8
 )
 
 // A Variant is a diagram type that is a flowchart laid out its own way, which may draw its
@@ -34,13 +34,13 @@ type Variant struct {
 	Type string
 	// Prepare changes the graph before it is laid out.
 	Prepare func(g *Graph)
-	// Layout lays the graph out in place of layout.Compound; tight is set when the diagram is
+	// Layout lays the graph out in place of graphs.Compound; tight is set when the diagram is
 	// laid out tightly to fit the host's width.
-	Layout func(nodes []layout.CNode, edges []layout.CEdge, dir layout.Dir, opt layout.LayeredOptions, tight bool) layout.CompoundResult
+	Layout func(nodes []graphs.CNode, edges []graphs.CEdge, dir graphs.Dir, opt graphs.LayeredOptions, tight bool) graphs.CompoundResult
 	// DrawGroup, if set, draws a top-level group in place of a cluster: c is the group as it
 	// was laid out, label its title, author what its author set for it, and dir the
 	// direction the diagram was laid out in.
-	DrawGroup func(c *layout.CNode, label *text.Label, author style.Author, classes []string, id string, dir layout.Dir) scene.Item
+	DrawGroup func(c *graphs.CNode, label *text.Label, author css.Author, classes []string, id string, dir graphs.Dir) scene.Item
 }
 
 // Layout lays out a parsed flowchart as a scene, as Pele's renderFlowchart draws it: across
@@ -56,6 +56,8 @@ func LayoutVariant(db *DB, config diagram.Config, o *layout.Options, v *Variant)
 	if o == nil {
 		o = &layout.Options{}
 	}
+	// fitted lays the flowchart out, down if down, and tightly where loosely does not fit, as
+	// Pele's fitted does.
 	fitted := func(down bool) *scene.Scene {
 		return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, v, down, tight) })
 	}
@@ -66,6 +68,7 @@ func LayoutVariant(db *DB, config diagram.Config, o *layout.Options, v *Variant)
 }
 
 // numberOption is a number of a flowchart's config, if it is one above 0, at most 2000.
+// It is Pele's numberOption.
 func numberOption(section diagram.Config, key string, fallback float64) float64 {
 	if v, ok := section[key].(float64); ok && v > 0 {
 		return min(v, 2000)
@@ -74,6 +77,7 @@ func numberOption(section diagram.Config, key string, fallback float64) float64 
 }
 
 // assetSize is the size an image or icon is given, if it is a sensible one.
+// It is Pele's assetSize.
 func assetSize(v *float64, fallback float64) float64 {
 	if v != nil && *v > 0 && *v <= 4000 {
 		return *v
@@ -81,17 +85,10 @@ func assetSize(v *float64, fallback float64) float64 {
 	return fallback
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
 // A view is a node as it is drawn: Pele's NodeView.
 type view struct {
 	node   *GraphNode
-	author style.Author
+	author css.Author
 	label  text.Label
 	shape  string
 	w, h   float64
@@ -102,6 +99,7 @@ type view struct {
 // down lays out a flowchart that runs across as one that runs down; tight sets nodes closer
 // together.
 func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, down, tight bool) *scene.Scene {
+	padding := o.Pad()
 	gpad := float64(groupPad)
 	if tight {
 		gpad = 12
@@ -113,18 +111,15 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		}
 	}
 	curve, _ := flow["curve"].(string)
-	switch o.Routing {
-	case layout.Orthogonal:
-		curve = "step"
-	case layout.Straight:
-		curve = "linear"
+	if routed := common.RoutingCurve(o.Routing); routed != "" {
+		curve = routed
 	}
-	graph := BuildGraph(db, curve)
+	graph := buildGraph(db, curve)
 	if variant != nil {
 		variant.Prepare(graph)
 	}
 	size := o.Size()
-	edgeSize := math.Floor(size*0.875 + 0.5)
+	edgeSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
 	wrapWidth := numberOption(flow, "wrappingWidth", 200)
 	groupMax := 4000.0
@@ -132,6 +127,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		wrapWidth = min(wrapWidth, 100)
 		groupMax = max(80, common.TitleRoom(o)/2)
 	}
+	// labelOf lays out a label with the flowchart's measurer and icons, the call to layoutLabel
+	// that Pele's draw makes for each label.
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
@@ -141,13 +138,13 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		index[n.ID] = i
 	}
 	views := make([]view, 0, len(graph.Nodes))
-	cnodes := make([]layout.CNode, 0, len(graph.Nodes))
+	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for _, node := range graph.Nodes {
 		decls := node.CSSCompiledStyles
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold
@@ -161,14 +158,14 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			fontSize = author.FontSize
 		}
 		var v view
-		var c layout.CNode
+		var c graphs.CNode
 		if node.IsGroup {
 			label := labelOf(node.Label, markdown, fontSize, groupMax, face)
 			v = view{node: node, author: author, label: label, shape: "group"}
-			c = layout.NewCNode(0, 0, -1)
+			c = graphs.NewCNode(0, 0, -1)
 			c.IsGroup = true
 			if node.Dir != "" {
-				c.Dir = layout.Direction(node.Dir)
+				c.Dir = graphs.Direction(node.Dir)
 			}
 			c.PadX = gpad
 			if label.Height > 0 {
@@ -210,7 +207,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 				w, h, dy = s.W, s.H, s.DY
 			}
 			v = view{node: node, author: author, label: label, shape: shape, w: w, h: h, dy: dy}
-			c = layout.NewCNode(w, h, -1)
+			c = graphs.NewCNode(w, h, -1)
 		}
 		c.Seq = float64(len(views))
 		views = append(views, v)
@@ -224,19 +221,21 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		}
 	}
 
-	rootDir := layout.Direction(db.Direction)
+	rootDir := graphs.Direction(db.Direction)
 	if down {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
+	// flowsSideways reports whether the nodes about node i run across, by the direction of the
+	// nearest group that sets one, as Pele's flowsSideways does.
 	flowsSideways := func(i int) bool {
-		var dir layout.Dir
+		var dir graphs.Dir
 		for p, hops := cnodes[i].Parent, 0; p >= 0 && dir == "" && hops < 10000; p, hops = cnodes[p].Parent, hops+1 {
 			dir = cnodes[p].Dir
 		}
 		if dir == "" {
 			dir = rootDir
 		}
-		return dir == layout.LR || dir == layout.RL
+		return dir == graphs.LR || dir == graphs.RL
 	}
 	// The edges on one side of a node spread along it; a picture or an icon keeps them at
 	// its middle.
@@ -248,7 +247,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		}
 	}
 
-	var cedges []layout.CEdge
+	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
 	var drawn []*GraphEdge
 	loops := make([]int, len(views))
@@ -283,7 +282,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		if edge.MinLen == 0 {
 			minlen = 1
 		}
-		ce := layout.CEdge{Src: src, Dst: dst, Minlen: minlen}
+		ce := graphs.CEdge{Src: src, Dst: dst, Minlen: minlen}
 		if label.Width > 0 {
 			ce.LabelW = label.Width + 12
 		}
@@ -293,7 +292,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		cedges = append(cedges, ce)
 	}
 
-	opt := layout.LayeredOptions{
+	opt := graphs.LayeredOptions{
 		NodeSep:  numberOption(flow, "nodeSpacing", nodeSep),
 		EdgeSep:  edgeSep,
 		RankSep:  numberOption(flow, "rankSpacing", rankSep),
@@ -306,11 +305,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		opt.NodeSep *= 0.5
 		opt.RankSep *= 0.75
 	}
-	var result layout.CompoundResult
+	var result graphs.CompoundResult
 	if variant != nil {
 		result = variant.Layout(cnodes, cedges, rootDir, opt, tight)
 	} else {
-		result = layout.Compound(cnodes, cedges, rootDir, opt)
+		result = graphs.Compound(cnodes, cedges, rootDir, opt)
 	}
 
 	titleMax := 4000.0
@@ -325,7 +324,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 	inner := max(result.Width, title.Width)
 	ox := padding + (inner-result.Width)/2
 	oy := padding + titleHeight
-	layout.Shift(cnodes, cedges, ox, oy)
+	graphs.Shift(cnodes, cedges, ox, oy)
 	sc := &scene.Scene{
 		Type:     "flowchart",
 		Width:    math.Ceil(inner + 2*padding),
@@ -337,6 +336,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 	if variant != nil {
 		sc.Type = variant.Type
 	}
+	// node is the box of node i that the drawing helpers take; Pele hands them the CNode
+	// itself.
 	node := func(i int) draw.Node {
 		c := &cnodes[i]
 		return draw.Node{X: c.X, Y: c.Y, W: c.W, H: c.H, Group: c.IsGroup}
@@ -355,7 +356,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 	var titles, clusters, struck, nodes, edges, labels []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "flowchart.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: padding + title.Height/2},
 		})
 	}
@@ -364,9 +365,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		c := &cnodes[i]
 		n := v.node
 		x, y := c.X, c.Y
-		classes := classNames(trimDefault(n.CSSClasses))
+		classes, tags := common.Clickable(common.ClassNames(common.TrimDefault(n.CSSClasses)))
 		if c.IsGroup && variant != nil && variant.DrawGroup != nil && c.Parent < 0 {
-			clusters = append(clusters, variant.DrawGroup(c, &v.label, v.author, classes, n.ID, rootDir))
+			lane := variant.DrawGroup(c, &v.label, v.author, classes, n.ID, rootDir)
+			lane.Tags = tags
+			clusters = append(clusters, lane)
 			continue
 		}
 		if c.IsGroup {
@@ -374,9 +377,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			titleY := y - c.H/2 + 8 + v.label.Height/2
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
 			cluster := scene.Item{
-				Kind: scene.Group, Role: "flowchart.cluster", ID: n.ID, Class: classes, Box: box,
+				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Tags: tags, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
 			}
 			label := &v.label
@@ -385,7 +388,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 				if draw.TitleCrossed(node(i), label.Width, titleX, crossings) {
 					depth := draw.StruckDepth(func(k int) int { return cnodes[k].Parent }, i)
 					struck = append(struck, scene.Item{
-						Kind: scene.Text, Role: "flowchart.cluster-title", ID: n.ID, Label: label, At: at,
+						Kind: scene.Text, Role: RoleClusterTitle, ID: n.ID, Label: label, At: at,
 						Style: style.Style{
 							Text:      style.Muted,
 							Halo:      style.SurfaceAlt.Alpha(draw.StruckTint(depth) / 100).Over(style.Bg),
@@ -403,7 +406,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 
 		w, h := v.w, v.h
 		it := scene.Item{
-			Kind: scene.Node, Role: "flowchart.node", Shape: scene.Shape(v.shape), ID: n.ID, Class: classes,
+			Kind: scene.Node, Role: RoleNode, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Tags: tags,
 			Box:    scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
 			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
 			Author: v.author.Style,
@@ -478,9 +481,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		ce := &cedges[i]
 		edge := drawn[i]
 		label := &edgeLabels[i]
-		var author style.Author
+		var author css.Author
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
-			author = style.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
+			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
 			// What styles an edge's line styles its markers, and fills nothing.
 			author.Style.Fill = style.Paint{}
 		}
@@ -519,8 +522,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 				own.Dash = style.Dashes(3, 4)
 			}
 			it := scene.Item{
-				Kind: scene.Edge, Role: "flowchart.edge", ID: edge.ID,
-				Class:  classNames(edgeClassNoise.Replace(edge.Classes)),
+				Kind: scene.Edge, Role: RoleEdge, ID: edge.ID,
+				Class:  common.ClassNames(edgeClassNoise.Replace(edge.Classes)),
 				Box:    path.Path.Bounds(),
 				Parts:  []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 				Ends:   path.Ends(start, end),
@@ -530,11 +533,15 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			for k := 0; k+1 < len(route); k += 3 {
 				it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
 			}
+			if len(it.Route) == 0 {
+				// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+				it.Route = it.Parts[0].Path.Corners()
+			}
 			edges = append(edges, it)
 		}
 		if label.Width > 0 {
 			labels = append(labels, scene.Item{
-				Kind: scene.Text, Role: "flowchart.edge-label", ID: edge.ID,
+				Kind: scene.Text, Role: RoleEdgeLabel, ID: edge.ID,
 				Box:    scene.Rect{X: ce.LabelX - (label.Width+8)/2, Y: ce.LabelY - label.Height/2, W: label.Width + 8, H: label.Height},
 				Parts:  []scene.Part{draw.LabelPatch(label, ce.LabelX, ce.LabelY)},
 				Label:  label,
@@ -555,18 +562,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 // The classes Mermaid gives every edge, which say nothing.
 var edgeClassNoise = strings.NewReplacer("edge-thickness-normal", "", "edge-pattern-solid", "", "flowchart-link", "")
 
-// trimDefault takes /^default\s?/ off a node's classes: the class every node has.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
-}
-
+// hasClass reports whether name is among classes, the / internal-link(?: |$)/ test of
+// Pele's draw.
 func hasClass(classes []string, name string) bool {
 	for _, c := range classes {
 		if c == name {

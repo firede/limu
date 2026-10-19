@@ -1,7 +1,9 @@
 // State diagrams parsed as Pele parses them, from text to tokens, StateDb and the graph
 // buildStateGraph makes of it: the sources of Pele's tests and Mermaid's specs and
 // documentation, cases written here, and those sources mutated at random.
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/state/oracle.test.ts, and more of what Pele reads beyond the
 // grammar.

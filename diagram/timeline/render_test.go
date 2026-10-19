@@ -1,7 +1,6 @@
 package timeline
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -22,27 +21,24 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -54,9 +50,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
 		}
 	}
@@ -103,9 +99,9 @@ func partPaint(it *scene.Item, part *scene.Part) string {
 	case scene.StrokeOnly:
 		s = "none " + paintName(it.Style.Stroke)
 	case scene.FillOnly:
-		s = paintName(it.Style.Fill) + " -"
+		s = paintName(pelesvg.OwnFill(it)) + " -"
 	default:
-		s = paintName(it.Style.Fill) + " " + paintName(it.Style.Stroke)
+		s = paintName(pelesvg.OwnFill(it)) + " " + paintName(it.Style.Stroke)
 	}
 	if w, ok := it.Style.StrokeWidth.Get(); ok {
 		s += " w" + pelesvg.Num(w)
@@ -172,26 +168,26 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "timeline.title":
+		case RoleTitle:
 			lines = append(lines, "title "+textAt(it))
-		case "timeline.axis":
+		case RoleAxis:
 			lines = append(lines, "pele-axis "+subpaths(it.Parts[0].Path)+" "+partPaint(it, &it.Parts[0]))
 			for _, m := range it.Ends {
 				for _, part := range m.Outline() {
 					lines = append(lines, "pele-marker "+subpaths(part.Path)+" "+paintName(it.Style.Stroke)+" none")
 				}
 			}
-		case "timeline.section", "timeline.period":
+		case RoleSection, RolePeriod:
 			lines = append(lines, strings.TrimPrefix(string(it.Role), "timeline.")+" "+xmlText(text.DecodeEntities(it.ID)))
 			box(it)
 			lines = append(lines, textAt(it))
-		case "timeline.event":
+		case RoleEvent:
 			lines = append(lines, "event")
 			box(it)
 			lines = append(lines, textAt(it))
-		case "timeline.connector":
+		case RoleConnector:
 			lines = append(lines, "pele-edge "+subpaths(it.Parts[0].Path)+" "+partPaint(it, &it.Parts[0]))
-		case "timeline.dot":
+		case RoleDot:
 			// The circle, as Path.Ellipse draws it: from its right end, four quarters.
 			var args [][]float64
 			it.Parts[0].Path.Each(func(_ scene.Op, a []float64) { args = append(args, a) })

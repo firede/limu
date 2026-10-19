@@ -1,13 +1,13 @@
 package treemap
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -30,25 +30,23 @@ type peleRender struct {
 	Cases []struct {
 		Src      string   `json:"src"`
 		MaxWidth float64  `json:"maxWidth"`
+		Padding  *float64 `json:"padding"`
 		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 5000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -59,15 +57,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		want := make([]string, len(c.Lines))
-		for i, line := range c.Lines {
-			want[i] = authorLine(line)
-		}
-		if i := pelesvg.FirstDiff(got, want); i >= 0 {
+		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding}))
+		if msg := f.Diff(k, &c.Drawing, got, authorLine); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i,
-					pelesvg.At(got, i), pelesvg.At(want, i))
+				t.Errorf("Layout(%q, max %v, size %v, padding %v), %s", c.Src, c.MaxWidth, c.FontSize, (&layout.Options{Padding: c.Padding}).Pad(), msg)
 			}
 		}
 	}
@@ -88,6 +81,16 @@ func textView(s style.Style) string {
 	return fmt.Sprintf("%+v", style.Style{Text: s.Text, Opacity: s.Opacity})
 }
 
+// author writes what view takes of an author's style: as "author=" and the view, or as
+// "css=", as Pele writes no style, where the view is that of no style. A line of Pele's with
+// no style is so read as it is, and the oracle keeps only the lines with one in full.
+func author(view func(style.Style) string, s style.Style) string {
+	if v := view(s); v != view(style.Style{}) {
+		return "author=" + v
+	}
+	return "css="
+}
+
 // authorLine is a line of the fixture with the style Pele writes, "css=", read as limu reads
 // declarations, "author=": on a shape as it is, and on a text with its fill, which is the
 // color the author gave, read as that color.
@@ -102,23 +105,23 @@ func authorLine(line string) string {
 	} else {
 		end += at + 1
 	}
-	css, err := url.PathUnescape(line[at+len(" css=") : end])
+	written, err := url.PathUnescape(line[at+len(" css=") : end])
 	if err != nil {
 		return line
 	}
-	decls := strings.Split(css, ";")
-	var view string
+	decls := strings.Split(written, ";")
+	var field string
 	if strings.HasPrefix(line, "section ") || strings.HasPrefix(line, "leaf ") {
-		view = shapeView(style.Declarations(decls).Style)
+		field = author(shapeView, css.Declarations(decls).Style)
 	} else {
 		for i, d := range decls {
 			if strings.HasPrefix(d, "fill:") {
 				decls[i] = "color:" + d[len("fill:"):]
 			}
 		}
-		view = textView(style.Declarations(decls).Style)
+		field = author(textView, css.Declarations(decls).Style)
 	}
-	return line[:at] + " author=" + view + line[end:]
+	return line[:at] + " " + field + line[end:]
 }
 
 // series are the colors Pele's seriesColor gives, as its SVG writes them.
@@ -184,7 +187,7 @@ func sceneLines(sc *scene.Scene) []string {
 		}
 		for _, line := range l.Lines {
 			at := prefix + "t " + pt(it.At.X, y) + " " + size + " " + anchors[it.Align] + " " + textPaints[it.Style.Text] + " " +
-				weight + " author=" + textView(it.Author) + " "
+				weight + " " + author(textView, it.Author) + " "
 			if len(line) == 0 {
 				lines = append(lines, at+" ")
 			}
@@ -213,9 +216,9 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Parts[0].Rounded {
 				rounded = "r"
 			}
-			lines = append(lines, fmt.Sprintf("%s %s [%s] %s,%s %s %s %s %s author=%s", kind, pelesvg.ID(it.ID), strings.Join(it.Class, " "),
-				pt(r.X, r.Y), pt(r.W, r.H), rounded, fillName(it.Style.Fill), strokeName(it.Style.Stroke), pelesvg.CapJoin(it),
-				shapeView(it.Author)))
+			lines = append(lines, fmt.Sprintf("%s %s [%s] %s,%s %s %s %s %s %s", kind, pelesvg.ID(it.ID), strings.Join(it.Class, " "),
+				pt(r.X, r.Y), pt(r.W, r.H), rounded, fillName(pelesvg.OwnFill(it)), strokeName(it.Style.Stroke), pelesvg.CapJoin(it),
+				author(shapeView, it.Author)))
 			weight := "-"
 			if it.Label != nil && len(it.Label.Lines) > 0 && it.Label.Lines[0][0].Face&text.Bold != 0 {
 				weight = "var(--_hw)"

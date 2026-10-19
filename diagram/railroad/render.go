@@ -362,12 +362,7 @@ func line(s string, face text.Face, size float64, m text.Measurer) *text.Label {
 	if s == "" {
 		return nil
 	}
-	w := m.Width(s, size, face)
-	lh := jsmath.Round(float64(size * text.LineHeight))
-	return &text.Label{
-		Lines:  [][]text.Span{{{Text: s, Face: face, Width: w}}},
-		Widths: []float64{w}, Width: w, Height: lh, Size: size, LineHeight: lh,
-	}
+	return common.Line(s, m.Width(s, size, face), size, face)
 }
 
 // draw lays the diagram out, with room to spare or tightly, as Pele's draw does.
@@ -411,7 +406,7 @@ func draw(model *Model, config diagram.Config, o *layout.Options, tight bool) *s
 	if w := option(config, "strokeWidth", 0, 20); w > 0 {
 		stroke = style.N(w)
 	}
-	const pad = common.Padding
+	pad := o.Pad()
 	arc := m.arc
 
 	room := 4000.0

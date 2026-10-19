@@ -42,12 +42,8 @@ type peleCommon struct {
 
 func loadPele(t *testing.T) peleCommon {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/common.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleCommon
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/common.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p

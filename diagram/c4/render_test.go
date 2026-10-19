@@ -1,7 +1,6 @@
 package c4
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -23,28 +23,25 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string         `json:"src"`
-		MaxWidth float64        `json:"maxWidth"`
-		FontSize float64        `json:"fontSize"`
-		Lines    []string       `json:"lines"`
-		Error    map[string]any `json:"error"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
+		Error map[string]any `json:"error"`
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3000 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed := 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -69,13 +66,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 			failed++
 		default:
 			got := sceneLines(sc)
-			want := make([]string, len(c.Lines))
-			for i, line := range c.Lines {
-				want[i] = readCSS(line)
-			}
-			if i := pelesvg.FirstDiff(got, want); i >= 0 {
+			if msg := f.Diff(k, &c.Drawing, got, readCSS); msg != "" {
 				if failed++; failed <= 20 {
-					t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i, pelesvg.At(got, i), pelesvg.At(want, i))
+					t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 				}
 			}
 		}
@@ -95,11 +88,16 @@ func readCSS(line string) string {
 		return line
 	}
 	decls := strings.Split(line[m[2]:m[3]], ";")
-	return line[:m[0]] + " css=" + colors(style.Declarations(decls).Style.Fill, style.Declarations(decls).Style.Stroke)
+	return line[:m[0]] + " css=" + colors(css.Declarations(decls).Style.Fill, css.Declarations(decls).Style.Stroke)
 }
 
-// colors is an author's fill and stroke as the test writes them.
+// colors is an author's fill and stroke as the test writes them, and nothing where the author
+// set neither, as Pele writes no style. A line of Pele's with no style is so read as it is,
+// and the oracle keeps only the lines with one in full.
 func colors(fill, stroke style.Paint) string {
+	if !fill.Set() && !stroke.Set() {
+		return ""
+	}
 	paint := func(p style.Paint) string {
 		switch {
 		case !p.Set():
@@ -244,8 +242,8 @@ func sceneLines(sc *scene.Scene) []string {
 				}
 			}
 		case RoleElement:
-			classes := "pele-shape-" + string(it.Shape) + " pele-c4-" + it.Class[0]
-			if len(it.Class) > 1 {
+			classes := "pele-shape-" + string(it.Shape) + " pele-c4-" + it.Tags[0]
+			if len(it.Tags) > 1 {
 				classes += " pele-c4-external"
 			}
 			// The middle, which Pele moves the shape's inside by, is checked through the box
@@ -295,7 +293,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Tooltip != "" {
 				lines = append(lines, "tip "+it.Tooltip)
 			}
-			lines = append(lines, fmt.Sprintf("patch %s %d %s - -", box(it.Parts[0].Box), patchRadius, paintName(it.Style.Fill)))
+			lines = append(lines, fmt.Sprintf("patch %s %d %s - -", box(it.Box), patchRadius, paintName(it.Style.Fill)))
 			if it.Link != "" {
 				lines = append(lines, "link "+it.Link)
 			}

@@ -32,7 +32,6 @@ const (
 	swatch = 12
 	row    = 26
 	gap    = 24
-	pad    = common.Padding
 )
 
 // point is a place about the chart's center, Pele's Point.
@@ -101,6 +100,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 // which is then moved to where the margins, the labels, the legend and the title leave it.
 // tight is set when the chart does not fit the width it has with its legend beside it.
 func draw(m *Model, config diagram.Config, o *layout.Options, width, height float64, tight bool) *scene.Scene {
+	pad := o.Pad()
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()
@@ -235,7 +235,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, width, height floa
 		items = append(items, scene.Item{
 			Kind: scene.Mark, Role: RoleCurve, ID: curve.Name, Box: path.Bounds(),
 			Parts: []scene.Part{{Path: path}},
-			Style: style.Style{Fill: color.Alpha(0.2), Stroke: color, StrokeWidth: style.N(1.5), Join: style.JoinRound},
+			Style: style.Style{Fill: color, FillOpacity: style.N(0.2), Stroke: color, StrokeWidth: style.N(1.5), Join: style.JoinRound},
 		})
 	}
 	items = append(items, labels...)
@@ -274,7 +274,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, width, height floa
 			Box:   scene.Rect{X: legendX, Y: y - row/2, W: swatch + 8 + l.Width, H: row},
 			Parts: []scene.Part{{Box: scene.Rect{X: legendX, Y: y - swatch/2, W: swatch, H: swatch}, Rounded: true}},
 			At:    scene.Point{X: legendX + swatch + 8 + l.Width/2, Y: y},
-			Style: style.Style{Fill: style.Series(index).Alpha(0.4), Stroke: style.Series(index), Text: style.Fg, Radius: style.N(2)},
+			Style: style.Style{Fill: style.Series(index), FillOpacity: style.N(0.4), Stroke: style.Series(index), Text: style.Fg, Radius: style.N(2)},
 		}
 		if len(l.Lines) > 0 {
 			it.Label = l

@@ -4,6 +4,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -136,17 +137,24 @@ func parse(src string, db *DB) (err error) {
 	return nil
 }
 
+// parseSequence reads the statements of a sequence diagram, as Pele's parseSequence does, and
+// applies them to db once they are all read. It reports an error by a panic, which parse
+// recovers.
 func parseSequence(src string, db *DB) {
 	toks := tokenize(src)
 	i := 0
 
+	// failAt stops with a syntax error at the current token, which says what was expected, as the
+	// fail of Pele's parseSequence does.
 	failAt := func(expected string) {
 		t := toks[i]
 		if t.typ == tERROR {
-			panic(syntaxFailure{diagram.SyntaxError("sequence", src, t.start, "", true)})
+			panic(syntaxFailure{common.SyntaxError("sequence", src, t.start, "", true)})
 		}
-		panic(syntaxFailure{diagram.SyntaxError("sequence", src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
+		panic(syntaxFailure{common.SyntaxError("sequence", src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 	}
+	// expect reads a token of a type and gives its text, failing on any other, as the expect of
+	// Pele's parseSequence does.
 	expect := func(typ int) string {
 		if toks[i].typ != typ {
 			failAt("'" + tokenNames[typ] + "'")
@@ -154,6 +162,7 @@ func parseSequence(src string, db *DB) {
 		i++
 		return toks[i-1].text
 	}
+	// actor reads a participant's name, as the actor of Pele's parseSequence does.
 	actor := func() *stmt {
 		if t := toks[i].typ; t != tACTOR && t != tLink {
 			failAt("'ACTOR'")
@@ -161,11 +170,14 @@ func parseSequence(src string, db *DB) {
 		i++
 		return &stmt{typ: "addParticipant", actor: toks[i-1].text}
 	}
+	// text2 reads the text after a colon, as the text2 of Pele's parseSequence does.
 	text2 := func() *seqText {
 		t := db.parseMessage(chars.DropUnits(chars.Trim(expect(tTXT)), 1))
 		return &t
 	}
 
+	// participant reads a participant, actor or destroy statement, as the participant of Pele's
+	// parseSequence does.
 	participant := func() *stmt {
 		t := toks[i].typ
 		i++
@@ -202,6 +214,8 @@ func parseSequence(src string, db *DB) {
 		return node
 	}
 
+	// signal reads a message from the participant from, with the activation or central connection
+	// its marks ask for, as the signal of Pele's parseSequence does.
 	signal := func(from *stmt) item {
 		centralFrom := false
 		if toks[i].typ == tCENTRAL {
@@ -244,12 +258,15 @@ func parseSequence(src string, db *DB) {
 		return out
 	}
 
+	// menu reads a links, link, properties or details statement, as the menu of Pele's
+	// parseSequence does.
 	menu := func(typ string) item {
 		i++
 		who := actor()
 		return []item{who, &stmt{typ: typ, actor: who.actor, text: text2()}}
 	}
 
+	// note reads a note statement, as the note of Pele's parseSequence does.
 	note := func() item {
 		i++
 		t := toks[i].typ
@@ -278,6 +295,7 @@ func parseSequence(src string, db *DB) {
 		return []item{who, &stmt{typ: "addNote", placement: placement, actor: who.actor, text: text2()}}
 	}
 
+	// autonumber reads an autonumber statement, as the autonumber of Pele's parseSequence does.
 	autonumber := func() *stmt {
 		i++
 		node := &stmt{typ: "sequenceIndex", visible: true, signalType: Autonumber}
@@ -302,7 +320,8 @@ func parseSequence(src string, db *DB) {
 	}
 
 	// fold folds the sections of an alt, par or critical block from the last one back, as the
-	// grammar's right recursion does, so that the texts reach the DB in the same order.
+	// grammar's right recursion does, so that the texts reach the DB in the same order. It is the
+	// fold of Pele's parseSequence.
 	fold := func(f *frame, divider string, signalType int) []item {
 		list := f.list
 		for k := len(f.sections) - 1; k >= 0; k-- {
@@ -313,10 +332,13 @@ func parseSequence(src string, db *DB) {
 		return list
 	}
 
+	// msgOf is db.parseMessage of a block's text, for the start entry closeFrame writes.
 	msgOf := func(s string) *seqText {
 		t := db.parseMessage(s)
 		return &t
 	}
+	// closeFrame is the statements of a block that has ended, between the entries that start and
+	// end it, as the close of Pele's parseSequence gives them.
 	closeFrame := func(f *frame) []item {
 		text := f.text
 		list := f.list
@@ -359,6 +381,8 @@ func parseSequence(src string, db *DB) {
 
 	var stack []*frame
 	f := &frame{kind: kTop}
+	// pop closes the block being read and adds it to the one around it, as Pele's parseSequence
+	// does inline where a block ends.
 	pop := func() {
 		done := closeFrame(f)
 		f = stack[len(stack)-1]
@@ -494,8 +518,10 @@ func parseSequence(src string, db *DB) {
 	}
 }
 
-// units16 is a string's UTF-16 code units.
+// units16 is a string's UTF-16 code units. It is limu's own, for reading strings by code units
+// as JavaScript does.
 func units16(s string) []uint16 { return utf16.Encode([]rune(s)) }
 
-// decode16 is code units as a string; a lone surrogate becomes U+FFFD.
+// decode16 is code units as a string; a lone surrogate becomes U+FFFD. It is limu's own, the
+// reverse of units16.
 func decode16(u []uint16) string { return string(utf16.Decode(u)) }

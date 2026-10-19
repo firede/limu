@@ -4,12 +4,12 @@ import (
 	"math"
 	"slices"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
-	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
@@ -37,7 +37,6 @@ const (
 	noWrap      float64 = 1e6
 	portGap     float64 = 18
 	portMargin  float64 = 14
-	padding     float64 = 8
 	// markerLength is how far a marker reaches back along its line from the box it touches,
 	// Pele's MARKER_LENGTH.
 	markerLength float64 = 18
@@ -50,12 +49,14 @@ const (
 	RoleRelationship      scene.Role = "er.relationship"
 	RoleRelationshipLabel scene.Role = "er.relationship-label"
 	RoleEntity            scene.Role = "er.entity"
+	RoleDivider           scene.Role = "er.divider"
 	RoleAttributeType     scene.Role = "er.attribute-type"
 	RoleAttributeName     scene.Role = "er.attribute-name"
 	RoleAttributeKeys     scene.Role = "er.attribute-keys"
 	RoleAttributeComment  scene.Role = "er.attribute-comment"
 )
 
+// cellRoles are the roles of the four cells of an attribute's row, in their order.
 var cellRoles = [4]scene.Role{RoleAttributeType, RoleAttributeName, RoleAttributeKeys, RoleAttributeComment}
 
 // Layout lays out a parsed ER diagram as a scene, as Pele's renderEr draws it: in its own
@@ -89,8 +90,8 @@ type row struct {
 
 // A view is an entity or a subgraph as it is drawn: Pele's NodeView.
 type view struct {
-	node   *GraphNode
-	author style.Author
+	node   *graphNode
+	author css.Author
 	label  text.Label
 	w, h   float64
 	headH  float64
@@ -124,10 +125,13 @@ func cellText(raw string) string {
 // lay lays the diagram out once, as Pele's draw does. turned lays out a diagram that runs
 // across as one that runs down.
 func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
-	graph := BuildGraph(db)
+	padding := o.Pad()
+	graph := buildGraph(db)
 	size := o.Size()
 	smallSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
+	// labelOf lays out a label with the diagram's measurer and icons, as each call of Pele's
+	// layoutLabel in draw does.
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
@@ -137,9 +141,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		index[n.ID] = i
 	}
 
-	var cedges []layout.CEdge
+	var cedges []graphs.CEdge
 	var edgeLabels []*text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	loops := map[int][]*selfLoop{}
 	var loopOrder []int
 	var loopOf []*selfLoop
@@ -161,7 +165,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		loopOf = append(loopOf, lp)
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, &label)
-		ce := layout.CEdge{Src: src, Dst: dst, Minlen: 1}
+		ce := graphs.CEdge{Src: src, Dst: dst, Minlen: 1}
 		if label.Width > 0 {
 			ce.LabelW = label.Width + 12
 		}
@@ -173,7 +177,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 
 	// horizontal is whether the level node i is laid out in runs across: its nearest
 	// subgraph's direction that sets one, or the diagram's. Subgraphs can name each other as
-	// members, so the walk up is bounded.
+	// members, so the walk up is bounded. It is the horizontal of Pele's draw.
 	horizontal := func(i int) bool {
 		at := i
 		for steps := 0; steps < len(graph.Nodes); steps++ {
@@ -194,13 +198,13 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	}
 
 	views := make([]view, 0, len(graph.Nodes))
-	cnodes := make([]layout.CNode, 0, len(graph.Nodes))
+	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for i, node := range graph.Nodes {
 		decls := node.CSSCompiledStyles
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold
@@ -242,12 +246,12 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if below {
 			minW = max(minWidth, bands+8)
 		}
-		var c layout.CNode
+		var c graphs.CNode
 		if node.IsGroup {
-			c = layout.NewCNode(0, 0, -1)
+			c = graphs.NewCNode(0, 0, -1)
 			c.IsGroup = true
 			if node.Dir != "" {
-				c.Dir = layout.Direction(node.Dir)
+				c.Dir = graphs.Direction(node.Dir)
 			}
 			c.PadX = groupPad
 			if label.Height > 0 {
@@ -324,9 +328,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				room = float64(2 * (markerLength + loopLength*0.75 + 10 + reach))
 			}
 			if below {
-				c = layout.NewCNode(v.w, v.h+room, -1)
+				c = graphs.NewCNode(v.w, v.h+room, -1)
 			} else {
-				c = layout.NewCNode(v.w+room, v.h, -1)
+				c = graphs.NewCNode(v.w+room, v.h, -1)
 			}
 		}
 		c.Seq = float64(len(views))
@@ -341,15 +345,19 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		}
 	}
 
-	rootDir := layout.Direction(db.Direction)
+	rootDir := graphs.Direction(db.Direction)
 	if turned {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: numberOption(config, "nodeSpacing", nodeSep),
-		EdgeSep: edgeSep,
-		RankSep: numberOption(config, "rankSpacing", rankSep),
-		PortSep: 24,
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
+		EdgeSep:  edgeSep,
+		RankSep:  numberOption(config, "rankSpacing", rankSep),
+		PortSep:  24,
 	})
 
 	spreadEnds(cedges, cnodes, views)
@@ -377,7 +385,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	inner := max(layoutWidth, title.Width)
 	ox := padding + (inner-layoutWidth)/2
 	oy := padding + titleHeight
-	layout.Shift(cnodes, cedges, ox, oy)
+	graphs.Shift(cnodes, cedges, ox, oy)
 	sc := &scene.Scene{
 		Type:     "er",
 		Width:    math.Ceil(inner + 2*padding),
@@ -386,6 +394,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		Title:    db.AccTitle,
 		Desc:     db.AccDescr,
 	}
+	// node is cnode i as the drawing helpers take it, where Pele's draw hands them the cnode
+	// itself.
 	node := func(i int) draw.Node {
 		c := &cnodes[i]
 		return draw.Node{X: c.X, Y: c.Y, W: c.W, H: c.H, Group: c.IsGroup}
@@ -412,7 +422,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		v := &views[i]
 		c := &cnodes[i]
 		n := v.node
-		classes := classNames(trimDefault(n.CSSClasses))
+		classes := common.ClassNames(common.TrimDefault(n.CSSClasses))
 		if c.IsGroup {
 			v.w, v.h = c.W, c.H
 			box := scene.Rect{X: c.X - c.W/2, Y: c.Y - c.H/2, W: c.W, H: c.H}
@@ -420,7 +430,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			cluster := scene.Item{
 				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
 			}
 			if !v.label.Empty() {
@@ -511,7 +521,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			if !direct {
 				stub = markerLength
 			}
-			ep := draw.RoutePath(r, "", stub, stub, draw.OwnReach(stub), draw.OwnReach(stub))
+			ep := draw.RoutePath(r, curve, stub, stub, draw.OwnReach(stub), draw.OwnReach(stub))
 			path = ep.Path
 			if stub > 0 {
 				path = new(scene.Path).MoveTo(ep.SX, ep.SY)
@@ -541,6 +551,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if edge.Pattern == "dashed" {
 			own.Dash = style.Dashes(4, 3)
 		}
+		if len(route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			route = path.Corners()
+		}
 		edges = append(edges, scene.Item{
 			Kind: scene.Edge, Role: RoleRelationship, ID: edge.ID,
 			Box:   path.Bounds(),
@@ -569,9 +583,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 }
 
 // entity is an entity drawn about x, y, as Pele's draw draws one: its box, with its name, and,
-// when it has attributes, its table: the stripes of every other row, the line under its name
-// and its outline drawn again over the stripes as parts, and the text of each cell as an
-// item of its own after it.
+// when it has attributes, its table: the stripes of every other row and its outline drawn
+// again over them as parts, and the line under its name and the text of each cell as items
+// of their own after it.
 func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.Item {
 	n := v.node
 	w, h := v.w, v.h
@@ -639,12 +653,19 @@ func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.
 		}
 		top += rw.h
 	}
-	divider := y + (y0 + v.headH)
-	it.Parts = append(it.Parts,
-		scene.Part{Path: new(scene.Path).MoveTo(x+x0, divider).LineTo(x+(x0+w), divider), Paint: scene.StrokeOnly},
-		scene.Part{Box: box, Rounded: true, Paint: scene.StrokeOnly},
-	)
-	return append([]scene.Item{it}, cells...)
+	it.Parts = append(it.Parts, scene.Part{Box: box, Rounded: true, Paint: scene.StrokeOnly})
+	// The line under the name is an item of its own, as Pele gives it only the stroke color
+	// the author set and none of the rest of the entity's style. Pele draws it before the
+	// outline drawn again over the stripes; here it is drawn after it, in the same color.
+	at := y + (y0 + v.headH)
+	line := new(scene.Path).MoveTo(x+x0, at).LineTo(x+(x0+w), at)
+	divider := scene.Item{
+		Kind: scene.Mark, Role: RoleDivider, ID: n.Label, Box: line.Bounds(),
+		Parts:  []scene.Part{{Path: line, Paint: scene.StrokeOnly}},
+		Style:  style.Style{Stroke: style.Border},
+		Author: style.Style{Stroke: v.author.Style.Stroke},
+	}
+	return append([]scene.Item{it, divider}, cells...)
 }
 
 // straighten drops the points of a route that lie on a straight run between their
@@ -653,6 +674,8 @@ func straighten(route []float64) []float64 {
 	out := append([]float64(nil), route[:min(3, len(route))]...)
 	for k := 3; k < len(route); k += 3 {
 		prev := len(out) - 3
+		// flat reports whether point k lies on a straight run along axis between the last
+		// point kept and the next, as the flat of Pele's straighten does.
 		flat := func(axis int) bool {
 			return math.Abs(out[prev+axis]-route[k+axis]) < 0.01 && math.Abs(route[k+axis]-route[k+3+axis]) < 0.01
 		}
@@ -675,9 +698,11 @@ type end struct {
 // spreadEnds spaces the ends of the edges on each side of a box along it, in the order they
 // fan out, as Pele's spreadEnds does: the layout brings every edge that ends on one side to
 // its middle, where their markers would cover each other.
-func spreadEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
+func spreadEnds(cedges []graphs.CEdge, cnodes []graphs.CNode, views []view) {
 	sides := map[int][]*end{}
 	var order []int
+	// add files the end of a route at index at under the side of node's box it lies on, with
+	// where the next point lies along that side, as the add of Pele's spreadEnds does.
 	add := func(node int, route []float64, at, next int) {
 		c := &cnodes[node]
 		dx := route[at] - c.X
@@ -745,7 +770,7 @@ func spreadEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
 
 // inset moves a route's end from the side of the larger box an entity with a
 // self-relationship is laid out in onto the entity's own side, as Pele's inset does.
-func inset(route []float64, at int, v *view, c *layout.CNode) {
+func inset(route []float64, at int, v *view, c *graphs.CNode) {
 	if c.IsGroup {
 		return
 	}
@@ -759,25 +784,8 @@ func inset(route []float64, at int, v *view, c *layout.CNode) {
 	}
 }
 
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
-// trimDefault takes /^default\s?/ off an entity's classes: the class every entity has.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
-}
-
+// hasClass reports whether name is among the classes, as the test / internal-link(?: |$)/ of
+// Pele's draw finds it in the string of them.
 func hasClass(classes []string, name string) bool {
 	return slices.Contains(classes, name)
 }

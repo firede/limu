@@ -83,12 +83,6 @@ var single = [128]uint8{
 	'&': tAMP, '-': tMINUS, ';': tSEMI,
 }
 
-// wordAt reports whether word, written in lower case, is at byte p of src, as Pele's wordAt
-// does: only ASCII letters match in either case.
-func wordAt(src string, p int, word string) bool {
-	return p <= len(src) && chars.HasPrefixFold(src[p:], word)
-}
-
 // tokenize splits an XY chart's text into tokens, as Pele's tokenize does. Where Pele reads
 // a code unit with charCodeAt, chars.UnitAt reads the same one; a character outside ASCII is
 // white space, which is stepped over whole, or ends the tokens.
@@ -126,7 +120,7 @@ func tokenize(src string) *common.JisonTokens {
 		return q
 	}
 	keyword := func(word string) bool {
-		return wordAt(src, p, word) && !chars.IsWord(chars.Unit(src, p+len(word)))
+		return common.WordAt(src, p, word) && !chars.IsWord(chars.Unit(src, p+len(word)))
 	}
 
 	for p < n {
@@ -199,9 +193,9 @@ func tokenize(src string) *common.JisonTokens {
 				continue
 			}
 		case 'a':
-			if wordAt(src, p, "acc") {
-				descr := wordAt(src, p+3, "descr")
-				if descr || wordAt(src, p+3, "title") {
+			if common.WordAt(src, p, "acc") {
+				descr := common.WordAt(src, p+3, "descr")
+				if descr || common.WordAt(src, p+3, "title") {
 					k := chars.SpaceRun(src, p+8)
 					d := chars.Unit(src, k)
 					if d == ':' {
@@ -242,12 +236,12 @@ func tokenize(src string) *common.JisonTokens {
 				continue
 			}
 		case 'v':
-			if wordAt(src, p, "vertical") {
+			if common.WordAt(src, p, "vertical") {
 				emit(tCHART_ORIENTATION, p, p+8)
 				continue
 			}
 		case 'h':
-			if wordAt(src, p, "horizontal") {
+			if common.WordAt(src, p, "horizontal") {
 				emit(tCHART_ORIENTATION, p, p+10)
 				continue
 			}
@@ -305,7 +299,7 @@ func tokenize(src string) *common.JisonTokens {
 				continue
 			}
 		}
-		if c == '`' && wordAt(src, p, brokenRule) {
+		if c == '`' && common.WordAt(src, p, brokenRule) {
 			p += len(brokenRule)
 			pop()
 			continue

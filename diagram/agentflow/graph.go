@@ -8,9 +8,9 @@ import (
 	"github.com/firede/limu/internal/yaml"
 )
 
-// GraphNode is a node or a flow as it is drawn, Pele's GraphNode. A string Pele may leave
+// graphNode is a node or a flow as it is drawn, Pele's GraphNode. A string Pele may leave
 // undefined is empty where it is, but for Parent, whose HasParent says.
-type GraphNode struct {
+type graphNode struct {
 	ID        string
 	Label     string
 	LabelType LabelType
@@ -36,8 +36,8 @@ type GraphNode struct {
 	Metadata *yaml.Map
 }
 
-// GraphEdge is an edge as it is drawn, Pele's GraphEdge.
-type GraphEdge struct {
+// graphEdge is an edge as it is drawn, Pele's GraphEdge.
+type graphEdge struct {
 	ID              string
 	IsUserDefinedID bool
 	Start           string
@@ -63,14 +63,14 @@ type GraphEdge struct {
 	Metadata *yaml.Map
 }
 
-// Graph is what an agent flow draws, Pele's AgentGraph.
-type Graph struct {
-	Nodes []*GraphNode
-	Edges []*GraphEdge
+// graph is what an agent flow draws, Pele's AgentGraph.
+type graph struct {
+	Nodes []*graphNode
+	Edges []*graphEdge
 }
 
-// Palette is the number of series colors, the palette Mermaid's slot rules are applied to.
-const Palette = 8
+// palette is the number of series colors, the palette Mermaid's slot rules are applied to.
+const palette = 8
 
 // kindSlot is the palette slot of each kind of node: fixed, so that editing a diagram
 // around a node never recolors it.
@@ -89,6 +89,8 @@ func containerSlot(n, paletteLength int) int {
 	return slot
 }
 
+// trimAll trims each of s in place and gives s, as the map of trim in the compiled closure of
+// Pele's buildAgentGraph does.
 func trimAll(s []string) []string {
 	for i := range s {
 		s[i] = chars.Trim(s[i])
@@ -96,6 +98,8 @@ func trimAll(s []string) []string {
 	return s
 }
 
+// collapsedView reports whether a flow's metadata sets its view to collapsed, the test
+// sg.metadata?.view === 'collapsed' of Pele's buildAgentGraph.
 func collapsedView(m *yaml.Map) bool {
 	v, _ := m.Value("view").(string)
 	return v == "collapsed"
@@ -107,6 +111,7 @@ type orderedSet struct {
 	has  map[string]bool
 }
 
+// add adds k if the set does not hold it, as Set.add does.
 func (s *orderedSet) add(k string) {
 	if s.has == nil {
 		s.has = map[string]bool{}
@@ -117,24 +122,26 @@ func (s *orderedSet) add(k string) {
 	}
 }
 
-// Graph is the graph the diagram draws, built once, as Pele's agentGraph builds it: building
-// it records the model's shape and containment diagnostics. defaultCurve is the flowchart
-// config's curve, "" where it has none, and is read only the first time.
-func (d *DB) Graph(defaultCurve string) *Graph {
+// agentGraph is the graph the diagram draws, built once, as Pele's agentGraph builds it:
+// building it records the model's shape and containment diagnostics. defaultCurve is the
+// flowchart config's curve, "" where it has none, and is read only the first time.
+func (d *DB) agentGraph(defaultCurve string) *graph {
 	if d.graph == nil {
-		d.graph = BuildGraph(d, Palette, defaultCurve)
+		d.graph = buildGraph(d, palette, defaultCurve)
 	}
 	return d.graph
 }
 
-// BuildGraph resolves a parsed agent flow into the nodes and edges that are drawn, as Pele's
+// buildGraph resolves a parsed agent flow into the nodes and edges that are drawn, as Pele's
 // buildAgentGraph does: flow membership, collapsed flows, shapes reduced to the ones agent
 // flows have, class styles and palette slots. Shape and containment problems are recorded on
 // the model as diagnostics.
-func BuildGraph(d *DB, paletteLength int, defaultCurve string) *Graph {
-	g := &Graph{Nodes: []*GraphNode{}, Edges: []*GraphEdge{}}
+func buildGraph(d *DB, paletteLength int, defaultCurve string) *graph {
+	g := &graph{Nodes: []*graphNode{}, Edges: []*graphEdge{}}
 	subgraphs := d.Subgraphs
 
+	// compiled is the styles and text styles of the classes named, trimmed, as Pele's compiled
+	// gives them.
 	compiled := func(classNames []string) []string {
 		out := []string{}
 		for _, name := range classNames {
@@ -236,7 +243,7 @@ func BuildGraph(d *DB, paletteLength int, defaultCurve string) *Graph {
 		}
 		for _, id := range sg.Nodes {
 			if closesLoop(id, sg.ID, i) {
-				d.EmitWarning(ContainmentViolation, `Container "`+sg.ID+`" cannot contain "`+id+`" because "`+id+
+				d.emitWarning(ContainmentViolation, `Container "`+sg.ID+`" cannot contain "`+id+`" because "`+id+
 					`" already contains it. The nesting that would close the loop is dropped.`, id)
 				continue
 			}
@@ -244,14 +251,14 @@ func BuildGraph(d *DB, paletteLength int, defaultCurve string) *Graph {
 		}
 	}
 
-	byID := map[string]*GraphNode{}
+	byID := map[string]*graphNode{}
 	for i := len(subgraphs) - 1; i >= 0; i-- {
 		sg := subgraphs[i]
 		if hidden.has[sg.ID] {
 			continue
 		}
 		collapsed := collapsedView(sg.Metadata)
-		node := &GraphNode{
+		node := &graphNode{
 			ID:                sg.ID,
 			Label:             sg.Title,
 			LabelType:         sg.LabelType,
@@ -284,12 +291,12 @@ func BuildGraph(d *DB, paletteLength int, defaultCurve string) *Graph {
 			existing.CSSClasses = strings.Join(vertex.Classes, " ")
 			continue
 		}
-		typ := ResolveShapeAlias(vertex.Type)
+		typ := resolveShapeAlias(vertex.Type)
 		if typ == "square" || typ == "" {
 			typ = "squareRect"
 		}
 		tooltip, _ := d.Tooltip(vertex.ID)
-		node := &GraphNode{
+		node := &graphNode{
 			ID:                vertex.ID,
 			Label:             vertex.Text,
 			LabelType:         vertex.LabelType,
@@ -347,7 +354,7 @@ func BuildGraph(d *DB, paletteLength int, defaultCurve string) *Graph {
 		case defaultCurve != "":
 			curve = defaultCurve
 		}
-		g.Edges = append(g.Edges, &GraphEdge{
+		g.Edges = append(g.Edges, &graphEdge{
 			ID:                id,
 			IsUserDefinedID:   raw.IsUserDefinedID,
 			Start:             start,

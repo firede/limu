@@ -1,9 +1,10 @@
 // State diagrams drawn end to end: what Pele's render draws, read back out of its SVG as one
 // line per element drawn, in the order drawn, with numbers as the SVG writes them. limu's test
 // writes the same lines from its scene.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, capJoin } from '../lib/svg.mjs';
 import { WRITTEN, stateCorpus } from './state.mjs';
-import { capJoin } from './render.mjs';
 
 // The fragments mutations splice in, for text that parses and still draws something odd.
 const FRAGMENTS = [
@@ -15,13 +16,6 @@ const FRAGMENTS = [
   '\nstyle a stroke:#f00,font-size:22px\n', '\nclick a "https://x.y/z" "tip"\n', '中文', '😀', '#quot;', '<br>',
   '**bold**', '\nhide empty description\n',
 ];
-
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 
 const TAG = /<(\/?)(g|a|rect|circle|polygon|path|text|title)\b([^>]*)>/g;
 

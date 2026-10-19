@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -23,11 +24,11 @@ type parser struct {
 	db  *DB
 }
 
-// ParseInto parses a state diagram's text into db, as Pele's parseState does: it reads the
+// parseInto parses a state diagram's text into db, as Pele's parseState does: it reads the
 // statements in a loop, with a stack of the composites open, and accepts what Mermaid's
 // stateDiagram.jison accepts. It then sets the root document, which resolves the DB's states
 // and its graph. An error is a *diagram.Error.
-func ParseInto(source string, db *DB) (err error) {
+func parseInto(source string, db *DB) (err error) {
 	p := &parser{src: source, lex: tokenize(source), db: db}
 	defer func() {
 		if r := recover(); r != nil {
@@ -54,13 +55,13 @@ func (p *parser) fail(expected string) {
 	t := p.lex.toks[p.i]
 	if t.typ == t_ERROR {
 		if p.lex.hasError {
-			loc := diagram.Locate(p.src, t.start)
+			loc := common.Locate(p.src, t.start)
 			panic(parseError{&diagram.Error{Code: diagram.Syntax, Message: p.lex.error, Type: "state",
 				Line: loc.Line, Column: loc.Column, Snippet: loc.Snippet}})
 		}
-		panic(parseError{diagram.SyntaxError("state", p.src, t.start, "", true)})
+		panic(parseError{common.SyntaxError("state", p.src, t.start, "", true)})
 	}
-	panic(parseError{diagram.SyntaxError("state", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
+	panic(parseError{common.SyntaxError("state", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 }
 
 func (p *parser) expect(typ token) string {

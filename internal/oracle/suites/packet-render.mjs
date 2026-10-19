@@ -3,15 +3,10 @@
 //
 // Pele draws a packet with no groups that move what is in them, so its numbers are where the
 // scene has them, and are compared as Pele writes them, to two decimals.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './packet.mjs';
-
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 
 // The lines of text in s: each <text> or <tspan> that says where it is, with the size of its
 // type (that of the <text> it is in, or size), its anchor, and what it writes; a <tspan> that goes on

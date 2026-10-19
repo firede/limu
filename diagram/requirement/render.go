@@ -4,13 +4,13 @@ import (
 	"cmp"
 	"math"
 	"slices"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
-	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
@@ -49,8 +49,8 @@ type row struct {
 
 // A view is a requirement or an element as it is drawn: Pele's NodeView.
 type view struct {
-	node       *GraphNode
-	author     style.Author
+	node       *graphNode
+	author     css.Author
 	kind, name text.Label
 	rows       []row
 	keyWidth   float64
@@ -92,7 +92,7 @@ func restyle(l text.Label, bits text.Face, m text.Measurer) text.Label {
 // does. The layout attaches every edge to the middle of a side; ends that share one are
 // spread along it, in the order of where they head, so their markers do not sit on each
 // other.
-func spreadEnds(cnodes []layout.CNode, cedges []layout.CEdge, views []view) {
+func spreadEnds(cnodes []graphs.CNode, cedges []graphs.CEdge, views []view) {
 	type end struct {
 		route  []float64
 		at     int
@@ -181,21 +181,21 @@ func Layout(db *DB, _ diagram.Config, o *layout.Options) *scene.Scene {
 // lay lays the diagram out once, as Pele's draw does. down lays out a diagram that runs
 // across as one that runs down.
 func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
-	graph := BuildGraph(db)
+	graph := buildGraph(db)
 	size := o.Size()
-	small := math.Floor(size*0.875 + 0.5)
+	small := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
-	const padding = common.Padding
+	padding := o.Pad()
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
 
 	index := make(map[string]int, len(graph.Nodes))
 	views := make([]view, 0, len(graph.Nodes))
-	cnodes := make([]layout.CNode, 0, len(graph.Nodes))
+	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for i := range graph.Nodes {
 		node := &graph.Nodes[i]
-		author := style.Declarations(node.CSSStyles)
+		author := css.Declarations(node.CSSStyles)
 		var base text.Face
 		if author.Bold {
 			base |= text.Bold
@@ -245,21 +245,21 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		if _, ok := index[node.ID]; !ok {
 			index[node.ID] = len(views)
 		}
-		c := layout.NewCNode(w, headHeight+bodyHeight, -1)
+		c := graphs.NewCNode(w, headHeight+bodyHeight, -1)
 		c.Seq = float64(len(views))
 		views = append(views, view{node: node, author: author, kind: kind, name: name, rows: rows,
 			keyWidth: keyWidth, headHeight: headHeight, w: w, h: headHeight + bodyHeight})
 		cnodes = append(cnodes, c)
 	}
 
-	rootDir := layout.Direction(graph.Direction)
+	rootDir := graphs.Direction(graph.Direction)
 	if down {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
-	sideways := rootDir == layout.LR || rootDir == layout.RL
-	var cedges []layout.CEdge
+	sideways := rootDir == graphs.LR || rootDir == graphs.RL
+	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	for i := range graph.Edges {
 		edge := &graph.Edges[i]
 		if !edge.HasStart || !edge.HasEnd {
@@ -278,14 +278,18 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		}
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, label)
-		cedges = append(cedges, layout.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: label.Width + 12, LabelH: label.Height + 4})
+		cedges = append(cedges, graphs.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: label.Width + 12, LabelH: label.Height + 4})
 	}
 
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
-		NodeSep: nodeSep,
-		EdgeSep: edgeSep,
-		RankSep: rankSep,
-		PortSep: 20,
+	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
+	curve := common.RoutingCurve(o.Routing)
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
+		Tracks:   curve == "step",
+		Straight: curve == "linear",
+		NodeSep:  nodeSep,
+		EdgeSep:  edgeSep,
+		RankSep:  rankSep,
+		PortSep:  20,
 	})
 
 	spreadEnds(cnodes, cedges, views)
@@ -298,7 +302,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	inner := max(result.Width, title.Width)
 	ox := padding + (inner-result.Width)/2
 	oy := padding + titleHeight
-	layout.Shift(cnodes, cedges, ox, oy)
+	graphs.Shift(cnodes, cedges, ox, oy)
 	sc := &scene.Scene{
 		Type:     "requirement",
 		Width:    math.Ceil(inner + 2*padding),
@@ -311,7 +315,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	var titles, edges, labels, nodes []scene.Item
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
-			Kind: scene.Text, Role: "requirement.title", Label: &title,
+			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: padding + title.Height/2},
 		})
 	}
@@ -321,13 +325,13 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		x, y := cnodes[i].X, cnodes[i].Y
 		left, top := -v.w/2, -v.h/2
 		box := scene.Rect{X: x + left, Y: y + top, W: v.w, H: v.h}
-		role := scene.Role("requirement.element")
+		role := RoleElement
 		if v.node.Requirement != nil {
-			role = "requirement.requirement"
+			role = RoleRequirement
 		}
 		it := scene.Item{
 			Kind: scene.Node, Role: role, Shape: "rect", ID: v.node.ID,
-			Class:  classNames(trimDefault(v.node.CSSClasses)),
+			Class:  common.ClassNames(common.TrimDefault(v.node.CSSClasses)),
 			Box:    box,
 			Parts:  []scene.Part{{Box: box, Rounded: true}},
 			Label:  &v.name,
@@ -335,7 +339,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
 			Author: v.author.Style,
 		}
-		texts := []scene.Item{textItem("requirement.kind", &v.kind, scene.Middle, x, y+(top+padY+v.kind.Height/2), style.Muted, v.author)}
+		texts := []scene.Item{textItem(RoleKind, &v.kind, scene.Middle, x, y+(top+padY+v.kind.Height/2), style.Muted, v.author)}
 		if len(v.rows) > 0 {
 			divider := top + v.headHeight
 			it.Parts = append(it.Parts, scene.Part{
@@ -346,8 +350,8 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			for k := range v.rows {
 				r := &v.rows[k]
 				texts = append(texts,
-					textItem("requirement.field", &r.key, scene.Start, x+(left+padX), y+(at+r.key.Height/2), style.Muted, v.author),
-					textItem("requirement.value", &r.value, scene.Start, x+(left+padX+v.keyWidth+columnGap), y+(at+r.value.Height/2), style.Fg, v.author))
+					textItem(RoleField, &r.key, scene.Start, x+(left+padX), y+(at+r.key.Height/2), style.Muted, v.author),
+					textItem(RoleValue, &r.value, scene.Start, x+(left+padX+v.keyWidth+columnGap), y+(at+r.value.Height/2), style.Fg, v.author))
 				at += r.height + rowGap
 			}
 		}
@@ -407,7 +411,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			}
 		} else {
 			route = append([]float64(nil), ce.Route...)
-			path = draw.RoutePath(route, "", startTrim, 0, draw.OwnReach(startTrim), 0)
+			path = draw.RoutePath(route, curve, startTrim, 0, draw.OwnReach(startTrim), 0)
 		}
 		// Pele draws the edges in a group that ends their lines round.
 		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
@@ -415,7 +419,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			own.Dash = style.Dashes(5, 4)
 		}
 		it := scene.Item{
-			Kind: scene.Edge, Role: "requirement.relationship", ID: edge.ID,
+			Kind: scene.Edge, Role: RoleRelationship, ID: edge.ID,
 			Box:   path.Path.Bounds(),
 			Parts: []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 			Ends:  path.Ends(start, end),
@@ -424,9 +428,13 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
 		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
+		}
 		edges = append(edges, it)
 		labels = append(labels, scene.Item{
-			Kind: scene.Text, Role: "requirement.relationship-label", ID: edge.ID,
+			Kind: scene.Text, Role: RoleRelationshipLabel, ID: edge.ID,
 			Box:   scene.Rect{X: labelX - (label.Width+8)/2, Y: labelY - label.Height/2, W: label.Width + 8, H: label.Height},
 			Parts: []scene.Part{draw.LabelPatch(label, labelX, labelY)},
 			Label: label,
@@ -444,7 +452,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 
 // textItem is a text of a box beside its name: its kind, or a field's name or value, drawn
 // about x, y in the color own and the color of text its author gave the box.
-func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, own style.Paint, author style.Author) scene.Item {
+func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, own style.Paint, author css.Author) scene.Item {
 	box := scene.Rect{X: x - l.Width/2, Y: y - l.Height/2, W: l.Width, H: l.Height}
 	if align == scene.Start {
 		box.X = x
@@ -454,23 +462,4 @@ func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, o
 		Style:  style.Style{Text: own},
 		Author: style.Style{Text: author.Style.Text},
 	}
-}
-
-// classNames is a class attribute's names, as Pele's classNames cleans them.
-func classNames(raw string) []string {
-	return strings.FieldsFunc(raw, func(r rune) bool {
-		return !(r == '_' || r == '-' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z')
-	})
-}
-
-// trimDefault takes /^default\s?/ off a node's classes: the class every node has.
-func trimDefault(classes string) string {
-	rest, ok := strings.CutPrefix(classes, "default")
-	if !ok {
-		return classes
-	}
-	if r, n := utf8.DecodeRuneInString(rest); n > 0 && chars.IsSpace(int(r)) {
-		rest = rest[n:]
-	}
-	return rest
 }

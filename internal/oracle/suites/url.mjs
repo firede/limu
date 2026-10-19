@@ -1,6 +1,6 @@
 // Pele's checks of the URLs diagrams link to and show: sanitizeUrl, which follows
 // @braintree/sanitize-url, safeUrl, and the schemes linkUrl and imageUrl let through.
-import { lone } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
 
 const WRITTEN = [
   // Pele's own cases, tests/util/url.test.ts.

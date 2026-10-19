@@ -9,6 +9,7 @@ package pie
 
 import (
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -34,7 +35,7 @@ func buildPie(tree *ast, title string) (*Model, error) {
 	seen := map[string]bool{}
 	for _, s := range tree.sections {
 		if s.value < 0 {
-			return nil, diagram.NewError(`"`+s.label+`" has invalid value: `+chars.NumberString(s.value)+
+			return nil, common.NewError(`"`+s.label+`" has invalid value: `+chars.NumberString(s.value)+
 				`. Negative values are not allowed in pie charts. All slice values must be >= 0.`, diagram.Semantic, "pie")
 		}
 		if !seen[s.label] {

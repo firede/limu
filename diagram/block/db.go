@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -161,8 +162,8 @@ type DB struct {
 	spaces    float64
 }
 
-// NewDB is a model with nothing in it, as Pele's BlockDb starts.
-func NewDB() *DB {
+// newDB is a model with nothing in it, as Pele's BlockDb starts.
+func newDB() *DB {
 	columns := -1.0
 	return &DB{
 		Root:      &Block{ID: "root", Type: "composite", Children: []*Block{}, Columns: &columns},
@@ -332,7 +333,7 @@ func (db *DB) setHierarchy(statements []statement) error {
 				width = *b.Width
 			}
 			if !(width <= maxSpaces-db.spaces) {
-				return diagram.NewError("A block diagram can hold at most "+strconv.Itoa(maxSpaces)+" space blocks.", diagram.Limit, "block")
+				return common.NewError("A block diagram can hold at most "+strconv.Itoa(maxSpaces)+" space blocks.", diagram.Limit, "block")
 			}
 			db.spaces += max(width, 0)
 			for j := 0; float64(j) < width; j++ {

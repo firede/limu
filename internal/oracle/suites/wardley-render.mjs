@@ -10,18 +10,15 @@
 // in the last bit shows. A label whose lines start at a point is written where limu centers
 // it: its first baseline less a little over a third of its size, and down by half of what
 // its lines after the first take.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n } from '../lib/svg.mjs';
+import { readLabel, readMarker } from '../lib/limu.mjs';
 import { FRAGMENTS, corpus, hostile, randomMaps } from './wardley.mjs';
 
 // The icons the host has, in the cases drawn with icons.
 export const ICONS = ['star', 'fa:fa-car', 'fa:fa-coffee'];
 
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (v) => String(v);
 const FACES = ['-', 'b', 'i', 'bi'];
 
 // The lines of a map's SVG, drawn with its numbers in full.
@@ -70,26 +67,24 @@ export function readSvg(svg) {
     }
     return out.join(' ');
   };
-  const label = (kind, e) => {
-    const attrs = decodeURIComponent(attr(e, 'attrs'));
-    const own = (name) => new RegExp(`\\s${name}="([^"]*)"`).exec(attrs)?.[1] ?? '-';
+  // A label, centered on its point, or, for start, with its lines starting there.
+  const label = (e) => {
+    const l = readLabel(e);
+    const kind = l.align === 'start' ? 'start' : 'label';
+    const own = (name) => new RegExp(`\\s${name}="([^"]*)"`).exec(l.attrs)?.[1] ?? '-';
     // A weight on the text draws every span of it bold, as limu's scene holds it.
     const weight = own('font-weight') === '-' ? 0 : 1;
-    const spans = JSON.parse(decodeURIComponent(attr(e, 'lines')))
-      .map((line) => line.map((s) => (s[0] === 'i' ? `i:${s[1]}` : `t:${FACES[(s[1] | weight) & 3]}:${s[2]}`)).join(' + '))
+    const spans = l.lines
+      .map((line) => line.map((s) => (s.icon !== undefined ? `i:${s.icon}` : `t:${FACES[(s.style | weight) & 3]}:${s.text}`)).join(' + '))
       .join(' | ');
-    const x = Number(attr(e, 'x'));
-    let y = Number(attr(e, 'y'));
-    const w = Number(attr(e, 'w'));
-    const h = Number(attr(e, 'h'));
-    const size = Number(attr(e, 'size'));
-    const lh = Number(attr(e, 'lh'));
+    const { x, width: w, height: h, size, lineHeight: lh } = l;
+    let y = l.y;
     if (kind === 'start') y = y - size * 0.35 + h / 2 - lh / 2;
-    const turn = /rotate\(([^ ]*) /.exec(attrs);
+    const turn = /rotate\(([^ ]*) /.exec(l.attrs);
     return `${kind} ${own('class')} ${own('font-size')} ${own('fill')} ${own('font-weight')}${turn ? ` turn ${turn[1]}` : ''} ${pt(x, y)} ${n(w)},${n(h)} ${n(size)} ${n(lh)} | ${spans}`;
   };
 
-  const tags = /<(\/?)(g|path|rect|circle|svg|limu-label|limu-start|limu-marker)\b[^>]*>/g;
+  const tags = /<(\/?)(g|path|rect|circle|svg|limu-label|limu-marker)\b[^>]*>/g;
   // Inside an icon, whose drawing is the host's.
   let icon = false;
   for (const m of svg.matchAll(tags)) {
@@ -128,14 +123,13 @@ export function readSvg(svg) {
         break;
       }
       case 'limu-label':
-        lines.push(label('label', e));
+        lines.push(label(e));
         break;
-      case 'limu-start':
-        lines.push(label('start', e));
+      case 'limu-marker': {
+        const k = readMarker(e);
+        lines.push(`marker ${k.type} ${pt(k.x, k.y)} ${n(k.dx)},${n(k.dy)} ${k.color}`);
         break;
-      case 'limu-marker':
-        lines.push(`marker ${attr(e, 'type')} ${pt(attr(e, 'x'), attr(e, 'y'))} ${n(Number(attr(e, 'dx')))},${n(Number(attr(e, 'dy')))} ${attr(e, 'color')}`);
-        break;
+      }
     }
   }
   return lines;

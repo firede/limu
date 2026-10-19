@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 )
 
 // alignment is the column a node goes in, Pele's Alignment: "justify", "left", "right" or
@@ -142,7 +143,7 @@ func layoutSankey(m *Model, options layoutOptions) ([]placedNode, []placedLink, 
 				}
 			}
 		}
-		return nil, nil, diagram.NewError(`Sankey diagrams cannot have circular links, and "`+m.Nodes[stuck].ID+`" is part of one.`,
+		return nil, nil, common.NewError(`Sankey diagrams cannot have circular links, and "`+m.Nodes[stuck].ID+`" is part of one.`,
 			diagram.Semantic, "sankey")
 	}
 	layers := 1
@@ -281,7 +282,7 @@ func layoutSankey(m *Model, options layoutOptions) ([]placedNode, []placedLink, 
 	for _, column := range columns {
 		y := 0.0
 		for _, i := range column {
-			nodes[i].height = flow[i] * scale
+			nodes[i].height = float64(flow[i] * scale)
 			margin[i] = max(0, claim-nodes[i].height) / 2
 			nodes[i].y = y + margin[i]
 			y += nodes[i].height + float64(2*margin[i]) + gap

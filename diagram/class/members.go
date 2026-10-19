@@ -17,12 +17,13 @@ type Member struct {
 	ReturnType string
 }
 
+// isVisibility reports whether s is a mark of visibility, as Pele's isVisibility does.
 func isVisibility(s string) bool { return s == "#" || s == "+" || s == "~" || s == "-" }
 
-// NewMember reads a member as Pele's ClassMember does. Mermaid throws a TypeError for a method
+// newMember reads a member as Pele's ClassMember does. Mermaid throws a TypeError for a method
 // with no opening parenthesis, such as `run)`; it is kept here as an attribute, so it is
 // shown as written.
-func NewMember(input, memberType string) *Member {
+func newMember(input, memberType string) *Member {
 	m := &Member{MemberType: memberType}
 	if memberType != "method" || !m.parseMethod(input) {
 		m.parseAttribute(input)
@@ -35,7 +36,8 @@ func NewMember(input, memberType string) *Member {
 	return m
 }
 
-// lineEnd is where the line that starts at byte i of s ends, and the bytes of what ends it.
+// lineEnd is where the line that starts at byte i of s ends, and the bytes of what ends it:
+// the loops over isLineEnd that Pele's parseMethod runs.
 func lineEnd(s string, i int) (end, size int) {
 	for i < len(s) {
 		c, n := chars.UnitAt(s, i)
@@ -100,6 +102,8 @@ func (m *Member) parseMethod(input string) bool {
 	return false
 }
 
+// parseAttribute reads an attribute: its visibility, its classifier and its name between
+// them, as the parseAttribute of Pele's ClassMember does.
 func (m *Member) parseAttribute(input string) {
 	if input == "" {
 		return

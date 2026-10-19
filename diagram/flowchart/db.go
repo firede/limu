@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/internal/yaml"
@@ -20,8 +21,8 @@ const (
 	LabelMarkdown LabelType = "markdown"
 )
 
-// Text is a label as written, with how it is read. Pele's FlowText.
-type Text struct {
+// flowText is a label as written, with how it is read. Pele's FlowText.
+type flowText struct {
 	Text string
 	Type LabelType
 }
@@ -106,17 +107,17 @@ type Tooltip struct {
 	ID, Text string
 }
 
-// LinkInfo is what an arrow says of an edge: Pele's LinkInfo.
-type LinkInfo struct {
+// linkInfo is what an arrow says of an edge: Pele's LinkInfo.
+type linkInfo struct {
 	Type   string
 	Stroke string
 	Length int
-	Text   *Text
+	Text   *flowText
 	ID     string
 }
 
-// Options are Pele's FlowDbOptions.
-type Options struct {
+// options are Pele's FlowDbOptions.
+type options struct {
 	// MaxEdges is the most edges the flowchart may have; no limit when it is negative.
 	MaxEdges int
 	// InheritDir gives a subgraph that sets no direction the flowchart's.
@@ -156,11 +157,12 @@ type DB struct {
 	edgeByID       map[string]*Edge
 	pairCount      map[string]int
 	subCount       int
-	options        Options
+	options        options
 }
 
-// NewDB is an empty flowchart.
-func NewDB(options Options) *DB {
+// newDB is an empty flowchart.
+// It is the constructor of Pele's FlowDb.
+func newDB(options options) *DB {
 	return &DB{
 		nodes:          map[string]*Node{},
 		classes:        map[string]*ClassDef{},
@@ -174,12 +176,16 @@ func NewDB(options Options) *DB {
 }
 
 // Node is the node of id, or nil.
+// It is Pele's nodes.get(id).
 func (d *DB) Node(id string) *Node { return d.nodes[id] }
 
 // Class is the class of id, or nil.
+// It is Pele's classes.get(id).
 func (d *DB) Class(id string) *ClassDef { return d.classes[id] }
 
 // Tooltip is the tooltip of the node of id, and whether it has one.
+// It is Pele's tooltips.get(id): Pele keeps the tooltips in a Map, which limu keeps as a
+// list and an index.
 func (d *DB) Tooltip(id string) (string, bool) {
 	i, ok := d.tooltips[id]
 	if !ok {
@@ -189,8 +195,11 @@ func (d *DB) Tooltip(id string) (string, bool) {
 }
 
 // Subgraph is the subgraph of id, or nil.
+// It is Pele's subgraph.
 func (d *DB) Subgraph(id string) *Subgraph { return d.subgraphLookup[id] }
 
+// labelType is a label type as given, if it is one, and "markdown" otherwise, as Pele's
+// labelType gives it.
 func labelType(t string) LabelType {
 	switch t {
 	case "markdown", "string", "text":
@@ -199,6 +208,8 @@ func labelType(t string) LabelType {
 	return LabelMarkdown
 }
 
+// unquote drops the double quotes text starts and ends with, if it has both, as Pele's
+// unquote does.
 func unquote(text string) string {
 	if len(text) >= 2 && text[0] == '"' && text[len(text)-1] == '"' {
 		return text[1 : len(text)-1]
@@ -206,7 +217,9 @@ func unquote(text string) string {
 	return text
 }
 
-func destructStartLink(raw string) LinkInfo {
+// destructStartLink reads the start of an arrow that has a label between its start and its
+// end, its head and its stroke, as Pele's destructStartLink does.
+func destructStartLink(raw string) linkInfo {
 	str := chars.Trim(raw)
 	typ := "arrow_open"
 	if str != "" {
@@ -229,10 +242,12 @@ func destructStartLink(raw string) LinkInfo {
 	if strings.Contains(str, ".") {
 		stroke = "dotted"
 	}
-	return LinkInfo{Type: typ, Stroke: stroke}
+	return linkInfo{Type: typ, Stroke: stroke}
 }
 
-func destructEndLink(raw string) LinkInfo {
+// destructEndLink reads an arrow, or the end of one with a label between, its heads, stroke
+// and length, as Pele's destructEndLink does; Pele's countChar is strings.Count here.
+func destructEndLink(raw string) linkInfo {
 	str := chars.Trim(raw)
 	line := ""
 	last := byte(0)
@@ -273,17 +288,19 @@ func destructEndLink(raw string) LinkInfo {
 		stroke = "dotted"
 		length = dots
 	}
-	return LinkInfo{Type: typ, Stroke: stroke, Length: length}
+	return linkInfo{Type: typ, Stroke: stroke, Length: length}
 }
 
+// flowError is an error of a flowchart, the PeleError of type flowchart that Pele's FlowDb
+// throws.
 func flowError(message string, code diagram.Code) *diagram.Error {
-	return diagram.NewError(message, code, "flowchart")
+	return common.NewError(message, code, "flowchart")
 }
 
-// AddVertex adds a node, or adds to it, as Pele's addVertex does. text is nil, typ "", and
+// addVertex adds a node, or adds to it, as Pele's addVertex does. text is nil, typ "", and
 // style and classes nil where Pele's are undefined; metadata is the text of a metadata block,
 // if hasMetadata.
-func (d *DB) AddVertex(id string, text *Text, typ string, style, classes []string, dir string, props []Prop, metadata string, hasMetadata bool) error {
+func (d *DB) addVertex(id string, text *flowText, typ string, style, classes []string, dir string, props []Prop, metadata string, hasMetadata bool) error {
 	if id == "" || chars.Trim(id) == "" {
 		return nil
 	}
@@ -409,6 +426,7 @@ func (d *DB) AddVertex(id string, text *Text, typ string, style, classes []strin
 
 // assignProp sets a property as Object.assign does: a __proto__ that the props do not hold
 // already is the prototype's, and setting it to a string does nothing.
+// It is the Object.assign of Pele's addVertex, one property at a time.
 func assignProp(props []Prop, p Prop) []Prop {
 	for i := range props {
 		if props[i].Key == p.Key {
@@ -422,8 +440,8 @@ func assignProp(props []Prop, p Prop) []Prop {
 	return append(props, p)
 }
 
-// AddSingleLink adds an edge, as Pele's addSingleLink does; id "" gives it one of its own.
-func (d *DB) AddSingleLink(start, end string, info *LinkInfo, id string) error {
+// addSingleLink adds an edge, as Pele's addSingleLink does; id "" gives it one of its own.
+func (d *DB) addSingleLink(start, end string, info *linkInfo, id string) error {
 	edge := &Edge{Start: start, End: end, LabelType: LabelText, Classes: []string{}}
 	if d.DefaultInterpolate != "" {
 		edge.Interpolate = d.DefaultInterpolate
@@ -460,9 +478,9 @@ func (d *DB) AddSingleLink(start, end string, info *LinkInfo, id string) error {
 	return nil
 }
 
-// AddLink adds an edge from each of starts to each of ends, as Pele's addLink does. The id the
+// addLink adds an edge from each of starts to each of ends, as Pele's addLink does. The id the
 // arrow gives goes to the edge from the last start to the first end.
-func (d *DB) AddLink(starts, ends []string, info *LinkInfo) error {
+func (d *DB) addLink(starts, ends []string, info *linkInfo) error {
 	id := ""
 	if info != nil {
 		id = strings.Replace(info.ID, "@", "", 1)
@@ -475,7 +493,7 @@ func (d *DB) AddLink(starts, ends []string, info *LinkInfo) error {
 			if start == lastStart && end == firstEnd {
 				edgeID = id
 			}
-			if err := d.AddSingleLink(start, end, info, edgeID); err != nil {
+			if err := d.addSingleLink(start, end, info, edgeID); err != nil {
 				return err
 			}
 		}
@@ -483,8 +501,9 @@ func (d *DB) AddLink(starts, ends []string, info *LinkInfo) error {
 	return nil
 }
 
-// UpdateLinkInterpolate sets the curve of the edges at positions, or of all with "default".
-func (d *DB) UpdateLinkInterpolate(positions []string, interpolate string) error {
+// updateLinkInterpolate sets the curve of the edges at positions, or of all with "default".
+// It is Pele's updateLinkInterpolate.
+func (d *DB) updateLinkInterpolate(positions []string, interpolate string) error {
 	for _, pos := range positions {
 		if pos == "default" {
 			d.DefaultInterpolate = interpolate
@@ -499,10 +518,10 @@ func (d *DB) UpdateLinkInterpolate(positions []string, interpolate string) error
 	return nil
 }
 
-// UpdateLink sets the style of the edges at positions, or of all with "default", as Pele's
+// updateLink sets the style of the edges at positions, or of all with "default", as Pele's
 // updateLink does. Pele gives every edge the same array and adds fill:none to it once, which
 // all of them then see.
-func (d *DB) UpdateLink(positions []string, style []string) error {
+func (d *DB) updateLink(positions []string, style []string) error {
 	var styled []*Edge
 	isDefault := false
 	for _, pos := range positions {
@@ -528,6 +547,8 @@ func (d *DB) UpdateLink(positions []string, style []string) error {
 	return nil
 }
 
+// hasFill reports whether any of a style's parts sets a fill, the test Pele's updateLink
+// makes with style.some.
 func hasFill(style []string) bool {
 	for _, s := range style {
 		if strings.HasPrefix(s, "fill") {
@@ -537,6 +558,8 @@ func hasFill(style []string) bool {
 	return false
 }
 
+// edgeAt is the edge at a position linkStyle gives, or an error where there is none, as
+// Pele's edgeAt gives it.
 func (d *DB) edgeAt(pos string) (*Edge, error) {
 	n := chars.Number(pos)
 	if n >= 0 && n < float64(len(d.Edges)) && n == float64(int(n)) {
@@ -546,9 +569,9 @@ func (d *DB) edgeAt(pos string) (*Edge, error) {
 		strconv.Itoa(len(d.Edges)-1)+". (Help: Ensure that the index is within the range of existing edges.)", diagram.Semantic)
 }
 
-// AddClass defines classes, or adds to them, as Pele's addClass does: ids are separated by
+// addClass defines classes, or adds to them, as Pele's addClass does: ids are separated by
 // commas, and so are styles, but for an escaped one.
-func (d *DB) AddClass(ids string, styles []string) {
+func (d *DB) addClass(ids string, styles []string) {
 	joined := strings.Join(styles, ",")
 	joined = strings.ReplaceAll(joined, "\\,", "§§§")
 	joined = strings.ReplaceAll(joined, ",", ";")
@@ -570,8 +593,9 @@ func (d *DB) AddClass(ids string, styles []string) {
 	}
 }
 
-// SetDirection sets the flowchart's direction, reading Mermaid's arrows for it.
-func (d *DB) SetDirection(dir string) {
+// setDirection sets the flowchart's direction, reading Mermaid's arrows for it.
+// It is Pele's setDirection.
+func (d *DB) setDirection(dir string) {
 	s := chars.Trim(dir)
 	if strings.Contains(s, "<") {
 		s = "RL"
@@ -591,8 +615,9 @@ func (d *DB) SetDirection(dir string) {
 	d.Direction = s
 }
 
-// SetClass gives the nodes, edges and subgraphs of ids, separated by commas, a class.
-func (d *DB) SetClass(ids, className string) {
+// setClass gives the nodes, edges and subgraphs of ids, separated by commas, a class.
+// It is Pele's setClass.
+func (d *DB) setClass(ids, className string) {
 	for _, id := range strings.Split(ids, ",") {
 		if n := d.nodes[id]; n != nil {
 			n.Classes = append(n.Classes, className)
@@ -606,8 +631,9 @@ func (d *DB) SetClass(ids, className string) {
 	}
 }
 
-// SetTooltip gives the nodes of ids a tooltip.
-func (d *DB) SetTooltip(ids, tooltip string) {
+// setTooltip gives the nodes of ids a tooltip.
+// It is Pele's setTooltip.
+func (d *DB) setTooltip(ids, tooltip string) {
 	for _, id := range strings.Split(ids, ",") {
 		if i, ok := d.tooltips[id]; ok {
 			d.Tooltips[i].Text = tooltip
@@ -618,8 +644,9 @@ func (d *DB) SetTooltip(ids, tooltip string) {
 	}
 }
 
-// SetLink makes the nodes of ids links to a URL, checked as Pele's safeUrl checks it.
-func (d *DB) SetLink(ids, link, target string) {
+// setLink makes the nodes of ids links to a URL, checked as Pele's safeUrl checks it.
+// It is Pele's setLink.
+func (d *DB) setLink(ids, link, target string) {
 	u := chars.Trim(link)
 	for _, id := range strings.Split(ids, ",") {
 		if v := d.nodes[id]; v != nil {
@@ -630,19 +657,22 @@ func (d *DB) SetLink(ids, link, target string) {
 			v.LinkTarget = target
 		}
 	}
-	d.SetClass(ids, "clickable")
+	d.setClass(ids, "clickable")
 }
 
-// SetClickEvent marks the nodes of ids clickable. Callbacks are never run, as in Mermaid's
+// setClickEvent marks the nodes of ids clickable. Callbacks are never run, as in Mermaid's
 // strict mode.
-func (d *DB) SetClickEvent(ids string) { d.SetClass(ids, "clickable") }
+// It is Pele's setClickEvent.
+func (d *DB) setClickEvent(ids string) { d.setClass(ids, "clickable") }
 
-// SetAccTitle sets the accessible title, without the white space it starts with.
-func (d *DB) SetAccTitle(text string) { d.AccTitle = chars.TrimStart(text) }
+// setAccTitle sets the accessible title, without the white space it starts with.
+// It is Pele's setAccTitle.
+func (d *DB) setAccTitle(text string) { d.AccTitle = chars.TrimStart(text) }
 
-// SetAccDescription sets the accessible description, without the white space each of its
+// setAccDescription sets the accessible description, without the white space each of its
 // lines but the first starts with: text.replace(/\n\s+/g, '\n').
-func (d *DB) SetAccDescription(text string) {
+// It is Pele's setAccDescription.
+func (d *DB) setAccDescription(text string) {
 	d.AccDescr = chars.DropIndents(text)
 }
 
@@ -660,12 +690,13 @@ const (
 	itemDir
 )
 
+// hasSpace reports whether s has white space in it, the /\s/.test of Pele's addSubGraph.
 func hasSpace(s string) bool { return strings.ContainsFunc(s, chars.IsSpaceRune) }
 
 // addSubGraph adds a subgraph of what its body gave, or adds to the one of the same id, as
 // Pele's addSubGraph does, and gives its id. A title that is the id itself, with white space
 // in it, is a title only.
-func (d *DB) addSubGraph(idText *Text, list []docItem, titleText *Text) string {
+func (d *DB) addSubGraph(idText *flowText, list []docItem, titleText *flowText) string {
 	id := ""
 	hasID := idText != nil
 	if hasID {
@@ -736,52 +767,23 @@ func (d *DB) addSubGraph(idText *Text, list []docItem, titleText *Text) string {
 	return id
 }
 
-// Exists reports whether any of subgraphs holds id, as Pele's exists does.
-func (d *DB) Exists(subgraphs []*Subgraph, id string) bool {
-	for _, sg := range subgraphs {
-		for _, n := range sg.Nodes {
-			if n == id {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// MakeUniq is the nodes of sg that none of subgraphs holds, as Pele's makeUniq gives them.
-func (d *DB) MakeUniq(sg *Subgraph, subgraphs []*Subgraph) []string {
-	taken := map[string]bool{}
-	for _, other := range subgraphs {
-		for _, id := range other.Nodes {
-			taken[id] = true
-		}
-	}
-	out := []string{}
-	for _, id := range sg.Nodes {
-		if !taken[id] {
-			out = append(out, id)
-		}
-	}
-	return out
-}
-
-// DestructLink reads an arrow, as Pele's destructLink does: end is the arrow, or its end where
+// destructLink reads an arrow, as Pele's destructLink does: end is the arrow, or its end where
 // start is the start of an arrow with a label between. An arrow whose start and end do not
 // agree is of type and stroke "INVALID".
-func (d *DB) DestructLink(end, start string) LinkInfo {
+func (d *DB) destructLink(end, start string) linkInfo {
 	info := destructEndLink(end)
 	if start == "" {
 		return info
 	}
 	startInfo := destructStartLink(start)
 	if startInfo.Stroke != info.Stroke {
-		return LinkInfo{Type: "INVALID", Stroke: "INVALID"}
+		return linkInfo{Type: "INVALID", Stroke: "INVALID"}
 	}
 	if startInfo.Type == "arrow_open" {
 		startInfo.Type = info.Type
 	} else {
 		if startInfo.Type != info.Type {
-			return LinkInfo{Type: "INVALID", Stroke: "INVALID"}
+			return linkInfo{Type: "INVALID", Stroke: "INVALID"}
 		}
 		startInfo.Type = "double_" + startInfo.Type
 	}

@@ -11,10 +11,6 @@ import (
 // The fixtures are what Pele makes of the same cases; ./scripts/oracle.sh writes them.
 
 func TestParseMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/yaml.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		YAML []struct {
 			Source string  `json:"source"`
@@ -22,7 +18,7 @@ func TestParseMatchesPele(t *testing.T) {
 			Error  *string `json:"error"`
 		} `json:"yaml"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/yaml.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.YAML) < 1000 {

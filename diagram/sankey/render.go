@@ -6,6 +6,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -19,7 +20,6 @@ import (
 const (
 	labelGap = 6
 	valueGap = 15
-	pad      = common.Padding
 )
 
 // The roles of a sankey diagram's items.
@@ -82,7 +82,7 @@ func fillStyle(color any) (style.Style, bool) {
 	if !ok {
 		return style.Style{}, false
 	}
-	if style.ShapeCSS([]string{"fill:" + s}) == "" {
+	if css.ShapeCSS([]string{"fill:" + s}) == "" {
 		return style.Style{}, false
 	}
 	// Pele writes the style without the control characters XML does not allow, and that is
@@ -93,17 +93,7 @@ func fillStyle(color any) (style.Style, bool) {
 		}
 		return r
 	}, s)
-	return style.Declarations([]string{"fill:" + s}).Style, true
-}
-
-// line is a label of one line of plain text, measured, in a size of type, as Pele writes a
-// node's id and its value: as it is, with no markup read.
-func line(s string, width, size float64) *text.Label {
-	lh := jsmath.Round(float64(size * text.LineHeight))
-	return &text.Label{
-		Lines:  [][]text.Span{{{Text: s, Width: width}}},
-		Widths: []float64{width}, Width: width, Height: lh, Size: size, LineHeight: lh,
-	}
+	return css.Declarations([]string{"fill:" + s}).Style, true
 }
 
 // Layout lays a sankey diagram out as a scene, as Pele's renderSankey draws it: the chart at
@@ -132,6 +122,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 
 // draw lays the diagram out with its chart chartWidth wide, as Pele's draw does.
 func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) (*scene.Scene, error) {
+	pad := o.Pad()
 	size := o.Size()
 	small := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
@@ -235,12 +226,12 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) 
 		// starts where the whole starts, and the value ends where it ends.
 		idItem := scene.Item{
 			Kind: scene.Text, Role: RoleLabel, ID: id, At: scene.Point{X: x, Y: y}, Align: scene.End,
-			Label: line(id, measure.Width(id, small, 0), small),
+			Label: common.Line(id, measure.Width(id, small, 0), small, 0),
 			Style: style.Style{Text: style.Fg, Halo: halo.Halo, HaloWidth: halo.HaloWidth},
 		}
 		valueItem := scene.Item{
 			Kind: scene.Text, Role: RoleValue, ID: id, At: scene.Point{X: x, Y: y}, Align: scene.End,
-			Label: line(value, measure.Width(value, small, 0), small),
+			Label: common.Line(value, measure.Width(value, small, 0), small, 0),
 			Style: style.Style{Text: style.Muted, Halo: halo.Halo, HaloWidth: halo.HaloWidth},
 		}
 		switch {
@@ -289,15 +280,13 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) 
 		if hasFixed {
 			author = fixed
 		}
-		// The bands are drawn in a group at 40% of the fill's opacity, an author's fill too.
-		if author.Fill.Visible() {
-			author.Fill = author.Fill.Alpha(linkOpacity)
-		}
+		// The bands are drawn in a group with a fill opacity of 0.4, which an author's fill
+		// takes too.
 		bands = append(bands, scene.Item{
 			Kind: scene.Mark, Role: RoleLink, ID: from + "->" + to,
 			Box:    path.Bounds(),
 			Parts:  []scene.Part{{Path: path, Paint: scene.FillOnly}},
-			Style:  style.Style{Fill: style.Series(end).Alpha(linkOpacity)},
+			Style:  style.Style{Fill: style.Series(end), FillOpacity: style.N(linkOpacity)},
 			Author: author,
 			Tooltip: text.DecodeEntities(from) + " → " + text.DecodeEntities(to) + ": " +
 				text.DecodeEntities(prefix) + chars.NumberString(rounded(link.value)) + text.DecodeEntities(suffix),

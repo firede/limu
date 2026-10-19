@@ -33,9 +33,9 @@ type Model struct {
 	Tasks    []Task
 }
 
-// Actors is everyone named on a task, once each, in code unit order, as Pele's journeyActors
+// journeyActors is everyone named on a task, once each, in code unit order, as Pele's journeyActors
 // gives them.
-func Actors(tasks []Task) []string {
+func journeyActors(tasks []Task) []string {
 	seen := map[string]bool{}
 	var names []string
 	for _, task := range tasks {

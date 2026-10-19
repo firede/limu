@@ -1,7 +1,6 @@
 package xychart
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -22,27 +21,24 @@ import (
 
 type peleRender struct {
 	Cases []struct {
-		Src      string   `json:"src"`
-		MaxWidth float64  `json:"maxWidth"`
-		FontSize float64  `json:"fontSize"`
-		Lines    []string `json:"lines"`
+		Src      string  `json:"src"`
+		MaxWidth float64 `json:"maxWidth"`
+		FontSize float64 `json:"fontSize"`
+		fixture.Drawing
 	} `json:"cases"`
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	f, err := fixture.LoadDrawings("testdata/pele/render.json", &p)
+	if err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 3500 {
 		t.Fatalf("only %d cases", len(p.Cases))
 	}
 	failed, refused := 0, 0
-	for _, c := range p.Cases {
+	for k, c := range p.Cases {
 		pre, err := diagram.Prepare(c.Src, diagram.Options{})
 		if err != nil {
 			t.Errorf("Prepare(%q): %v", c.Src, err)
@@ -62,9 +58,9 @@ func TestLayoutMatchesPele(t *testing.T) {
 		} else {
 			got = sceneLines(sc)
 		}
-		if i := pelesvg.FirstDiff(got, c.Lines); i >= 0 {
+		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i, pelesvg.At(got, i), pelesvg.At(c.Lines, i))
+				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
 		}
 	}
@@ -110,8 +106,8 @@ func sceneLines(sc *scene.Scene) []string {
 		lines = append(lines, "acc-desc "+pelesvg.ID(sc.Desc))
 	}
 	contexts := map[scene.Role]string{
-		"xychart.title": "title", "xychart.axis-label": "axis-labels", "xychart.axis-title": "axis-titles",
-		"xychart.data-label": "data-labels", "xychart.point-label": "point-labels", "xychart.legend": "legend",
+		RoleTitle: "title", RoleAxisLabel: "axis-labels", RoleAxisTitle: "axis-titles",
+		RoleDataLabel: "data-labels", RolePointLabel: "point-labels", RoleLegend: "legend",
 	}
 	// Where Pele's text puts the first line of a label, with its fill, anchor and size and the
 	// text of its lines: a plain one-line label that Pele's aligned writes anchored at its
@@ -124,7 +120,7 @@ func sceneLines(sc *scene.Scene) []string {
 			x, y = 0, 0
 		}
 		anchor := "middle"
-		aligned := it.Role == "xychart.axis-label" || it.Role == "xychart.point-label" || it.Role == "xychart.data-label"
+		aligned := it.Role == RoleAxisLabel || it.Role == RolePointLabel || it.Role == RoleDataLabel
 		if aligned && plain(l) {
 			anchor = map[scene.Align]string{scene.Middle: "middle", scene.Start: "start", scene.End: "end"}[it.Align]
 			y = y + float64(l.Size*0.35)
@@ -186,18 +182,18 @@ func sceneLines(sc *scene.Scene) []string {
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		switch it.Role {
-		case "xychart.title", "xychart.axis-label", "xychart.axis-title", "xychart.data-label", "xychart.point-label":
+		case RoleTitle, RoleAxisLabel, RoleAxisTitle, RoleDataLabel, RolePointLabel:
 			textAt(it)
-		case "xychart.grid":
+		case RoleGrid:
 			path(it, "grid", it.Parts[0].Path)
-		case "xychart.axis":
+		case RoleAxis:
 			path(it, "axis", it.Parts[0].Path)
-		case "xychart.bars":
+		case RoleBars:
 			lines = append(lines, "bars "+id(it.ID)+" "+paintName(it.Style.Fill))
 			for k := range it.Parts {
 				rect(it, &it.Parts[k])
 			}
-		case "xychart.line":
+		case RoleLine:
 			lines = append(lines, "line "+id(it.ID)+" "+paintName(it.Style.Fill))
 			for k := range it.Parts {
 				part := &it.Parts[k]
@@ -210,7 +206,7 @@ func sceneLines(sc *scene.Scene) []string {
 				cx, cy := a[6], a[1]
 				lines = append(lines, "circle "+pt(cx, cy)+" "+pelesvg.Num(a[0]-cx)+" "+paintName(it.Style.Fill))
 			}
-		case "xychart.legend":
+		case RoleLegend:
 			lines = append(lines, "legend "+pelesvg.ID(it.ID))
 			part := &it.Parts[0]
 			if part.Path != nil {

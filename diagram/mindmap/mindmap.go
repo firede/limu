@@ -76,7 +76,7 @@ func (d *db) AddNode(level int, id, descr string, typ int, _ string, _ bool) err
 		parent = d.open[depth-1]
 	}
 	if parent == nil && !isRoot {
-		return diagram.NewError(`There can be only one root. No parent could be found for ("`+descr+`")`, diagram.Semantic, "mindmap")
+		return common.NewError(`There can be only one root. No parent could be found for ("`+descr+`")`, diagram.Semantic, "mindmap")
 	}
 	node := &Node{ID: len(nodes), NodeID: id, Level: level, Descr: descr, Type: typ, Children: []*Node{}, IsRoot: isRoot}
 	if parent != nil {
@@ -107,8 +107,8 @@ func (d *db) DecorateNode(text string, class bool) {
 	}
 }
 
-// Tokenize reads a mindmap's tokens, as Pele's tokenize does.
-func Tokenize(src string) common.OutlineTokens {
+// tokenize reads a mindmap's tokens, as Pele's tokenize does.
+func tokenize(src string) common.OutlineTokens {
 	return common.TokenizeOutline(src, false)
 }
 

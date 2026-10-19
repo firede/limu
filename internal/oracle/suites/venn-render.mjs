@@ -8,32 +8,15 @@
 // with their radii and flags, for the test to draw again as limu draws an arc. The styles an
 // author gives are written as Pele writes them on each circle, path and text, for the test to
 // read as limu reads them.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n, pt, stroke } from '../lib/svg.mjs';
 import { corpus, drawableDiagrams, fragments, hostile } from './venn.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (s) => String(Number(s));
-const pt = (x, y) => `${n(x)},${n(y)}`;
-// A stroke's ends or corners as a browser takes them on an element: from its style attribute,
-// then from its attribute, as a keyword the browser knows, initial as SVG's initial value, and
-// otherwise what it inherits, which nothing of a venn diagram sets: SVG's initial value.
-const keyword = (name, values, initial) => (e) => {
-  const style = [...(attr(e, 'style') ?? '').matchAll(new RegExp(`(?:^|;)\\s*${name}\\s*:([^;]*)`, 'g'))].pop();
-  for (const v of [style?.[1], attr(e, name)]) {
-    if (v === undefined) continue;
-    const k = v.trim().toLowerCase();
-    if (values.includes(k)) return k;
-    if (k === 'initial' || k === 'inherit' || k === 'unset') return initial;
-  }
-  return initial;
-};
-const linecap = keyword('stroke-linecap', ['butt', 'round', 'square'], 'butt');
-const linejoin = keyword('stroke-linejoin', ['miter', 'round', 'bevel'], 'miter');
+// A stroke's ends or corners as a browser takes them on an element, as lib/svg.mjs's stroke
+// settles them; no group of a venn diagram sets either.
+const linecap = (e) => stroke('stroke-linecap', [e]);
+const linejoin = (e) => stroke('stroke-linejoin', [e]);
 const css = (e) => encodeURIComponent(attr(e, 'style') ?? '');
 
 // A path's d, its commands apart and its numbers written out.
@@ -166,5 +149,9 @@ export default async function ({ pele, src, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, fragments(pele), random(32));
   while (drawn < 5000) each(next());
-  write('diagram/venn/testdata/pele/render.json', { cases: out });
+  // The test draws an overlap's arcs again as limu draws them, so the lines of overlaps are
+  // kept in full, and so are those of sets and texts with a style, css=, which it reads as a
+  // browser draws it.
+  const keep = (line) => line.startsWith('overlap ') || / css=[^ ]/.test(line);
+  write('diagram/venn/testdata/pele/render.json', { cases: out }, { keep });
 }

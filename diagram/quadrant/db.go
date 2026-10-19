@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -18,7 +19,7 @@ func newDB() *db {
 
 // invalid is the error of a style's value that cannot be read, as Pele's invalid words it.
 func invalid(style, value, kind string) *diagram.Error {
-	return diagram.NewError("value for "+style+" "+value+" is invalid, please use a valid "+kind, diagram.Semantic, "quadrantChart")
+	return common.NewError("value for "+style+" "+value+" is invalid, please use a valid "+kind, diagram.Semantic, "quadrantChart")
 }
 
 // keyValue is the first two parts of Mermaid's `style.trim().split(/\s*:\s*/)`, as Pele's
@@ -96,7 +97,7 @@ func parseStyles(styles []string) (PointStyle, error) {
 			}
 			out.StrokeWidth = &value
 		default:
-			return out, diagram.NewError("style named "+key+" is not supported.", diagram.Semantic, "quadrantChart")
+			return out, common.NewError("style named "+key+" is not supported.", diagram.Semantic, "quadrantChart")
 		}
 	}
 	return out, nil
