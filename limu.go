@@ -5,6 +5,7 @@ import (
 	"github.com/firede/limu/diagram/agentflow"
 	"github.com/firede/limu/diagram/class"
 	"github.com/firede/limu/diagram/er"
+	"github.com/firede/limu/diagram/eventmodeling"
 	"github.com/firede/limu/diagram/flowchart"
 	"github.com/firede/limu/diagram/gantt"
 	"github.com/firede/limu/diagram/gitgraph"
@@ -179,6 +180,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = venn.Layout(m, p.Config, o)
+	case diagram.EventModeling:
+		m, err := eventmodeling.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = eventmodeling.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
