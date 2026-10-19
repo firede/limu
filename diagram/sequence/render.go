@@ -793,7 +793,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		return bottom
 	}
 	// The lifeline of a destroyed participant ends in a cross a little below the message
-	// that ends it.
+	// that ends it, with round ends, as Pele draws its crosses in a group of them.
 	destroy := func(c *column, lineY float64) float64 {
 		cx, cy := c.x, lineY+16
 		c.lifeEnd = cy
@@ -801,7 +801,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		destroys = append(destroys, scene.Item{
 			Kind: scene.Mark, Role: "sequence.destroy", ID: c.id, Box: p.Bounds(),
 			Parts: []scene.Part{{Path: p, Paint: scene.StrokeOnly}},
-			Style: style.Style{Stroke: style.Line, StrokeWidth: style.N(1.5)},
+			Style: style.Style{Stroke: style.Line, StrokeWidth: style.N(1.5), Cap: style.CapRound},
 		})
 		return cy + 6
 	}
@@ -968,9 +968,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			circleFrom := cc == CentralConnectionReverse || cc == CentralConnectionDual
 			tailAtEnd := st.atStart && !st.atEnd
 			headTrim := trim(st.head)
+			// A message's line and heads end round, as Pele draws them in the group of
+			// edges, which sets round caps.
 			msg := scene.Item{
 				Kind: scene.Edge, Role: "sequence.message", ID: "i" + m.ID,
-				Style: style.Style{Stroke: style.Line, Fill: style.Line},
+				Style: style.Style{Stroke: style.Line, Fill: style.Line, Cap: style.CapRound},
 			}
 			if st.dotted {
 				msg.Style.Dash = style.Dashes(4, 4)

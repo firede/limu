@@ -20,6 +20,25 @@ const paint = (s) => {
   return `${attr(s, 'fill') ?? '-'}${opacity ? '/' + opacity : ''} ${attr(s, 'stroke') ?? '-'}`;
 };
 
+// How a path's stroke ends and turns its corners, "-" for SVG's initial ones, as the browser
+// settles them: from the author's style Pele writes on the path, where it gives a keyword the
+// browser takes, else from the path's own attribute. No group a path is in sets either.
+const pen = (s) => {
+  const css = new Map();
+  for (const decl of (attr(s, 'style') ?? '').split(';')) {
+    const at = decl.indexOf(':');
+    if (at > 0) css.set(decl.slice(0, at).trim(), decl.slice(at + 1).trim().toLowerCase());
+  }
+  const one = (prop, keywords, initial) => {
+    const v = css.get(prop);
+    if (keywords.includes(v)) return v;
+    if (v === 'initial') return initial;
+    if (v === 'inherit' || v === 'unset') return '-';
+    return attr(s, prop) ?? '-';
+  };
+  return `${one('stroke-linecap', ['butt', 'round', 'square'], 'butt')} ${one('stroke-linejoin', ['miter', 'round', 'bevel'], 'miter')}`;
+};
+
 function reader(num) {
   const pt = (x, y) => `${num(Number(x))},${num(Number(y))}`;
   const box = (s) => `${pt(attr(s, 'x') ?? 0, attr(s, 'y') ?? 0)},${pt(attr(s, 'width'), attr(s, 'height'))}`;
@@ -111,7 +130,7 @@ export function readSvg(svg, num) {
           if (d !== '') lines.push('grid');
         } else if (attr(e, 'stroke') === 'var(--_b)' && attr(e, 'fill') === undefined) lines.push('axis');
         else if (cls === 'pele-vert') lines.push(`vert ${id}`);
-        for (const p of f.subpaths(d)) lines.push(`path ${p} ${paint(e)}`);
+        for (const p of f.subpaths(d)) lines.push(`path ${p} ${paint(e)} ${pen(e)}`);
         break;
       }
       case 'text': {
@@ -166,6 +185,7 @@ function drawableDiagrams(rnd) {
     // styles the line, and some that do not.
     if (rnd() < 0.15) {
       body += `todayMarker ${pick(['stroke-width:5px,stroke:#0f0,opacity:0.5', 'fill:#f00', 'fill-opacity:0.2', 'stroke-linecap:round',
+        'stroke-linecap:SQUARE,stroke-linejoin:bevel', 'stroke-linecap:initial', 'stroke-linejoin:inherit', 'stroke-linecap:flat',
         'stroke:url(x)', 'color:red', ' STROKE : red !IMPORTANT', 'stroke:', ':x', 'stroke-dasharray:4 2', 'rx:3'])}\n`;
     }
     if (rnd() < 0.5) return body;

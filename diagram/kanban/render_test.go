@@ -213,6 +213,13 @@ func stripe(lines *[]string, it *scene.Item) {
 	if v, ok := it.Style.Opacity.Get(); ok {
 		opacity = chars.NumberString(v)
 	}
-	*lines = append(*lines, fmt.Sprintf("priority %s %s %s %s", strings.Join(pts, " "), paintName(it.Style.Stroke), opacity,
-		chars.NumberString(it.Style.StrokeWidth.Or(1))))
+	s := it.Author.Over(it.Style)
+	pen := func(v string) string {
+		if v == "" {
+			return "-"
+		}
+		return v
+	}
+	*lines = append(*lines, fmt.Sprintf("priority %s %s %s %s %s %s", strings.Join(pts, " "), paintName(it.Style.Stroke), opacity,
+		chars.NumberString(it.Style.StrokeWidth.Or(1)), pen(s.Cap.String()), pen(s.Join.String())))
 }

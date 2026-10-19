@@ -941,11 +941,12 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			Box:   path.Path.Bounds(),
 			Parts: []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
 			Ends:  path.Ends("", endType),
-			Style: style.Style{Stroke: style.Line, Fill: style.None},
+			// Pele draws the edges in a group with round caps.
+			Style: style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound},
 		}
 		if note {
 			it.Role = "state.note-edge"
-			it.Style = style.Style{Stroke: style.Border, Fill: style.None, Dash: style.Dashes(3, 4)}
+			it.Style = style.Style{Stroke: style.Border, Fill: style.None, Dash: style.Dashes(3, 4), Cap: style.CapRound}
 		}
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})

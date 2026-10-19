@@ -23,6 +23,8 @@ const WRITTEN = [
   'erDiagram\np[Person] {\n  string firstName\n}\na["A very long alias that wraps onto more than one line because it is long"]\np ||--o| a : has',
   'erDiagram\nA\nB\nC\nstyle A fill:#f9f,stroke:#333,stroke-width:4px\nstyle B font-size:20px,font-weight:bold\nstyle C font-style:italic,color:red\nA ||--o{ B : x\nB ||--o{ C : y',
   'erDiagram\nA {\n  int id PK\n  string name\n}\nstyle A fill:#f96,font-size:11px\nclassDef big font-size:24px,font-weight:700\nB:::big {\n  int id PK\n}\nclass A big',
+  // Ends and corners an author sets, and some a browser does not take.
+  'erDiagram\nA\nB {\n  int id PK\n}\nC\nstyle A stroke:#333,stroke-linejoin:bevel,rx:0\nclassDef k stroke:#a00,stroke-linecap:square,stroke-linejoin:ROUND\nclass B k\nstyle C stroke-linejoin:inherit,stroke-linecap:flat\nsubgraph S\nD\nend\nstyle S stroke-linejoin:round,rx:0\nA ||--o{ B : x\nB }|..|{ C : y',
   'erDiagram\nA:::internal-link\nB["Note"]:::internal-link\nC["javascript:alert(1)"]:::internal-link\nA ||--o{ B : x',
   'erDiagram\nsubgraph S [A long title for the subgraph]\nA ||--o{ B : x\nend\nC ||--o{ A : y\nC ||--o{ B : z',
   'erDiagram\nsubgraph O\nsubgraph I\ndirection LR\nA ||--o{ B : x\nend\nC\nend\nI ||--o{ C : y\nO ||--o{ D : z',
@@ -64,6 +66,38 @@ const tag = (s, name) => {
   return i < 0 ? undefined : s.slice(i, s.indexOf('>', i));
 };
 const tags = (s, name) => [...s.matchAll(new RegExp(`<${name} [^>]*>`, 'g'))].map((m) => m[0]);
+
+// How a browser ends and turns a stroke: the keywords it takes of stroke-linecap and
+// stroke-linejoin, initial for the initial value and inherit or unset for the parent's.
+const CAPS = { butt: 'butt', round: 'round', square: 'square', initial: 'butt', inherit: null, unset: null };
+const JOINS = { miter: 'miter', round: 'round', bevel: 'bevel', initial: 'miter', inherit: null, unset: null };
+// What an element sets of a stroke property, from the keywords given: a declaration in its
+// style attribute, the last the browser takes, over its attribute of that name; null for the
+// parent's, undefined for none.
+function sets(tag, prop, values) {
+  let v;
+  for (const decl of (attr(tag, 'style') ?? '').split(';')) {
+    const at = decl.indexOf(':');
+    if (at < 0 || decl.slice(0, at).trim().toLowerCase() !== prop) continue;
+    const k = decl.slice(at + 1).trim().toLowerCase();
+    if (Object.hasOwn(values, k)) v = values[k];
+  }
+  if (v !== undefined) return v;
+  const a = attr(tag, prop);
+  return a !== undefined && Object.hasOwn(values, a) ? values[a] : undefined;
+}
+// How an element's stroke ends and turns, as "cap/join", taking from the elements it is in,
+// innermost first, what it does not set.
+function pen(tag, outer) {
+  const get = (prop, values, initial) => {
+    for (const t of [tag, ...outer]) {
+      const v = sets(t, prop, values);
+      if (v) return v;
+    }
+    return initial;
+  };
+  return `${get('stroke-linecap', CAPS, 'butt')}/${get('stroke-linejoin', JOINS, 'miter')}`;
+}
 
 // A path's d with its horizontal and vertical lines written as lines to a point, as limu's
 // paths have them.
@@ -112,6 +146,8 @@ export function readSvg(svg, num) {
   out.push(`size ${n(attr(head, 'width'))},${n(attr(head, 'height'))}`);
   const title = svg.indexOf('<text class="pele-title"');
   if (title >= 0) out.push('title ' + textAt(svg.slice(title)));
+  // The group the edges are drawn in, which ends their lines.
+  const edges = tag(svg, 'g class="pele-edges"') ?? '';
   const starts = [...svg.matchAll(GROUP)];
   for (let k = 0; k < starts.length; k++) {
     const kind = starts[k][1];
@@ -121,7 +157,7 @@ export function readSvg(svg, num) {
     const classes = attr(open, 'class').split(' ');
     switch (kind) {
       case 'cluster': {
-        out.push(`cluster ${id} [${classes.slice(1).join(' ')}] ${box(tag(s, 'rect'))}`);
+        out.push(`cluster ${id} [${classes.slice(1).join(' ')}] ${box(tag(s, 'rect'))} ${pen(tag(s, 'rect'), [open])}`);
         const t = textAt(s);
         if (t) out.push(t);
         break;
@@ -129,10 +165,11 @@ export function readSvg(svg, num) {
       case 'edge': {
         const line = tag(s, 'path');
         const dashed = line.includes(' stroke-dasharray="4 3"') ? ' dashed' : '';
-        out.push(`edge ${id} ${classes[1].slice('pele-er-'.length)}${dashed} ${path(attr(line, 'd'))}`);
+        out.push(`edge ${id} ${classes[1].slice('pele-er-'.length)}${dashed} ${path(attr(line, 'd'))} ${pen(line, [open, edges])}`);
         for (const m of s.matchAll(/<(path|circle) class="pele-marker"[^>]*>/g)) {
-          if (m[1] === 'circle') out.push(`m o ${n(attr(m[0], 'cx'))},${n(attr(m[0], 'cy'))} ${n(attr(m[0], 'r'))}`);
-          else out.push(`m ${path(attr(m[0], 'd'))}${attr(m[0], 'fill') === 'var(--_bg)' ? ' bg' : ''}`);
+          const p = pen(m[0], [open, edges]);
+          if (m[1] === 'circle') out.push(`m o ${n(attr(m[0], 'cx'))},${n(attr(m[0], 'cy'))} ${n(attr(m[0], 'r'))} ${p}`);
+          else out.push(`m ${path(attr(m[0], 'd'))}${attr(m[0], 'fill') === 'var(--_bg)' ? ' bg' : ''} ${p}`);
         }
         break;
       }
@@ -143,13 +180,13 @@ export function readSvg(svg, num) {
         const [, cx, cy] = /translate\(([^,]+),([^)]+)\)/.exec(attr(open, 'transform'));
         out.push(`node ${id} [${classes.slice(2).join(' ')}]`);
         const rects = tags(s, 'rect');
-        out.push(`box ${box(rects[0], cx, cy)}`);
+        out.push(`box ${box(rects[0], cx, cy)} ${pen(rects[0], [open])}`);
         const stripes = s.indexOf('<g class="pele-er-stripes"');
         if (stripes >= 0) {
           const group = s.slice(stripes, s.indexOf('</g>', stripes));
           for (const r of tags(group, 'rect')) out.push(`stripe ${box(r, cx, cy)}${/rx/.test(r) ? ' rounded' : ''}`);
           out.push(`divider ${path(attr(tag(s, 'path class="pele-er-divider"'), 'd'), cx, cy)}`);
-          out.push(`outline ${box(rects.at(-1), cx, cy)}`);
+          out.push(`outline ${box(rects.at(-1), cx, cy)} ${pen(rects.at(-1), [open])}`);
         }
         const a = /<a [^>]*\shref="([^"]*)"/.exec(s);
         if (a) out.push(`link ${unescape(a[1])}`);

@@ -376,7 +376,11 @@ func (w *Writer) item(sc *scene.Scene, it *scene.Item, st style.Style) {
 			w.paintAttr("fill", fill)
 			w.paintAttr("stroke", stroke)
 			if stroke.Visible() {
-				w.strokeAttrs(solid, sw)
+				ms := solid
+				if j := m.Type.Join(); j.Set() {
+					ms.Join = j
+				}
+				w.strokeAttrs(ms, sw)
 			}
 			b.WriteString("/>")
 		}
@@ -408,6 +412,16 @@ func (w *Writer) strokeAttrs(st style.Style, sw float64) {
 			}
 			w.Num(f)
 		}
+		b.WriteByte('"')
+	}
+	if st.Cap.Set() {
+		b.WriteString(` stroke-linecap="`)
+		b.WriteString(st.Cap.String())
+		b.WriteByte('"')
+	}
+	if st.Join.Set() {
+		b.WriteString(` stroke-linejoin="`)
+		b.WriteString(st.Join.String())
 		b.WriteByte('"')
 	}
 }

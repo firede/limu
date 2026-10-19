@@ -1,5 +1,7 @@
 package scene
 
+import "github.com/firede/limu/style"
+
 // The markers of class diagrams, as Pele's diagrams/class/markers.ts draws them: the hollow
 // triangle of an extension, the diamonds of a composition, filled, and of an aggregation,
 // hollow, the arrowhead of a dependency, and the ring of a lollipop. Pele draws them inside
@@ -14,6 +16,10 @@ const (
 )
 
 func init() {
+	// Pele turns the corners of the triangle and the diamonds round.
+	markerJoins["class.extension"] = style.JoinRound
+	markerJoins["class.composition"] = style.JoinRound
+	markerJoins["class.aggregation"] = style.JoinRound
 	markers["class.extension"] = markerKind{classTriangle, func(m Marker) []Part {
 		x, y, dx, dy, nx, ny := m.frame()
 		bx, by := x-float64(dx*classTriangle), y-float64(dy*classTriangle)

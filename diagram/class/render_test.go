@@ -10,6 +10,7 @@ import (
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
+	"github.com/firede/limu/style"
 	"github.com/firede/limu/text"
 )
 
@@ -146,10 +147,10 @@ func sceneLines(sc *scene.Scene) []string {
 			} else if len(d) == 2 && d[0] == 2 {
 				kind += " dotted"
 			}
-			lines = append(lines, "edge "+id+" "+kind+" "+pelesvg.D(it.Parts[0].Path))
+			lines = append(lines, "edge "+id+" "+kind+" "+pelesvg.D(it.Parts[0].Path)+" "+pen(it, ""))
 			for _, m := range it.Ends {
 				if m.Type != "" {
-					lines = append(lines, peleMarker(m))
+					lines = append(lines, peleMarker(m)+" "+pen(it, m.Type))
 				}
 			}
 		case "class.namespace-title":
@@ -168,7 +169,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Tooltip != "" {
 				lines = append(lines, "tip "+peleText(it.Tooltip))
 			}
-			lines = append(lines, "rect "+box(it.Parts[0].Box))
+			lines = append(lines, "rect "+box(it.Parts[0].Box)+" "+pen(it, ""))
 			if len(it.Parts) > 1 {
 				lines = append(lines, "divider "+pelesvg.D(it.Parts[1].Path))
 			}
@@ -189,7 +190,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			lines = append(lines, "member "+kind+" "+textAt(it.Label, it.At.X, it.At.Y)+" "+peleText(spans(it.Label)))
 		case "class.note":
-			lines = append(lines, "note "+id, "path "+pelesvg.D(it.Parts[0].Path), "fold "+pelesvg.D(it.Parts[1].Path))
+			lines = append(lines, "note "+id, "path "+pelesvg.D(it.Parts[0].Path)+" "+pen(it, ""), "fold "+pelesvg.D(it.Parts[1].Path)+" "+pen(it, ""))
 			label(it.Label, it.At.X, it.At.Y)
 		case "class.interface":
 			lines = append(lines, "interface "+id)
@@ -218,6 +219,22 @@ func peleText(s string) string {
 		}
 		return r
 	}, s)
+}
+
+// pen is how an item's lines end and turn their corners, as the oracle reads them, "cap/join":
+// the author's style over the diagram's own, and a marker's own join over both.
+func pen(it *scene.Item, marker scene.MarkerType) string {
+	s := it.Author.Over(it.Style)
+	if j := marker.Join(); j.Set() {
+		s.Join = j
+	}
+	if !s.Cap.Set() {
+		s.Cap = style.CapButt
+	}
+	if !s.Join.Set() {
+		s.Join = style.JoinMiter
+	}
+	return s.Cap.String() + "/" + s.Join.String()
 }
 
 // peleMarker is the marker Pele draws at an end, as the oracle reads it: how it is painted

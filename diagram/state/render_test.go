@@ -164,7 +164,7 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Role == "state.note-edge" {
 				kind = "note-edge"
 			}
-			lines = append(lines, "edge "+id+" "+kind, "path "+pelesvg.D(it.Parts[0].Path))
+			lines = append(lines, "edge "+id+" "+kind, "path "+pelesvg.D(it.Parts[0].Path), "stroke "+pelesvg.CapJoin(it))
 			for _, m := range it.Ends {
 				if s := peleMarker(m); s != "" {
 					lines = append(lines, "m "+s)

@@ -12,6 +12,7 @@ import (
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
+	"github.com/firede/limu/style"
 	"github.com/firede/limu/text"
 )
 
@@ -106,22 +107,22 @@ func sceneLines(sc *scene.Scene) []string {
 		case RoleTitle:
 			lines = append(lines, "title "+textAt(it.Label, it.At.X, it.At.Y))
 		case RoleCluster:
-			lines = append(lines, fmt.Sprintf("cluster %s [%s] %s", id, classes, box(it.Box)))
+			lines = append(lines, fmt.Sprintf("cluster %s [%s] %s %s", id, classes, box(it.Box), pen(it, "")))
 			label(it.Label, it.At.X, it.At.Y)
 		case RoleRelationship:
 			kind := "non-identifying dashed"
 			if !it.Style.Dash.Set() {
 				kind = "identifying"
 			}
-			lines = append(lines, fmt.Sprintf("edge %s %s %s", id, kind, pelesvg.D(it.Parts[0].Path)))
+			lines = append(lines, fmt.Sprintf("edge %s %s %s %s", id, kind, pelesvg.D(it.Parts[0].Path), pen(it, "")))
 			for _, m := range it.Ends {
-				lines = append(lines, markerLines(m)...)
+				lines = append(lines, markerLines(m, pen(it, m.Type))...)
 			}
 		case RoleRelationshipLabel:
 			lines = append(lines, "label "+id+" "+box(it.Box))
 			label(it.Label, it.At.X, it.At.Y)
 		case RoleEntity:
-			lines = append(lines, fmt.Sprintf("node %s [%s]", id, classes), "box "+box(it.Parts[0].Box))
+			lines = append(lines, fmt.Sprintf("node %s [%s]", id, classes), "box "+box(it.Parts[0].Box)+" "+pen(it, ""))
 			for _, part := range it.Parts[1:] {
 				switch {
 				case part.Paint == scene.Shade && part.Rounded:
@@ -131,7 +132,7 @@ func sceneLines(sc *scene.Scene) []string {
 				case part.Path != nil:
 					lines = append(lines, "divider "+pelesvg.D(part.Path))
 				default:
-					lines = append(lines, "outline "+box(part.Box))
+					lines = append(lines, "outline "+box(part.Box)+" "+pen(it, ""))
 				}
 			}
 			if it.Link != "" {
@@ -174,8 +175,9 @@ var ringBack = map[scene.MarkerType]float64{"er.zero_or_one": 13.5, "er.zero_or_
 // markerLines are the lines of a marker's outline, as the oracle reads Pele's: a path's d,
 // " bg" after one filled with the background, and a ring as its center and radius. Pele
 // writes a ring as a circle, which limu draws as curves, so the center is worked out as Pele
-// works it out, and the ring's curves must lie about it.
-func markerLines(m scene.Marker) []string {
+// works it out, and the ring's curves must lie about it. Each ends with pen, how the marker
+// ends and turns its lines.
+func markerLines(m scene.Marker, pen string) []string {
 	var out []string
 	for _, part := range m.Outline() {
 		if back, ok := ringBack[m.Type]; ok && part.Path.Ops[1] == scene.CubeTo {
@@ -184,16 +186,32 @@ func markerLines(m scene.Marker) []string {
 			if math.Abs(b.X+b.W/2-x) > 1e-9 || math.Abs(b.Y+b.H/2-y) > 1e-9 || part.Paint != scene.Hollow {
 				out = append(out, "ring astray")
 			}
-			out = append(out, "m o "+pelesvg.Num(x)+","+pelesvg.Num(y)+" "+pelesvg.Num(b.W/2))
+			out = append(out, "m o "+pelesvg.Num(x)+","+pelesvg.Num(y)+" "+pelesvg.Num(b.W/2)+" "+pen)
 			continue
 		}
 		s := "m " + pelesvg.D(part.Path)
 		if part.Paint == scene.Hollow {
 			s += " bg"
 		}
-		out = append(out, s)
+		out = append(out, s+" "+pen)
 	}
 	return out
+}
+
+// pen is how an item's lines end and turn their corners, as the oracle reads them, "cap/join":
+// the author's style over the diagram's own, and a marker's own join over both.
+func pen(it *scene.Item, marker scene.MarkerType) string {
+	s := it.Author.Over(it.Style)
+	if j := marker.Join(); j.Set() {
+		s.Join = j
+	}
+	if !s.Cap.Set() {
+		s.Cap = style.CapButt
+	}
+	if !s.Join.Set() {
+		s.Join = style.JoinMiter
+	}
+	return s.Cap.String() + "/" + s.Join.String()
 }
 
 // peleID is an id as Pele writes a data-id: entities decoded, characters XML does not allow

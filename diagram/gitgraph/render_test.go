@@ -115,6 +115,14 @@ func sceneLines(sc *scene.Scene) []string {
 		s := "f=" + paintName(fill) + " s=" + paintName(stroke)
 		if stroke.Visible() {
 			s += " w=" + num(it.Style.StrokeWidth.Or(1))
+			pen := it.Author.Over(it.Style)
+			name := func(v string) string {
+				if v == "" {
+					return "-"
+				}
+				return v
+			}
+			s += " c=" + name(pen.Cap.String()) + " j=" + name(pen.Join.String())
 		}
 		dash := "-"
 		if d := it.Style.Dash.Pattern(); len(d) > 0 {

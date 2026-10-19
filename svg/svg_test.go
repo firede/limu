@@ -58,7 +58,7 @@ func sample() *scene.Scene {
 				Kind: scene.Edge, Role: "flowchart.edge", ID: "L_A_B_0",
 				Parts: []scene.Part{{Path: edge, Paint: scene.StrokeOnly}},
 				Ends:  [2]scene.Marker{{}, {Type: "arrow_point", At: scene.Point{X: 100, Y: 120}, DY: 1}},
-				Style: style.Style{Stroke: style.Line, Fill: style.None},
+				Style: style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound},
 			},
 			{
 				Kind: scene.Text, Role: "flowchart.edge-label",
@@ -138,6 +138,38 @@ func TestRenderShade(t *testing.T) {
 	}
 	if got := Render(sc, &Options{Literal: true}); !strings.Contains(got, `fill="#ffd6c2" stroke="none"/>`) {
 		t.Errorf("no tint of the author's fill, written as a color:\n%s", got)
+	}
+}
+
+// A cap and a join are written where they are set: an edge's on its line and on the markers
+// it strokes, a marker's own join over the edge's, and an author's over the diagram's.
+func TestRenderCapJoin(t *testing.T) {
+	line := new(scene.Path).MoveTo(0, 0).LineTo(40, 0).LineTo(40, 30)
+	edge := scene.Item{
+		Kind: scene.Edge, Role: "class.edge",
+		Parts: []scene.Part{{Path: line, Paint: scene.StrokeOnly}},
+		Ends: [2]scene.Marker{
+			{Type: "arrow_cross", At: scene.Point{}, DX: -1},
+			{Type: "class.extension", At: scene.Point{X: 40, Y: 30}, DY: 1},
+		},
+		Style: style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound},
+	}
+	sc := &scene.Scene{Width: 50, Height: 40, FontSize: 16, Items: []scene.Item{edge}}
+	got := Render(sc, nil)
+	for _, want := range []string{
+		`<path d="M0,0L40,0L40,30" fill="none" stroke="var(--limu-line,#1f1f1f)" stroke-linecap="round"/>`,
+		`<path class="limu-marker" d="M7.5,3.5L0.5,-3.5M7.5,-3.5L0.5,3.5" fill="none" stroke="var(--limu-line,#1f1f1f)" stroke-linecap="round"/>`,
+		`stroke-linecap="round" stroke-linejoin="round"/>`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("no %s in\n%s", want, got)
+		}
+	}
+	sc.Items[0].Author = style.Declarations([]string{"stroke-linecap:square", "stroke-linejoin:bevel"}).Style
+	got = Render(sc, nil)
+	if !strings.Contains(got, `L40,30" fill="none" stroke="var(--limu-line,#1f1f1f)" stroke-linecap="square" stroke-linejoin="bevel"/>`) ||
+		!strings.Contains(got, `stroke-linecap="square" stroke-linejoin="round"/>`) {
+		t.Errorf("the author's cap and join, under the marker's join:\n%s", got)
 	}
 }
 

@@ -10,6 +10,8 @@ const FRAGMENTS = [
   'A', 'B', 'C', 'id1', 'long label that wraps past the width a node has', '"', '`**bold** _it_`', '<br>',
   '\nsubgraph S\n', '\nsubgraph T [Title]\n', '\nend\n', '\ndirection LR\n', '\ndirection TB\n', ' & ',
   ':::cls', '\nclassDef cls fill:#f96\n', '\nstyle A stroke:#f00\n', '\nlinkStyle 0 stroke:#0f0\n',
+  '\nlinkStyle 0 stroke-linecap:butt,stroke-linejoin:ROUND\n', '\nlinkStyle default stroke-linecap:square\n',
+  '\nlinkStyle 1 stroke-linecap:inherit,stroke-linejoin:bevel\n', '\nclassDef cls stroke-linecap:initial\n',
   '\nclick A "https://x.y/z" "tip"\n', '@{ shape: circle }', '@{ shape: hex }', '@{ shape: doc }',
   '@{ icon: "fa:user", form: circle, label: "U" }', '@{ img: "https://x/y.png", w: 60, h: 40 }',
   'e1@{ curve: linear }', 'e1@{ curve: step }', '中文', '😀', '#quot;', '\nA --> A\n',
@@ -33,6 +35,33 @@ const tag = (s, name) => {
   const i = s.indexOf('<' + name + ' ');
   return i < 0 ? undefined : s.slice(i, s.indexOf('>', i));
 };
+
+// The cap and the join a stroke is drawn with, as the browser settles them from the opening
+// tags of the element and of the groups it is in, outermost first: each takes them from its
+// parent, then from its own attributes, then from the declarations of its style attribute,
+// in turn, of which the browser takes a keyword in either case, initial for SVG's initial
+// value, and inherit or unset for its parent's, and drops any other.
+const KEYWORDS = { 'stroke-linecap': ['butt', 'round', 'square'], 'stroke-linejoin': ['miter', 'round', 'bevel'] };
+export function capJoin(chain) {
+  const settle = (prop) => {
+    let v = KEYWORDS[prop][0];
+    for (const open of chain) {
+      const parent = v;
+      const a = attr(open, prop);
+      if (a !== undefined && KEYWORDS[prop].includes(a.toLowerCase())) v = a.toLowerCase();
+      for (const decl of (attr(open, 'style') ?? '').split(';')) {
+        const at = decl.indexOf(':');
+        if (at < 0 || decl.slice(0, at).trim().toLowerCase() !== prop) continue;
+        const value = decl.slice(at + 1).trim().toLowerCase();
+        if (KEYWORDS[prop].includes(value)) v = value;
+        else if (value === 'initial') v = KEYWORDS[prop][0];
+        else if (value === 'inherit' || value === 'unset') v = parent;
+      }
+    }
+    return v;
+  };
+  return `${settle('stroke-linecap')} ${settle('stroke-linejoin')}`;
+}
 
 const GROUP = /<g class="pele-(cluster|edge|cluster-title|edge-label|node)[ "]/g;
 
@@ -73,6 +102,8 @@ export function readSvg(svg) {
         if (path.includes(' stroke-width="2.5"')) flags += ' thick';
         if (path.includes(' stroke-dasharray="3 4"')) flags += ' dotted';
         lines.push(`edge ${id} [${classes}]${flags} ${attr(path, 'd')}`);
+        // The edge's line, in the group of all of them and its own.
+        lines.push(`stroke ${capJoin([tag(svg, 'g class="pele-edges"'), open, path])}`);
         for (const m of s.matchAll(/<(path|circle) class="pele-marker"[^>]*>/g)) {
           lines.push(m[1] === 'path' ? `m ${attr(m[0], 'd')}` : `m o ${attr(m[0], 'cx')},${attr(m[0], 'cy')}`);
         }

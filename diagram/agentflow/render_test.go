@@ -122,6 +122,7 @@ func sceneLines(sc *scene.Scene) []string {
 				flags = " dotted"
 			}
 			lines = append(lines, fmt.Sprintf("edge %s [%s]%s %s", id, strings.TrimSpace("pele-edge-"+kind+" "+classes), flags, pelesvg.D(it.Parts[0].Path)))
+			lines = append(lines, "stroke "+pelesvg.CapJoin(it))
 			for _, m := range it.Ends {
 				if s := peleMarker(m); s != "" {
 					lines = append(lines, "m "+s)

@@ -73,6 +73,52 @@ func TestDeclarations(t *testing.T) {
 	}
 }
 
+// Caps and joins are read as the browser takes what Pele passes through: a keyword in
+// either case. Pele keeps only the last value of each, so one the browser drops, or inherit,
+// leaves them to what is under them.
+func TestDeclarationsCapJoin(t *testing.T) {
+	for _, c := range []struct {
+		decls []string
+		cap   Cap
+		join  Join
+	}{
+		{[]string{"stroke-linecap:round", "stroke-linejoin:bevel"}, CapRound, JoinBevel},
+		{[]string{"stroke-linecap: SQUARE !important", "stroke-linejoin:Miter"}, CapSquare, JoinMiter},
+		{[]string{"stroke-linecap:round", "stroke-linecap:initial", "stroke-linejoin:initial"}, CapButt, JoinMiter},
+		{[]string{"stroke-linecap:round", "stroke-linecap:inherit", "stroke-linejoin:round", "stroke-linejoin:unset"}, 0, 0},
+		{[]string{"stroke-linecap:round", "stroke-linecap:flat", "stroke-linejoin:round", "stroke-linejoin:miter-clip"}, 0, 0},
+		{[]string{"stroke-linecap:ſquare", "stroke-linejoin:arcs"}, 0, 0},
+	} {
+		s := Declarations(c.decls).Style
+		if s.Cap != c.cap || s.Join != c.join {
+			t.Errorf("%q: cap %v join %v, want %v %v", c.decls, s.Cap, s.Join, c.cap, c.join)
+		}
+	}
+}
+
+// What leaves the cap and join unset resolves them to SVG's initial values; what sets them
+// is cascaded as the rest of a style is.
+func TestCapJoin(t *testing.T) {
+	var look *Look
+	if r := look.Resolve("x", Style{}, Style{}); r.Cap != CapButt || r.Join != JoinMiter {
+		t.Errorf("unset %v %v", r.Cap, r.Join)
+	}
+	over := &Look{Overrides: Overrides{"x.edge": {Join: JoinBevel}}}
+	own := Style{Cap: CapRound, Join: JoinRound}
+	if r := over.Resolve("x.edge", own, Style{}); r.Cap != CapRound || r.Join != JoinBevel {
+		t.Errorf("override %v %v", r.Cap, r.Join)
+	}
+	if r := over.Resolve("x.edge", own, Style{Cap: CapSquare}); r.Cap != CapSquare || r.Join != JoinBevel {
+		t.Errorf("author %v %v", r.Cap, r.Join)
+	}
+	if s := look.Cascade("x", Style{}, Style{}); s.Cap.Set() || s.Join.Set() {
+		t.Errorf("cascade settled %v %v", s.Cap, s.Join)
+	}
+	if CapRound.String() != "round" || JoinMiter.String() != "miter" || Cap(0).String() != "" {
+		t.Error("names")
+	}
+}
+
 // Font sizes and weights are read as Pele's resolveStyle reads them, with JavaScript's
 // /^[\d.]+(px)?$/, parseFloat and Number.
 func TestDeclarationsFont(t *testing.T) {

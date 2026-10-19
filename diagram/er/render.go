@@ -536,7 +536,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				route = append(route, scene.Point{X: r[k], Y: r[k+1]})
 			}
 		}
-		own := style.Style{Stroke: style.Line, Fill: style.None}
+		// Pele draws the edges in a group that ends their lines round.
+		own := style.Style{Stroke: style.Line, Fill: style.None, Cap: style.CapRound}
 		if edge.Pattern == "dashed" {
 			own.Dash = style.Dashes(4, 3)
 		}

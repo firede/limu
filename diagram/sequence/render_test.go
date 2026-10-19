@@ -93,7 +93,8 @@ func paintName(p style.Paint) string {
 }
 
 // partPaint is how a part of an item is painted, as the oracle reads Pele's fill and stroke,
-// with the width of the stroke where it is not the theme's, and whether the author set a fill.
+// with the width of the stroke where it is not the theme's, its ends and corners, and whether
+// the author set a fill.
 func partPaint(it *scene.Item, paint scene.Painting) string {
 	fill, stroke := paintName(it.Style.Fill), paintName(it.Style.Stroke)
 	switch paint {
@@ -106,6 +107,7 @@ func partPaint(it *scene.Item, paint scene.Painting) string {
 	if w, ok := it.Style.StrokeWidth.Get(); ok {
 		s += " w=" + pelesvg.Num(w)
 	}
+	s += ends(it.Author.Over(it.Style), stroke, 0)
 	if it.Author.Fill.Set() {
 		s += " author=" + fmt.Sprint(it.Author.Fill)
 	}
@@ -133,12 +135,32 @@ func authorFill(line string) string {
 }
 
 // markerPaint is how a part of a marker is painted, in the color of its edge's line.
-func markerPaint(it *scene.Item, paint scene.Painting) string {
+func markerPaint(it *scene.Item, paint scene.Painting, join style.Join) string {
 	line := paintName(it.Style.Stroke)
 	if paint == scene.FillOnly {
 		return line + " none"
 	}
-	return "none " + line
+	return "none " + line + ends(it.Author.Over(it.Style), line, join)
+}
+
+// ends is how a stroke ends and turns its corners, as the oracle reads them: " cap=" and
+// " join=" where they are not SVG's initial butt and miter, and nothing where nothing is
+// stroked. A marker's own join, when it has one, is over the style's.
+func ends(s style.Style, stroke string, join style.Join) string {
+	if stroke == "none" {
+		return ""
+	}
+	if join.Set() {
+		s.Join = join
+	}
+	out := ""
+	if s.Cap.Set() && s.Cap != style.CapButt {
+		out += " cap=" + s.Cap.String()
+	}
+	if s.Join.Set() && s.Join != style.JoinMiter {
+		out += " join=" + s.Join.String()
+	}
+	return out
 }
 
 // clean drops what XML does not allow, as Pele's esc does.
@@ -296,7 +318,7 @@ func sceneLines(sc *scene.Scene) []string {
 			for _, m := range it.Ends {
 				for _, pa := range m.Outline() {
 					for _, s := range subpaths(pa.Path) {
-						lines = append(lines, "path "+s+" "+markerPaint(it, pa.Paint))
+						lines = append(lines, "path "+s+" "+markerPaint(it, pa.Paint, m.Type.Join()))
 					}
 				}
 			}

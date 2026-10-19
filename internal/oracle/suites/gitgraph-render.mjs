@@ -69,7 +69,7 @@ export function readSvg(svg, num) {
   const mx = (v) => dx + Number(v);
   const my = (v) => dy + Number(v);
   const pt = (x, y) => `${num(mx(x))},${num(my(y))}`;
-  // The groups open, each with the paint and stroke width it gives what is in it.
+  // The groups open, each with the paint, stroke width, cap and join it gives what is in it.
   const stack = [{ fill: 'var(--_fg)', width: '1', cls: 'svg' }];
   const inherited = (key) => {
     for (let k = stack.length - 1; k >= 0; k--) if (stack[k][key] !== undefined) return stack[k][key];
@@ -79,7 +79,11 @@ export function readSvg(svg, num) {
     const fill = attr(e, 'fill') ?? inherited('fill');
     const stroke = attr(e, 'stroke') ?? 'none';
     let s = `f=${paintName(fill)} s=${paintName(stroke)}`;
-    if (stroke !== 'none') s += ` w=${num(Number(attr(e, 'stroke-width') ?? inherited('width')))}`;
+    if (stroke !== 'none') {
+      s += ` w=${num(Number(attr(e, 'stroke-width') ?? inherited('width')))}`;
+      // How the stroke ends and turns its corners, "-" for SVG's initial ones.
+      s += ` c=${attr(e, 'stroke-linecap') ?? inherited('cap') ?? '-'} j=${attr(e, 'stroke-linejoin') ?? inherited('join') ?? '-'}`;
+    }
     const dash = attr(e, 'stroke-dasharray');
     s += ` d=${dash === undefined ? '-' : dash.split(/[ ,]+/).map((v) => num(Number(v))).join(' ')}`;
     return s;
@@ -155,7 +159,13 @@ export function readSvg(svg, num) {
           dy = Number(t[2]);
         }
         const r = /rotate\(([^ ]*) ([^ ]*) ([^)]*)\)/.exec(attr(whole, 'transform') ?? '');
-        stack.push({ fill: attr(whole, 'fill'), width: attr(whole, 'stroke-width'), cls });
+        stack.push({
+          fill: attr(whole, 'fill'),
+          width: attr(whole, 'stroke-width'),
+          cap: attr(whole, 'stroke-linecap'),
+          join: attr(whole, 'stroke-linejoin'),
+          cls,
+        });
         if (cls === 'pele-branch') lines.push(`branch ${attr(whole, 'data-id')}`);
         else if (cls.startsWith('pele-commit ')) lines.push(`commit ${attr(whole, 'data-id')} ${cls}`);
         else if (cls === 'pele-tag') lines.push('tag');

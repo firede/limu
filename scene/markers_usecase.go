@@ -1,9 +1,12 @@
 package scene
 
+import "github.com/firede/limu/style"
+
 // The markers of use case diagrams.
 func init() {
 	// The hollow triangle of a generalization, with its tip at the end of the line, as
-	// Pele's extension in its use case render draws it.
+	// Pele's extension in its use case render draws it, its corners turned round.
+	markerJoins["usecase.extension"] = style.JoinRound
 	markers["usecase.extension"] = markerKind{12, func(m Marker) []Part {
 		x, y, dx, dy, _, _ := m.frame()
 		const length, half = 12, 6

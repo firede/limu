@@ -113,6 +113,19 @@ func partPaint(it *scene.Item, part *scene.Part) string {
 	return paintName(it.Style.Fill) + " " + paintName(it.Style.Stroke)
 }
 
+// pen is how an item's lines end and turn their corners, as the oracle reads Pele's
+// stroke-linecap and stroke-linejoin: the author's or the diagram's, or "-" for neither.
+func pen(it *scene.Item) string {
+	s := it.Author.Over(it.Style)
+	name := func(v string) string {
+		if v == "" {
+			return "-"
+		}
+		return v
+	}
+	return name(s.Cap.String()) + " " + name(s.Join.String())
+}
+
 // peleText is text as Pele writes it in its SVG: characters XML does not allow dropped.
 func peleText(s string) string {
 	return strings.Map(func(r rune) rune {
@@ -187,7 +200,7 @@ func sceneLines(sc *scene.Scene) []string {
 		}
 		lines = append(lines, name+" "+dash)
 		for _, s := range subpaths(it.Parts[0].Path) {
-			lines = append(lines, "path "+s+" "+partPaint(it, &it.Parts[0]))
+			lines = append(lines, "path "+s+" "+partPaint(it, &it.Parts[0])+" "+pen(it))
 		}
 	}
 	box := func(it *scene.Item) {
@@ -226,7 +239,7 @@ func sceneLines(sc *scene.Scene) []string {
 				end := mouth.Last()
 				s = "path M " + pt(mouth.Args[0], mouth.Args[1]) + " A 6,6,0,0," + sweep + " " + pt(end.X, end.Y)
 			}
-			lines = append(lines, s+" "+partPaint(it, &it.Parts[3]))
+			lines = append(lines, s+" "+partPaint(it, &it.Parts[3])+" "+pen(it))
 		case "journey.section":
 			if it.Kind == scene.Group {
 				lines = append(lines, "section "+peleText(text.DecodeEntities(it.ID)))
