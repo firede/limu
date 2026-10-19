@@ -29,10 +29,12 @@ export async function resolve(spec, ctx, next) {
 // map's labels write, before each, the point it is drawn about, its measures, its
 // attributes and its spans, and its markers where their tips are and the way they point; a
 // railroad diagram's names of rules and texts of its boxes write as y, with an m before it,
-// the middle of their line before Pele adds the shift to their baseline; and a C4
+// the middle of their line before Pele adds the shift to their baseline; a C4
 // diagram's labels write, before each one, the point it is drawn about, its size, the size
 // of its type and its lines, its markers write their tip and direction, and its shapes write
-// their width and height as data-wh.
+// their width and height as data-wh; and an Ishikawa
+// diagram's labels write, in place of their text, the point they are centered on and all that
+// is in them, and its markers their tips and the way they point.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -57,6 +59,7 @@ const C4_BUILDER = "import { esc, escText, labelSvg, num } from '../../svg/build
 const C4_EDGES = "import { ARROW, marker, markerTrim } from '../../svg/edges.js';";
 const C4_LEFT = "import { leftLabelSvg } from '../common/literal-label.js';";
 const C4_NODE = 'transform="translate(${num(node.x + w / 2)},${num(node.y + h / 2)})"';
+const ISHIKAWA_EDGES = "import { ARROW, marker } from '../../svg/edges.js';";
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -215,6 +218,25 @@ function marker(type: string, x: number, y: number, dx: number, dy: number, colo
   const s = markerPele(type, x, y, dx, dy, color);
   if (!(globalThis as any).limuExactNumbers) return s;
   return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" color="\${color}"/>\` + s;
+}
+`;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/ishikawa/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = patch(url, String(loaded.source), RADAR_IMPORT, RADAR_IMPORT.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, ISHIKAWA_EDGES, ISHIKAWA_EDGES.replace('marker', 'marker as markerPele'));
+    source += `
+function labelSvg(label: Label, cx: number, cy: number, attrs: string): string {
+  if (!(globalThis as any).limuExactNumbers) return labelSvgPele(label, cx, cy, attrs);
+  if (label.lines.length === 0) return '';
+  const lines = label.lines.map((line) => line.map((span) => [span.icon ?? null, span.text, span.style, span.width]));
+  const data = { size: label.size, lineHeight: label.lineHeight, width: label.width, height: label.height, widths: label.widths, lines };
+  return \`<limu-label x="\${cx}" y="\${cy}" attrs="\${encodeURIComponent(attrs)}" data="\${encodeURIComponent(JSON.stringify(data))}"/>\`;
+}
+function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
+  if (!(globalThis as any).limuExactNumbers) return markerPele(type, x, y, dx, dy, color);
+  return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" fill="\${color}"/>\`;
 }
 `;
     return { ...loaded, source, shortCircuit: true };
