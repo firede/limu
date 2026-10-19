@@ -5,6 +5,7 @@ import (
 	"github.com/firede/limu/diagram/agentflow"
 	"github.com/firede/limu/diagram/architecture"
 	"github.com/firede/limu/diagram/block"
+	"github.com/firede/limu/diagram/c4"
 	"github.com/firede/limu/diagram/class"
 	"github.com/firede/limu/diagram/er"
 	"github.com/firede/limu/diagram/eventmodeling"
@@ -216,6 +217,14 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = railroad.Layout(m, p.Config, o)
+	case diagram.C4:
+		db, err := c4.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		if sc, err = c4.Layout(db, p.Config, o); err != nil {
+			return nil, err
+		}
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}

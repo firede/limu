@@ -27,9 +27,12 @@ export async function resolve(spec, ctx, next) {
 // diagram's labelSvg writes, before each label, the point it is centered on, its size and its
 // spans, and its blocks write the size they are drawn at as data-limu; a Wardley
 // map's labels write, before each, the point it is drawn about, its measures, its
-// attributes and its spans, and its markers where their tips are and the way they point; and a
+// attributes and its spans, and its markers where their tips are and the way they point; a
 // railroad diagram's names of rules and texts of its boxes write as y, with an m before it,
-// the middle of their line before Pele adds the shift to their baseline.
+// the middle of their line before Pele adds the shift to their baseline; and a C4
+// diagram's labels write, before each one, the point it is drawn about, its size, the size
+// of its type and its lines, its markers write their tip and direction, and its shapes write
+// their width and height as data-wh.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -50,6 +53,10 @@ const WARDLEY_EDGES = "import { marker, markerTrim } from '../../svg/edges.js';"
 const WARDLEY_START = 'function startLabel(';
 const RAILROAD_NAME_Y = 'y="${num(top + headHeight / 2 + headSize * 0.35)}"';
 const RAILROAD_TEXT_Y = 'y="${num(y + textShift)}"';
+const C4_BUILDER = "import { esc, escText, labelSvg, num } from '../../svg/builder.js';";
+const C4_EDGES = "import { ARROW, marker, markerTrim } from '../../svg/edges.js';";
+const C4_LEFT = "import { leftLabelSvg } from '../common/literal-label.js';";
+const C4_NODE = 'transform="translate(${num(node.x + w / 2)},${num(node.y + h / 2)})"';
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -132,6 +139,34 @@ function edgeLabelSvg(id: string, label: Label, x: number, y: number, attrs: str
 function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
   if (!(globalThis as any).limuExactNumbers) return markerPele(type, x, y, dx, dy, color);
   return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" fill="\${color}"/>\`;
+}
+`;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/c4/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = String(loaded.source);
+    source = patch(url, source, C4_BUILDER, C4_BUILDER.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, C4_EDGES, C4_EDGES.replace('marker,', 'marker as markerPele,'));
+    source = patch(url, source, C4_LEFT, C4_LEFT.replace('leftLabelSvg', 'leftLabelSvg as leftLabelSvgPele'));
+    source = patch(url, source, C4_NODE, `${C4_NODE}\${${EXACT.slice(4, -1)} ? \` data-wh="\${w} \${h}"\` : ''}`);
+    source += `
+const limuLines = (label: any): string =>
+  encodeURIComponent(JSON.stringify(label.lines.map((line: any) => line.map((span: any) => span.style + ':' + span.text))));
+function labelSvg(label: any, cx: number, cy: number, attrs: string): string {
+  const s = labelSvgPele(label, cx, cy, attrs);
+  if (!${EXACT.slice(4, -1)} || s === '') return s;
+  return \`<limu-label x="\${cx}" y="\${cy}" w="\${label.width}" h="\${label.height}" s="\${label.size}" lines="\${limuLines(label)}"/>\` + s;
+}
+function leftLabelSvg(label: any, x: number, top: number, attrs: string): string {
+  const s = leftLabelSvgPele(label, x, top, attrs);
+  if (!${EXACT.slice(4, -1)} || s === '') return s;
+  return \`<limu-left x="\${x}" y="\${top + label.height / 2}" w="\${label.width}" h="\${label.height}" s="\${label.size}" lines="\${limuLines(label)}"/>\` + s;
+}
+function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
+  const s = markerPele(type, x, y, dx, dy, color);
+  if (!${EXACT.slice(4, -1)}) return s;
+  return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}"/>\` + s;
 }
 `;
     return { ...loaded, source, shortCircuit: true };
