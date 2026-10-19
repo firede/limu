@@ -42,6 +42,9 @@ type Options struct {
 	// Icons reports whether the host can draw an icon by name. A label leaves room for an
 	// icon only where it can; with nil, it never does.
 	Icons func(name string) bool
+	// Bounded takes MaxWidth as it is even at 0 or below, as Pele's layoutLabel does: a width
+	// worked out to fit text in a box of a set size can come out at nothing or less.
+	Bounded bool
 }
 
 // Layout lays out a label as Pele's layoutLabel does: <br> and new lines break it, <b>,
@@ -52,7 +55,7 @@ func Layout(raw string, o Options) Label {
 	if raw == "" {
 		return Label{}
 	}
-	if o.MaxWidth <= 0 {
+	if o.MaxWidth <= 0 && !o.Bounded {
 		o.MaxWidth = math.Inf(1)
 	}
 	lineHeight := jsmath.Round(o.Size * LineHeight)
