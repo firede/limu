@@ -20,8 +20,11 @@ export async function resolve(spec, ctx, next) {
 // patch writes what the suite needs to compare it: a kanban board's textBlock writes, in place of each line of text, where the
 // line starts or ends and what is in it; a pie's percentages write, as data-y, where they are
 // before Pele adds the shift to their baseline; a radar chart's labelSvg writes, before each
-// label, the point it is centered on, its size and the text of its lines; and a sankey
-// diagram's labels write the middle of their line as y, with an m before it.
+// label, the point it is centered on, its size and the text of its lines; a sankey
+// diagram's labels write the middle of their line as y, with an m before it; and a C4
+// diagram's labels write, before each one, the point it is drawn about, its size, the size
+// of its type and its lines, its markers write their tip and direction, and its shapes write
+// their width and height as data-wh.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -35,6 +38,10 @@ const PIE_INSIDE = 'labels += `<text x="${num(Math.sin(mid) * r)}"';
 const dataY = (y) => `<text\${(globalThis as any).limuExactNumbers ? \` data-y="\${${y}}"\` : ''}`;
 const RADAR_IMPORT = "import { escText, labelSvg, num } from '../../svg/builder.js';";
 const SANKEY_Y = 'y="${num(y + small * 0.35)}"';
+const C4_BUILDER = "import { esc, escText, labelSvg, num } from '../../svg/builder.js';";
+const C4_EDGES = "import { ARROW, marker, markerTrim } from '../../svg/edges.js';";
+const C4_LEFT = "import { leftLabelSvg } from '../common/literal-label.js';";
+const C4_NODE = 'transform="translate(${num(node.x + w / 2)},${num(node.y + h / 2)})"';
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -91,6 +98,34 @@ function labelSvg(label: Label, cx: number, cy: number, attrs: string): string {
   if (!(globalThis as any).limuExactNumbers || s === '') return s;
   const lines = label.lines.map((line) => line.map((span) => span.text).join(''));
   return \`<limu-label x="\${cx}" y="\${cy}" w="\${label.width}" h="\${label.height}" lines="\${encodeURIComponent(JSON.stringify(lines))}"/>\` + s;
+}
+`;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/c4/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = String(loaded.source);
+    source = patch(url, source, C4_BUILDER, C4_BUILDER.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, C4_EDGES, C4_EDGES.replace('marker,', 'marker as markerPele,'));
+    source = patch(url, source, C4_LEFT, C4_LEFT.replace('leftLabelSvg', 'leftLabelSvg as leftLabelSvgPele'));
+    source = patch(url, source, C4_NODE, `${C4_NODE}\${${EXACT.slice(4, -1)} ? \` data-wh="\${w} \${h}"\` : ''}`);
+    source += `
+const limuLines = (label: any): string =>
+  encodeURIComponent(JSON.stringify(label.lines.map((line: any) => line.map((span: any) => span.style + ':' + span.text))));
+function labelSvg(label: any, cx: number, cy: number, attrs: string): string {
+  const s = labelSvgPele(label, cx, cy, attrs);
+  if (!${EXACT.slice(4, -1)} || s === '') return s;
+  return \`<limu-label x="\${cx}" y="\${cy}" w="\${label.width}" h="\${label.height}" s="\${label.size}" lines="\${limuLines(label)}"/>\` + s;
+}
+function leftLabelSvg(label: any, x: number, top: number, attrs: string): string {
+  const s = leftLabelSvgPele(label, x, top, attrs);
+  if (!${EXACT.slice(4, -1)} || s === '') return s;
+  return \`<limu-left x="\${x}" y="\${top + label.height / 2}" w="\${label.width}" h="\${label.height}" s="\${label.size}" lines="\${limuLines(label)}"/>\` + s;
+}
+function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
+  const s = markerPele(type, x, y, dx, dy, color);
+  if (!${EXACT.slice(4, -1)}) return s;
+  return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}"/>\` + s;
 }
 `;
     return { ...loaded, source, shortCircuit: true };
