@@ -40,6 +40,9 @@ type group struct {
 // Layout lays out a timeline diagram as a scene, as Pele's renderTimeline draws it: across,
 // unless the text asks for it to run down or it runs down to fit the host's width.
 func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
+	if o == nil {
+		o = &layout.Options{}
+	}
 	if m.Direction == "TD" {
 		return lay(m, config, o, true)
 	}

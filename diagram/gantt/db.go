@@ -276,6 +276,23 @@ func (db *DB) Schedule(now time.Time, loc *time.Location) error {
 	return err
 }
 
+// copied is a copy of the chart for Layout to schedule, its tasks copied with it, since
+// Schedule writes into each task: laying a chart out then leaves the DB as it was, and may be
+// done from many goroutines at once.
+func (db *DB) copied() *DB {
+	c := *db
+	c.Tasks = make([]*Task, len(db.Tasks))
+	c.byID = make(map[string]*Task, len(db.byID))
+	for i, t := range db.Tasks {
+		own := *t
+		c.Tasks[i] = &own
+		if db.byID[t.ID] == t {
+			c.byID[t.ID] = &own
+		}
+	}
+	return &c
+}
+
 // numericFormat is RE_NUMERIC_FORMAT, /^[YMDHhmsSZXx\-/.:, T]*$/.
 func numericFormat(s string) bool {
 	for i := 0; i < len(s); i++ {
