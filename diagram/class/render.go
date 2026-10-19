@@ -753,7 +753,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	for _, layer := range [][]scene.Item{clusters, edges, struck, labels, cardItems, nodeItems} {
 		sc.Items = append(sc.Items, layer...)
 	}
-	withTitle(sc, db.Title, measure, size)
+	common.WithTitle(sc, db.Title, "class.title", measure, size)
 	return sc
 }
 
@@ -859,59 +859,6 @@ func markerType(name string) scene.MarkerType {
 		return ""
 	}
 	return scene.MarkerType("class." + name)
-}
-
-// withTitle puts the diagram's title above what was laid out without it, as Pele's withTitle
-// does: the scene is widened to the title's width if it is wider, and moved down below it.
-func withTitle(sc *scene.Scene, title string, measure text.Measurer, size float64) {
-	label := text.Layout(title, text.Options{Measurer: measure, Size: size, MaxWidth: 4000, Face: text.Bold})
-	if label.Height == 0 {
-		return
-	}
-	shift := label.Height + 12
-	full := max(sc.Width, math.Ceil(label.Width+2*padding))
-	translate(sc.Items, (full-sc.Width)/2, shift)
-	sc.Width = full
-	sc.Height = math.Ceil(sc.Height + shift)
-	sc.Items = slices.Insert(sc.Items, 0, scene.Item{
-		Kind: scene.Text, Role: "class.title", Label: &label, At: scene.Point{X: full / 2, Y: padding + label.Height/2},
-	})
-}
-
-// translate moves items by dx, dy: their boxes, parts, routes, markers and labels.
-func translate(items []scene.Item, dx, dy float64) {
-	box := func(r *scene.Rect) {
-		r.X += dx
-		r.Y += dy
-	}
-	point := func(p *scene.Point) {
-		p.X += dx
-		p.Y += dy
-	}
-	for i := range items {
-		it := &items[i]
-		box(&it.Box)
-		for j := range it.Parts {
-			part := &it.Parts[j]
-			box(&part.Box)
-			if p := part.Path; p != nil {
-				for k := 0; k+1 < len(p.Args); k += 2 {
-					p.Args[k] += dx
-					p.Args[k+1] += dy
-				}
-			}
-		}
-		for j := range it.Route {
-			point(&it.Route[j])
-		}
-		for j := range it.Ends {
-			point(&it.Ends[j].At)
-		}
-		point(&it.At)
-		if it.Picture != nil {
-			box(&it.Picture.Box)
-		}
-	}
 }
 
 // classNames is a class attribute's names, as Pele's classNames cleans them.

@@ -12,6 +12,8 @@
 package scene
 
 import (
+	"slices"
+
 	"github.com/firede/limu/style"
 	"github.com/firede/limu/text"
 )
@@ -77,6 +79,47 @@ type Item struct {
 
 	Link    string // where the part leads, when it is a link
 	Tooltip string
+}
+
+// Move moves the item by dx, dy: its box, parts, route, markers, label and picture. Its
+// parts and paths are copied before they are moved, as other items may share them.
+func (it *Item) Move(dx, dy float64) {
+	box := func(r *Rect) {
+		r.X += dx
+		r.Y += dy
+	}
+	point := func(p *Point) {
+		p.X += dx
+		p.Y += dy
+	}
+	box(&it.Box)
+	parts := slices.Clone(it.Parts)
+	for k := range parts {
+		box(&parts[k].Box)
+		if p := parts[k].Path; p != nil {
+			q := &Path{Ops: p.Ops, Args: slices.Clone(p.Args)}
+			for j := 0; j+1 < len(q.Args); j += 2 {
+				q.Args[j] += dx
+				q.Args[j+1] += dy
+			}
+			parts[k].Path = q
+		}
+	}
+	it.Parts = parts
+	route := slices.Clone(it.Route)
+	for k := range route {
+		point(&route[k])
+	}
+	it.Route = route
+	for k := range it.Ends {
+		point(&it.Ends[k].At)
+	}
+	point(&it.At)
+	if it.Picture != nil {
+		pic := *it.Picture
+		box(&pic.Box)
+		it.Picture = &pic
+	}
 }
 
 // A Picture is an image, or an icon by name, drawn in a box.

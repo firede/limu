@@ -975,65 +975,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	for _, layer := range [][]scene.Item{clusters, dividers, edges, labels, nodes, notes} {
 		sc.Items = append(sc.Items, layer...)
 	}
-	withTitle(sc, db.Title, measure, size, pad)
+	common.WithTitle(sc, db.Title, "state.title", measure, size)
 	return sc
-}
-
-// withTitle puts a title above a scene that was laid out without one, as Pele's withTitle
-// does: the scene grows to hold it, and what was in it moves down below it, and across to
-// stay centered where the title is the wider.
-func withTitle(sc *scene.Scene, title string, measure text.Measurer, size, pad float64) {
-	label := text.Layout(title, text.Options{Measurer: measure, Size: size, MaxWidth: 4000, Face: text.Bold})
-	if label.Height == 0 {
-		return
-	}
-	shift := label.Height + 12
-	full := max(sc.Width, math.Ceil(label.Width+2*pad))
-	dx := (full - sc.Width) / 2
-	for i := range sc.Items {
-		move(&sc.Items[i], dx, shift)
-	}
-	sc.Width = full
-	sc.Height = math.Ceil(sc.Height + shift)
-	sc.Items = append([]scene.Item{{
-		Kind: scene.Text, Role: "state.title", Label: &label,
-		At:    scene.Point{X: full / 2, Y: pad + label.Height/2},
-		Style: style.Style{Text: style.Fg},
-	}}, sc.Items...)
-}
-
-// move moves an item by dx, dy, as the group Pele's withTitle wraps a diagram in does.
-func move(it *scene.Item, dx, dy float64) {
-	shift := func(p *scene.Path) *scene.Path {
-		if p == nil {
-			return nil
-		}
-		q := &scene.Path{Ops: p.Ops, Args: slices.Clone(p.Args)}
-		for k := 0; k+1 < len(q.Args); k += 2 {
-			q.Args[k] += dx
-			q.Args[k+1] += dy
-		}
-		return q
-	}
-	it.Box.X += dx
-	it.Box.Y += dy
-	parts := slices.Clone(it.Parts)
-	for k := range parts {
-		parts[k].Box.X += dx
-		parts[k].Box.Y += dy
-		parts[k].Path = shift(parts[k].Path)
-	}
-	it.Parts = parts
-	for k := range it.Route {
-		it.Route[k].X += dx
-		it.Route[k].Y += dy
-	}
-	for k := range it.Ends {
-		it.Ends[k].At.X += dx
-		it.Ends[k].At.Y += dy
-	}
-	it.At.X += dx
-	it.At.Y += dy
 }
 
 // titleX picks where a composite's title sits in its title bar so that edges entering from
