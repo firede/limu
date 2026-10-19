@@ -15,13 +15,13 @@ func parseTimeline(src string, m *Model) error {
 	t := tokenize(src)
 	fail := func(i int, expected string) error {
 		got := "1"
-		if t.types[i] != tEND {
-			got = tokenNames[t.types[i]]
+		if t.Types[i] != tEND {
+			got = tokenNames[t.Types[i]]
 		}
-		return diagram.SyntaxError("timeline", src, t.starts[i], "Expecting "+expected+", got '"+got+"'", false)
+		return diagram.SyntaxError("timeline", src, t.Starts[i], "Expecting "+expected+", got '"+got+"'", false)
 	}
 
-	head := t.types[0]
+	head := t.Types[0]
 	if head != tTimeline && head != tTimelineLR && head != tTimelineTD {
 		return fail(0, "'timeline', 'timeline_lr', 'timeline_td'")
 	}
@@ -32,17 +32,17 @@ func parseTimeline(src string, m *Model) error {
 	}
 
 	for i := 1; ; i++ {
-		text := t.texts[i]
-		switch t.types[i] {
+		text := t.Texts[i]
+		switch t.Types[i] {
 		case tNEWLINE:
 		case tTitle:
 			m.setDiagramTitle(afterKeyword(text, 5))
 		case tAccTitle:
 			i++
-			m.setAccTitle(chars.Trim(t.texts[i]))
+			m.setAccTitle(chars.Trim(t.Texts[i]))
 		case tAccDescr:
 			i++
-			m.setAccDescription(chars.Trim(t.texts[i]))
+			m.setAccDescription(chars.Trim(t.Texts[i]))
 		case tAccDescrMultilineValue:
 			m.setAccDescription(chars.Trim(text))
 		case tSection:
