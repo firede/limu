@@ -2,7 +2,6 @@ package gantt
 
 import (
 	"encoding/json"
-	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -23,16 +22,7 @@ func enc(v any) any {
 	case nil:
 		return map[string]any{"$": "undefined"}
 	case float64:
-		switch {
-		case math.IsNaN(x):
-			return map[string]any{"$n": "NaN"}
-		case math.IsInf(x, 1):
-			return map[string]any{"$n": "Infinity"}
-		case math.IsInf(x, -1):
-			return map[string]any{"$n": "-Infinity"}
-		case x == 0 && math.Signbit(x):
-			return map[string]any{"$n": "-0"}
-		}
+		return fixture.Number(x)
 	case []float64:
 		out := make([]any, len(x))
 		for i, f := range x {

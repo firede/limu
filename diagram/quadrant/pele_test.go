@@ -2,7 +2,6 @@ package quadrant
 
 import (
 	"encoding/json"
-	"math"
 	"reflect"
 	"testing"
 
@@ -50,21 +49,6 @@ func (c *peleCase) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// enc is a number as the oracle's enc writes it.
-func enc(f float64) any {
-	switch {
-	case math.IsNaN(f):
-		return map[string]any{"$n": "NaN"}
-	case math.IsInf(f, 1):
-		return map[string]any{"$n": "Infinity"}
-	case math.IsInf(f, -1):
-		return map[string]any{"$n": "-Infinity"}
-	case f == 0 && math.Signbit(f):
-		return map[string]any{"$n": "-0"}
-	}
-	return f
-}
-
 func dumpTokens(src string) []any {
 	t := tokenize(src)
 	out := []any{}
@@ -88,7 +72,7 @@ func dumpText(t *Text) any {
 func dumpStyle(s PointStyle) map[string]any {
 	out := map[string]any{}
 	if s.Radius != nil {
-		out["radius"] = enc(*s.Radius)
+		out["radius"] = fixture.Number(*s.Radius)
 	}
 	if s.Color != nil {
 		out["color"] = *s.Color
@@ -109,7 +93,7 @@ func dumpModel(m *Model) map[string]any {
 	}
 	points := []any{}
 	for _, p := range m.Points {
-		points = append(points, map[string]any{"x": enc(p.X), "y": enc(p.Y), "text": dumpText(&p.Text), "className": p.Class,
+		points = append(points, map[string]any{"x": fixture.Number(p.X), "y": fixture.Number(p.Y), "text": dumpText(&p.Text), "className": p.Class,
 			"style": dumpStyle(p.PointStyle)})
 	}
 	classes := []any{}

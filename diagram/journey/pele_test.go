@@ -2,7 +2,6 @@ package journey
 
 import (
 	"encoding/json"
-	"math"
 	"reflect"
 	"testing"
 
@@ -50,21 +49,6 @@ func (c *peleCase) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// enc is a number as the oracle's enc writes it.
-func enc(f float64) any {
-	switch {
-	case math.IsNaN(f):
-		return map[string]any{"$n": "NaN"}
-	case math.IsInf(f, 1):
-		return map[string]any{"$n": "Infinity"}
-	case math.IsInf(f, -1):
-		return map[string]any{"$n": "-Infinity"}
-	case f == 0 && math.Signbit(f):
-		return map[string]any{"$n": "-0"}
-	}
-	return f
-}
-
 func strs(s []string) []any {
 	out := make([]any, len(s))
 	for i, x := range s {
@@ -85,7 +69,7 @@ func dumpTokens(src string) []any {
 func dumpModel(m *Model) map[string]any {
 	tasks := []any{}
 	for _, t := range m.Tasks {
-		tasks = append(tasks, map[string]any{"task": t.Task, "score": enc(t.Score), "people": strs(t.People), "section": t.Section})
+		tasks = append(tasks, map[string]any{"task": t.Task, "score": fixture.Number(t.Score), "people": strs(t.People), "section": t.Section})
 	}
 	o := map[string]any{"sections": strs(m.Sections), "tasks": tasks}
 	opt := func(key, value string) {

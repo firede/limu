@@ -36,22 +36,15 @@ func NumberString(f float64) string {
 	case -6 < n && n <= 0:
 		return "0." + strings.Repeat("0", -n) + digits
 	}
-	sign := "+"
-	if n-1 < 0 {
-		sign = "-"
+	sign, e10 := "+", n-1
+	if e10 < 0 {
+		sign, e10 = "-", -e10
 	}
-	exponent := strconv.Itoa(abs(n - 1))
+	exponent := strconv.Itoa(e10)
 	if k == 1 {
 		return digits + "e" + sign + exponent
 	}
 	return digits[:1] + "." + digits[1:] + "e" + sign + exponent
-}
-
-func abs(n int) int {
-	if n < 0 {
-		return -n
-	}
-	return n
 }
 
 // Number is JavaScript's Number() of a string: white space around it is ignored, an empty
