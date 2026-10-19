@@ -21,6 +21,10 @@ func NumberString(f float64) string {
 		return "-Infinity"
 	case f < 0:
 		return "-" + NumberString(-f)
+	case f < 1<<53 && f == math.Trunc(f):
+		// Below 2⁵³ doubles are no more than 1 apart, so a whole number reads back only from
+		// all of its digits.
+		return strconv.FormatInt(int64(f), 10)
 	}
 	e := strconv.FormatFloat(f, 'e', -1, 64)
 	mant, exp, _ := strings.Cut(e, "e")
