@@ -377,19 +377,7 @@ func (db *DB) SetAccTitle(s string) { db.AccTitle = chars.TrimStart(s) }
 // SetAccDescription sets the description for assistive technology, with the white space at
 // the start of each of its lines taken out, as /\n\s+/g replaced with a line feed does.
 func (db *DB) SetAccDescription(s string) {
-	var b strings.Builder
-	for i := 0; i < len(s); {
-		if s[i] == '\n' {
-			if j := chars.SpaceRun(s, i+1); j > i+1 {
-				b.WriteByte('\n')
-				i = j
-				continue
-			}
-		}
-		b.WriteByte(s[i])
-		i++
-	}
-	db.AccDescr = b.String()
+	db.AccDescr = chars.DropIndents(s)
 }
 
 // AddNamespace opens a namespace in the one open, and its ancestors where its name is

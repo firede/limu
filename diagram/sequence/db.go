@@ -74,19 +74,7 @@ func (db *DB) setAccTitle(text string) {
 // setAccDescription replaces each line break and the white space after it with a line
 // break, as text.replace(/\n\s+/g, '\n') does.
 func (db *DB) setAccDescription(text string) {
-	var b strings.Builder
-	for i := 0; i < len(text); {
-		if text[i] == '\n' {
-			if j := chars.SpaceRun(text, i+1); j > i+1 {
-				b.WriteByte('\n')
-				i = j
-				continue
-			}
-		}
-		b.WriteByte(text[i])
-		i++
-	}
-	db.AccDescr = b.String()
+	db.AccDescr = chars.DropIndents(text)
 	db.HasAccDescr = true
 }
 

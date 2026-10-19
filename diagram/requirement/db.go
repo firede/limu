@@ -268,15 +268,5 @@ func (db *DB) setAccTitle(text string) { db.AccTitle = chars.TrimStart(text) }
 // setAccDescription is Pele's setAccDescription: the text with /\n\s+/g replaced by a line
 // feed.
 func (db *DB) setAccDescription(text string) {
-	var b strings.Builder
-	for i := 0; i < len(text); {
-		if text[i] != '\n' {
-			b.WriteByte(text[i])
-			i++
-			continue
-		}
-		b.WriteByte('\n')
-		i = chars.SpaceRun(text, i+1)
-	}
-	db.AccDescr = b.String()
+	db.AccDescr = chars.DropIndents(text)
 }

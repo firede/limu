@@ -3,7 +3,6 @@ package usecase
 import (
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/internal/chars"
@@ -785,31 +784,11 @@ func resolve(src string, d *drafts, headerSpan Span, statements []*Statement, ti
 	m.Title = title
 	m.AccTitle = d.accTitle
 	m.AccDescription = d.accDescription
-	m.AccDescr = dropIndents(d.accDescription)
+	m.AccDescr = chars.DropIndents(d.accDescription)
 	m.Source = src
 	m.HeaderSpan = headerSpan
 	m.Statements = statements
 	return m, nil
-}
-
-// dropIndents is s.replace(/\n\s+/g, '\n'): a line feed and the white space after it, line
-// breaks among it, become one line feed.
-func dropIndents(s string) string {
-	if !strings.Contains(s, "\n") {
-		return s
-	}
-	var b strings.Builder
-	for i := 0; i < len(s); {
-		if s[i] != '\n' {
-			b.WriteByte(s[i])
-			i++
-			continue
-		}
-		j := chars.SpaceRun(s, i+1)
-		b.WriteByte('\n')
-		i = j
-	}
-	return b.String()
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }

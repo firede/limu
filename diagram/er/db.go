@@ -266,17 +266,5 @@ func (d *DB) SetAccTitle(text string) { d.AccTitle = chars.TrimStart(text) }
 // setAccDescription does: the white space that starts each line after the first is taken
 // off, /\n\s+/g replaced by a line feed.
 func (d *DB) SetAccDescription(text string) {
-	var b strings.Builder
-	for i := 0; i < len(text); {
-		if text[i] == '\n' {
-			if e := chars.SpaceRun(text, i+1); e > i+1 {
-				b.WriteByte('\n')
-				i = e
-				continue
-			}
-		}
-		b.WriteByte(text[i])
-		i++
-	}
-	d.AccDescr = b.String()
+	d.AccDescr = chars.DropIndents(text)
 }

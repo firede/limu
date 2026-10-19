@@ -643,17 +643,7 @@ func (d *DB) SetAccTitle(text string) { d.AccTitle = chars.TrimStart(text) }
 // SetAccDescription sets the accessible description, without the white space each of its
 // lines but the first starts with: text.replace(/\n\s+/g, '\n').
 func (d *DB) SetAccDescription(text string) {
-	var b strings.Builder
-	for i := 0; i < len(text); {
-		if text[i] == '\n' {
-			b.WriteByte('\n')
-			i = chars.SpaceRun(text, i+1)
-			continue
-		}
-		b.WriteByte(text[i])
-		i++
-	}
-	d.AccDescr = b.String()
+	d.AccDescr = chars.DropIndents(text)
 }
 
 // docItem is what a statement of a subgraph's body gives it, Pele's DocItem: a string, a list
