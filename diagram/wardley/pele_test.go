@@ -8,7 +8,6 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/fixture"
-	"github.com/firede/limu/internal/yaml"
 )
 
 // The fixture is what Pele makes of the same cases; ./scripts/oracle.sh writes it: the tokens
@@ -31,22 +30,19 @@ type peleCase struct {
 
 var undefined = map[string]any{"$": "undefined"}
 
-// enc is a number as the oracle writes it.
-func enc(f float64) any { return yaml.Encode(f, false) }
-
 // encOpt is a number Pele may leave undefined.
 func encOpt(f float64, has bool) any {
 	if !has {
 		return undefined
 	}
-	return enc(f)
+	return fixture.Number(f)
 }
 
 func encPtr(f *float64) any {
 	if f == nil {
 		return undefined
 	}
-	return enc(*f)
+	return fixture.Number(*f)
 }
 
 func encStr(s string, has bool) any {
@@ -68,13 +64,13 @@ func dumpLabel(l *labelAst) any {
 	if l == nil {
 		return undefined
 	}
-	return []any{l.negX, enc(l.offsetX), l.negY, enc(l.offsetY)}
+	return []any{l.negX, fixture.Number(l.offsetX), l.negY, fixture.Number(l.offsetY)}
 }
 
 func dumpPlaced(list []placedAst) []any {
 	out := []any{}
 	for _, p := range list {
-		out = append(out, []any{p.name, enc(p.a), enc(p.b)})
+		out = append(out, []any{p.name, fixture.Number(p.a), fixture.Number(p.b)})
 	}
 	return out
 }
@@ -88,7 +84,7 @@ func dumpAST(t *ast) map[string]any {
 		"evolution": undefined,
 	}
 	if t.size != nil {
-		out["size"] = []any{enc(t.size[0]), enc(t.size[1])}
+		out["size"] = []any{fixture.Number(t.size[0]), fixture.Number(t.size[1])}
 	}
 	if t.evolution != nil {
 		stages := []any{}
@@ -100,7 +96,7 @@ func dumpAST(t *ast) map[string]any {
 	out["anchors"] = dumpPlaced(t.anchors)
 	components := []any{}
 	for _, c := range t.components {
-		components = append(components, []any{c.name, enc(c.visibility), enc(c.evolution), dumpLabel(c.label),
+		components = append(components, []any{c.name, fixture.Number(c.visibility), fixture.Number(c.evolution), dumpLabel(c.label),
 			encStr(c.strategy, c.hasDecorator), c.inertia})
 	}
 	out["components"] = components
@@ -112,14 +108,14 @@ func dumpAST(t *ast) map[string]any {
 	out["links"] = links
 	evolves := []any{}
 	for _, e := range t.evolves {
-		evolves = append(evolves, []any{e.component, enc(e.target)})
+		evolves = append(evolves, []any{e.component, fixture.Number(e.target)})
 	}
 	out["evolves"] = evolves
 	pipelines := []any{}
 	for _, p := range t.pipelines {
 		components := []any{}
 		for _, c := range p.components {
-			components = append(components, []any{c.name, enc(c.evolution), dumpLabel(c.label)})
+			components = append(components, []any{c.name, fixture.Number(c.evolution), dumpLabel(c.label)})
 		}
 		pipelines = append(pipelines, []any{p.parent, components})
 	}
@@ -127,12 +123,12 @@ func dumpAST(t *ast) map[string]any {
 	out["notes"] = dumpPlaced(t.notes)
 	boxes := []any{}
 	for _, a := range t.annotations {
-		boxes = append(boxes, []any{enc(a[0]), enc(a[1])})
+		boxes = append(boxes, []any{fixture.Number(a[0]), fixture.Number(a[1])})
 	}
 	out["annotations"] = boxes
 	annotation := []any{}
 	for _, a := range t.annotation {
-		annotation = append(annotation, []any{enc(a.number), enc(a.x), enc(a.y), a.text})
+		annotation = append(annotation, []any{fixture.Number(a.number), fixture.Number(a.x), fixture.Number(a.y), a.text})
 	}
 	out["annotation"] = annotation
 	out["accelerators"] = dumpPlaced(t.accelerators)
@@ -143,7 +139,7 @@ func dumpAST(t *ast) map[string]any {
 func forces(list []Force) []any {
 	out := []any{}
 	for _, f := range list {
-		out = append(out, []any{f.Name, enc(f.X), enc(f.Y)})
+		out = append(out, []any{f.Name, fixture.Number(f.X), fixture.Number(f.Y)})
 	}
 	return out
 }
@@ -158,7 +154,7 @@ func dumpModel(m *Model) map[string]any {
 	out := map[string]any{"title": opt(m.Title), "accTitle": opt(m.AccTitle), "accDescr": opt(m.AccDescr)}
 	nodes := []any{}
 	for _, n := range m.Nodes {
-		nodes = append(nodes, []any{n.ID, n.Label, enc(n.X), enc(n.Y), encStr(n.Class, n.Class != ""), encPtr(n.LabelOffsetX),
+		nodes = append(nodes, []any{n.ID, n.Label, fixture.Number(n.X), fixture.Number(n.Y), encStr(n.Class, n.Class != ""), encPtr(n.LabelOffsetX),
 			encPtr(n.LabelOffsetY), encTrue(n.InPipeline), encTrue(n.IsPipelineParent),
 			map[bool]any{true: n.Inertia, false: undefined}[n.HasInertia], encStr(n.SourceStrategy, n.SourceStrategy != "")})
 	}
@@ -170,7 +166,7 @@ func dumpModel(m *Model) map[string]any {
 	out["links"] = links
 	trends := []any{}
 	for _, t := range m.Trends {
-		trends = append(trends, []any{t.NodeID, enc(t.TargetX), enc(t.TargetY)})
+		trends = append(trends, []any{t.NodeID, fixture.Number(t.TargetX), fixture.Number(t.TargetY)})
 	}
 	out["trends"] = trends
 	pipelines := []any{}
@@ -182,21 +178,21 @@ func dumpModel(m *Model) map[string]any {
 	for _, a := range m.Annotations {
 		coords := []any{}
 		for _, c := range a.Coordinates {
-			coords = append(coords, []any{enc(c.X), enc(c.Y)})
+			coords = append(coords, []any{fixture.Number(c.X), fixture.Number(c.Y)})
 		}
-		annotations = append(annotations, []any{enc(a.Number), coords, a.Text})
+		annotations = append(annotations, []any{fixture.Number(a.Number), coords, a.Text})
 	}
 	out["annotations"] = annotations
 	notes := []any{}
 	for _, n := range m.Notes {
-		notes = append(notes, []any{n.Text, enc(n.X), enc(n.Y)})
+		notes = append(notes, []any{n.Text, fixture.Number(n.X), fixture.Number(n.Y)})
 	}
 	out["notes"] = notes
 	out["accelerators"] = forces(m.Accelerators)
 	out["deaccelerators"] = forces(m.Deaccelerators)
 	out["annotationsBox"] = undefined
 	if b := m.AnnotationsBox; b != nil {
-		out["annotationsBox"] = []any{enc(b.X), enc(b.Y)}
+		out["annotationsBox"] = []any{fixture.Number(b.X), fixture.Number(b.Y)}
 	}
 	axes := []any{undefined, undefined, undefined, undefined}
 	if m.Axes.XLabel != nil {
@@ -211,14 +207,14 @@ func dumpModel(m *Model) map[string]any {
 	if m.Axes.StageBoundaries != nil {
 		bounds := []any{}
 		for _, b := range m.Axes.StageBoundaries {
-			bounds = append(bounds, enc(b))
+			bounds = append(bounds, fixture.Number(b))
 		}
 		axes[3] = bounds
 	}
 	out["axes"] = axes
 	out["size"] = undefined
 	if s := m.Size; s != nil {
-		out["size"] = []any{enc(s.Width), enc(s.Height)}
+		out["size"] = []any{fixture.Number(s.Width), fixture.Number(s.Height)}
 	}
 	return out
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/fixture"
-	"github.com/firede/limu/internal/yaml"
 )
 
 // The fixture is what Pele makes of the same cases; ./scripts/oracle.sh writes it: the tokens
@@ -31,9 +30,6 @@ type peleCase struct {
 
 var undefined = map[string]any{"$": "undefined"}
 
-// enc is a number as the oracle writes it.
-func enc(f float64) any { return yaml.Encode(f, false) }
-
 func encStr(s string, has bool) any {
 	if !has {
 		return undefined
@@ -46,7 +42,7 @@ func dumpAST(t *ast) map[string]any {
 	for _, r := range t.rows {
 		indent := any(undefined)
 		if r.hasIndent {
-			indent = enc(float64(r.indent))
+			indent = fixture.Number(float64(r.indent))
 		}
 		if r.classDef {
 			rows = append(rows, []any{"classDef", indent, r.className, encStr(r.styleText, r.hasStyle)})
@@ -54,7 +50,7 @@ func dumpAST(t *ast) map[string]any {
 		}
 		typ, value := "Section", any(undefined)
 		if r.item.leaf {
-			typ, value = "Leaf", enc(r.item.value)
+			typ, value = "Leaf", fixture.Number(r.item.value)
 		}
 		rows = append(rows, []any{"row", indent, typ, r.item.name, value, encStr(r.item.selector, r.item.hasClass)})
 	}
@@ -75,7 +71,7 @@ func dumpNode(n *Node) map[string]any {
 		}
 		out["children"] = children
 	} else {
-		out["value"] = enc(n.Value)
+		out["value"] = fixture.Number(n.Value)
 	}
 	if n.Class != "" {
 		out["classSelector"] = n.Class

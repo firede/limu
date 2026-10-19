@@ -8,7 +8,6 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/fixture"
-	"github.com/firede/limu/internal/yaml"
 )
 
 // The fixture is what Pele makes of the same cases; ./scripts/oracle.sh writes it: the tokens
@@ -29,9 +28,6 @@ type peleCase struct {
 	Error  map[string]any `json:"error"`
 }
 
-// enc is a number as the oracle writes it.
-func enc(f float64) any { return yaml.Encode(f, false) }
-
 func encStr(s string, has bool) any {
 	if !has {
 		return map[string]any{"$": "undefined"}
@@ -42,7 +38,7 @@ func encStr(s string, has bool) any {
 func dumpAST(t *ast) map[string]any {
 	sections := []any{}
 	for _, sec := range t.sections {
-		sections = append(sections, []any{sec.label, enc(sec.value)})
+		sections = append(sections, []any{sec.label, fixture.Number(sec.value)})
 	}
 	return map[string]any{
 		"showData": t.showData,
@@ -56,7 +52,7 @@ func dumpAST(t *ast) map[string]any {
 func dumpModel(m *Model) map[string]any {
 	sections := []any{}
 	for _, sec := range m.Sections {
-		sections = append(sections, []any{sec.Label, enc(sec.Value)})
+		sections = append(sections, []any{sec.Label, fixture.Number(sec.Value)})
 	}
 	out := map[string]any{"showData": m.ShowData, "sections": sections}
 	for k, v := range map[string]string{"title": m.Title, "accTitle": m.AccTitle, "accDescr": m.AccDescr} {

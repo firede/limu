@@ -8,7 +8,6 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/internal/fixture"
-	"github.com/firede/limu/internal/yaml"
 )
 
 // The fixture is what Pele makes of the same cases; ./scripts/oracle.sh writes it: the tokens
@@ -29,9 +28,6 @@ type peleCase struct {
 	Error  map[string]any `json:"error"`
 }
 
-// enc is a number as the oracle writes it.
-func enc(f float64) any { return yaml.Encode(f, false) }
-
 var undefined = map[string]any{"$": "undefined"}
 
 func encStr(s string, has bool) any {
@@ -50,7 +46,7 @@ func dumpAST(t *ast) map[string]any {
 	for _, c := range t.curves {
 		entries := []any{}
 		for _, e := range c.entries {
-			entries = append(entries, []any{encStr(e.axis, e.hasAxis), enc(e.value)})
+			entries = append(entries, []any{encStr(e.axis, e.hasAxis), fixture.Number(e.value)})
 		}
 		curves = append(curves, []any{c.name, encStr(c.label, c.hasLabel), entries})
 	}
@@ -58,7 +54,7 @@ func dumpAST(t *ast) map[string]any {
 	for _, o := range t.options {
 		value := o.value
 		if f, ok := value.(float64); ok {
-			value = enc(f)
+			value = fixture.Number(f)
 		}
 		options = append(options, []any{o.name, value})
 	}
@@ -81,18 +77,18 @@ func dumpModel(m *Model) map[string]any {
 	for _, c := range m.Curves {
 		entries := []any{}
 		for _, v := range c.Entries {
-			entries = append(entries, enc(v))
+			entries = append(entries, fixture.Number(v))
 		}
 		curves = append(curves, []any{c.Name, c.Label, entries})
 	}
 	o := m.Options
 	var top any
 	if !math.IsNaN(o.Max) {
-		top = enc(o.Max)
+		top = fixture.Number(o.Max)
 	}
 	out := map[string]any{
 		"axes": axes, "curves": curves,
-		"options": []any{o.ShowLegend, enc(o.Ticks), top, enc(o.Min), o.Graticule},
+		"options": []any{o.ShowLegend, fixture.Number(o.Ticks), top, fixture.Number(o.Min), o.Graticule},
 	}
 	for k, v := range map[string]string{"title": m.Title, "accTitle": m.AccTitle, "accDescr": m.AccDescr} {
 		if v != "" {

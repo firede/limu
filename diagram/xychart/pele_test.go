@@ -9,7 +9,6 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
-	"github.com/firede/limu/internal/yaml"
 )
 
 // The fixture is what Pele makes of the same cases; ./scripts/oracle.sh writes it. The tokens
@@ -61,9 +60,6 @@ func (o object) opt(key, value string) {
 	}
 }
 
-// enc is a number as the oracle writes it.
-func enc(f float64) any { return yaml.Encode(f, false) }
-
 func dumpTokens(src string) []any {
 	t := tokenize(src)
 	out := []any{}
@@ -77,7 +73,7 @@ func dumpAxis(a Axis) object {
 	if a.Type == "band" {
 		return object{"type": a.Type, "title": a.Title, "categories": append([]string{}, a.Categories...)}
 	}
-	return object{"type": a.Type, "title": a.Title, "min": enc(a.Min), "max": enc(a.Max)}
+	return object{"type": a.Type, "title": a.Title, "min": fixture.Number(a.Min), "max": fixture.Number(a.Max)}
 }
 
 func dumpModel(m *Model) object {
@@ -97,7 +93,7 @@ func dumpModel(m *Model) object {
 		for _, d := range p.Data {
 			var v any = map[string]any{"$": "undefined"}
 			if !math.IsNaN(d.Value) {
-				v = enc(d.Value)
+				v = fixture.Number(d.Value)
 			}
 			data = append(data, []any{d.X, v})
 		}
