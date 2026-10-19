@@ -348,10 +348,6 @@ func (j *jsonParser) str() string {
 	}
 }
 
-func isNumberPart(c int) bool {
-	return c >= '0' && c <= '9' || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-'
-}
-
 // number reads a number at the cursor, as V8's ParseJsonNumber does.
 func (j *jsonParser) number() float64 {
 	start := j.at

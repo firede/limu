@@ -19,11 +19,6 @@ func (m *ordered[V]) get(key string) (V, bool) {
 	return zero, false
 }
 
-func (m *ordered[V]) has(key string) bool {
-	_, ok := m.index[key]
-	return ok
-}
-
 func (m *ordered[V]) set(key string, v V) {
 	if i, ok := m.index[key]; ok {
 		m.vals[i] = v
@@ -48,8 +43,6 @@ func (m *ordered[V]) clear() {
 	m.keys, m.vals, m.live = nil, nil, nil
 	m.index = map[string]int{}
 }
-
-func (m *ordered[V]) size() int { return len(m.index) }
 
 // each calls fn with each key and value, in order, as long as it returns true.
 func (m *ordered[V]) each(fn func(key string, v V) bool) {
