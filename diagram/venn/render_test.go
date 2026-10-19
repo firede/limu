@@ -167,14 +167,12 @@ func peleLine(line string) string {
 		if !s.Fill.Set() {
 			s.Fill = fill
 		}
-		if s.Fill.Visible() {
-			s.Fill = s.Fill.Alpha(opacity)
-		}
+		s.FillOpacity = style.N(opacity)
 		if !s.Stroke.Set() {
 			s.Stroke = stroke
 		}
-		if s.Stroke.Visible() && hasStrokeOpacity {
-			s.Stroke = s.Stroke.Alpha(strokeOpacity)
+		if hasStrokeOpacity {
+			s.StrokeOpacity = style.N(strokeOpacity)
 		}
 		return strings.Join(fields[:n-6], " ") + " " + strings.Join(fields[n-3:n-1], " ") + " style=" + view(s)
 	case "overlap":
@@ -184,8 +182,7 @@ func peleLine(line string) string {
 		n := len(head)
 		s := style.Declarations(declarations(head[n-1])).Style
 		s.Text = style.Paint{}
-		// A fill or stroke of none at an opacity draws nothing, as none does.
-		s = plainNone(s).Over(style.Style{Fill: style.None, Stroke: style.None})
+		s = s.Over(style.Style{Fill: style.None, Stroke: style.None})
 		return strings.Join(head[:n-4], " ") + " " + strings.Join(head[n-3:n-1], " ") + " style=" + view(s) + " | " +
 			pathLine(peleOutline(line[bar+3:]))
 	case "title", "label", "text":

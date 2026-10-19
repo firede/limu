@@ -88,7 +88,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 	size := o.Size()
 	small := jsmath.Round(size * 0.75)
 	measure := o.Measure()
-	pad := float64(common.Padding)
+	pad := o.Pad()
 
 	showBranches := flag(config, "showBranches", true)
 	showCommitLabel := flag(config, "showCommitLabel", true)

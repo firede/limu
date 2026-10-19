@@ -367,7 +367,7 @@ func TestLabelPatchMatchesPele(t *testing.T) {
 	for _, c := range loadPele(t).Patches {
 		part := LabelPatch(&text.Label{Width: c.Width, Height: c.Height}, c.X, c.Y)
 		a := attrs(reTag.FindString(c.SVG[strings.Index(c.SVG, "<rect"):]))
-		b := part.Box
+		b := LabelPatchBox(&text.Label{Width: c.Width, Height: c.Height}, c.X, c.Y)
 		got := []string{pelesvg.Num(b.X), pelesvg.Num(b.Y), pelesvg.Num(b.W), pelesvg.Num(b.H), "3"}
 		want := []string{a["x"], a["y"], a["width"], a["height"], a["rx"]}
 		if !slices.Equal(got, want) {

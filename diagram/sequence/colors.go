@@ -102,12 +102,15 @@ func termKind(term string) int {
 	return termBad
 }
 
+// isAlpha reports whether a term can be a color function's alpha: a number or a percentage, or
+// none in the modern notation, as Pele's isAlpha does.
 func isAlpha(term string, modern bool) bool {
 	k := termKind(term)
 	return k == termNumber || k == termPercent || modern && k == termNone
 }
 
-// splitSpaces is s.split(/\s+/), for a string that starts and ends with no space.
+// splitSpaces is s.split(/\s+/), for a string that starts and ends with no space. It stands
+// for the split in Pele's isFunction.
 func splitSpaces(s string) []string {
 	var out []string
 	start := 0
@@ -124,6 +127,9 @@ func splitSpaces(s string) []string {
 	return append(out, s[start:])
 }
 
+// isFunction reports whether a color is an rgb(), rgba(), hsl() or hsla() function whose terms
+// are of the kinds the notation takes, in the legacy notation with commas or the modern one
+// with spaces, as Pele's isFunction does.
 func isFunction(color string) bool {
 	hsl := strings.HasPrefix(color, "hsl")
 	open := strings.IndexByte(color, '(')

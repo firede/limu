@@ -29,6 +29,7 @@ type peleRender struct {
 	Cases []struct {
 		Src      string   `json:"src"`
 		MaxWidth float64  `json:"maxWidth"`
+		Padding  *float64 `json:"padding"`
 		FontSize float64  `json:"fontSize"`
 		Lines    []string `json:"lines"`
 	} `json:"cases"`
@@ -54,14 +55,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
+		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding}))
 		want := make([]string, len(c.Lines))
 		for i, line := range c.Lines {
 			want[i] = authorLine(line)
 		}
 		if i := pelesvg.FirstDiff(got, want); i >= 0 {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, i,
+				t.Errorf("Layout(%q, max %v, size %v, padding %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, c.FontSize, (&layout.Options{Padding: c.Padding}).Pad(), i,
 					pelesvg.At(got, i), pelesvg.At(want, i))
 			}
 		}
@@ -209,7 +210,7 @@ func sceneLines(sc *scene.Scene) []string {
 				rounded = "r"
 			}
 			lines = append(lines, fmt.Sprintf("%s %s [%s] %s,%s %s %s %s %s author=%s", kind, pelesvg.ID(it.ID), strings.Join(it.Class, " "),
-				pt(r.X, r.Y), pt(r.W, r.H), rounded, fillName(it.Style.Fill), strokeName(it.Style.Stroke), pelesvg.CapJoin(it),
+				pt(r.X, r.Y), pt(r.W, r.H), rounded, fillName(pelesvg.OwnFill(it)), strokeName(it.Style.Stroke), pelesvg.CapJoin(it),
 				shapeView(it.Author)))
 			weight := "-"
 			if it.Label != nil && len(it.Label.Lines) > 0 && it.Label.Lines[0][0].Face&text.Bold != 0 {

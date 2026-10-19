@@ -2,7 +2,6 @@ package treemap
 
 import (
 	"math"
-	"strings"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
@@ -61,13 +60,6 @@ func classes(class string) []string {
 	return []string{class}
 }
 
-// fillsShape reports whether declarations give a shape a fill of its own, as Pele finds it
-// with /[";]fill:/ in the style it writes on the shape.
-func fillsShape(decls []string) bool {
-	css := style.ShapeCSS(decls)
-	return strings.HasPrefix(css, "fill:") || strings.Contains(css, ";fill:")
-}
-
 // Layout lays a treemap out as a scene, as Pele's renderTreemap does: the tree squarified into
 // a rectangle ten times the nodes' width by ten times their height, or the host's width when
 // that is less, sections tinted in the color of the top-level branch they are in, with their
@@ -83,7 +75,11 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	least := jsmath.Round(size * 0.5625)
 	measure := o.Measure()
 	section, _ := config["treemap"].(diagram.Config)
+	// The host's padding, or the diagram's own.
 	pad := option(config, "diagramPadding", 8, 0, 2000)
+	if o.Padding != nil {
+		pad = *o.Padding
+	}
 
 	// Mermaid sizes the diagram as ten times nodeWidth by ten times nodeHeight.
 	width := jsmath.Round(common.CapWidth(o, option(config, "nodeWidth", 64, 1, 400)*10, 200, float64(2*pad)))
@@ -128,12 +124,11 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 
 		if node.Section {
 			// A section is a tint of its color, unless a class gives it a fill of its own.
-			fill := color.Alpha(0.12)
-			if fillsShape(node.CSS) {
-				fill = color
-			}
 			it.Kind, it.Role = scene.Group, RoleSection
-			it.Style = style.Style{Fill: fill, Stroke: color, Text: style.Fg}
+			it.Style = style.Style{Fill: color, Stroke: color, Text: style.Fg}
+			if !style.FillDeclared(node.CSS) {
+				it.Style.FillOpacity = style.N(0.12)
+			}
 			var shown *scene.Item
 			if b.h >= header {
 				room := b.w - 2*sideInset - 4

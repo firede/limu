@@ -82,11 +82,11 @@ export default async function ({ pele, src, write, random }) {
   const { metricsMeasurer } = await src('text/measurer.ts');
 
   const out = [];
-  const draw = (source, maxWidth, fontSize) => {
+  const draw = (source, maxWidth, fontSize, padding) => {
     let r;
     globalThis.limuExactNumbers = true;
     try {
-      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, outputLimit: Infinity });
+      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, padding, outputLimit: Infinity });
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
       return false;
@@ -94,11 +94,12 @@ export default async function ({ pele, src, write, random }) {
       globalThis.limuExactNumbers = false;
     }
     if (r.type !== 'treemap') return false;
-    out.push({ src: source, maxWidth, fontSize, lines: readSvg(r.svg) });
+    out.push({ src: source, maxWidth, fontSize, padding, lines: readSvg(r.svg) });
     return true;
   };
   const NARROW = [360, 320, 280, 240, 200, 160, 120, 600, 500, 90];
   const SIZES = [13, 20, 11, 24, 13.5, 9];
+  const PADS = [0, 20, 2.5];
   const seen = new Set();
   let drawn = 0;
   const each = (source) => {
@@ -110,6 +111,9 @@ export default async function ({ pele, src, write, random }) {
     // title, and every fifth in another size of type.
     if (drawn % 3 === 0) draw(source, NARROW[(drawn / 3) % NARROW.length]);
     if (drawn % 5 === 0) draw(source, drawn % 10 === 0 ? undefined : NARROW[(drawn / 5) % NARROW.length], SIZES[(drawn / 5) % SIZES.length]);
+    // Every twentieth with the host's padding, which takes the place of diagramPadding, some
+    // in a narrow host, where it is taken from the treemap's width.
+    if (drawn % 20 === 0) draw(source, drawn % 40 === 0 ? undefined : NARROW[(drawn / 20) % NARROW.length], undefined, PADS[(drawn / 20) % PADS.length]);
     drawn++;
   };
   corpus(pele).forEach(each);

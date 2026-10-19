@@ -7,9 +7,6 @@ import (
 	"github.com/firede/limu/scene"
 )
 
-// Padding is the room about a diagram, as Pele's default padding.
-const Padding = 8
-
 // RunsAcross reports whether a direction runs across, as Pele's runsAcross does.
 func RunsAcross(dir string) bool { return dir == "LR" || dir == "RL" }
 
@@ -70,7 +67,7 @@ func FitWidth(o *layout.Options, natural, least float64, lay func(plot float64, 
 // TitleRoom is the width a title may take before it wraps, as Pele's titleRoom gives it.
 func TitleRoom(o *layout.Options) float64 {
 	if o.MaxWidth > 0 {
-		return max(80, o.MaxWidth-2*Padding)
+		return max(80, o.MaxWidth-2*o.Pad())
 	}
 	return 4000
 }

@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"github.com/firede/limu/diagram"
-	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -130,7 +129,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	small := jsmath.Round(size * 0.8125)
 	itemSize := jsmath.Round(size * 0.875)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	section, _ := config["cynefin"].(diagram.Config)
 	showDescriptions := section["showDomainDescriptions"] != false
 	amplitude := setting(config, "boundaryAmplitude", 8, 0, 50)
@@ -275,7 +274,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		items = append(items, scene.Item{
 			Kind: scene.Mark, Role: RoleRegion, ID: q.name, Box: p.Bounds(),
 			Parts: []scene.Part{{Path: p, Paint: scene.FillOnly}},
-			Style: style.Style{Fill: style.Series(q.series).Alpha(0.14)},
+			Style: style.Style{Fill: style.Series(q.series), FillOpacity: style.N(0.14)},
 		})
 	}
 	stroke := func(role scene.Role, curve []float64, st style.Style) {
@@ -304,7 +303,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		scene.Item{
 			Kind: scene.Mark, Role: RoleRegion, Shape: "ellipse", ID: Confusion, Box: ovalBox,
 			Parts: []scene.Part{{Path: oval}},
-			Style: style.Style{Fill: style.Series(confusionColor).Alpha(0.18), Stroke: style.Border, Dash: style.Dashes(4, 2)},
+			Style: style.Style{Fill: style.Series(confusionColor), FillOpacity: style.N(0.18), Stroke: style.Border, Dash: style.Dashes(4, 2)},
 		})
 
 	drawBlock := func(b *block) {

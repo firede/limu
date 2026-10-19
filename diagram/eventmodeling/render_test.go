@@ -226,7 +226,7 @@ func sceneLines(sc *scene.Scene) []string {
 		if part.Rounded {
 			radius = "r"
 		}
-		fill, opacity, stroke := it.Style.Fill, "-", paintName(it.Style.Stroke)
+		fill, opacity, stroke := pelesvg.OwnFill(it), "-", paintName(it.Style.Stroke)
 		switch part.Paint {
 		case scene.Shade:
 			fill, stroke = style.Bg, "-"
@@ -266,8 +266,8 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 		case "eventmodeling.ui", "eventmodeling.command", "eventmodeling.event", "eventmodeling.readmodel", "eventmodeling.processor":
 			s := "node " + it.ID + " " + strings.TrimPrefix(string(it.Role), "eventmodeling.")
-			if len(it.Class) > 0 {
-				s += " " + strings.Join(it.Class, " ")
+			if len(it.Tags) > 0 {
+				s += " " + strings.Join(it.Tags, " ")
 			}
 			lines = append(lines, s)
 			for k := range it.Parts {

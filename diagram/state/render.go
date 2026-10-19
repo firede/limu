@@ -30,7 +30,6 @@ const (
 	noteWrap  = 320
 	corner    = 10
 	bar       = 8
-	padding   = common.Padding
 )
 
 // kind is what a node is drawn as, Pele's K.
@@ -163,7 +162,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()
 	wrapWidth := numberOption(config, "wrappingWidth", 200)
-	const pad = padding
+	pad := o.Pad()
 	rootDir := layout.Direction(db.Direction())
 	if turned {
 		rootDir = layout.TB
@@ -707,7 +706,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			box := scene.Rect{X: left, Y: top, W: c.W, H: c.H}
 			it.Kind, it.Box = scene.Group, box
 			it.Parts = []scene.Part{{Box: box, Rounded: true}}
-			it.Style = style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Fg, Radius: style.N(corner)}
+			it.Style = style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Fg, Radius: style.N(corner)}
 			if v.titleH > 0 {
 				rule := new(scene.Path).MoveTo(left, top+v.titleH).LineTo(left+c.W, top+v.titleH)
 				it.Parts = append(it.Parts, scene.Part{Path: rule, Paint: scene.StrokeOnly})
@@ -951,6 +950,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
 		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
+		}
 		edges = append(edges, it)
 		if label.Width > 0 {
 			lx, ly := ce.LabelX+pad, ce.LabelY+pad
@@ -976,7 +979,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	for _, layer := range [][]scene.Item{clusters, dividers, edges, labels, nodes, notes} {
 		sc.Items = append(sc.Items, layer...)
 	}
-	common.WithTitle(sc, db.Title, "state.title", measure, size)
+	common.WithTitle(sc, db.Title, "state.title", measure, size, pad)
 	return sc
 }
 

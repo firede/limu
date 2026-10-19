@@ -1,5 +1,6 @@
-// Package samples holds scenes laid out by hand, for the tests and the example: no diagram
-// is read yet that would lay them out.
+// Package samples holds scenes laid out by hand, for the tests and the example: each puts
+// what a backend draws where a test can point at it, with no layout between that would move
+// it. The golden tests draw diagrams laid out by limu too.
 package samples
 
 import (

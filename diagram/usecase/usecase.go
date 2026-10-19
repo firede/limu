@@ -170,7 +170,8 @@ type Statement struct {
 	hasGroup   bool
 }
 
-// HasGroup reports whether the statement is of a system boundary, whose id may be "".
+// HasGroup reports whether the statement is of a system boundary, whose id may be "": whether
+// Pele's GraphStatement has its group set.
 func (s *Statement) HasGroup() bool { return s.hasGroup }
 
 // Model is a parsed use case diagram, Pele's UsecaseModel. Each list is in the order Pele's

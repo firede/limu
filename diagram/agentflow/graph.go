@@ -89,6 +89,8 @@ func containerSlot(n, paletteLength int) int {
 	return slot
 }
 
+// trimAll trims each of s in place and gives s, as the map of trim in the compiled closure of
+// Pele's buildAgentGraph does.
 func trimAll(s []string) []string {
 	for i := range s {
 		s[i] = chars.Trim(s[i])
@@ -96,6 +98,8 @@ func trimAll(s []string) []string {
 	return s
 }
 
+// collapsedView reports whether a flow's metadata sets its view to collapsed, the test
+// sg.metadata?.view === 'collapsed' of Pele's buildAgentGraph.
 func collapsedView(m *yaml.Map) bool {
 	v, _ := m.Value("view").(string)
 	return v == "collapsed"
@@ -107,6 +111,7 @@ type orderedSet struct {
 	has  map[string]bool
 }
 
+// add adds k if the set does not hold it, as Set.add does.
 func (s *orderedSet) add(k string) {
 	if s.has == nil {
 		s.has = map[string]bool{}
@@ -135,6 +140,8 @@ func BuildGraph(d *DB, paletteLength int, defaultCurve string) *Graph {
 	g := &Graph{Nodes: []*GraphNode{}, Edges: []*GraphEdge{}}
 	subgraphs := d.Subgraphs
 
+	// compiled is the styles and text styles of the classes named, trimmed, as Pele's compiled
+	// gives them.
 	compiled := func(classNames []string) []string {
 		out := []string{}
 		for _, name := range classNames {

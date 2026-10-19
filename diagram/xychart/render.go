@@ -20,7 +20,6 @@ const (
 	row       = 26
 	legendGap = 24
 	limit     = 1e300
-	pad       = common.Padding
 )
 
 // mark is a labelled place along an axis, as a fraction of its length: Pele's Mark.
@@ -123,6 +122,7 @@ func line(s string, width, size float64) text.Label {
 // bars and lines of each series over a grid, and a legend at its right. A chart with no
 // series is an error, as in Mermaid.
 func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, error) {
+	pad := o.Pad()
 	if o == nil {
 		o = &layout.Options{}
 	}

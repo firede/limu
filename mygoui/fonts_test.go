@@ -24,7 +24,9 @@ func TestFonts(t *testing.T) {
 	if a, b := f.Width("iiii", 16, text.Mono), f.Width("MMMM", 16, text.Mono); a != b {
 		t.Errorf("mono %v and %v", a, b)
 	}
-	if double := f.Width("Hello, world", 32, 0); math.Abs(double-2*regular) > 0.02*regular {
+	// Pango, on Linux, rounds each glyph's advance to a whole pixel: twice the size is near
+	// twice the width only to a DIP a glyph.
+	if double := f.Width("Hello, world", 32, 0); math.Abs(double-2*regular) > max(0.02*regular, float64(len("Hello, world"))) {
 		t.Errorf("twice the size: %v, %v", double, regular)
 	}
 	if f.Width("", 16, 0) != 0 || f.Width("x", 0, 0) != 0 {

@@ -27,7 +27,8 @@ type KeyOrder struct {
 	m *ordered[*[]string]
 }
 
-// Pointers are the pointers of the objects, in order.
+// Pointers are the pointers of the objects, in order, as iterating Pele's propertyOrder Map
+// gives them.
 func (k *KeyOrder) Pointers() []string {
 	var out []string
 	k.m.each(func(p string, _ *[]string) bool {
@@ -37,7 +38,8 @@ func (k *KeyOrder) Pointers() []string {
 	return out
 }
 
-// Keys are the keys of the object at pointer, in the order they were written.
+// Keys are the keys of the object at pointer, in the order they were written, as
+// propertyOrder.get(pointer) gives them in Pele's flattenJsonRows.
 func (k *KeyOrder) Keys(pointer string) ([]string, bool) {
 	keys, ok := k.m.get(pointer)
 	if !ok {
@@ -47,7 +49,7 @@ func (k *KeyOrder) Keys(pointer string) ([]string, bool) {
 }
 
 // isArrayIndex reports whether key is a canonical array index, which JavaScript orders before
-// an object's other keys.
+// an object's other keys. Pele has no such function: its objects are JavaScript's own.
 func isArrayIndex(key string) bool {
 	if key == "" || len(key) > 10 || key[0] == '0' && len(key) > 1 {
 		return false
@@ -61,7 +63,8 @@ func isArrayIndex(key string) bool {
 	return n < 1<<32-1
 }
 
-// newObject is an object of keys and values in the order they were written.
+// newObject is an object of keys and values in the order they were written, keyed as the
+// objects JSON.parse makes for Pele's parseOrderedJson are.
 func newObject(keys []string, values []any) *Object {
 	o := &Object{Values: make(map[string]any, len(keys))}
 	var indices []string
@@ -88,7 +91,7 @@ func newObject(keys []string, values []any) *Object {
 }
 
 // decode16 is a string of code units, as a Go string holds it: a surrogate with no partner
-// becomes U+FFFD.
+// becomes U+FFFD. It is limu's own, for the strings JavaScript keeps as code units.
 func decode16(u []uint16) string { return string(utf16.Decode(u)) }
 
 // jsonParser is V8's JSON.parse, as far as Pele's use of it shows: the value it gives, and
@@ -120,6 +123,8 @@ const (
 	jRBrack
 )
 
+// jsonToken is the token V8's JSON parser reads a character as, as its table of one-character
+// tokens gives it; -1, the end of the text, is jEOS.
 func jsonToken(c int) int {
 	switch {
 	case c < 0:
@@ -152,6 +157,8 @@ func jsonToken(c int) int {
 	return jIllegal
 }
 
+// cur is the code unit at the cursor, or -1 at the end of the text, as V8's JSON parser
+// reads its current character.
 func (j *jsonParser) cur() int {
 	if j.at >= len(j.text) {
 		return -1
@@ -159,11 +166,14 @@ func (j *jsonParser) cur() int {
 	return int(j.text[j.at])
 }
 
+// next moves the cursor on by one and gives the code unit there, as V8's JSON parser reads
+// its next character.
 func (j *jsonParser) next() int {
 	j.at++
 	return j.cur()
 }
 
+// skip moves the cursor past JSON's whitespace, as V8's JSON parser skips it.
 func (j *jsonParser) skip() {
 	for {
 		c := j.cur()
@@ -248,6 +258,8 @@ func (j *jsonParser) expect(token int, message string) {
 	j.at++
 }
 
+// check skips whitespace and takes the token at the cursor if it is the one given, reporting
+// whether it did, as V8's JSON parser checks for a token.
 func (j *jsonParser) check(token int) bool {
 	j.skip()
 	if jsonToken(j.cur()) != token {
@@ -284,6 +296,9 @@ func (j *jsonParser) literal(word string) {
 	j.unexpected(jEOS)
 }
 
+// hexValue is the value of a hexadecimal digit, or -1 for any other character. Pele's
+// propertyOrder tests the four digits of an escape with /^[\dA-Fa-f]{4}$/ and reads them with
+// parseInt.
 func hexValue(c int) int {
 	switch {
 	case c >= '0' && c <= '9':
@@ -457,7 +472,8 @@ func (j *jsonParser) value() any {
 	return nil
 }
 
-// jsonParse is JSON.parse of text, or the message of the error it throws.
+// jsonParse is JSON.parse of text, or the message of the error it throws: the call Pele's
+// parseOrderedJson makes.
 func jsonParse(text []uint16) (v any, message string) {
 	j := &jsonParser{text: text}
 	defer func() {
@@ -490,6 +506,8 @@ type walkFrame struct {
 	index  int
 }
 
+// escapePointer escapes a key for a JSON Pointer, ~ as ~0 and / as ~1, as Pele's propertyOrder
+// and flattenJsonRows do in line.
 func escapePointer(key string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(key, "~", "~0"), "/", "~1")
 }
@@ -535,6 +553,8 @@ func propertyOrder(text []uint16) (order *ordered[*[]string], failed *walkError)
 			at++
 		}
 	}
+	// readString reads a string at the cursor, giving its value if decode is set, as the
+	// readString closure of Pele's propertyOrder does.
 	readString := func(decode bool) string {
 		at++
 		var value []uint16
@@ -591,6 +611,7 @@ func propertyOrder(text []uint16) (order *ordered[*[]string], failed *walkError)
 		}
 		panic(walkError{at})
 	}
+	// literal reads true, false or null, as the literal closure of Pele's propertyOrder does.
 	literal := func(word string) {
 		for k := 0; k < len(word); k++ {
 			if code(at+k) != int(word[k]) {
@@ -599,6 +620,7 @@ func propertyOrder(text []uint16) (order *ordered[*[]string], failed *walkError)
 		}
 		at += len(word)
 	}
+	// number reads a number, as the number closure of Pele's propertyOrder does.
 	number := func() {
 		if code(at) == '-' {
 			at++
@@ -762,10 +784,12 @@ func locationAt(text []uint16, offset float64, line, column int) (int, int) {
 	return line, column
 }
 
+// isWordByte reports whether \w matches byte b, for the \b of the patterns of Pele's
+// locationFromMessage.
 func isWordByte(b byte) bool { return chars.IsWord(int(b)) }
 
 // boundedDigits is the run of digits that starts at byte i of s, with its end, if a word
-// boundary follows it: the (\d+)\b of a regular expression.
+// boundary follows it: the (\d+)\b of the patterns of Pele's locationFromMessage.
 func boundedDigits(s string, i int) (string, int) {
 	j := i
 	for j < len(s) && chars.IsDigit(int(s[j])) {
@@ -777,7 +801,9 @@ func boundedDigits(s string, i int) (string, int) {
 	return s[i:j], j
 }
 
-// findWord is the first place in s where word starts after a word boundary.
+// findWord calls fn with the end of each place in s, from from on, where word starts after a
+// word boundary, until fn reports a match: the search for the \bposition and \bline of the
+// patterns of Pele's locationFromMessage.
 func findWord(s, word string, from int, fn func(at int) bool) bool {
 	for k := from; k <= len(s)-len(word); k++ {
 		if strings.HasPrefix(s[k:], word) && (k == 0 || !isWordByte(s[k-1])) && fn(k+len(word)) {
@@ -787,7 +813,7 @@ func findWord(s, word string, from int, fn func(at int) bool) bool {
 	return false
 }
 
-// parseNumber is parseInt of a run of decimal digits.
+// parseNumber is parseInt of a run of decimal digits, as Pele's locationFromMessage reads one.
 func parseNumber(digits string) float64 {
 	f, err := strconv.ParseFloat(digits, 64)
 	if err != nil && !math.IsInf(f, 0) {
@@ -848,7 +874,8 @@ func locationFromMessage(message string, text []uint16, line, column int) (int, 
 	return 0, 0, false
 }
 
-// boundedDigitsLoose is a run of digits from i, which a space follows in the pattern.
+// boundedDigitsLoose is a run of digits from i, which a space follows in the pattern: the
+// (\d+) after `line ` in Pele's locationFromMessage.
 func boundedDigitsLoose(s string, i int) (string, int) {
 	j := i
 	for j < len(s) && chars.IsDigit(int(s[j])) {
@@ -886,6 +913,8 @@ func parseOrderedJSON(text string, origin func() (int, int)) (*Object, *KeyOrder
 	return object, &KeyOrder{order}, nil
 }
 
+// jsonError is a syntax error in the body of a `json` node at a line and column, as Pele's
+// jsonError makes it.
 func jsonError(message string, line, column int) *diagram.Error {
 	return &diagram.Error{
 		Code:    diagram.Syntax,

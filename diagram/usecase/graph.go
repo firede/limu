@@ -84,7 +84,7 @@ var actorShapes = map[string]string{
 }
 
 // markerTypes are the start and end markers of each arrow type, in the order of the arrow
-// types.
+// types: Pele's MARKERS.
 var markerTypes = [...][2]string{
 	{"none", "arrow_point"},
 	{"arrow_point", "none"},
@@ -95,6 +95,8 @@ var markerTypes = [...][2]string{
 	{"arrow_cross", "none"},
 }
 
+// scalar is how a JSON table writes a value that is not an array or an object, as String()
+// does in Pele's scalar.
 func scalar(v any) string {
 	switch x := v.(type) {
 	case string:
@@ -117,6 +119,8 @@ func scalar(v any) string {
 // undefinedValue is the value of a key a JSON object does not have.
 type undefinedValue struct{}
 
+// isObjectValue reports whether a JSON value is an array or an object, which Pele's
+// flattenJsonRows tests as item !== null && typeof item === 'object'.
 func isObjectValue(v any) bool {
 	switch v.(type) {
 	case *Object, []any:
@@ -199,6 +203,7 @@ func FlattenJSONRows(value *Object, order *KeyOrder) []JSONRow {
 	return rows
 }
 
+// classList joins the names that are not empty with spaces, as Pele's classList does.
 func classList(names ...string) string {
 	var kept []string
 	for _, n := range names {
@@ -209,6 +214,7 @@ func classList(names ...string) string {
 	return strings.Join(kept, " ")
 }
 
+// markersOf are the start and end markers of a relationship, as Pele's markers gives them.
 func markersOf(r *Relationship) [2]string {
 	if r.Type == "generalization" {
 		return [2]string{"none", "extension"}
@@ -232,7 +238,8 @@ func BuildGraph(m *Model) *Graph {
 	for _, c := range m.ClassDefs {
 		classDefs[c.ID] = c
 	}
-	// A later class wins a property but keeps the place the property first took.
+	// A later class wins a property but keeps the place the property first took, as the
+	// compiled closure of Pele's buildUsecaseGraph has it.
 	compiled := func(classNames []string) []string {
 		out := newOrdered[string]()
 		for _, name := range append([]string{"default"}, classNames...) {

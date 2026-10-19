@@ -31,7 +31,6 @@ const (
 	emptySection = 10 // the height of a compartment with no members
 	minWidth     = 64 // of a class
 	fold         = 8  // of a note's corner
-	padding      = common.Padding
 )
 
 // Layout lays out a parsed class diagram as a scene, as Pele's renderClass draws it: across
@@ -41,6 +40,8 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) *scene.Scene {
 	if o == nil {
 		o = &layout.Options{}
 	}
+	// fitted lays the diagram out loosely, or tightly where that does not fit, as the fitted
+	// of Pele's renderClass does.
 	fitted := func(down bool) *scene.Scene {
 		return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, down, tight) })
 	}
@@ -50,7 +51,8 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) *scene.Scene {
 	return fitted(false)
 }
 
-// numberOption is a number of the diagram's config, if it is one above 0, at most 2000.
+// numberOption is a number of the diagram's config, if it is one above 0, at most 2000, as
+// Pele's numberOption reads it.
 func numberOption(section diagram.Config, key string, fallback float64) float64 {
 	if v, ok := section[key].(float64); ok && v > 0 {
 		return min(v, 2000)
@@ -103,6 +105,7 @@ type card struct {
 // across as one that runs down; tight gives up the room that keeps a namespace's name clear
 // of an edge coming in beside it.
 func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *scene.Scene {
+	padding := o.Pad()
 	conf, _ := config["class"].(diagram.Config)
 	graph := BuildGraph(db, Hierarchical(config))
 	hideEmpty, _ := conf["hideEmptyMembersBox"].(bool)
@@ -115,6 +118,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	if turned {
 		rootDir = layout.TB
 	}
+	// labelOf lays out a label's text, as Pele's draw does with layoutLabel.
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
@@ -146,6 +150,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		}
 	}
 
+	// memberLine is a member as it is drawn, at a size, as Pele's memberLine gives it.
 	memberLine := func(m *Member, size float64) line {
 		t := chars.Trim(text.DecodeEntities(m.DisplayText()))
 		var face text.Face
@@ -154,6 +159,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		}
 		return line{text: t, width: measure.Width(t, size, face), classifier: m.Classifier}
 	}
+	// classView measures a class as it is drawn: its name, its annotations and its members,
+	// and the box they fit in, as the classView of Pele's draw does.
 	classView := func(node *GraphNode, cls *Class) view {
 		author := classStyle(db, cls)
 		fontSize := size
@@ -196,6 +203,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			inner = max(inner, l.width)
 		}
 		sections := !(hideEmpty && len(attributes) == 0 && len(methods) == 0)
+		// section is the height of a compartment of count members, as the section of Pele's
+		// classView gives it.
 		section := func(count int) float64 {
 			switch {
 			case !sections:
@@ -268,6 +277,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	// Edges leave one side of a class and arrive at the other, so a class with many of them
 	// is widened until they, and the text at their ends, fit side by side.
 	crowd := make([]float64, len(views)*4)
+	// meet counts an edge at a side of a class and keeps the widest text at its ends, as the
+	// meet of Pele's draw does.
 	meet := func(item, slot int, room float64) {
 		crowd[item*4+slot]++
 		if room > crowd[item*4+slot+1] {
@@ -350,6 +361,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		PortSep: 20,
 		Apart:   true,
 	})
+	// node is the box of the laid-out node i, as Pele's draw passes its CNode to endSide and
+	// the cluster helpers.
 	node := func(i int) draw.Node {
 		c := &cnodes[i]
 		return draw.Node{X: c.X, Y: c.Y, W: c.W, H: c.H, Group: c.IsGroup}
@@ -362,6 +375,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	// text between them.
 	sides := map[int][]*end{}
 	var sideKeys []int
+	// attach records where an end of an edge meets the side of a class, as the attach of
+	// Pele's draw does, and gives the end, or nil where it meets no side.
 	attach := func(ce *layout.CEdge, at, item int, room float64, order int) *end {
 		route := ce.Route
 		side := draw.EndSide(route, at, node(item))
@@ -403,7 +418,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		}
 	}
 	// onBorder reports whether a point lies on the border of one of the namespaces around a
-	// class.
+	// class, as the onBorder of Pele's draw does.
 	onBorder := func(item int, x, y float64) bool {
 		for g, hops := cnodes[item].Parent, 0; g >= 0 && hops < 10000; g, hops = cnodes[g].Parent, hops+1 {
 			c := &cnodes[g]
@@ -496,6 +511,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		}
 	}
 
+	// straighten makes an end with text run straight from the class for the length of the
+	// text, adding a point to its route, as the straighten of Pele's draw does.
 	straighten := func(route []float64, e *end, room float64, first bool) []float64 {
 		if e == nil || room <= 0 {
 			return route
@@ -535,6 +552,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	minX, minY := 0.0, 0.0
 	maxX, maxY := result.Width, result.Height
 	var cards []card
+	// addCard places the text at an end of a relation beside its line and widens the bounds to
+	// take it, as the card of Pele's draw does.
 	addCard := func(raw string, width, x, y float64, side int, after bool) {
 		if raw == "" {
 			return
@@ -632,7 +651,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			cluster := scene.Item{
 				Kind: scene.Group, Role: "class.namespace", ID: n.ID, Box: box,
 				Parts: []scene.Part{{Box: box, Rounded: true}},
-				Style: style.Style{Fill: style.SurfaceAlt.Alpha(0.5), Stroke: style.Border, Text: style.Muted},
+				Style: style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 			}
 			if !v.label.Empty() {
 				at := scene.Point{X: titleX + ox, Y: titleY}
@@ -728,6 +747,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
 		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
+		}
 		edges = append(edges, it)
 		if label.Width > 0 {
 			x, y := ce.LabelX+ox, ce.LabelY+oy
@@ -755,7 +778,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	for _, layer := range [][]scene.Item{clusters, edges, struck, labels, cardItems, nodeItems} {
 		sc.Items = append(sc.Items, layer...)
 	}
-	common.WithTitle(sc, db.Title, "class.title", measure, size)
+	common.WithTitle(sc, db.Title, "class.title", measure, size, padding)
 	return sc
 }
 
@@ -811,8 +834,9 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 		})
 		at += tinyHeight
 	}
+	classes, tags := common.Clickable(classNames(trimDefault(cls.CSSClasses)))
 	it := scene.Item{
-		Kind: scene.Node, Role: "class.class", Shape: "classBox", ID: cls.ID, Class: classNames(trimDefault(cls.CSSClasses)),
+		Kind: scene.Node, Role: "class.class", Shape: "classBox", ID: cls.ID, Class: classes, Tags: tags,
 		Box: box, Parts: parts,
 		Label: &v.label, At: scene.Point{X: x, Y: y + (at+first-titlePad)/2},
 		Style:   style.Style{Fill: style.Surface, Stroke: style.Border},
@@ -825,6 +849,8 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 		}
 	}
 	items := append([]scene.Item{it}, annotations...)
+	// lines draws the members of a compartment, one text each, from the top of the compartment
+	// down, as the lines of Pele's classSvg does.
 	lines := func(list []line, role scene.Role, from float64) {
 		middle := from + sectionPad + lineHeight/2
 		for _, ln := range list {
@@ -855,7 +881,8 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 	return items
 }
 
-// markerType is the scene's marker of an end of a relation.
+// markerType is the scene's marker of an end of a relation, for the marker Pele's
+// classMarker draws there.
 func markerType(name string) scene.MarkerType {
 	if name == "none" || name == "" {
 		return ""
@@ -871,6 +898,7 @@ func classNames(raw string) []string {
 }
 
 // trimDefault takes /^default\s?/ off a class's classes: the class every class has.
+// Pele's classSvg does this with a replace.
 func trimDefault(classes string) string {
 	rest, ok := strings.CutPrefix(classes, "default")
 	if !ok {

@@ -80,7 +80,8 @@ var keywords = map[string]int{
 var directions = [...]string{"TB", "BT", "RL", "LR"}
 
 // lineEnd is where the line that byte p is on ends: the first line terminator at or after p,
-// as RE_LINE_END finds it, or the end of src.
+// as RE_LINE_END finds it, or the end of src. It is the search that Pele's tokenize makes
+// with RE_LINE_END, written out.
 func lineEnd(src string, p int) int {
 	for q := p; q < len(src); {
 		c, size := chars.UnitAt(src, q)
@@ -95,7 +96,8 @@ func lineEnd(src string, p int) int {
 // matchDirection is the end of what /.*direction\s+WORD[^\n]*/y matches at p, or -1. The greedy
 // .* backtracks from the end of the line, so the last `direction` on the line that is followed
 // by white space and the word is the one matched; \s+ takes all the white space after it, line
-// breaks too, as nothing else lets the word follow.
+// breaks too, as nothing else lets the word follow. It is the match of RE_DIRECTION in Pele's
+// tokenize, written out by hand.
 func matchDirection(src string, p, end int, word string) int {
 	const keyword = "direction"
 	for d := end - len(keyword); d >= p; d-- {
@@ -133,6 +135,7 @@ func tokenize(src string) tokens {
 	lineAt := -1
 	dirFailed := 0
 
+	// emit adds a token from s to e and moves p to its end, as Pele's emit does.
 	emit := func(typ, s, e int) {
 		t.types = append(t.types, typ)
 		t.starts = append(t.starts, s)
@@ -141,6 +144,7 @@ func tokenize(src string) tokens {
 	}
 	// at is the code unit at q, -1 past the end, as charCodeAt's NaN.
 	at := func(q int) int { return chars.Unit(src, q) }
+	// upTo is where the next ch is from from, or the end of the text, as Pele's upTo gives it.
 	upTo := func(ch byte, from int) int {
 		if from > n {
 			return n
@@ -150,7 +154,8 @@ func tokenize(src string) tokens {
 		}
 		return n
 	}
-	// statement matches word\s[^#\n;]+.
+	// statement matches word\s[^#\n;]+, and emits it as a token of typ, as Pele's statement
+	// does.
 	statement := func(word string, typ int) bool {
 		if !strings.HasPrefix(src[p:], word) {
 			return false

@@ -32,7 +32,6 @@ const (
 	row     = 26
 	gap     = 32
 	outside = 28
-	pad     = common.Padding
 )
 
 // option is a setting of the pie's config, as Pele's option reads it: nil where the config
@@ -116,6 +115,7 @@ type clearing struct{ x, y, width float64 }
 // draw lays the pie out with a radius, as Pele's draw does; tight is set when the chart does
 // not fit the width it has with its legend beside it.
 func draw(m *Model, config diagram.Config, o *layout.Options, radius float64, tight bool) *scene.Scene {
+	pad := o.Pad()
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	measure := o.Measure()

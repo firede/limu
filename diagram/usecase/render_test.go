@@ -138,11 +138,11 @@ func partPaint(it *scene.Item, part *scene.Part, corners bool) string {
 	case scene.StrokeOnly:
 		s = "none " + stroke
 	case scene.FillOnly:
-		return name(it.Style.Fill) + " -"
+		return name(pelesvg.OwnFill(it)) + " -"
 	case scene.Hollow:
 		s = "var(--_bg) " + stroke
 	default:
-		s = name(it.Style.Fill) + " " + stroke
+		s = name(pelesvg.OwnFill(it)) + " " + stroke
 	}
 	if stroke != "-" && stroke != "none" {
 		s += ends(it, 0, corners)
@@ -319,7 +319,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 		case "usecase.label":
 			r := it.Box
-			if it.Parts[0].Box != r {
+			if pelesvg.D(it.Parts[0].Path) != pelesvg.D(new(scene.Path).RoundRect(r, 3)) {
 				lines = append(lines, "patch not the label's box")
 			}
 			lines = append(lines, "label "+id+" "+pt(r.X, r.Y)+","+pt(r.W, r.H))

@@ -1,7 +1,10 @@
 package svg
 
 import (
+	"encoding/xml"
 	"flag"
+	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,8 +120,9 @@ func TestRenderOverrides(t *testing.T) {
 	}
 }
 
-// A part painted Shade is filled with the background, or a tint of a fill its author set,
-// and not stroked.
+// A part painted Shade is filled with the background, or over a fill its author set, with
+// the background at 60%, and not stroked; a fill with an alpha of its own does not change
+// that, as variables or as colors.
 func TestRenderShade(t *testing.T) {
 	stripe := scene.Part{Box: scene.Rect{X: 0, Y: 10, W: 50, H: 10}, Paint: scene.Shade}
 	item := func(author style.Style) scene.Item {
@@ -132,12 +136,143 @@ func TestRenderShade(t *testing.T) {
 	if got := Render(sc, nil); !strings.Contains(got, `height="10" fill="var(--limu-bg,#ffffff)" stroke="none"/>`) {
 		t.Errorf("no stripe of the background:\n%s", got)
 	}
-	sc.Items[0] = item(style.Style{Fill: style.Of(style.Hex("#ff9966"))})
-	if got := Render(sc, nil); !strings.Contains(got, `fill="color-mix(in srgb,var(--limu-bg,#ffffff) 60%,#ff9966)" stroke="none"/>`) {
-		t.Errorf("no tint of the author's fill:\n%s", got)
+	for _, fill := range []string{"fill:#ff9966", "fill:#ff996680"} {
+		sc.Items[0] = item(style.Declarations([]string{fill}).Style)
+		if got := Render(sc, nil); !strings.Contains(got, `height="10" fill="var(--limu-bg,#ffffff)" fill-opacity="0.6" stroke="none"/>`) {
+			t.Errorf("%s: no stripe of the background at 60%%:\n%s", fill, got)
+		}
+		if got := Render(sc, &Options{Literal: true}); !strings.Contains(got, `height="10" fill="#ffffff" fill-opacity="0.6" stroke="none"/>`) {
+			t.Errorf("%s: no stripe of the background at 60%%, written as a color:\n%s", fill, got)
+		}
 	}
-	if got := Render(sc, &Options{Literal: true}); !strings.Contains(got, `fill="#ffd6c2" stroke="none"/>`) {
-		t.Errorf("no tint of the author's fill, written as a color:\n%s", got)
+}
+
+// A color of the author's own with an alpha is written opaque, its alpha its opacity, and
+// not twice: fill:#ff000080 is drawn at 0.5, not at 0.25.
+func TestRenderOwnAlpha(t *testing.T) {
+	sc := sample()
+	sc.Items[3].Author = style.Declarations([]string{"fill:#ff000080", "stroke:#00ff0040"}).Style
+	for _, literal := range []bool{false, true} {
+		got := Render(sc, &Options{Literal: literal})
+		if !strings.Contains(got, `fill="#ff0000" fill-opacity="0.5" stroke="#00ff00" stroke-opacity="0.25"`) {
+			t.Errorf("literal %v: the author's alpha not written once:\n%s", literal, got)
+		}
+	}
+}
+
+// A style's fill and stroke opacities are written with its paints, times the paints' own;
+// a marker is filled in the stroke's color alone and stroked at the stroke opacity.
+func TestRenderFillOpacity(t *testing.T) {
+	sc := sample()
+	sc.Items[3].Author = style.Declarations([]string{"fill:#ff000080", "fill-opacity:0.5", "stroke-opacity:0.25"}).Style
+	got := Render(sc, &Options{Literal: true})
+	if !strings.Contains(got, `fill="#ff0000" fill-opacity="0.25"`) || !strings.Contains(got, `stroke-opacity="0.25"`) {
+		t.Errorf("opacities not written:\n%s", got)
+	}
+	edge := &scene.Scene{Width: 20, Height: 20, Items: []scene.Item{{
+		Kind: scene.Edge, Role: "flowchart.edge",
+		Parts: []scene.Part{{Path: new(scene.Path).MoveTo(0, 10).LineTo(20, 10), Paint: scene.StrokeOnly}},
+		Ends:  [2]scene.Marker{{}, {Type: "arrow_point", At: scene.Point{X: 20, Y: 10}, DX: 1}},
+		Style: style.Style{Stroke: style.Of(style.Hex("#f00")), StrokeOpacity: style.N(0.25)},
+	}}}
+	got = Render(edge, &Options{Literal: true})
+	if !strings.Contains(got, `class="limu-marker" d="M20,10L12,13.36L12,6.64Z" fill="#ff0000" stroke="none"/>`) {
+		t.Errorf("marker not filled opaque:\n%s", got)
+	}
+}
+
+// An item's tags and then its classes are written as the element's classes.
+func TestRenderTagsAndClasses(t *testing.T) {
+	sc := &scene.Scene{Width: 10, Height: 10, Items: []scene.Item{{
+		Kind: scene.Node, Role: "c4.element", Tags: []string{"person", "external"}, Class: []string{"mine"},
+	}}}
+	if got := Render(sc, nil); !strings.Contains(got, `class="limu-node limu-c4-element person external mine"`) {
+		t.Errorf("classes not written:\n%s", got)
+	}
+}
+
+// icons is an IconMarkup that has every icon, a circle.
+func icons(string) string { return `<circle cx="12" cy="12" r="10"/>` }
+
+// An icon in a label is drawn in the color of the label's text, as an item's picture is,
+// at its opacity.
+func TestRenderLabelIconColor(t *testing.T) {
+	l := text.Layout("fa:fa-car Car", text.Options{Measurer: text.Arial, Size: 16, Icons: func(string) bool { return true }})
+	sc := &scene.Scene{Type: "t", Width: 100, Height: 40, FontSize: 16, Items: []scene.Item{
+		{Kind: scene.Node, Label: &l, At: scene.Point{X: 50, Y: 20}, Style: style.Style{Text: style.Muted.Alpha(0.5)},
+			Picture: &scene.Picture{Icon: "fa:fa-tree", Box: scene.Rect{X: 0, Y: 0, W: 20, H: 20}}},
+	}}
+	got := Render(sc, &Options{IconMarkup: icons})
+	for _, icon := range []string{"fa:fa-car", "fa:fa-tree"} {
+		at := strings.Index(got, `data-icon="`+icon+`"`)
+		if at < 0 {
+			t.Fatalf("no icon %s:\n%s", icon, got)
+		}
+		tag := got[at : at+strings.Index(got[at:], ">")]
+		if !strings.Contains(tag, ` color="var(--limu-muted,#6e6e6e)" opacity="0.5" `) {
+			t.Errorf("icon %s not in the text's color: %s", icon, tag)
+		}
+	}
+}
+
+// A label turned by its Rotate is written in a group turned about its At, its icons in it:
+// the title of a lane of a swimlane diagram drawn across, with an icon, keeps its icon by
+// its text, where the icon fell outside the diagram, at x -18.9.
+func TestRenderRotatedIcon(t *testing.T) {
+	l := text.Layout("fa:fa-user Customer", text.Options{Measurer: text.Arial, Size: 16, Icons: func(string) bool { return true }})
+	sc := &scene.Scene{Type: "swimlane", Width: 60, Height: 200, FontSize: 16, Items: []scene.Item{
+		{Kind: scene.Text, Role: "swimlane.title", Label: &l, At: scene.Point{X: 20, Y: 100}, Rotate: -90,
+			Style: style.Style{Halo: style.Bg, HaloWidth: style.N(4)}},
+	}}
+	got := Render(sc, &Options{IconMarkup: icons})
+	open := strings.Index(got, `<g transform="rotate(-90 20 100)">`)
+	icon := strings.Index(got, `<svg class="limu-icon"`)
+	end := strings.LastIndex(got, "</g></g>")
+	if open < 0 || icon < open || end < icon || strings.Count(got, "<text ") != 2 || strings.Contains(got, "<text text-anchor=\"middle\" xml:space=\"preserve\" transform") {
+		t.Errorf("the label and its icon not turned together:\n%s", got)
+	}
+}
+
+// A Draw of one's own writes a paint with its opacity, and keeps the default's label.
+func TestRenderDrawPieces(t *testing.T) {
+	got := Render(sample(), &Options{Draw: func(w *Writer, it *scene.Item, s style.Style, next func()) {
+		if it.ID != "g1" {
+			next()
+			return
+		}
+		w.Raw(`<g class="mine"><circle`)
+		w.PaintAttr("fill", s.Fill)
+		w.Raw(` opacity="`)
+		w.Num(w.Opacity(s.Fill))
+		w.Raw(`"/>`)
+		w.Parts(it, s)
+		w.Label(it, s)
+		w.Raw(`</g>`)
+	}})
+	want := `<g class="mine"><circle fill="var(--limu-surface-alt,#e6e6e6)" fill-opacity="0.5" opacity="0.5"/><rect x="8" y="8" width="224" height="204" rx="4" fill="var(--limu-surface-alt,#e6e6e6)" fill-opacity="0.5" stroke="var(--limu-border,#8a8a8a)"/><text text-anchor="middle" xml:space="preserve" fill="var(--limu-muted,#6e6e6e)"><tspan x="120" y="29.6">Group &amp; co</tspan></text></g>`
+	if !strings.Contains(got, want) {
+		t.Errorf("no %s in\n%s", want, got)
+	}
+}
+
+// What XML does not allow is not written, in text or in attributes, and what is written
+// reads as XML.
+func TestRenderValidXML(t *testing.T) {
+	bad := "a\xffb\uFFFEc\uFFFFd\xed\xa0\xbde\x01f\x7f<&>"
+	l := text.Layout("x", text.Options{Measurer: text.Arial, Size: 16})
+	sc := &scene.Scene{Type: bad, Title: bad, Desc: bad, Width: 10, Height: 10, FontSize: 16, Items: []scene.Item{
+		{Kind: scene.Node, ID: bad, Class: []string{bad}, Tooltip: bad, Label: &l},
+	}}
+	got := Render(sc, nil)
+	d := xml.NewDecoder(strings.NewReader(got))
+	for {
+		_, err := d.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("%v in\n%s", err, got)
+		}
 	}
 }
 
@@ -195,6 +330,11 @@ func TestNum(t *testing.T) {
 	for in, want := range map[float64]string{
 		0: "0", 1: "1", -1: "-1", 0.004: "0", -0.004: "0", 12.5: "12.5", 12.05: "12.05",
 		12.345: "12.35", 1.999: "2", -3.25: "-3.25", 0.1: "0.1", 123456789012.5: "123456789012.5",
+		// The product is rounded before Math.round takes it: fused into one multiply-add
+		// with the half, as Go does on arm64, -0.005 would be -0.01.
+		-0.005: "0", 22.505: "22.51",
+		math.NaN(): "0", math.Inf(1): "0", math.Inf(-1): "0",
+		1e300: "1" + strings.Repeat("0", 300), -1e300: "-1" + strings.Repeat("0", 300),
 	} {
 		var b strings.Builder
 		num(&b, in)
@@ -205,10 +345,18 @@ func TestNum(t *testing.T) {
 }
 
 func TestEsc(t *testing.T) {
-	var b strings.Builder
-	esc(&b, "a<b>&\"c\"\x01\x7f\td")
-	if b.String() != "a&lt;b&gt;&amp;&quot;c&quot;\td" {
-		t.Errorf("got %q", b.String())
+	for in, want := range map[string]string{
+		"a<b>&\"c\"\x01\x7f\td": "a&lt;b&gt;&amp;&quot;c&quot;\td",
+		// Bytes that are not UTF-8 are U+FFFD, a surrogate's encoding three of them.
+		"a\xffb": "a�b", "\xed\xa0\xbd!": "���!", "\xe2\x82": "��",
+		// U+FFFE and U+FFFF are left out; other characters are kept.
+		"x￾y￿z": "xyz", "é�😀\U0010FFFD": "é�😀\U0010FFFD",
+	} {
+		var b strings.Builder
+		esc(&b, in)
+		if b.String() != want {
+			t.Errorf("esc(%q) = %q, want %q", in, b.String(), want)
+		}
 	}
 }
 

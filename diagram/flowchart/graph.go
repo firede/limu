@@ -73,6 +73,8 @@ type Graph struct {
 	Edges []*GraphEdge
 }
 
+// shapeOf is the shape a node that is not a group is drawn with: an image's or an icon's, or
+// the one its brackets give, as Pele's shapeOf gives it.
 func shapeOf(v *Node) string {
 	if v.Img != "" {
 		return "imageSquare"
@@ -97,6 +99,8 @@ func shapeOf(v *Node) string {
 	return v.Type
 }
 
+// arrows are the markers at the start and at the end of an edge of type typ, as Pele's arrows
+// gives them.
 func arrows(typ string) (string, string) {
 	switch typ {
 	case "arrow_point", "arrow_circle", "arrow_cross":
@@ -108,6 +112,8 @@ func arrows(typ string) (string, string) {
 	return "none", "arrow_point"
 }
 
+// collapsed reports whether a subgraph's metadata collapses it, the test of Pele's
+// isCollapsed and of the loops of buildFlowGraph that read metadata.view.
 func collapsed(sg *Subgraph) bool {
 	if sg == nil {
 		return false
@@ -123,6 +129,7 @@ func BuildGraph(model *DB, defaultCurve string) *Graph {
 	g := &Graph{Nodes: []*GraphNode{}, Edges: []*GraphEdge{}}
 	subgraphs := model.Subgraphs
 
+	// compiled is the styles of the classes, trimmed, as Pele's compiled gives them.
 	compiled := func(classNames []string) []string {
 		out := []string{}
 		for _, name := range classNames {
@@ -390,6 +397,7 @@ func BuildGraph(model *DB, defaultCurve string) *Graph {
 	return g
 }
 
+// trimAll trims each of the strings in place, the map((s) => s.trim()) of Pele's compiled.
 func trimAll(s []string) []string {
 	for i := range s {
 		s[i] = chars.Trim(s[i])

@@ -35,7 +35,8 @@ func setting(config diagram.Config, key string, least, most float64) (float64, b
 	return min(most, max(least, v)), true
 }
 
-// settingOr is setting, or fallback when the config has none.
+// settingOr is setting, or fallback when the config has none, as Pele writes
+// setting(…) ?? fallback.
 func settingOr(config diagram.Config, key string, least, most, fallback float64) float64 {
 	if v, ok := setting(config, key, least, most); ok {
 		return v
@@ -57,7 +58,8 @@ func flag(config diagram.Config, key string) bool {
 	return ok && v
 }
 
-// breakAt is the length of a match of /<br\s*\/?>/i at i, or 0.
+// breakAt is the length of a match of /<br\s*\/?>/i at i, or 0: Pele's RE_BREAK, written out
+// by hand.
 func breakAt(s string, i int) int {
 	if i+3 > len(s) || s[i] != '<' || !chars.EqualFoldASCII(s[i+1:i+3], "br") {
 		return 0
@@ -168,14 +170,15 @@ func tickText(s string, width, size float64) *text.Label {
 
 // Layout schedules a parsed gantt chart's tasks and lays the chart out as a scene, as Pele's
 // renderGantt draws it: a row for each task, on a time axis as wide as the chart may be. It
-// schedules in o.Location against o.Now; an error is a *diagram.Error, from scheduling.
+// schedules a copy of the tasks in o.Location against o.Now, and leaves db as it was; an
+// error is a *diagram.Error, from scheduling.
 func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, error) {
 	if o == nil {
 		o = &layout.Options{}
 	}
 	size := o.Size()
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	now := float64(o.Clock().UnixMilli())
 
 	labelSize := settingOr(config, "fontSize", 4, 72, jsmath.Round(size*0.8125))
@@ -188,6 +191,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	compact := db.DisplayMode == "compact"
 	topAxis := db.TopAxis || flag(config, "topAxis")
 
+	db = db.copied()
 	if err := db.Schedule(o.Clock(), o.Zone()); err != nil {
 		return nil, err
 	}
@@ -249,6 +253,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		titleHeight = title.Height + 16
 	}
 	sc := &scene.Scene{Type: "gantt", FontSize: size, Title: db.AccTitle, Desc: db.AccDescr}
+	// titleItem is the chart's title, which Pele's renderGantt writes with labelSvg first.
 	titleItem := func() []scene.Item {
 		if title.Empty() {
 			return nil
@@ -284,6 +289,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			axisFormat = "%Y-%m-%d"
 		}
 	}
+	// tickLabel is Pele's tickLabel: a tick's time in the axis format.
 	tickLabel := func(t float64) string { return z.timeFormat(axisFormat, t) }
 	sampleWidth := max(measure.Width(tickLabel(start), tickSize, 0), measure.Width(tickLabel(stop), tickSize, 0))
 
@@ -304,6 +310,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	if stop > start {
 		scale = plotWidth / (stop - start)
 	}
+	// x is Pele's x: where a time falls on the plot, its middle when the chart spans no time.
 	x := func(t float64) float64 {
 		if scale == 0 {
 			return left + plotWidth/2
@@ -486,8 +493,8 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			box := scene.Rect{X: 0, Y: y, W: sc.Width, H: h}
 			bands = append(bands, scene.Item{
 				Kind: scene.Mark, Role: "gantt.section", Shape: "rect", ID: section,
-				Class: []string{"section-" + strconv.FormatFloat(index, 'f', -1, 64)},
-				Box:   box, Parts: []scene.Part{{Box: box}},
+				Tags: []string{"section-" + strconv.FormatFloat(index, 'f', -1, 64)},
+				Box:  box, Parts: []scene.Part{{Box: box}},
 				Style: style.Style{Fill: fill, Stroke: style.None},
 			})
 		}
@@ -506,6 +513,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 	if (len(db.Excludes) > 0 || len(db.Includes) > 0) && z.add(start, 6, "y") > stop {
 		from, to := math.NaN(), math.NaN()
 		have := false
+		// flush is Pele's flush: it marks the run of excluded days from from to to, if there is one.
 		flush := func() {
 			if !have {
 				return
@@ -552,7 +560,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 		case t.Done:
 			state = "done"
 		}
-		// The classes Pele gives the task besides pele-task.
+		// The classes Pele gives the task besides pele-task, the task's tags.
 		var class []string
 		if state != "" {
 			class = append(class, state)
@@ -581,7 +589,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 			case "done":
 				it.Style.Fill = style.SurfaceAlt
 			case "active":
-				it.Style.Fill = color.Alpha(0.25)
+				it.Style.Fill, it.Style.FillOpacity = color, style.N(0.25)
 			default:
 				it.Style.Fill = color
 			}
@@ -611,7 +619,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, err
 				it.Style.Text = style.Muted
 			}
 		}
-		it.Class = class
+		it.Tags = class
 		if !b.label.Empty() {
 			it.Label = &b.label
 		}

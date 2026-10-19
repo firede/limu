@@ -185,7 +185,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	size := o.Size()
 	small := math.Floor(size*0.875 + 0.5)
 	measure := o.Measure()
-	const padding = common.Padding
+	padding := o.Pad()
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: size, MaxWidth: max, Face: face, Markdown: markdown, Icons: o.Icons})
 	}
@@ -423,6 +423,10 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		}
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
+		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
 		}
 		edges = append(edges, it)
 		labels = append(labels, scene.Item{

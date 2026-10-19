@@ -190,7 +190,7 @@ func sceneLines(sc *scene.Scene) []string {
 	}
 	// What a part is filled and stroked with, the stroke's width, its dash, cap and join.
 	pen := func(it *scene.Item, paint scene.Painting) string {
-		fill, stroke := paintName(it.Style.Fill), paintName(it.Style.Stroke)
+		fill, stroke := paintName(pelesvg.OwnFill(it)), paintName(it.Style.Stroke)
 		switch paint {
 		case scene.StrokeOnly:
 			fill = "none"

@@ -1,6 +1,6 @@
-// Flowcharts drawn end to end: what Pele's render draws, read back out of its SVG as one line
-// per thing drawn, in the order drawn, with numbers as the SVG writes them. limu's test writes
-// the same lines from its scene.
+// Flowcharts drawn end to end, some with a padding other than Pele's 8: what Pele's render
+// draws, read back out of its SVG as one line per thing drawn, in the order drawn, with
+// numbers as the SVG writes them. limu's test writes the same lines from its scene.
 import { mutator } from '../lib/mutate.mjs';
 import { unescape, attr, tag, capJoin } from '../lib/svg.mjs';
 
@@ -112,22 +112,28 @@ export default async function ({ src, cases, write, random }) {
   });
 
   const out = [];
-  const draw = (source, maxWidth) => {
+  const draw = (source, maxWidth, padding) => {
     let r;
     try {
-      r = render(source, { measurer: metricsMeasurer, maxWidth, outputLimit: Infinity });
+      r = render(source, { measurer: metricsMeasurer, maxWidth, padding, outputLimit: Infinity });
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
       return false;
     }
     if (r.type !== 'flowchart') return false;
-    out.push({ src: source, maxWidth, lines: readSvg(r.svg) });
+    out.push({ src: source, maxWidth, padding, lines: readSvg(r.svg) });
     return true;
   };
+  const PADS = [0, 20, 2.5];
   let drawn = 0;
   const each = (source) => {
-    // Every third one again in a narrow host, which turns or tightens what does not fit.
-    if (draw(source) && drawn++ % 3 === 0) draw(source, 360);
+    if (!draw(source)) return;
+    // Every third one again in a narrow host, which turns or tightens what does not fit, and
+    // every twentieth with a padding other than Pele's 8, some in the narrow host, which
+    // takes the padding from the room for the title and the groups.
+    if (drawn % 3 === 0) draw(source, 360);
+    if (drawn % 20 === 0) draw(source, drawn % 40 === 0 ? undefined : 360, PADS[(drawn / 20) % PADS.length]);
+    drawn++;
   };
   flowcharts.forEach(each);
   const next = mutator(flowcharts, FRAGMENTS, random(11));

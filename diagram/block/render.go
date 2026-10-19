@@ -474,37 +474,12 @@ func classNames(names []string) []string {
 	})
 }
 
-// ownPaint is the diagram's own fill and stroke of a part, with what the author's
-// fill-opacity and stroke-opacity make of them: a browser takes those the author set over
-// the paints Pele writes each on its own, so an author's fill-opacity with no fill of their
-// own is the diagram's fill at that opacity, and the author's fill is at the opacity Pele
-// writes, opacity, when the author set none.
-func ownPaint(fill, stroke style.Paint, opacity float64, a style.Author) (own, author style.Style) {
-	author = a.Style
-	if f, ok := a.FillOpacity.Get(); ok {
-		opacity = f
-	} else if opacity < 1 && author.Fill.Visible() {
-		author.Fill = author.Fill.Alpha(opacity)
-	}
-	own = style.Style{Fill: fill.Alpha(opacity), Stroke: stroke}
-	if f, ok := a.StrokeOpacity.Get(); ok {
-		own.Stroke = own.Stroke.Alpha(f)
-	}
-	if author.Fill.Set() && !author.Fill.Visible() {
-		author.Fill = style.None
-	}
-	if author.Stroke.Set() && !author.Stroke.Visible() {
-		author.Stroke = style.None
-	}
-	return own, author
-}
-
 // lay lays the diagram out once, as Pele's draw does.
 func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.Scene, error) {
 	size := o.Size()
 	edgeSize := jsmath.Round(size * 0.875)
 	measure := o.Measure()
-	const pad = common.Padding
+	pad := o.Pad()
 	gap := float64(gapDefault)
 	section, _ := config["block"].(diagram.Config)
 	if configured, ok := section["padding"].(float64); ok && configured >= 0 {
@@ -803,13 +778,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		if v.kind == kindComposite {
 			top := v.y - v.h/2
 			box := scene.Rect{X: v.x - v.w/2, Y: top, W: v.w, H: v.h}
-			own, author := ownPaint(style.SurfaceAlt, style.Border, 0.5, v.author)
-			own.Text = style.Muted
 			it := scene.Item{
 				Kind: scene.Group, Role: RoleComposite, ID: b.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  own,
-				Author: author,
+				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
+				Author: v.author.Style,
 			}
 			if !v.label.Empty() {
 				it.Label = &v.label
@@ -818,12 +791,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 			clusters = append(clusters, it)
 			continue
 		}
-		own, author := ownPaint(style.Surface, style.Border, 1, v.author)
 		it := scene.Item{
 			Kind: scene.Node, Role: RoleBlock, Shape: scene.Shape(v.shape), ID: b.ID, Class: classes,
 			Box:    scene.Rect{X: v.x - v.bw/2, Y: v.y - v.bh/2, W: v.bw, H: v.bh},
-			Style:  own,
-			Author: author,
+			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
+			Author: v.author.Style,
 			At:     scene.Point{X: v.x + v.dx, Y: v.y + v.dy},
 		}
 		if v.kind == kindArrow {
@@ -871,6 +843,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		}
 		for k := 0; k+1 < len(r.points); k += 2 {
 			it.Route = append(it.Route, scene.Point{X: r.points[k], Y: r.points[k+1]})
+		}
+		if len(it.Route) == 0 {
+			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
+			it.Route = it.Parts[0].Path.Corners()
 		}
 		edges = append(edges, it)
 		if r.label.Width > 0 {

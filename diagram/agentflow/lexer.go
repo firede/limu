@@ -39,6 +39,7 @@ const (
 	sShapeDataStr
 )
 
+// nodeChar holds the ASCII characters a NODE_STRING is made of, Pele's NODE_CHAR.
 var nodeChar = func() (t [128]bool) {
 	for _, c := range "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!\"#$%&'*+.`?\\_/" {
 		t[c] = true
@@ -49,9 +50,11 @@ var nodeChar = func() (t [128]bool) {
 // The regular expressions of Pele's lexer, written out. Each is sticky: it matches at q or
 // not at all, and gives the end of its match or -1.
 
+// space matches /\s*/y, the run of white space Pele's patterns begin and end with.
 func space(s string, q int) int { return chars.SpaceRun(s, q) }
 
 // keywordColon matches /word\s*<sep>\s*/y.
+// It is Pele's RE_ACC_TITLE, RE_ACC_DESCR and RE_ACC_DESCR_ML.
 func keywordColon(s string, q int, word string, sep byte) int {
 	if !strings.HasPrefix(s[q:], word) {
 		return -1
@@ -64,6 +67,7 @@ func keywordColon(s string, q int, word string, sep byte) int {
 }
 
 // keywordSpace matches /word\s+/y.
+// It is Pele's RE_CALL and RE_CLICK.
 func keywordSpace(s string, q int, word string) int {
 	if !strings.HasPrefix(s[q:], word) {
 		return -1
@@ -76,6 +80,7 @@ func keywordSpace(s string, q int, word string) int {
 }
 
 // nodir matches /(?:\r?\n)*\s*\n/y: white space up to the last line feed in it.
+// It is Pele's RE_NODIR.
 func nodir(s string, q int) int {
 	end := space(s, q)
 	if i := strings.LastIndexByte(s[q:end], '\n'); i >= 0 {
@@ -84,9 +89,12 @@ func nodir(s string, q int) int {
 	return -1
 }
 
+// wordAt reports whether the code unit at i is a word character, which \b tests in Pele's
+// RE_DIR and RE_DIR_V; past the end of s it is not.
 func wordAt(s string, i int) bool { return chars.IsWord(chars.Unit(s, i)) }
 
 // dir matches /\s*(?:LR|RL|TB|BT|TD|BR)\b/y.
+// It is Pele's RE_DIR.
 func dir(s string, q int) int {
 	j := space(s, q)
 	if j+2 > len(s) {
@@ -102,6 +110,7 @@ func dir(s string, q int) int {
 }
 
 // dirSym matches /\s*[<>^]/y.
+// It is Pele's RE_DIR_SYM.
 func dirSym(s string, q int) int {
 	j := space(s, q)
 	if j < len(s) && (s[j] == '<' || s[j] == '>' || s[j] == '^') {
@@ -111,6 +120,7 @@ func dirSym(s string, q int) int {
 }
 
 // dirV matches /\s*v\b/y.
+// It is Pele's RE_DIR_V.
 func dirV(s string, q int) int {
 	j := space(s, q)
 	if j < len(s) && s[j] == 'v' && !wordAt(s, j+1) {
@@ -120,6 +130,7 @@ func dirV(s string, q int) int {
 }
 
 // lineEndFrom is the first line terminator at or after q, or the end.
+// It is the search with RE_LINE_END that Pele's initial makes before it tries RE_DIRECTION.
 func lineEndFrom(s string, q int) int {
 	for q < len(s) {
 		c, size := chars.UnitAt(s, q)
@@ -131,10 +142,12 @@ func lineEndFrom(s string, q int) int {
 	return len(s)
 }
 
+// directionNames are the names Pele's RE_DIRECTION are written for, in their order.
 var directionNames = [5]string{"TB", "BT", "RL", "LR", "TD"}
 
 // direction matches /.*direction\s+<name>[^\n]*/y: the last `direction` on the line that is
 // followed by white space and the name, and the rest of the line its match ends on.
+// It is one of Pele's RE_DIRECTION.
 func direction(s string, q int, name string) int {
 	end := lineEndFrom(s, q)
 	for x := end - 1; x >= q; x-- {
@@ -154,6 +167,7 @@ func direction(s string, q int, name string) int {
 }
 
 // emptyCall matches /\(\s*\)/y.
+// It is Pele's RE_EMPTY_CALL.
 func emptyCall(s string, q int) int {
 	if q >= len(s) || s[q] != '(' {
 		return -1
@@ -166,6 +180,7 @@ func emptyCall(s string, q int) int {
 }
 
 // breaks is s.replace(/\n\s*/g, '<br/>').
+// It is Pele's replace with RE_BR, which a metadata string's line breaks go through.
 func breaks(s string) string {
 	if !strings.Contains(s, "\n") {
 		return s
@@ -184,6 +199,7 @@ func breaks(s string) string {
 }
 
 // index is s.indexOf(sub, from).
+// It is Pele's src.indexOf, whose start may be past the end.
 func index(s, sub string, from int) int {
 	if from > len(s) {
 		return -1
@@ -196,10 +212,13 @@ func index(s, sub string, from int) int {
 }
 
 // separatorAt reports whether U+2028 or U+2029 starts at byte i of s.
+// It is the test of Pele's advance for where a column stops.
 func separatorAt(s string, i int) bool {
 	return i+2 < len(s) && s[i] == 0xe2 && s[i+1] == 0x80 && (s[i+2] == 0xa8 || s[i+2] == 0xa9)
 }
 
+// lexer holds the variables of Pele's tokenize, which its closures share; here they are the
+// lexer's fields, and the closures its methods.
 type lexer struct {
 	src        string
 	n          int
@@ -246,10 +265,13 @@ func tokenize(src string) []tok {
 }
 
 // at is the code unit at i, -1 past the end.
+// It is Pele's src.charCodeAt(i), but -1 where that gives NaN. Pele's own at, which runs a
+// pattern at q, is written here as a call of the pattern's function.
 func (l *lexer) at(i int) int { return chars.Unit(l.src, i) }
 
 // advance moves over the source up to e. Jison counts \r\n, \r and \n as one line break each,
 // and after a break its column stops at the first U+2028 or U+2029.
+// It is Pele's advance.
 func (l *lexer) advance(e int) {
 	brk := -1
 	for k := l.p; k < e; k++ {
@@ -278,9 +300,11 @@ func (l *lexer) advance(e int) {
 }
 
 // emit adds a token of the source up to e.
+// It is Pele's emit.
 func (l *lexer) emit(typ token, e int) { l.emitText(typ, l.src[l.p:e], e) }
 
 // emitText adds a token of the source up to e, with a text of its own.
+// It is Pele's emitText.
 func (l *lexer) emitText(typ token, text string, e int) {
 	t := tok{typ: typ, text: text, start: l.p}
 	t.loc[0], t.loc[1] = l.line, l.col
@@ -290,6 +314,7 @@ func (l *lexer) emitText(typ token, text string, e int) {
 }
 
 // emitFlat adds a token that cannot hold a line break.
+// It is Pele's emitFlat.
 func (l *lexer) emitFlat(typ token, e int) {
 	t := tok{typ: typ, text: l.src[l.p:e], start: l.p}
 	t.loc[0], t.loc[1] = l.line, l.col
@@ -301,6 +326,8 @@ func (l *lexer) emitFlat(typ token, e int) {
 
 // emitChars adds a run that Jison matches one character at a time, where \r\n counts as two
 // line breaks.
+// It is Pele's emitChars, which counts a character above U+FFFF as the two code units it
+// reads it as.
 func (l *lexer) emitChars(typ token, e int) {
 	t := tok{typ: typ, text: l.src[l.p:e], start: l.p}
 	t.loc[0], t.loc[1] = l.line, l.col
@@ -320,11 +347,13 @@ func (l *lexer) emitChars(typ token, e int) {
 	l.toks = append(l.toks, t)
 }
 
+// push enters state s, keeping the state it leaves, as Pele's push does.
 func (l *lexer) push(s int) {
 	l.stack = append(l.stack, l.state)
 	l.state = s
 }
 
+// pop goes back to the state push left, if there is one, as Pele's pop does.
 func (l *lexer) pop() {
 	if len(l.stack) > 0 {
 		l.state = l.stack[len(l.stack)-1]
@@ -332,12 +361,15 @@ func (l *lexer) pop() {
 	}
 }
 
+// kw reports whether the source has the keyword word at the current position, not followed
+// by a word character, as Pele's kw does.
 func (l *lexer) kw(word string) bool {
 	return strings.HasPrefix(l.src[l.p:], word) && !chars.IsWord(l.at(l.p+len(word)))
 }
 
 // wsEnd is the end of the run of white space starting at q. The last run is kept, so asking
 // again from inside it costs nothing.
+// It is Pele's wsEnd.
 func (l *lexer) wsEnd(q int) int {
 	if q >= l.wsFrom && q <= l.wsTo {
 		return l.wsTo
@@ -349,6 +381,7 @@ func (l *lexer) wsEnd(q int) int {
 }
 
 // blankEnd is the end of the run of spaces and tabs starting at q, kept as wsEnd keeps its.
+// It is Pele's blankEnd.
 func (l *lexer) blankEnd(q int) int {
 	if q >= l.blankFrom && q <= l.blankTo {
 		return l.blankTo
@@ -360,6 +393,7 @@ func (l *lexer) blankEnd(q int) int {
 }
 
 // blanks is the end of the run of spaces and tabs from q.
+// It is Pele's blanks.
 func blanks(s string, q int) int {
 	for q < len(s) && (s[q] == ' ' || s[q] == '\t') {
 		q++
@@ -368,6 +402,7 @@ func blanks(s string, q int) int {
 }
 
 // arrowEnd is the end of `\s*--+[x>]\s*` starting at q, or -1.
+// It is Pele's arrowEnd: a place it fails at is kept, so it fails there at once again.
 func (l *lexer) arrowEnd(q int) int {
 	j := l.wsEnd(q)
 	if j == l.noArrow || l.at(j) != '-' || l.at(j+1) != '-' {
@@ -384,6 +419,8 @@ func (l *lexer) arrowEnd(q int) int {
 	return -1
 }
 
+// link reads a link in the initial state, a whole one or the start of one with a label in it,
+// as Pele's link does: a place it fails at is kept, so it fails there at once again.
 func (l *lexer) link() bool {
 	j := l.wsEnd(l.p)
 	if j == l.noLink || l.at(j) != '-' {
@@ -417,6 +454,7 @@ func (l *lexer) link() bool {
 }
 
 // commentEnd is the end of `%%` not followed by `{`, through the end of its line, or -1.
+// It is Pele's commentEnd.
 func (l *lexer) commentEnd(q int) int {
 	if l.at(q) != '%' || l.at(q+1) != '%' || l.at(q+2) == '{' {
 		return -1
@@ -427,6 +465,7 @@ func (l *lexer) commentEnd(q int) int {
 	return l.n
 }
 
+// quote enters a string or a Markdown string at a double quote, as Pele's quote does.
 func (l *lexer) quote() {
 	if l.at(l.p+1) == '`' {
 		l.push(sMdString)
@@ -437,6 +476,8 @@ func (l *lexer) quote() {
 	}
 }
 
+// opener reads the token that opens a node's shape or a link's label at character c, and
+// enters the state its text is read in, as Pele's opener does. It reports whether c opens one.
 func (l *lexer) opener(c int) bool {
 	p := l.p
 	d := l.at(p + 1)
@@ -488,6 +529,8 @@ func (l *lexer) opener(c int) bool {
 	return false
 }
 
+// nodeString reads a NODE_STRING, which stops before a dash that starts a link, as Pele's
+// nodeString does. It reports whether there was one.
 func (l *lexer) nodeString() bool {
 	q := l.p
 	for q < l.n {
@@ -511,6 +554,8 @@ func (l *lexer) nodeString() bool {
 	return true
 }
 
+// initial reads a token in the initial state, at character c, as Pele's initial does. It
+// reports whether one starts there.
 func (l *lexer) initial(c int) bool {
 	p := l.p
 	src := l.src
@@ -805,6 +850,8 @@ func (l *lexer) initial(c int) bool {
 	return false
 }
 
+// run reads the tokens of each state until the end of the source or an error, as the loop of
+// Pele's tokenize does after its closures.
 func (l *lexer) run() []tok {
 	src := l.src
 	for {
