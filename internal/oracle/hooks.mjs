@@ -27,7 +27,8 @@ export async function resolve(spec, ctx, next) {
 // diagram's labelSvg writes, before each label, the point it is centered on, its size and its
 // spans, and its blocks write the size they are drawn at as data-limu; and a Wardley
 // map's labels write, before each, the point it is drawn about, its measures, its
-// attributes and its spans, and its markers where their tips are and the way they point.
+// attributes and its spans, and its markers where their tips are and the way they point; and
+// a Cynefin diagram's labels and markers write the same before each.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -171,6 +172,27 @@ function startLabel(label: Label, x: number, y: number, attrs: string): string {
   const s = startLabelPele(label, x, y, attrs);
   if (!(globalThis as any).limuExactNumbers || s === '') return s;
   return limuLabel('limu-start', label, x, y, attrs) + s;
+}
+function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
+  const s = markerPele(type, x, y, dx, dy, color);
+  if (!(globalThis as any).limuExactNumbers) return s;
+  return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" color="\${color}"/>\` + s;
+}
+`;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/cynefin/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = String(loaded.source);
+    source = patch(url, source, RADAR_IMPORT, RADAR_IMPORT.replace('labelSvg', 'labelSvg as labelSvgPele'));
+    source = patch(url, source, WARDLEY_EDGES, WARDLEY_EDGES.replace('marker,', 'marker as markerPele,'));
+    source += `
+function labelSvg(label: Label, cx: number, cy: number, attrs: string, icons?: any): string {
+  const s = labelSvgPele(label, cx, cy, attrs, icons);
+  if (!(globalThis as any).limuExactNumbers || s === '') return s;
+  const lines = label.lines.map((line) => line.map((s) => [s.icon ?? null, s.style, s.text, s.width]));
+  const data = { w: label.width, h: label.height, size: label.size, lh: label.lineHeight, widths: label.widths, lines };
+  return \`<limu-label x="\${cx}" y="\${cy}" attrs="\${encodeURIComponent(attrs)}" data="\${encodeURIComponent(JSON.stringify(data))}"/>\` + s;
 }
 function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
   const s = markerPele(type, x, y, dx, dy, color);
