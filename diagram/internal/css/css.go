@@ -122,9 +122,8 @@ func LineDeclared(decls []string) bool {
 // it into an attribute: each property of a shape that is kept, with the last value given it,
 // in the order the properties first came, "fill:red;stroke:blue;", with & and " written as
 // entities and the control characters XML does not allow dropped; "" for none. (A value with
-// < or > is dropped before, as unsafe.) A diagram
-// that decides by what the attribute holds, as a treemap does whether a class fills a
-// section, reads it here.
+// < or > is dropped before, as unsafe.) A diagram that decides by what the attribute holds,
+// as a treemap does whether a class fills a section, reads it here.
 func ShapeCSS(decls []string) string {
 	var props, values []string
 	for _, decl := range decls {

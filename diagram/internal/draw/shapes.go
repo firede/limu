@@ -4,8 +4,10 @@
 //
 // What layout or placement depends on — the sizes, insets and spans of shapes, the ends of
 // routes, the tips of edges, the places of titles — is what Pele makes of it to the last bit.
-// The outlines are the same figures as Pele's, in absolute coordinates, but not the same
-// numbers: Pele writes arcs, circles and rounded boxes, which become cubic curves here.
+// The outlines are Pele's, in absolute coordinates: where Pele draws with lines and curves,
+// the numbers it writes, and where it writes arcs, circles and ellipses, which become cubic
+// curves here, the same figures but not the same numbers. A box with the theme's corners is
+// a box, as Pele's rect is, with its corners left to the backend.
 //
 // Go may fuse a multiplication and an addition into one step, rounded once, where
 // JavaScript rounds twice. The products that feed sums are converted with float64(…),
