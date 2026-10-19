@@ -3,9 +3,9 @@
 // buildEventModel makes of the tree. The cases are Mermaid's documentation and specs, the
 // inputs of Pele's own tests, cases written here, random diagrams, and all of those mutated
 // at random.
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/eventmodeling/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -119,36 +119,15 @@ export const WRITTEN = [
   'not eventmodeling',
 ];
 
-// Strings in the sources of a folder of Pele's tests that hold the keyword, as Pele's
-// loadCorpus collects them, from files whose names match.
-function testStrings(pele, dir, files) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/eventmodeling/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
-
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests and the
 // cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/eventmodeling-docs.json'), 'utf8'));
   return [
     ...new Set([
-      ...docs,
-      ...testStrings(pele, 'tests/compat/eventmodeling', /\.(spec|test)\.[jt]s$/),
-      ...testStrings(pele, 'tests/eventmodeling', /\.test\.ts$/),
-      ...testStrings(pele, 'tests/render', /^eventmodeling.*\.test\.ts$/),
+      ...docs(pele, 'eventmodeling'),
+      ...testStrings(pele, 'tests/compat/eventmodeling', /\.(spec|test)\.[jt]s$/, /eventmodeling/),
+      ...testStrings(pele, 'tests/eventmodeling', /\.test\.ts$/, /eventmodeling/),
+      ...testStrings(pele, 'tests/render', /^eventmodeling.*\.test\.ts$/, /eventmodeling/),
       ...WRITTEN,
     ]),
   ].filter((s) => !lone(s) && s.length <= 50000);
@@ -179,7 +158,7 @@ const TITLES = ['Checkout', 'A title of an event model that is a good deal wider
 
 // Random event modeling diagrams, most of them well formed.
 export function randomDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const id = (n) => (chance(0.8) ? String(n).padStart(2, '0') : String(n));
   return () => {

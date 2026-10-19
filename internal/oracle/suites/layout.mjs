@@ -1,6 +1,7 @@
 // The layered and compound layouts: Pele's layered() and compoundLayout() run on the graphs in
 // cases/layout.json, each with several options, and on random graphs like those a flowchart
 // gives them.
+import { picker } from '../lib/corpus.mjs';
 
 // JSON has no infinities and no NaN; they are written as strings, and read back so.
 function finite(value) {
@@ -85,7 +86,7 @@ function cedgeIn(spec) {
 // spread their edges, some edges labelled, ports with one edge each, now and then pins and
 // ends held at offsets.
 function randomLayered(next, index) {
-  const pick = (list) => list[Math.floor(next() * list.length)];
+  const pick = picker(next);
   const count = 1 + Math.floor(next() * 60);
   const spanMode = pick(['none', 'flat', 'part', 'all', 'mixed']);
   const nodes = [];
@@ -149,7 +150,7 @@ function randomLayered(next, index) {
 // at random (some in each other, some in what is not a group), groups with their own
 // direction, edges between nodes and groups, some labelled, some from a node to itself.
 function randomCompound(next, index) {
-  const pick = (list) => list[Math.floor(next() * list.length)];
+  const pick = picker(next);
   const count = 1 + Math.floor(next() * 60);
   const groups = next() * 0.3;
   const nested = next();

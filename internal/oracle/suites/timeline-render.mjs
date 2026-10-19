@@ -3,15 +3,11 @@
 //
 // Pele draws a timeline with no group that moves what is in it, so the numbers of its SVG are
 // where things are on the page, as the scene holds them, and are compared as Pele writes them.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, drawableDiagrams } from './timeline.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
 // How a shape is painted: its fill, with its opacity, its stroke, and the stroke's width.
 const paint = (s) => {
   const opacity = attr(s, 'fill-opacity');

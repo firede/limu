@@ -119,7 +119,11 @@ func exponent(e int) string {
 
 // ratPow10 is 10^n exactly.
 func ratPow10(n int) *big.Rat {
-	p := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(abs(n))), nil)
+	m := n
+	if m < 0 {
+		m = -m
+	}
+	p := new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(m)), nil)
 	if n < 0 {
 		return new(big.Rat).SetFrac(big.NewInt(1), p)
 	}
@@ -132,11 +136,4 @@ func roundHalfUp(r *big.Rat) *big.Int {
 	num.Add(num, r.Denom())
 	den := new(big.Int).Lsh(r.Denom(), 1)
 	return num.Quo(num, den)
-}
-
-func abs(n int) int {
-	if n < 0 {
-		return -n
-	}
-	return n
 }

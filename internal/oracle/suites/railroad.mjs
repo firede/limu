@@ -4,9 +4,11 @@
 // Mermaid's documentation and specs, the inputs of Pele's own tests, cases written here in each
 // of the four notations, random grammars and random pieces of them, and all of those mutated
 // at random.
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The generators of Pele's tests/support/railroad-oracle.ts, as they are there.
 
@@ -180,26 +182,6 @@ export const FRAGMENTS = [
 
 const RE_KEYWORD = /railroad-(?:ebnf-|abnf-|peg-)?beta/;
 const RE_ANY_KEYWORD = /railroad-(?:ebnf-|abnf-|peg-)?beta/i;
-
-// Strings in the sources of a folder of Pele's tests that hold a keyword, as Pele's
-// loadCorpus collects them, from files whose names match.
-function testStrings(pele, dir, files, keyword = RE_KEYWORD) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!keyword.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
 
 // The expressions Pele's tests/railroad/model.test.ts reads through its ir, ebnf, abnf and peg
 // helpers, written out as the helpers write them.
@@ -529,8 +511,8 @@ export const WRITTEN = [
 export function corpus(pele) {
   const own = [
     ...new Set([
-      ...JSON.parse(readFileSync(join(pele, 'tests/corpus/railroad-docs.json'), 'utf8')),
-      ...testStrings(pele, 'tests/compat/railroad', /\.(spec|test)\.[jt]s$/),
+      ...docs(pele, 'railroad'),
+      ...testStrings(pele, 'tests/compat/railroad', /\.(spec|test)\.[jt]s$/, RE_KEYWORD),
       ...testStrings(pele, 'tests/railroad', /^(model|oracle)\.test\.ts$/, RE_ANY_KEYWORD),
       ...testStrings(pele, 'tests/render', /^railroad.*\.test\.ts$/, RE_ANY_KEYWORD),
       ...modelTestCases(pele),

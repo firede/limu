@@ -8,23 +8,20 @@ import (
 	"github.com/firede/limu/internal/fixture"
 )
 
-// The fixture is what V8 makes of Math.sin, Math.cos, Math.atan2, Math.acos and Math.asin;
-// ./scripts/oracle.sh writes it, with its jsmath suite.
+// The fixture is what V8 makes of Math.sin, Math.cos, Math.atan2, Math.acos, Math.asin and
+// Math.round; ./scripts/oracle.sh writes it, with its jsmath suite.
 type mathFixture struct {
 	Trig  [][3]json.RawMessage `json:"trig"`
 	Atan2 [][3]json.RawMessage `json:"atan2"`
 	Acos  [][2]json.RawMessage `json:"acos"`
 	Asin  [][2]json.RawMessage `json:"asin"`
+	Round [][2]json.RawMessage `json:"round"`
 }
 
 func readMath(t *testing.T) mathFixture {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/math.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p mathFixture
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/math.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p
@@ -105,6 +102,16 @@ func TestAsinMatchesV8(t *testing.T) {
 		as.see(Asin(x), decode(c[1]), x)
 	}
 	as.done(25000)
+}
+
+func TestRoundMatchesV8(t *testing.T) {
+	p := readMath(t)
+	r := check{t: t, name: "Round"}
+	for _, c := range p.Round {
+		x := decode(c[0])
+		r.see(Round(x), decode(c[1]), x)
+	}
+	r.done(6000)
 }
 
 var percent = 22.505

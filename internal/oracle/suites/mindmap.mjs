@@ -3,9 +3,10 @@
 // payloads, cases written here, those mutated at random, maps built at random, and random
 // strings of tokens. Each case is tokenized and parsed as the raw text, and parsed as Pele's
 // parse does it, after the preprocessing every diagram goes through.
-import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { fileLiterals, testFiles, docs, arrayIn, lone, picker } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/mindmap/oracle.test.ts, and more for decorations, config and what
 // is drawn.
@@ -110,32 +111,6 @@ export const WRITTEN = [
   'mindmap\n root\n  a\n b',
 ];
 
-// The literals of a test file that hold a mindmap, as Pele's loadCorpus finds them.
-function literals(file, keyword) {
-  const out = [];
-  const src = readFileSync(file, 'utf8');
-  for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-    const raw = m[1] ?? m[2] ?? m[3];
-    if (!keyword.test(raw)) continue;
-    try {
-      out.push(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-    } catch {
-      continue;
-    }
-  }
-  return out;
-}
-
-// An array literal of a test's source, evaluated with the names given.
-function arrayIn(file, start, names = {}) {
-  const src = readFileSync(file, 'utf8');
-  const from = src.indexOf(start);
-  if (from < 0) throw new Error(`no ${start} in ${file}`);
-  const open = from + start.length;
-  const end = src.indexOf('\n];', open);
-  return new Function(...Object.keys(names), 'return [' + src.slice(open, end) + '\n];')(...Object.values(names));
-}
-
 // Pele's hostile templates, tests/render/mindmap-security.test.ts, filled with its payloads.
 function hostile(pele) {
   const payloads = arrayIn(join(pele, 'tests/support/inert.ts'), 'export const PAYLOADS = [');
@@ -148,11 +123,10 @@ function hostile(pele) {
 // The corpus the suites start from: documentation, specs, Pele's tests and the cases above.
 export function corpus(pele) {
   const out = new Set();
-  const dir = join(pele, 'tests/compat/mindmap');
-  for (const file of readdirSync(dir).filter((f) => /\.(spec|test)\.[jt]s$/.test(f))) for (const s of literals(join(dir, file), /mindmap/)) out.add(s);
-  for (const s of JSON.parse(readFileSync(join(pele, 'tests/corpus/mindmap-docs.json'), 'utf8'))) out.add(s);
+  for (const file of testFiles(pele, 'tests/compat/mindmap', /\.(spec|test)\.[jt]s$/)) for (const s of fileLiterals(file, /mindmap/)) out.add(s);
+  for (const s of docs(pele, 'mindmap')) out.add(s);
   for (const file of ['tests/render/mindmap.test.ts', 'tests/render/max-width.test.ts', 'tests/render/all-types.test.ts']) {
-    for (const s of literals(join(pele, file), /^mindmap/)) out.add(s);
+    for (const s of fileLiterals(join(pele, file), /^mindmap/)) out.add(s);
   }
   for (const s of WRITTEN) out.add(s);
   return [...out].filter((s) => !lone(s) && s.length <= 4000);
@@ -165,7 +139,7 @@ export function hostileCorpus(pele) {
 // Maps built at random: a root and branches of every shape, with icons, classes and labels of
 // every kind, mostly well formed.
 export function maps(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const texts = [
     'Origins', 'Long history', 'Research', 'On effectiveness<br/>and features', 'Tools', 'Pen and paper', 'Mermaid', 'Plan', 'Build',

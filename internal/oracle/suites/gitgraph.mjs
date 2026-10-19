@@ -4,9 +4,10 @@
 // them, and random histories that mostly get past the model builder's checks. Each case is
 // parsed as Pele's parse does it, after the preprocessing every diagram goes through, and as
 // the parser alone reads the raw text.
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { readFileSync } from 'node:fs';
+import { enc, peleError } from '../lib/value.mjs';
+import { literals, testFiles, lone, picker, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/git/oracle.test.ts.
 export const FRAGMENTS = [
@@ -155,22 +156,9 @@ export const WRITTEN = [
 // and the whole sources the specs build by adding literals.
 function specSources(pele) {
   const out = new Set();
-  const dir = join(pele, 'tests/compat/git');
-  const evaluate = (raw) => {
-    try {
-      return new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')();
-    } catch {
-      return undefined;
-    }
-  };
-  for (const file of readdirSync(dir).filter((f) => /\.(spec|test)\.[jt]s$/.test(f))) {
-    const src = readFileSync(join(dir, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/gitGraph/.test(raw)) continue;
-      const text = evaluate(raw);
-      if (text !== undefined) out.add(text);
-    }
+  for (const file of testFiles(pele, 'tests/compat/git', /\.(spec|test)\.[jt]s$/)) {
+    const src = readFileSync(file, 'utf8');
+    for (const s of literals(src, /gitGraph/)) out.add(s);
     for (const m of src.matchAll(/const str =\s*((?:'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`|"(?:[^"\\\n]|\\.)*"|\s|\+)+);/g)) {
       try {
         out.add(new Function('return ' + m[1])());
@@ -182,8 +170,7 @@ function specSources(pele) {
 
 // The corpus the suites start from: documentation, specs, Pele's seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/git-docs.json'), 'utf8'));
-  return [...new Set([...docs, ...specSources(pele), ...SEEDS, ...WRITTEN])].filter((s) => !lone(s));
+  return [...new Set([...docs(pele, 'git'), ...specSources(pele), ...SEEDS, ...WRITTEN])].filter((s) => !lone(s));
 }
 
 // Random sequences of whole tokens, as Pele's test makes them.
@@ -211,7 +198,7 @@ const STATEMENTS = [
 ];
 
 export function soup(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const gap = () => {
     const r = rnd();
     return r < 0.75 ? ' ' : r < 0.9 ? '\n' : '';
@@ -235,7 +222,7 @@ export function soup(rnd) {
 // committed to, merged and cherry-picked from, with ids, tags, types and messages, in every
 // direction, with the settings of front matter.
 export function histories(rnd, opts = {}) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const tags = ['v1.0', 'release', 'a much longer tag name', 'x', 'β', '日本', 'hot<fix>', '#35;1'];
   const ids = ['init', 'a', 'fix-1', 'Feature X', 'a very long commit id that goes on and on', '日本語', 'x&y', 'z<br>w'];

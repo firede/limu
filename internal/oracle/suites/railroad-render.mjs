@@ -10,19 +10,13 @@
 // and arrows of its tracks, is added to that one first, as the scene holds where it ends;
 // and the lines hold every number in full, as String() writes it, so that a difference in
 // the last bit shows.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n, pt, readHead } from '../lib/svg.mjs';
 import { FRAGMENTS, NOTATIONS, corpus, grammar } from './railroad.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (v) => String(Number(v));
 // A number inside the group of rules, where the scene has it.
 const off = (v) => 0.5 + Number(v);
-const pt = (x, y) => `${n(x)},${n(y)}`;
 
 // A path Pele writes in the group, with M, H, V, a, l, v and z, as absolute steps from
 // where each starts: M x y, L x y, A rx ry rot large sweep x y and Z, every number in full.
@@ -83,19 +77,8 @@ const pen = (e) =>
 // The lines of a railroad diagram's SVG, drawn with its numbers in full.
 export function readSvg(svg) {
   const lines = [];
-  const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`);
-  let body = svg.slice(svg.indexOf('>') + 1);
-  const title = /^<title id="[^"]*">([^<]*)<\/title>/.exec(body);
-  if (title) {
-    lines.push(`acc-title ${unescape(title[1])}`);
-    body = body.slice(title[0].length);
-  }
-  const desc = /^<desc id="[^"]*">([^<]*)<\/desc>/.exec(body);
-  if (desc) {
-    lines.push(`acc-desc ${unescape(desc[1])}`);
-    body = body.slice(desc[0].length);
-  }
+  const { open: head, body, acc } = readHead(svg);
+  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`, ...acc);
   // The title: where its first line sits and the text of each line.
   const t = /^<text class="pele-title"([^>]*)>([\s\S]*?)<\/text>/.exec(body);
   if (t) {

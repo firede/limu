@@ -115,12 +115,8 @@ type peleDraw struct {
 
 func loadPele(t *testing.T) *peleDraw {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/draw.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleDraw
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/draw.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return &p
@@ -383,9 +379,15 @@ func TestLabelPatchMatchesPele(t *testing.T) {
 	}
 }
 
-// The outlines are compared as figures: Pele's markup and the pieces are each flattened to
-// lines through points no more than about a unit apart, and each piece must have the paint
-// of its element, the same bounding box, and every point near the other's lines.
+// The outlines are compared number for number where Pele draws with lines and curves: a
+// polygon, a rect with square corners and a path with no arc in it must be the steps of the
+// piece's path, and a rect with the theme's corners its box. The fixture has Pele's numbers
+// in full; a path's are taken to hundredths, as Pele writes them, since the pieces take
+// them as written. A circle, an ellipse, a rect with corners of its own and a path with an
+// arc, which a scene.Path draws in curves that only come near, are compared as figures:
+// Pele's markup and the pieces are each flattened to lines through points no more than
+// about a unit apart, and each piece must have the paint of its element, the same bounding
+// box, and every point near the other's lines.
 
 type pt struct{ x, y float64 }
 
@@ -394,6 +396,17 @@ type figure struct {
 	rounded bool
 	box     scene.Rect
 	lines   [][]pt
+	// steps is the element as a path, for one drawn with lines and curves; exact says the
+	// steps, or the box of a rect with the theme's corners, are to be the piece's exactly.
+	steps []pathStep
+	exact bool
+	rect  bool // the element is a rect, whose box a piece may have in place of a path
+}
+
+// A pathStep is one step of a path, as scene.Path.Each gives it.
+type pathStep struct {
+	op   scene.Op
+	args []float64
 }
 
 // step is how far apart the points of a flattened curve are, at most.
@@ -496,9 +509,8 @@ func svgPath(t *testing.T, d string, ox, oy float64) [][]pt {
 	var line []pt
 	var at, start, ctrl pt
 	quadAt := false
-	cmds := regexp.MustCompile(`[MLHVCQTAZmlhvcqtaz][^MLHVCQTAZmlhvcqtaz]*`).FindAllString(d, -1)
-	for _, c := range cmds {
-		op, n := c[0], numbers(t, c[1:])
+	for _, c := range reCmd.FindAllString(d, -1) {
+		op, n := c[0], hundredths(numbers(t, c[1:]))
 		rel := op >= 'a'
 		var dx, dy float64
 		if rel {
@@ -564,6 +576,106 @@ func svgPath(t *testing.T, d string, ox, oy float64) [][]pt {
 	return lines
 }
 
+var reCmd = regexp.MustCompile(`[MLHVCQTAZmlhvcqtaz][^MLHVCQTAZmlhvcqtaz]*`)
+
+// hundredths is each of n to hundredths, as Pele's num writes it and SVG reads it back.
+func hundredths(n []float64) []float64 {
+	for i, v := range n {
+		n[i] = jsmath.Round(float64(v*100)) / 100
+	}
+	return n
+}
+
+// pathSteps is the d of a path about o as the steps of a scene.Path: its numbers to
+// hundredths, relative ones taken from where the path is and a T's control point the last
+// one's reflected, in the shape's frame, as SVG reads them, and then moved by o. A path
+// with an arc in it is nil.
+func pathSteps(t *testing.T, d string, o pt) []pathStep {
+	var out []pathStep
+	add := func(op scene.Op, ps ...pt) {
+		a := make([]float64, 0, 2*len(ps))
+		for _, p := range ps {
+			a = append(a, o.x+p.x, o.y+p.y)
+		}
+		out = append(out, pathStep{op, a})
+	}
+	var at, start, ctrl pt
+	quadAt := false
+	for _, c := range reCmd.FindAllString(d, -1) {
+		op, n := c[0], hundredths(numbers(t, c[1:]))
+		var r pt
+		if op >= 'a' {
+			r = at
+		}
+		if want := map[byte]int{'m': 2, 'l': 2, 'h': 1, 'v': 1, 'q': 4, 't': 2, 'c': 6, 'a': 7, 'z': 0}[op|0x20]; len(n) != want {
+			t.Fatalf("%q in %q has %d numbers", c, d, len(n))
+		}
+		wasQuad := quadAt
+		quadAt = false
+		switch op | 0x20 {
+		case 'm':
+			at = pt{r.x + n[0], r.y + n[1]}
+			start = at
+			add(scene.MoveTo, at)
+		case 'l':
+			at = pt{r.x + n[0], r.y + n[1]}
+			add(scene.LineTo, at)
+		case 'h':
+			at = pt{r.x + n[0], at.y}
+			add(scene.LineTo, at)
+		case 'v':
+			at = pt{at.x, r.y + n[0]}
+			add(scene.LineTo, at)
+		case 'q':
+			ctrl, at = pt{r.x + n[0], r.y + n[1]}, pt{r.x + n[2], r.y + n[3]}
+			add(scene.QuadTo, ctrl, at)
+			quadAt = true
+		case 't':
+			if wasQuad {
+				ctrl = pt{2*at.x - ctrl.x, 2*at.y - ctrl.y}
+			} else {
+				ctrl = at
+			}
+			at = pt{r.x + n[0], r.y + n[1]}
+			add(scene.QuadTo, ctrl, at)
+			quadAt = true
+		case 'c':
+			at = pt{r.x + n[4], r.y + n[5]}
+			add(scene.CubeTo, pt{r.x + n[0], r.y + n[1]}, pt{r.x + n[2], r.y + n[3]}, at)
+		case 'a':
+			return nil
+		case 'z':
+			add(scene.Close)
+			at = start
+		}
+	}
+	return out
+}
+
+// polygonSteps is a polygon about o as the steps of a scene.Path.
+func polygonSteps(o pt, xy ...float64) []pathStep {
+	out := []pathStep{{scene.MoveTo, []float64{o.x + xy[0], o.y + xy[1]}}}
+	for i := 2; i+1 < len(xy); i += 2 {
+		out = append(out, pathStep{scene.LineTo, []float64{o.x + xy[i], o.y + xy[i+1]}})
+	}
+	return append(out, pathStep{scene.Close, []float64{}})
+}
+
+// pieceSteps is the steps of a piece's path, or of its box where it has none.
+func pieceSteps(p scene.Part) []pathStep {
+	if p.Path == nil {
+		b := p.Box
+		return polygonSteps(pt{}, b.X, b.Y, b.X+b.W, b.Y, b.X+b.W, b.Y+b.H, b.X, b.Y+b.H)
+	}
+	var out []pathStep
+	p.Path.Each(func(op scene.Op, a []float64) { out = append(out, pathStep{op, slices.Clone(a)}) })
+	return out
+}
+
+func sameSteps(a, b []pathStep) bool {
+	return slices.EqualFunc(a, b, func(x, y pathStep) bool { return x.op == y.op && slices.Equal(x.args, y.args) })
+}
+
 // peleFigures reads the elements of Pele's markup for a shape drawn about x, y.
 func peleFigures(t *testing.T, svg string, x, y float64) []figure {
 	var out []figure
@@ -593,12 +705,16 @@ func peleFigures(t *testing.T, svg string, x, y float64) []figure {
 		}
 		switch name {
 		case "rect":
+			f.rect = true
 			rx, w, h := a["rx"], attrNum(t, a, "width"), attrNum(t, a, "height")
 			rx0 := at.x + attrNum(t, a, "x")
 			ry0 := at.y + attrNum(t, a, "y")
 			f.box = scene.Rect{X: rx0, Y: ry0, W: w, H: h}
 			if strings.HasPrefix(rx, "var(--pele-radius") {
-				f.rounded = true
+				f.rounded, f.exact = true, true
+			} else if rx == "" {
+				x0, y0 := attrNum(t, a, "x"), attrNum(t, a, "y")
+				f.steps, f.exact = polygonSteps(at, x0, y0, x0+w, y0, x0+w, y0+h, x0, y0+h), true
 			}
 			r := 0.0
 			if rx != "" && !f.rounded {
@@ -617,8 +733,11 @@ func peleFigures(t *testing.T, svg string, x, y float64) []figure {
 				l = append(l, pt{at.x + n[i], at.y + n[i+1]})
 			}
 			f.lines = [][]pt{append(l, l[0])}
+			f.steps, f.exact = polygonSteps(at, n...), true
 		case "path":
 			f.lines = svgPath(t, a["d"], at.x, at.y)
+			f.steps = pathSteps(t, a["d"], at)
+			f.exact = f.steps != nil
 		default:
 			t.Fatalf("element %s in %s", name, svg)
 		}
@@ -706,9 +825,10 @@ func toSegment(p, a, b pt) float64 {
 
 func TestOutlinesMatchPele(t *testing.T) {
 	p := loadPele(t)
-	// Pele writes its numbers to two decimals, and four cubic curves stand for a circle to
-	// within 0.027% of its radius.
-	shapesSeen := map[string]bool{}
+	// Four cubic curves stand for a circle to within 0.027% of its radius, and the numbers
+	// of Pele's markup for a circle, an ellipse or a rect are in full, where it writes them
+	// to hundredths.
+	shapesSeen, exact, all := map[string]bool{}, 0, 0
 	for _, c := range p.Outlines {
 		shapesSeen[c.Shape] = true
 		tol := 0.05 + 0.00028*max(c.W, c.H)/2
@@ -724,10 +844,24 @@ func TestOutlinesMatchPele(t *testing.T) {
 			if got.paint != w.paint || got.rounded != w.rounded {
 				t.Errorf("%s: piece %d paint %v rounded %v, Pele paint %v rounded %v", what, i, got.paint, got.rounded, w.paint, w.rounded)
 			}
-			if w.rounded {
-				b, wb := piece.Box, w.box
-				if piece.Path != nil || math.Abs(b.X-wb.X) > 0.0051 || math.Abs(b.Y-wb.Y) > 0.0051 || math.Abs(b.W-wb.W) > 0.0051 || math.Abs(b.H-wb.H) > 0.0051 {
-					t.Errorf("%s: piece %d box %v, Pele %v", what, i, b, wb)
+			all++
+			if w.exact {
+				exact++
+			}
+			switch {
+			case w.rounded:
+				if piece.Path != nil || piece.Box != w.box {
+					t.Errorf("%s: piece %d box %v, Pele %v", what, i, piece.Box, w.box)
+				}
+				continue
+			case w.exact && w.rect && piece.Path == nil:
+				if piece.Box != w.box {
+					t.Errorf("%s: piece %d box %v, Pele %v", what, i, piece.Box, w.box)
+				}
+				continue
+			case w.exact:
+				if got := pieceSteps(piece); !sameSteps(got, w.steps) {
+					t.Errorf("%s: piece %d is\n%v,\nPele\n%v: %s", what, i, got, w.steps, c.SVG)
 				}
 				continue
 			}
@@ -745,5 +879,5 @@ func TestOutlinesMatchPele(t *testing.T) {
 			t.Errorf("no outline of %q", name)
 		}
 	}
-	t.Logf("%d outlines", len(p.Outlines))
+	t.Logf("%d outlines, %d of their %d pieces compared number for number", len(p.Outlines), exact, all)
 }

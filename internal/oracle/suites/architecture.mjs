@@ -7,9 +7,9 @@
 //
 // A string Pele leaves undefined and one it leaves empty are written alike, as null: nothing
 // after the parser tells them apart.
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/architecture/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -142,35 +142,14 @@ export const WRITTEN = [
     'service auth in inner\nservice out\nservice mid\nweb:R -- L:mid\nmid:R -- L:gw\ngw:B -- T:auth\nauth:R -- L:out\nweb:B -- T:out',
 ];
 
-// Strings in the sources of a folder of Pele's tests that hold the word architecture, as
-// Pele's loadCorpus collects them, from files whose names match.
-function testStrings(pele, dir, files) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/architecture/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
-
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests, its
 // seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/architecture-docs.json'), 'utf8'));
   return [
     ...new Set([
-      ...docs,
-      ...testStrings(pele, 'tests/compat/architecture', /\.(spec|test)\.[jt]s$/),
-      ...testStrings(pele, 'tests/render', /^architecture.*\.test\.ts$/),
+      ...docs(pele, 'architecture'),
+      ...testStrings(pele, 'tests/compat/architecture', /\.(spec|test)\.[jt]s$/, /architecture/),
+      ...testStrings(pele, 'tests/render', /^architecture.*\.test\.ts$/, /architecture/),
       ...SEEDS,
       ...WRITTEN,
     ]),
@@ -190,7 +169,7 @@ const SEPARATORS = [' ', ' ', ' ', ' ', ' ', ' ', ' ', '', '  ', '\t'];
 const BREAKS = ['\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n', '\n\n', '\r\n', ' %% c\n', '\n  ', ' ', ''];
 
 export function statements(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const maybe = (p, ...tokens) => (rnd() < p ? tokens : []);
   const id = () => (rnd() < 0.93 ? pick(IDS.slice(0, 7)) : pick(IDS));
   const statement = () => {
@@ -248,7 +227,7 @@ const GROUP_TITLES = ['API', 'Backend', 'Frontend', 'Private network', 'A group 
 // Random architecture diagrams, most of them well formed, over groups nested at random, and
 // with random configuration.
 export function randomDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const n = (k) => Math.floor(rnd() * k);
   return () => {

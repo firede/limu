@@ -8,17 +8,11 @@
 // them while limuExactNumbers is set, and the lines hold every number in full, as String()
 // writes it, so that a difference in the last bit shows. A number Pele writes relative to the
 // one before it is added to that one first, as the scene holds where it ends.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n, pt, readHead } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, drawableDiagrams, hostile } from './xychart.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (s) => String(Number(s));
-const pt = (x, y) => `${n(x)},${n(y)}`;
 const TRANSLATE = /translate\(([^,]*),([^)]*)\) rotate\(([^)]*)\)/;
 
 // What a group of Pele's chart is called in the lines, by its class.
@@ -36,19 +30,8 @@ const CONTEXT = {
 // The lines of an XY chart's SVG, drawn with its numbers in full.
 export function readSvg(svg, fontSize) {
   const lines = [];
-  const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`);
-  let body = svg.slice(svg.indexOf('>') + 1);
-  const title = /^<title id="[^"]*">([^<]*)<\/title>/.exec(body);
-  if (title) {
-    lines.push(`acc-title ${unescape(title[1])}`);
-    body = body.slice(title[0].length);
-  }
-  const desc = /^<desc id="[^"]*">([^<]*)<\/desc>/.exec(body);
-  if (desc) {
-    lines.push(`acc-desc ${unescape(desc[1])}`);
-    body = body.slice(desc[0].length);
-  }
+  let { open: head, body, acc } = readHead(svg);
+  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`, ...acc);
   // The groups open about the element read: each one's class, fill and size of type.
   const stack = [];
   const inherited = (name) => {

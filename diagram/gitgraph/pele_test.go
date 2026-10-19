@@ -2,7 +2,6 @@ package gitgraph
 
 import (
 	"encoding/json"
-	"math"
 	"reflect"
 	"testing"
 
@@ -64,19 +63,6 @@ func (o object) opt(key, v string) {
 	}
 }
 
-// number is a number as the oracle writes it: one JSON has no word for, as enc writes it.
-func number(v float64) any {
-	switch {
-	case math.IsInf(v, 1):
-		return map[string]any{"$n": "Infinity"}
-	case math.IsInf(v, -1):
-		return map[string]any{"$n": "-Infinity"}
-	case math.IsNaN(v):
-		return map[string]any{"$n": "NaN"}
-	}
-	return v
-}
-
 func dumpAST(a *AST) object {
 	o := object{"$type": a.Type}
 	o.opt("dir", a.Dir)
@@ -95,7 +81,7 @@ func dumpAST(a *AST) object {
 		case "Branch":
 			v["name"] = s.Name
 			if s.Order != nil {
-				v["order"] = number(*s.Order)
+				v["order"] = fixture.Number(*s.Order)
 			}
 		case "Merge":
 			v["branch"] = s.Branch
@@ -223,14 +209,10 @@ func check(t *testing.T, what, text string, config diagram.Config, title string,
 }
 
 func TestParseMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/gitgraph.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/gitgraph.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 5000 {

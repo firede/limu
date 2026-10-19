@@ -7,32 +7,16 @@
 // its numbers written out in full, as the oracle's hooks have num() write them while
 // limuExactNumbers is set; each number of a place is moved by the group's move, as limu
 // moves it, and only then written to two decimals as Pele writes it.
-import { lone, mutator } from './parse.mjs';
+import { join } from 'node:path';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, stroke } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, drawableDiagrams } from './sequence.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-
-// A stroke's ends or corners as a browser takes them on an element: from its style attribute,
-// then from its attribute, as a keyword the browser knows, initial as SVG's initial value, and
-// otherwise what it inherits; a value it does not take is dropped.
-const keyword = (name, values, initial) => (e, inherited) => {
-  const style = [...(attr(e, 'style') ?? '').matchAll(new RegExp(`(?:^|;)\\s*${name}\\s*:([^;]*)`, 'g'))].pop();
-  for (const v of [style?.[1], attr(e, name)]) {
-    if (v === undefined) continue;
-    const k = v.trim().toLowerCase();
-    if (values.includes(k)) return k;
-    if (k === 'initial') return initial;
-    if (k === 'inherit' || k === 'unset') return inherited;
-  }
-  return inherited;
-};
-const linecap = keyword('stroke-linecap', ['butt', 'round', 'square'], 'butt');
-const linejoin = keyword('stroke-linejoin', ['miter', 'round', 'bevel'], 'miter');
+// A stroke's ends or corners as a browser takes them on an element, as lib/svg.mjs's stroke
+// settles them, from what it inherits.
+const linecap = (e, inherited) => stroke('stroke-linecap', [e], inherited);
+const linejoin = (e, inherited) => stroke('stroke-linejoin', [e], inherited);
 
 // The groups that hold one thing drawn, by the first of their classes; the others are the
 // layers things are drawn in, which give what is in them its paint.

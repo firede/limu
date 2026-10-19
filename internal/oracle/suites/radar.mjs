@@ -2,9 +2,9 @@
 // text with the radar's table, the tree parseRadar makes of them, and the model buildRadar
 // makes of the tree. The cases are Mermaid's documentation and specs, the inputs of Pele's own
 // tests, cases written here, random charts, and all of those mutated at random.
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/radar/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -156,34 +156,13 @@ export const WRITTEN = [
   '',
 ];
 
-// Strings in the sources of the files of a folder of Pele's tests whose names match, that
-// match a pattern, as Pele's loadCorpus and loadTestStrings collect them.
-function testStrings(pele, dir, files, keyword) {
-  const out = new Set();
-  const path = join(pele, dir);
-  for (const file of readdirSync(path).filter((f) => files.test(f))) {
-    const src = readFileSync(join(path, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!keyword.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
-
 // The corpus the suites start from: documentation, specs, the strings of Pele's tests, its
 // seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/radar-docs.json'), 'utf8'));
   const headless = testStrings(pele, 'tests/compat/radar', /\.test\.[jt]s$/, HEADLESS);
   return [
     ...new Set([
-      ...docs,
+      ...docs(pele, 'radar'),
       ...testStrings(pele, 'tests/compat/radar', /\.spec\.[jt]s$/, /radar/),
       ...testStrings(pele, 'tests/compat/radar', /\.test\.[jt]s$/, /radar/),
       ...headless.map((s) => (s.includes('radar') ? s : `radar-beta\naxis my-axis, ax1, ax2\n${s}`)),
@@ -204,7 +183,7 @@ const TITLES = ['T', 'Grades', 'Restaurant Comparison', 'A title much wider than
 // Random radar charts, most of them well formed, with random configuration. Small ones have
 // fewer axes and curves, for a fixture of what is drawn to stay small.
 export function randomDiagrams(rnd, small = false) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const value = () =>
     chance(0.7)

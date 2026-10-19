@@ -14,6 +14,7 @@ package jsdate
 
 import (
 	"math"
+	"sync/atomic"
 	"time"
 )
 
@@ -37,7 +38,8 @@ const (
 
 // A Zone is a time zone dates are read and written in.
 type Zone struct {
-	loc *time.Location
+	loc    *time.Location
+	recent *spans
 }
 
 // In is the zone of a location; nil is time.Local.
@@ -45,7 +47,20 @@ func In(loc *time.Location) Zone {
 	if loc == nil {
 		loc = time.Local
 	}
-	return Zone{loc}
+	return Zone{loc, new(spans)}
+}
+
+// A span is a stretch of time, from start up to end in milliseconds, in which a zone keeps
+// one offset from UTC, as time.Time.ZoneBounds gives it.
+type span struct{ start, end, offset int64 }
+
+// spans holds the spans a zone's offsets were last looked up in. A location works out the
+// offset of a time past its last change of offset from the rule its tz data ends with,
+// every time it is asked, and dates are converted many times over in the same few spans.
+// The spans are kept where any goroutine may read and replace them.
+type spans struct {
+	next atomic.Uint32
+	held [4]atomic.Pointer[span]
 }
 
 // Valid reports whether t is a date, not NaN: JavaScript's !isNaN(date.getTime()).
@@ -125,8 +140,29 @@ func isFinite(x float64) bool { return !math.IsNaN(x) && !math.IsInf(x, 0) }
 
 // offset is the zone's offset from UTC, in milliseconds, at the instant t.
 func (z Zone) offset(t int64) int64 {
-	_, off := time.UnixMilli(t).In(z.loc).Zone()
-	return int64(off) * msPerSecond
+	if z.recent != nil {
+		for i := range z.recent.held {
+			if s := z.recent.held[i].Load(); s != nil && s.start <= t && t < s.end {
+				return s.offset
+			}
+		}
+	}
+	at := time.UnixMilli(t).In(z.loc)
+	_, off := at.Zone()
+	offset := int64(off) * msPerSecond
+	if z.recent != nil {
+		// A bound that is the zero Time is none: the offset holds that far.
+		s := &span{math.MinInt64, math.MaxInt64, offset}
+		start, end := at.ZoneBounds()
+		if !start.IsZero() {
+			s.start = start.UnixMilli()
+		}
+		if !end.IsZero() {
+			s.end = end.UnixMilli()
+		}
+		z.recent.held[z.recent.next.Add(1)%uint32(len(z.recent.held))].Store(s)
+	}
+	return offset
 }
 
 // toLocal is V8's DateCache::ToLocal.

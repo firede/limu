@@ -2,7 +2,6 @@ package venn
 
 import (
 	"encoding/json"
-	"math"
 	"reflect"
 	"testing"
 
@@ -69,21 +68,6 @@ func (f fixedIndent) lex(src string) []any {
 	}
 }
 
-// enc is a number as the oracle's enc writes it.
-func enc(f float64) any {
-	switch {
-	case math.IsNaN(f):
-		return map[string]any{"$n": "NaN"}
-	case math.IsInf(f, 1):
-		return map[string]any{"$n": "Infinity"}
-	case math.IsInf(f, -1):
-		return map[string]any{"$n": "-Infinity"}
-	case f == 0 && math.Signbit(f):
-		return map[string]any{"$n": "-0"}
-	}
-	return f
-}
-
 func optional(s *string) any {
 	if s == nil {
 		return nil
@@ -94,7 +78,7 @@ func optional(s *string) any {
 func dumpModel(m *Model) map[string]any {
 	subsets := []any{}
 	for _, s := range m.Subsets {
-		subsets = append(subsets, map[string]any{"sets": s.Sets, "size": enc(s.Size), "label": optional(s.Label)})
+		subsets = append(subsets, map[string]any{"sets": s.Sets, "size": fixture.Number(s.Size), "label": optional(s.Label)})
 	}
 	texts := []any{}
 	for _, t := range m.TextNodes {
@@ -166,14 +150,10 @@ func check(t *testing.T, what, text string, m *Model, err error, want peleResult
 }
 
 func TestParseMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/venn.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/venn.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 8000 {

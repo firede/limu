@@ -2,9 +2,9 @@
 // sources of Mermaid's specs and documentation as Pele's tests collect them, the seeds of
 // Pele's tests/journey/oracle.test.ts, cases written here, those sources mutated at random,
 // diagrams built at random, and random strings of tokens.
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The fragments of Pele's tests/journey/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -130,22 +130,7 @@ export const WRITTEN = [
 // The sources in Mermaid's specs and documentation as Pele's tests collect them:
 // loadCorpus('journey', /journey/).
 function specSources(pele) {
-  const out = new Set();
-  const dir = join(pele, 'tests/compat/journey');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f))) {
-    const src = readFileSync(join(dir, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/journey/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  for (const s of JSON.parse(readFileSync(join(pele, 'tests/corpus/journey-docs.json'), 'utf8'))) out.add(s);
-  return [...out];
+  return [...new Set([...testStrings(pele, 'tests/compat/journey', /\.spec\.[jt]s$/, /journey/), ...docs(pele, 'journey')])];
 }
 
 // The corpus the suites start from.
@@ -156,7 +141,7 @@ export function corpus(pele) {
 // Journey diagrams built at random, which mostly parse, with names, scores and actors of every
 // kind the layout handles differently.
 export function randomDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const words = ['Make', 'tea', 'Go', 'upstairs', 'Do', 'work', 'a', 'very', 'long', 'task', 'name', 'that', 'wraps',
     'Supercalifragilistic', 'Averyveryverylongwordwithoutanyspaceinit', '日本語', '中文字', '😀', 'é', '<br>', '<b>x</b>',
     'x', 'W', 'iiii', 'MMMM', '1.5', '(a)', '[b]', '"q"', '<', '&', 'a-b'];

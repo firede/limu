@@ -1,17 +1,50 @@
-// Writes what Pele makes of the cases in ./cases as fixtures for limu's tests to compare with.
+// Writes what Pele makes of the cases its suites hold as fixtures for limu's tests to compare
+// with.
 //
 //   node --experimental-transform-types --no-warnings --import ./register.mjs run.mjs <pele> <limu> [suite…]
 //
 // scripts/oracle.sh runs it. Each suite is a module in ./suites whose default export is an
-// async function given the helpers below; with no suites named, all of them run.
+// async function given the helpers below; with no suites named, all of them run. The modules
+// the suites share are in ./lib.
+//
+// A suite is named for the fixture it writes: x writes x.json in the package x, and x-y writes
+// y.json there, as gantt-render writes diagram/gantt/testdata/pele/render.json. These are
+// otherwise:
+//
+//   parse     diagram/testdata/pele/parse.json, for what every diagram's text goes through
+//   common    diagram/internal/common/testdata/pele/common.json
+//   jsmath    internal/jsmath/testdata/pele/math.json
+//   gantt     dates.json too, beside gantt.json
+//
+// The fixtures of the trigonometry are the last bits V8 gives on arm64, where clang fuses
+// multiplies and adds that it does not fuse on x86-64, and limu's jsmath is ported to match
+// them; so the oracle runs only on arm64.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 
 const [pele, limu, ...only] = process.argv.slice(2);
 if (!pele || !limu) {
   console.error('usage: run.mjs <pele> <limu> [suite…]');
+  process.exit(2);
+}
+if (process.arch !== 'arm64') {
+  console.error(
+    `run.mjs: this is ${process.arch}; the fixtures hold what V8 on arm64 computes, as its sines and logarithms ` +
+      'come out otherwise where clang does not fuse multiply-adds, so they are written only on arm64'
+  );
+  process.exit(2);
+}
+
+const dir = new URL('./suites/', import.meta.url);
+const all = readdirSync(dir)
+  .filter((f) => f.endsWith('.mjs'))
+  .map((f) => f.slice(0, -4))
+  .sort();
+const unknown = only.filter((name) => !all.includes(name));
+if (unknown.length > 0) {
+  console.error(`run.mjs: no suite ${unknown.join(', ')}; the suites are ${all.join(' ')}`);
   process.exit(2);
 }
 
@@ -29,11 +62,17 @@ const helpers = {
   // Reads ./cases/<name>.json.
   cases: (name) => JSON.parse(readFileSync(new URL(`./cases/${name}.json`, import.meta.url), 'utf8')),
   // Writes a fixture, under limu, with the version of Pele it came from, gzipped at
-  // path + '.gz'; internal/fixture reads it back.
+  // path + '.gz'; internal/fixture reads it back. A fixture whose JSON is what the file holds
+  // already is left as it is.
   write(path, data) {
     const out = join(limu, path + '.gz');
+    const json = JSON.stringify({ pele: origin, ...data }) + '\n';
+    if (existsSync(out) && gunzipSync(readFileSync(out)).toString('utf8') === json) {
+      console.log(`unchanged ${path}.gz`);
+      return;
+    }
     mkdirSync(dirname(out), { recursive: true });
-    writeFileSync(out, gzipSync(JSON.stringify({ pele: origin, ...data }) + '\n', { level: 9 }));
+    writeFileSync(out, gzipSync(json, { level: 9 }));
     console.log(`wrote ${path}.gz`);
   },
   // A random number generator in [0, 1) that gives the same numbers for the same seed.
@@ -43,13 +82,7 @@ const helpers = {
   },
 };
 
-const dir = new URL('./suites/', import.meta.url);
-const names = readdirSync(dir)
-  .filter((f) => f.endsWith('.mjs'))
-  .map((f) => f.slice(0, -4))
-  .filter((name) => only.length === 0 || only.includes(name))
-  .sort();
-for (const name of names) {
+for (const name of all.filter((name) => only.length === 0 || only.includes(name))) {
   const suite = await import(new URL(`${name}.mjs`, dir));
   await suite.default(helpers);
 }

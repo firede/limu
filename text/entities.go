@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/firede/limu/internal/chars"
 )
 
 // The entities Mermaid text may use by name, from Pele's src/text/entities.ts.
@@ -95,7 +97,7 @@ func decodePlaceholders(s string) string {
 // jsNumber is JavaScript's Number() of a code's digits, as far as a code point can come of
 // it: anything else is -1, which names no character.
 func jsNumber(s string) int64 {
-	s = trim(s)
+	s = chars.Trim(s)
 	if s == "" {
 		return 0
 	}
@@ -190,7 +192,7 @@ func entityAt(s string, i int) (end int, rep string, ok bool) {
 		}
 		return 0, "", false
 	}
-	k := run(j, isWord)
+	k := run(j, func(b byte) bool { return chars.IsWord(int(b)) })
 	if k == j || k >= len(s) || s[k] != ';' {
 		return 0, "", false
 	}

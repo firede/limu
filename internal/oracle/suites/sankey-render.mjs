@@ -10,16 +10,11 @@
 // as String() writes it, so that a difference in the last bit shows. The style a diagram's
 // config gives a bar or a band is written as Pele writes it, for the test to read as limu
 // reads it.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, hostile, rowDiagrams } from './sankey.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (s) => String(Number(s));
 const css = (e) => encodeURIComponent(attr(e, 'style') ?? '');
 // A stroke's ends and corners, as the element's attributes set them, or SVG's initial values:
 // no group of a sankey diagram sets them, nor does the style the config gives.

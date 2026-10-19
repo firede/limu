@@ -6,30 +6,15 @@
 // write them while limuExactNumbers is set, and compared whole: a difference in the last bit
 // is a difference in the port. The styles an author's classes give are written as Pele writes
 // them on each shape and text, for the test to read as limu reads them.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, stroke } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './treemap.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-// A stroke's ends or corners as a browser takes them on an element: from its style attribute,
-// then from its attribute, as a keyword the browser knows, initial as SVG's initial value, and
-// otherwise what it inherits, which no group of a treemap sets: SVG's initial value.
-const keyword = (name, values, initial) => (e) => {
-  const style = [...(attr(e, 'style') ?? '').matchAll(new RegExp(`(?:^|;)\\s*${name}\\s*:([^;]*)`, 'g'))].pop();
-  for (const v of [style?.[1], attr(e, name)]) {
-    if (v === undefined) continue;
-    const k = v.trim().toLowerCase();
-    if (values.includes(k)) return k;
-    if (k === 'initial' || k === 'inherit' || k === 'unset') return initial;
-  }
-  return initial;
-};
-const linecap = keyword('stroke-linecap', ['butt', 'round', 'square'], 'butt');
-const linejoin = keyword('stroke-linejoin', ['miter', 'round', 'bevel'], 'miter');
+// A stroke's ends or corners as a browser takes them on an element, as lib/svg.mjs's stroke
+// settles them; no group of a treemap sets either.
+const linecap = (e) => stroke('stroke-linecap', [e]);
+const linejoin = (e) => stroke('stroke-linejoin', [e]);
 // The style Pele writes on an element, without the corner radius every rounded box takes.
 const css = (e) => encodeURIComponent((attr(e, 'style') ?? '').replace(/^rx:var\(--_r\);?/, ''));
 

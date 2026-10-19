@@ -3,9 +3,10 @@
 // random, charts built from random statements, and random strings of tokens. Each case is lexed
 // and parsed as the raw text, and parsed as Pele's parse does it, after the preprocessing every
 // diagram goes through.
-import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { fileLiterals, testFiles, docs, arrayIn, lone, picker } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // The text Mermaid's broken rule for markdown strings matches, as Pele's lexer has it.
 export const BROKEN =
@@ -123,33 +124,6 @@ export const WRITTEN = [
   configured('    width: 900\n    height: 400', `xychart\n  title "Sales Revenue"\n  ${BAND}\n  bar [${SALES}]`),
 ];
 
-// Every diagram source that appears as a string literal in a file of Pele's tests, as its
-// loadCorpus finds them.
-function literals(file, keyword) {
-  const out = [];
-  const src = readFileSync(file, 'utf8');
-  for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-    const raw = m[1] ?? m[2] ?? m[3];
-    if (!keyword.test(raw)) continue;
-    try {
-      out.push(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-    } catch {
-      continue;
-    }
-  }
-  return out;
-}
-
-// An array literal of a test's source, evaluated with the names given.
-function arrayIn(file, start, names = {}, close = '\n];') {
-  const src = readFileSync(file, 'utf8');
-  const from = src.indexOf(start);
-  if (from < 0) throw new Error(`no ${start} in ${file}`);
-  const open = from + start.length;
-  const end = src.indexOf(close, open);
-  return new Function(...Object.keys(names), 'return [' + src.slice(open, end) + '\n];')(...Object.values(names));
-}
-
 // Pele's hostile templates and extreme numbers, tests/render/xychart-security.test.ts.
 export function hostile(pele) {
   const file = join(pele, 'tests/render/xychart-security.test.ts');
@@ -167,10 +141,9 @@ export function hostile(pele) {
 // The corpus the suites start from: documentation, specs, Pele's tests and the cases above.
 export function corpus(pele) {
   const out = new Set();
-  const dir = join(pele, 'tests/compat/xychart');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f))) for (const s of literals(join(dir, file), /xychart/i)) out.add(s);
-  for (const s of JSON.parse(readFileSync(join(pele, 'tests/corpus/xychart-docs.json'), 'utf8'))) out.add(s);
-  for (const s of literals(join(pele, 'tests/render/xychart.test.ts'), /xychart/i)) out.add(s);
+  for (const file of testFiles(pele, 'tests/compat/xychart', /\.spec\.[jt]s$/)) for (const s of fileLiterals(file, /xychart/i)) out.add(s);
+  for (const s of docs(pele, 'xychart')) out.add(s);
+  for (const s of fileLiterals(join(pele, 'tests/render/xychart.test.ts'), /xychart/i)) out.add(s);
   for (const s of SEEDS) out.add(s);
   for (const s of WRITTEN) out.add(s);
   return [...out].filter((s) => !lone(s) && s.length <= 4000);
@@ -178,7 +151,7 @@ export function corpus(pele) {
 
 // Charts of random statements, most of which get through the grammar.
 export function statementDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const word = () => pick(['a', 'Sales', '"Revenue (in $)"', '"x y"', 'b_c', '"é"', '"😀"', 'a-b', '12', '"<br>"', 'x+y', '"#35;"']);
   const num = () => pick(['0', '1', '-1', '2.5', '.5', '+3', '100', '-0.25', '1000', '7']);
   const nums = () => Array.from({ length: Math.floor(rnd() * 6) }, () => num() + (rnd() < 0.2 ? ` ${pick(['"p"', '"a b"', '""'])}` : ''));
@@ -206,7 +179,7 @@ export function statementDiagrams(rnd) {
 // the data, bars and lines of every sign and size, labelled points, titles and labels of every
 // kind of text, and the settings of front matter and directives.
 export function drawableDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const titles = ['Sales Revenue', 'T', '"A title long enough to be wider than the chart it names, and to wrap over lines"', '"#35; &amp; <b>bold</b>"',
     '"中文的标题"', '"a<br>b"', 'Q1 results', '"😀 emoji"'];

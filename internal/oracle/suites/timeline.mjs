@@ -3,9 +3,9 @@
 // sources mutated at random, diagrams built from random statements, and random strings of
 // tokens. Each case is lexed and parsed as the raw text, and parsed as Pele's parse does it,
 // after the preprocessing every diagram goes through.
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { lone, mutator, peleError } from './parse.mjs';
+import { peleError } from '../lib/value.mjs';
+import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/timeline/oracle.test.ts, and some for what Pele draws.
 export const FRAGMENTS = [
@@ -86,33 +86,16 @@ export const WRITTEN = [
 
 // Every diagram source that appears as a string literal in Pele's ported specs, as its
 // loadCorpus('timeline', /timeline/) finds them.
-function specSources(pele) {
-  const out = new Set();
-  const dir = join(pele, 'tests/compat/timeline');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f))) {
-    const src = readFileSync(join(dir, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/timeline/.test(raw)) continue;
-      try {
-        out.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  return [...out];
-}
+const specSources = (pele) => testStrings(pele, 'tests/compat/timeline', /\.spec\.[jt]s$/, /timeline/);
 
 // The corpus the suites start from: documentation, specs, Pele's seeds and the cases above.
 export function corpus(pele) {
-  const docs = JSON.parse(readFileSync(join(pele, 'tests/corpus/timeline-docs.json'), 'utf8'));
-  return [...new Set([...specSources(pele), ...docs, ...SEEDS, ...WRITTEN])].filter((s) => !lone(s));
+  return [...new Set([...specSources(pele), ...docs(pele, 'timeline'), ...SEEDS, ...WRITTEN])].filter((s) => !lone(s));
 }
 
 // Diagrams of random statements, most of which get through the grammar.
 export function statementDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const word = () => pick(['2002', 'A', 'Bronze Age', 'x y', 'é', '日本', '😀', 'a:b', 'p#', '50%', '<br>', 'a<br>b', 'q ']);
   const statements = [
     () => `title ${word()}`,
@@ -136,7 +119,7 @@ export function statementDiagrams(rnd) {
 // Whole diagrams that Pele draws, with labels of all lengths and of every kind of text, sections
 // or none, periods before the first section, and the settings of front matter and directives.
 export function drawableDiagrams(rnd) {
-  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const pick = picker(rnd);
   const chance = (p) => rnd() < p;
   const periods = ['2002', '2004', 'Q1', 'Bronze Age', 'Industry 4.0', '7600 BC', 'The long period of the very late middle ages',
     'Supercalifragilisticexpialidocious', '日本語の期間', 'é ü ß', '😀 era', 'a #35; b', 'x < y & z', 'one<br>two', 'A', 'fa:fa-car x'];

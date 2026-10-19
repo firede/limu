@@ -10,17 +10,11 @@
 // shows. A percentage's baseline is where Pele puts it before it adds the shift, which the
 // hooks write as data-y, moved, with the shift added after, as limu's test adds it to the
 // middle of the label.
-import { lone, mutator } from './parse.mjs';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { unescape, attr, n, pt, readHead } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './pie.mjs';
 
-// Pele's escapes in attribute values and text, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-const n = (x) => String(Number(x));
-const pt = (x, y) => `${n(x)},${n(y)}`;
 const TRANSLATE = /^translate\(([^,]*),([^)]*)\)$/;
 
 // What a group or text of Pele's chart is called in the lines, by its class.
@@ -57,19 +51,8 @@ function moved(d, dx, dy) {
 // The lines of a pie chart's SVG, drawn with its numbers in full.
 export function readSvg(svg, fontSize) {
   const lines = [];
-  const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
-  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`);
-  let body = svg.slice(svg.indexOf('>') + 1);
-  const title = /^<title id="[^"]*">([^<]*)<\/title>/.exec(body);
-  if (title) {
-    lines.push(`acc-title ${unescape(title[1])}`);
-    body = body.slice(title[0].length);
-  }
-  const desc = /^<desc id="[^"]*">([^<]*)<\/desc>/.exec(body);
-  if (desc) {
-    lines.push(`acc-desc ${unescape(desc[1])}`);
-    body = body.slice(desc[0].length);
-  }
+  const { open: head, body, acc } = readHead(svg);
+  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`, ...acc);
   // The groups open about the element read: each one's context, move, fill, stroke, anchor,
   // size of type and the rest of its pen.
   const stack = [];

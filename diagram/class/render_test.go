@@ -1,7 +1,6 @@
 package class
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -27,12 +26,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 2000 {
@@ -52,7 +47,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 		}
 		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
 		want := pelesvg.TagsLast(c.Lines, "clickable")
-		if i := firstDiff(got, want); i >= 0 {
+		if i := fixture.FirstDiff(got, want); i >= 0 {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v), line %d\n got %s\nPele %s", c.Src, c.MaxWidth, i, at(got, i), at(want, i))
 			}
@@ -61,15 +56,6 @@ func TestLayoutMatchesPele(t *testing.T) {
 	if failed > 0 {
 		t.Errorf("%d of %d differ", failed, len(p.Cases))
 	}
-}
-
-func firstDiff(a, b []string) int {
-	for i := range max(len(a), len(b)) {
-		if i >= len(a) || i >= len(b) || a[i] != b[i] {
-			return i
-		}
-	}
-	return -1
 }
 
 func at(lines []string, i int) string {

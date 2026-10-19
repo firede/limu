@@ -2,6 +2,7 @@
 // edges and loops, markers, the patches under edge labels, and where clusters' titles go.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { picker } from '../lib/corpus.mjs';
 
 const SHAPE_ATTRS = ' fill="var(--_s)" stroke="var(--_b)"';
 const LINE_ATTRS = ' stroke="var(--_b)"';
@@ -16,7 +17,7 @@ export default async function ({ pele, src, cases, write, random }) {
   const { layoutLabel } = await src('text/label.ts');
   const c = cases('draw');
   const next = random(20261019);
-  const pick = (list) => list[Math.floor(next() * list.length)];
+  const pick = picker(next);
   const between = (a, b) => a + next() * (b - a);
   // Numbers as layouts make them: often whole or halves, sometimes anything.
   const coord = (a, b) => {
@@ -188,12 +189,23 @@ export default async function ({ pele, src, cases, write, random }) {
     titles.push({ node, routes, marked, tried });
   }
 
+  // Outlines with their numbers written out in full, as the oracle's hooks have num() write
+  // them while limuExactNumbers is set, so that those of lines and curves can be compared
+  // number for number.
   const outlines = [];
+  const drawShape = (shape, w, h) => {
+    globalThis.limuExactNumbers = true;
+    try {
+      return shapes.drawShape(shape, w, h, SHAPE_ATTRS, LINE_ATTRS);
+    } finally {
+      globalThis.limuExactNumbers = false;
+    }
+  };
   for (const shape of [...names, 'nonexistent']) {
     const sizes = labels.slice(0, 44).filter((_, i) => i % 3 === 0);
     for (const [tw, th] of sizes.concat([[coord(0, 300), coord(0, 100)]])) {
       const { w, h } = shapes.shapeSize(shape, tw, th);
-      outlines.push({ shape, w, h, x: coord(-300, 300), y: coord(-300, 300), svg: shapes.drawShape(shape, w, h, SHAPE_ATTRS, LINE_ATTRS) });
+      outlines.push({ shape, w, h, x: coord(-300, 300), y: coord(-300, 300), svg: drawShape(shape, w, h) });
     }
   }
 

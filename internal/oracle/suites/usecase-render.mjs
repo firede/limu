@@ -7,31 +7,16 @@
 // oracle's hooks have num() write them while limuExactNumbers is set. A number inside groups is
 // moved as limu's render moves it: the groups' moves are added up from the outermost in, the
 // number is added to their sum, and only then is it written to two decimals as Pele writes it.
-import { lone, mutator } from './parse.mjs';
+import { join } from 'node:path';
+import { lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
+import { attr, TRANSLATE, stroke } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, drawableDiagrams } from './usecase.mjs';
 
-// Pele's escapes in attribute values, undone.
-const unescape = (s) => s.replace(/&(amp|lt|gt|quot);/g, (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"' })[e]);
-const attr = (s, name) => {
-  const m = new RegExp(`\\s${name}="([^"]*)"`).exec(s);
-  return m ? unescape(m[1]) : undefined;
-};
-// A stroke's ends or corners as a browser takes them on an element: from its style attribute,
-// then from its attribute, as a keyword the browser knows, initial as SVG's initial value, and
-// otherwise what it inherits; a value it does not take is dropped.
-const keyword = (name, values, initial) => (e, inherited) => {
-  const style = [...(attr(e, 'style') ?? '').matchAll(new RegExp(`(?:^|;)\\s*${name}\\s*:([^;]*)`, 'g'))].pop();
-  for (const v of [style?.[1], attr(e, name)]) {
-    if (v === undefined) continue;
-    const k = v.trim().toLowerCase();
-    if (values.includes(k)) return k;
-    if (k === 'initial') return initial;
-    if (k === 'inherit' || k === 'unset') return inherited;
-  }
-  return inherited;
-};
-const linecap = keyword('stroke-linecap', ['butt', 'round', 'square'], 'butt');
-const linejoin = keyword('stroke-linejoin', ['miter', 'round', 'bevel'], 'miter');
+// A stroke's ends or corners as a browser takes them on an element, as lib/svg.mjs's stroke
+// settles them, from what it inherits.
+const linecap = (e, inherited) => stroke('stroke-linecap', [e], inherited);
+const linejoin = (e, inherited) => stroke('stroke-linejoin', [e], inherited);
 // How an element inside groups whose caps and joins are up ends and turns its corners, after
 // its own: " cap=" and " join=" with what a browser draws, left out where it is SVG's initial
 // butt or miter, and the join left out too where the element has no corners.
@@ -65,7 +50,6 @@ const paint = (s, up, corners = true) => {
   const stroke = attr(s, 'stroke');
   return `${attr(s, 'fill') ?? '-'}${opacity ? '/' + opacity : ''} ${stroke ?? '-'}${stroke && stroke !== 'none' ? ends(s, up, corners) : ''}`;
 };
-const TRANSLATE = /translate\(([^,]*),([^)]*)\)/;
 
 // How the numbers of what is drawn are read: moves holds the moves of the groups they are in,
 // the outermost first, and num writes a number as Pele does.

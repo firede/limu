@@ -4,7 +4,9 @@
 // cases written here, those sources mutated at random, and random runs of tokens.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { enc, lone, mutator, peleError } from './parse.mjs';
+import { enc, peleError } from '../lib/value.mjs';
+import { fileLiterals, testFiles, docs, lone } from '../lib/corpus.mjs';
+import { mutator } from '../lib/mutate.mjs';
 
 // Pele's fragments, tests/agentflow/oracle.test.ts, and more of what Pele reads beyond the
 // grammar: metadata, shapes, flows, connectors.
@@ -199,20 +201,8 @@ const WRITTEN = [
 // Pele's loadCorpus: the strings of the compat specs that hold an agent flow, and the docs.
 function loadCorpus(pele) {
   const seeds = new Set();
-  const dir = join(pele, 'tests/compat/agentflow');
-  for (const file of readdirSync(dir).filter((f) => /\.spec\.[jt]s$/.test(f)).sort()) {
-    const src = readFileSync(join(dir, file), 'utf8');
-    for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`|'((?:[^'\\\n]|\\.)*)'|"((?:[^"\\\n]|\\.)*)"/g)) {
-      const raw = m[1] ?? m[2] ?? m[3];
-      if (!/agentflow-beta/.test(raw)) continue;
-      try {
-        seeds.add(new Function('return `' + raw.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`')());
-      } catch {
-        continue;
-      }
-    }
-  }
-  for (const s of JSON.parse(readFileSync(join(pele, 'tests/corpus/agentflow-docs.json'), 'utf8'))) seeds.add(s);
+  for (const file of testFiles(pele, 'tests/compat/agentflow', /\.spec\.[jt]s$/, true)) for (const s of fileLiterals(file, /agentflow-beta/)) seeds.add(s);
+  for (const s of docs(pele, 'agentflow')) seeds.add(s);
   return [...seeds];
 }
 
