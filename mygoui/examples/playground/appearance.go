@@ -19,6 +19,10 @@ type appearance struct {
 	Code    *editor.Theme
 	// Chrome is the background of the toolbar and the status bar, about the panes.
 	Chrome ui.Color
+	// Track, Knob and KnobBorder are the colors of a segmented control, as Primer's: the
+	// track the segments are in, and the segment chosen, which stands out from it in a
+	// dark theme too.
+	Track, Knob, KnobBorder ui.Color
 }
 
 // The names of the appearances, as the Appearance menu lists them and the settings keep
@@ -157,7 +161,8 @@ func (p primer) appearance(name string) *appearance {
 		// dark on the dark colors Primer gives data in a dark theme: they take the text's.
 		look.Overrides = style.Overrides{"pie.slice-label": {Text: style.Fg}}
 	}
-	return &appearance{Name: name, Dark: p.dark, Diagram: look, UI: p.uiTheme(), Code: p.codeTheme(), Chrome: ui.Hex(p.bgInset)}
+	return &appearance{Name: name, Dark: p.dark, Diagram: look, UI: p.uiTheme(), Code: p.codeTheme(), Chrome: ui.Hex(p.bgInset),
+		Track: ui.Hex(p.controlHover), Knob: ui.Hex(p.knob()), KnobBorder: ui.Hex(p.borderEmphasis)}
 }
 
 // knownAppearance reports whether name is one of the appearances.
@@ -266,4 +271,13 @@ func (p primer) codeTheme() *editor.Theme {
 	tok(editor.TokenTag, p.syntaxEntityTag)
 	tok(editor.TokenAttribute, p.syntaxConstant)
 	return th
+}
+
+// knob is the background of a segmented control's chosen segment: the page's in a light
+// theme, and the darkest in a dark one, as Primer's controlKnob-bgColor-rest is.
+func (p primer) knob() string {
+	if p.dark {
+		return p.bgInset
+	}
+	return p.bgDefault
 }

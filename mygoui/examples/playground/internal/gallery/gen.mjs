@@ -225,8 +225,28 @@ const AMERICAN = [
 ];
 const american = (source) => AMERICAN.reduce((text, [british, spelling]) => text.replace(british, spelling), source);
 
+// Some of Mermaid's documentation indents a whole example, as it sat in a block of its page.
+// The playground shows the text in an editor, where that reads as a mistake, so the
+// whitespace every line starts with is taken off, with the blank lines before the first.
+// What is left keeps the indentation of its lines against each other, which mindmaps and
+// tree views read.
+const dedent = (source) => {
+  const lines = source.replace(/^(?:[ \t]*\n)+/, '').split('\n');
+  let common = null;
+  for (const line of lines) {
+    if (line.trim() === '') continue;
+    const lead = /^[ \t]*/.exec(line)[0];
+    if (common === null || !lead.startsWith(common)) {
+      let n = 0;
+      while (common !== null && n < common.length && n < lead.length && common[n] === lead[n]) n++;
+      common = common === null ? lead : common.slice(0, n);
+    }
+  }
+  return common ? lines.map((line) => (line.startsWith(common) ? line.slice(common.length) : line.trimStart())).join('\n') : lines.join('\n');
+};
+
 const sourcesOf = (corpus) =>
-  Array.isArray(corpus) ? corpus.filter((source) => typeof source === 'string' && source.trim() !== '').map(american) : [];
+  Array.isArray(corpus) ? corpus.filter((source) => typeof source === 'string' && source.trim() !== '').map((source) => american(dedent(source))) : [];
 
 // A type is beta when none of its examples is written without -beta in its keyword, as
 // Pele's isBeta has it.

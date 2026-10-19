@@ -151,7 +151,7 @@ func (a *app) toolbar(c *ui.Context, ap *appearance) {
 		if strings.HasPrefix(a.router.Path(), "/examples") {
 			page = 1
 		}
-		if ui.Segmented(c, &page, "Playground", "Examples").Label("Page").Changed() {
+		if segmented(c, ap, &page, "Playground", "Examples").Label("Page").Changed() {
 			if page == 0 {
 				a.router.Push("/playground")
 			} else {
@@ -221,7 +221,7 @@ func (a *app) output(c *ui.Context, ap *appearance) {
 	a.layout(c, math.Floor(float64(pane.LayoutBounds().W))-2*pad)
 	pane.Children(func() {
 		ui.Row(c).FillWidth().Padding(6, 12).Gap(8).Background(ap.Chrome).BorderWidth(0, 0, 1, 0).BorderColor(t.Border).Children(func() {
-			ui.Segmented(c, &a.shows, "Diagram", "SVG").Label("Output")
+			segmented(c, ap, &a.shows, "Diagram", "SVG").Label("Output")
 			ui.Box(c).Grow(1)
 			if a.shows == viewSVG {
 				if ui.Button(c, "Copy").Disabled(a.scene == nil).Clicked() {
