@@ -1,7 +1,6 @@
 package ishikawa
 
 import (
-	"encoding/json"
 	"slices"
 	"strconv"
 	"strings"
@@ -39,12 +38,8 @@ type peleRender struct {
 var hostIcons = []string{"fa:fa-car", "fa:fa-user", "fab:fa-github"}
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {

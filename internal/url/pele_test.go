@@ -1,7 +1,6 @@
 package url
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/firede/limu/internal/fixture"
@@ -10,10 +9,6 @@ import (
 // The fixtures are what Pele makes of the same cases; ./scripts/oracle.sh writes them.
 
 func TestSanitizeMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/url.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		URL []struct {
 			Input     string  `json:"input"`
@@ -24,7 +19,7 @@ func TestSanitizeMatchesPele(t *testing.T) {
 			Mail      *string `json:"mail"`
 		} `json:"url"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/url.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.URL) < 1000 {

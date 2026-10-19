@@ -183,14 +183,10 @@ func check(t *testing.T, what, text string, m *Model, err error, want peleResult
 }
 
 func TestParseMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/quadrant.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/quadrant.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 5000 {

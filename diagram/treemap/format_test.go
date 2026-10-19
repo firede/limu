@@ -36,14 +36,10 @@ func decodeNumber(raw json.RawMessage) float64 {
 }
 
 func TestFormatterMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/format.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases [][3]json.RawMessage `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/format.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	failed := 0

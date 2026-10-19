@@ -219,15 +219,11 @@ func check(t *testing.T, what string, c *peleCase, zones []*time.Location, db *D
 }
 
 func TestParseMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/gantt.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Zones []string   `json:"zones"`
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/gantt.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 4000 {
@@ -284,14 +280,10 @@ type peleDates struct {
 }
 
 func TestDatesMatchPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/dates.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Zones []peleDates `json:"zones"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/dates.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	str := func(raw json.RawMessage) string {

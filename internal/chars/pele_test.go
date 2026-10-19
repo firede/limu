@@ -56,12 +56,8 @@ func same(a, b float64) bool {
 }
 
 func load(t *testing.T) peleChars {
-	data, err := fixture.Read("testdata/pele/chars.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleChars
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/chars.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p

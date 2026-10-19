@@ -156,14 +156,10 @@ func compare(t *testing.T, what, src string, got, want any) bool {
 }
 
 func TestParseMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/treemap.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/treemap.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 5000 {

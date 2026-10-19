@@ -19,12 +19,8 @@ type mathFixture struct {
 
 func readMath(t *testing.T) mathFixture {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/math.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p mathFixture
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/math.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p

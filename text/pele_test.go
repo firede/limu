@@ -46,12 +46,8 @@ type peleText struct {
 
 func loadPele(t *testing.T) peleText {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/text.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleText
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/text.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p

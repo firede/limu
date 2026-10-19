@@ -35,14 +35,10 @@ func decode(raw json.RawMessage) float64 {
 }
 
 func TestLog10MatchesV8(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/log10.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases [][2]json.RawMessage `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/log10.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	failed := 0
@@ -64,14 +60,10 @@ func TestLog10MatchesV8(t *testing.T) {
 // numbers: each case is a number, the digits given to toFixed and toExponential and what
 // they write, and the precision given to toPrecision and what it writes.
 func TestFormatMatchesV8(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/format.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases [][6]json.RawMessage `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/format.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	str := func(raw json.RawMessage) string {

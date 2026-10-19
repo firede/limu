@@ -39,11 +39,7 @@ type peleParse struct {
 
 func load(t *testing.T, path string, v any) {
 	t.Helper()
-	data, err := fixture.Read(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal(data, v); err != nil {
+	if err := fixture.Load(path, v); err != nil {
 		t.Fatal(err)
 	}
 }

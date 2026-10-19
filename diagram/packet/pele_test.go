@@ -131,14 +131,10 @@ func compare(t *testing.T, what, src string, got, want any) bool {
 
 func loadCases(t *testing.T) []peleCase {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/packet.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/packet.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return p.Cases

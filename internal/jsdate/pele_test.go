@@ -47,14 +47,10 @@ func nums(raw json.RawMessage) []float64 {
 func same(a, b float64) bool { return a == b || math.IsNaN(a) && math.IsNaN(b) }
 
 func TestDatesMatchV8(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/jsdate.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Zones []zoneCases `json:"zones"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/jsdate.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	for _, zc := range p.Zones {

@@ -223,14 +223,10 @@ func check(t *testing.T, what, text string, config diagram.Config, title string,
 }
 
 func TestParseMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/gitgraph.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p struct {
 		Cases []peleCase `json:"cases"`
 	}
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/gitgraph.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 5000 {

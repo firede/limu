@@ -115,12 +115,8 @@ type peleDraw struct {
 
 func loadPele(t *testing.T) *peleDraw {
 	t.Helper()
-	data, err := fixture.Read("testdata/pele/draw.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleDraw
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/draw.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	return &p

@@ -1,7 +1,6 @@
 package state
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -29,12 +28,8 @@ type peleRender struct {
 }
 
 func TestLayoutMatchesPele(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	if len(p.Cases) < 2500 {
@@ -281,12 +276,8 @@ func peleMarker(m scene.Marker) string {
 
 // Every diagram of the corpus lays out with each routing, and the svg backend draws it.
 func TestRoutingAndDrawing(t *testing.T) {
-	data, err := fixture.Read("testdata/pele/render.json")
-	if err != nil {
-		t.Fatal(err)
-	}
 	var p peleRender
-	if err := json.Unmarshal(data, &p); err != nil {
+	if err := fixture.Load("testdata/pele/render.json", &p); err != nil {
 		t.Fatal(err)
 	}
 	for k, c := range p.Cases {
