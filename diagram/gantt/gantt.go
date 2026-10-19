@@ -91,9 +91,9 @@ func (t *Task) End() (time.Time, bool) { return t.end.time(t.loc) }
 func (t *Task) RenderEnd() (time.Time, bool) { return t.renderEnd.time(t.loc) }
 
 // Parse parses a gantt chart's text, as the parse of Pele's gantt chart does: source is what
-// diagram.Prepared.Source gives, title the title its front matter gives, "" for none, and
-// config its configuration. An error is a *diagram.Error.
-func Parse(source, title string, config diagram.Config) (*DB, error) {
+// diagram.Prepared.Source gives, config its configuration, and title the title its front
+// matter gives, "" for none. An error is a *diagram.Error.
+func Parse(source string, config diagram.Config, title string) (*DB, error) {
 	db := newDB()
 	if title != "" {
 		db.Title = title
@@ -111,7 +111,7 @@ func Parse(source, title string, config diagram.Config) (*DB, error) {
 
 // ParsePrepared parses a prepared gantt chart.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Title, p.Config)
+	return Parse(p.Source(false), p.Config, p.Title)
 }
 
 // trim is JavaScript's trim.
