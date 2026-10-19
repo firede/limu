@@ -29,6 +29,7 @@ import (
 	"github.com/firede/limu/diagram/swimlane"
 	"github.com/firede/limu/diagram/timeline"
 	"github.com/firede/limu/diagram/treemap"
+	"github.com/firede/limu/diagram/treeview"
 	"github.com/firede/limu/diagram/usecase"
 	"github.com/firede/limu/diagram/venn"
 	"github.com/firede/limu/diagram/wardley"
@@ -246,6 +247,12 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		sc = info.Layout(m, p.Config, o)
+	case diagram.TreeView:
+		m, err := treeview.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		sc = treeview.Layout(m, p.Config, o)
 	default:
 		return nil, diagram.Unsupported(p.Type)
 	}
