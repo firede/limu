@@ -34,7 +34,7 @@ func parseTimeline(src string, m *Model) error {
 		switch t.Types[i] {
 		case tNEWLINE:
 		case tTitle:
-			m.setDiagramTitle(afterKeyword(text, 5))
+			m.setDiagramTitle(chars.DropUnits(text, 6))
 		case tAccTitle:
 			i++
 			m.setAccTitle(chars.Trim(t.Texts[i]))
@@ -44,11 +44,11 @@ func parseTimeline(src string, m *Model) error {
 		case tAccDescrMultilineValue:
 			m.setAccDescription(chars.Trim(text))
 		case tSection:
-			m.addSection(afterKeyword(text, 7))
+			m.addSection(chars.DropUnits(text, 8))
 		case tPeriod:
 			m.addTask(text, "")
 		case tEvent:
-			if err := m.addEvent(afterKeyword(text, 1)); err != nil {
+			if err := m.addEvent(chars.DropUnits(text, 2)); err != nil {
 				return err
 			}
 		case tEOF:
@@ -57,14 +57,6 @@ func parseTimeline(src string, m *Model) error {
 			return fail(i, statement)
 		}
 	}
-}
-
-// afterKeyword is a token's text after its first n bytes, a keyword in ASCII, and the one
-// character of white space that follows it: what Pele's substring(n + 1) leaves, as that
-// character is in the Basic Multilingual Plane, one code unit.
-func afterKeyword(text string, n int) string {
-	_, size := chars.UnitAt(text, n)
-	return text[n+size:]
 }
 
 // setDiagramTitle is the TimelineDb's setDiagramTitle.
