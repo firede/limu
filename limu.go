@@ -15,6 +15,7 @@ import (
 	"github.com/firede/limu/diagram/quadrant"
 	"github.com/firede/limu/diagram/radar"
 	"github.com/firede/limu/diagram/requirement"
+	"github.com/firede/limu/diagram/sankey"
 	"github.com/firede/limu/diagram/sequence"
 	"github.com/firede/limu/diagram/state"
 	"github.com/firede/limu/diagram/swimlane"
@@ -161,6 +162,14 @@ func Layout(src string, o *layout.Options) (*scene.Scene, error) {
 			return nil, err
 		}
 		if sc, err = xychart.Layout(m, p.Config, o); err != nil {
+			return nil, err
+		}
+	case diagram.Sankey:
+		m, err := sankey.ParsePrepared(p)
+		if err != nil {
+			return nil, err
+		}
+		if sc, err = sankey.Layout(m, p.Config, o); err != nil {
 			return nil, err
 		}
 	default:
