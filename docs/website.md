@@ -12,10 +12,11 @@ It is in English only. The import path stays `github.com/firede/limu`: the site'
 not a vanity import path.
 
 A Go program, `website/gen`, run before Astro builds, writes what the site shows of limu's
-own work: the mark and the icon, the SVG of every example, and of every diagram in a
-page's Mermaid code blocks, drawn by the svg package, and `style.Kohu` and
-`style.KohuDark` as the `--limu-*` variables, so that the diagrams follow the site's theme
-and the theme's colors are written in one place. It is in a module of its own, as the
+own work: the mark and the icon; the SVG of every example, drawn by the svg package, and of
+each Mermaid code block a document marks `draw` (` ```mermaid draw title="limu"
+mark="scene" `), which the page shows in the code block's place while its Markdown keeps
+the source; and `style.Kohu` and `style.KohuDark` as the `--limu-*` variables, so that the
+diagrams follow the site's theme and the theme's colors are written in one place. It is in a module of its own, as the
 `./...` of limu's would reach into `website/node_modules`. The PNG icons are drawn from
 its SVGs by headless Chrome and committed (`website/scripts/icons.mjs`). No page but the
 playground loads WebAssembly.

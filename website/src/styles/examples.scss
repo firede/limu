@@ -33,6 +33,38 @@
   .drawing-narrow { display: grid; }
 }
 
+// A picture drawn by limu, on the home page and in the documents: its name over it, on the
+// page's own colors.
+.diagram-figure {
+  margin: 24px 0 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  padding: 14px 20px 24px;
+
+  figcaption {
+    margin-bottom: 16px;
+    color: var(--muted);
+    font-size: var(--font-size-small);
+  }
+}
+// What a picture points to, in the accent: the items a document's diagram marks, and on the
+// home page the scene, where limu's pipeline branches.
+.diagram-figure [data-mark], .home-figure-limu [data-id="scene"] {
+  rect {
+    stroke: var(--limu-accent);
+    stroke-width: 2;
+  }
+  text {
+    fill: var(--limu-accent);
+    font-weight: 700;
+  }
+}
+@media (max-width: 760px) {
+  .diagram-figure {
+    padding-inline: 12px;
+  }
+}
+
 // A diagram in a panel: a row naming it, over the diagram on its own theme's page color, so
 // that switching the theme shows as a change of the whole figure.
 .example-card {

@@ -40,30 +40,6 @@
   }
 }
 
-// A picture of the home page, drawn by limu: its name over it, on the page's own colors.
-.home-figure {
-  margin: 24px 0 28px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-panel);
-  padding: 14px 20px 24px;
-
-  figcaption {
-    margin-bottom: 16px;
-    color: var(--muted);
-    font-size: var(--font-size-small);
-  }
-}
-// The scene, where limu's pipeline branches, in the accent.
-.home-figure-limu [data-id="scene"] {
-  rect {
-    stroke: var(--limu-accent);
-    stroke-width: 2;
-  }
-  text {
-    fill: var(--limu-accent);
-    font-weight: 700;
-  }
-}
 
 .home-tabs {
   margin-bottom: 20px;
@@ -120,8 +96,5 @@
   }
   .guide-links {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .home-figure {
-    padding-inline: 12px;
   }
 }

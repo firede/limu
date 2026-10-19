@@ -39,12 +39,12 @@ const explore = [
         <section class="home-section" aria-labelledby="how-it-works">
           <h2 id="how-it-works">How it works</h2>
           <p>A renderer of SVG, as Mermaid and Pele are, lays a diagram out and writes it as SVG, for a browser to draw.</p>
-          <figure class="home-figure">
+          <figure class="diagram-figure">
             <figcaption>A renderer of SVG</figcaption>
             <Drawing drawing={home.renderer} label="Mermaid text goes to a layout, then to SVG, then to a browser." />
           </figure>
           <p>limu stops one step short, at the scene: the diagram laid out as data, each part, what it is and where it is, but not how it looks. A backend draws the scene: limumygo on the GPU with MyGo’s native UI, the svg package as SVG, or one of your own.</p>
-          <figure class="home-figure home-figure-limu">
+          <figure class="diagram-figure home-figure-limu">
             <figcaption>limu</figcaption>
             <Drawing drawing={home.limu} label="Mermaid text goes to a layout, then to a scene, which MyGo, SVG, or a backend of your own draws." />
           </figure>

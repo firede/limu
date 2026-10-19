@@ -29,8 +29,8 @@ type Options struct {
 	// Limit is the most UTF-16 code units a source may have: DefaultLimit when it is 0, and no
 	// limit when it is negative.
 	Limit int
-	// MaxEdges is the most edges a flowchart may have: DefaultMaxEdges when it is 0, and no
-	// limit when it is negative.
+	// MaxEdges is the most edges a flowchart or an agent flow may have: DefaultMaxEdges when
+	// it is 0, and no limit when it is negative.
 	MaxEdges int
 	// Config is configuration under the diagram's own, which takes its place key by key.
 	Config Config
@@ -38,7 +38,8 @@ type Options struct {
 
 // Limits are the limits a diagram's parser holds its text to.
 type Limits struct {
-	// MaxEdges is the most edges a flowchart may have, or no limit when it is negative.
+	// MaxEdges is the most edges a flowchart or an agent flow may have, or no limit when it is
+	// negative.
 	MaxEdges int
 }
 

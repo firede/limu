@@ -1,6 +1,6 @@
 // Command gen writes what the website shows of limu's own work, before Astro builds it: the
-// mark and the icon, the SVG of every example, drawn by the svg package, and the theme's
-// colors as the --limu-* variables the SVG is drawn in. Run it from the website directory:
+// mark and the icon, the SVG of every example and of the diagrams the documents draw, by the
+// svg package, and the theme's colors as the --limu-* variables the SVG is drawn in. Run it from the website directory:
 //
 //	go run ./gen
 package main
@@ -52,6 +52,7 @@ func main() {
 	write("src/generated/mark.json", mustJSON(map[string]string{"mark": markSVG(), "mark16": mark16SVG()}))
 	write("src/generated/limu-theme.css", themeCSS())
 	write("src/generated/home.json", mustJSON(home()))
+	write("src/generated/docs-diagrams.json", mustJSON(docsDiagrams()))
 
 	types, failed := examples()
 	write("src/generated/examples.json", mustJSON(types))
