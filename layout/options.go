@@ -26,6 +26,17 @@ type Options struct {
 	// MaxWidth is the width the host has for the diagram; a diagram that can draw itself
 	// narrower does. 0 is no limit.
 	MaxWidth float64
+	// KeepDirection keeps a diagram that runs across from being laid out running down when it
+	// does not fit MaxWidth; it is, by default, when MaxWidth is under DirectionBreakpoint
+	// (0 is 640) and running down is narrower.
+	KeepDirection       bool
+	DirectionBreakpoint float64
+
+	// NoLinks and NoImages leave out the links and the images a diagram's text asks for.
+	// LinkSchemes and ImageSchemes are the schemes they may use besides a relative address:
+	// nil is http, https, mailto and tel for links, and http and https for images.
+	NoLinks, NoImages         bool
+	LinkSchemes, ImageSchemes []string
 	// Snap rounds where things are to whole multiples of it, for a backend that draws on a
 	// grid of pixels. 0 leaves them as they fall.
 	Snap    float64

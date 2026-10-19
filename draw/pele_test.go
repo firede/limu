@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/internal/fixture"
+	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/text"
 )
@@ -133,48 +134,6 @@ func decode[T any](t *testing.T, raw json.RawMessage) T {
 	return v
 }
 
-// peleNum is Pele's num: a number written to two decimals, as SVG takes it.
-func peleNum(v float64) string {
-	n := jsRound(float64(v * 100))
-	if n == 0 {
-		return "0"
-	}
-	sign := ""
-	if n < 0 {
-		sign, n = "-", -n
-	}
-	if n >= 1e11 {
-		return strconv.FormatFloat(float64(jsRound(float64(v*100)))/100, 'f', -1, 64)
-	}
-	q := math.Floor(n / 100)
-	s := sign + strconv.FormatFloat(q, 'f', -1, 64)
-	switch i := int(n - float64(q*100)); {
-	case i == 0:
-	case i%10 == 0:
-		s += "." + strconv.Itoa(i/10)
-	case i < 10:
-		s += ".0" + strconv.Itoa(i)
-	default:
-		s += "." + strconv.Itoa(i)
-	}
-	return s
-}
-
-// peleD writes a path as Pele writes the d of one.
-func peleD(p *scene.Path) string {
-	var b strings.Builder
-	p.Each(func(op scene.Op, a []float64) {
-		b.WriteByte("MLQCZ"[op])
-		for i := 0; i < len(a); i += 2 {
-			if i > 0 {
-				b.WriteByte(' ')
-			}
-			b.WriteString(peleNum(a[i]) + "," + peleNum(a[i+1]))
-		}
-	})
-	return b.String()
-}
-
 func TestShapesMatchPele(t *testing.T) {
 	p := loadPele(t)
 	names := make([]string, 0, len(shapes))
@@ -227,7 +186,7 @@ func TestEndsMatchPele(t *testing.T) {
 
 func sameTips(t *testing.T, what string, e EdgePath, want peleTips) {
 	t.Helper()
-	got := peleTips{peleD(e.Path), e.SX, e.SY, e.SDX, e.SDY, e.EX, e.EY, e.EDX, e.EDY}
+	got := peleTips{pelesvg.D(e.Path), e.SX, e.SY, e.SDX, e.SDY, e.EX, e.EY, e.EDX, e.EDY}
 	if got != want {
 		t.Errorf("%s\n got %+v\nPele %+v", what, got, want)
 	}
@@ -314,7 +273,7 @@ func TestTitlesMatchPele(t *testing.T) {
 	}
 	for _, c := range p.Struck {
 		depth := StruckDepth(func(i int) int { return c.Parents[i] }, c.Index)
-		if got := peleNum(StruckTint(depth)); got != c.Tint {
+		if got := pelesvg.Num(StruckTint(depth)); got != c.Tint {
 			t.Errorf("StruckTint of %v at %d = %v, Pele %v", c.Parents, c.Index, got, c.Tint)
 		}
 	}
@@ -394,7 +353,7 @@ func TestMarkersMatchPele(t *testing.T) {
 			}
 			continue
 		}
-		if got := peleD(path); got != a["d"] {
+		if got := pelesvg.D(path); got != a["d"] {
 			t.Errorf("%s: %s, Pele %s", what, got, a["d"])
 		}
 	}
@@ -406,7 +365,7 @@ func TestLabelPatchMatchesPele(t *testing.T) {
 		part := LabelPatch(&text.Label{Width: c.Width, Height: c.Height}, c.X, c.Y)
 		a := attrs(reTag.FindString(c.SVG[strings.Index(c.SVG, "<rect"):]))
 		b := part.Box
-		got := []string{peleNum(b.X), peleNum(b.Y), peleNum(b.W), peleNum(b.H), "3"}
+		got := []string{pelesvg.Num(b.X), pelesvg.Num(b.Y), pelesvg.Num(b.W), pelesvg.Num(b.H), "3"}
 		want := []string{a["x"], a["y"], a["width"], a["height"], a["rx"]}
 		if !slices.Equal(got, want) {
 			t.Errorf("LabelPatch(%v, %v, %v, %v) = %v, Pele %v", c.Width, c.Height, c.X, c.Y, got, want)
