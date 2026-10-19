@@ -3,7 +3,7 @@ package flowchart
 import (
 	"strings"
 
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -127,9 +127,9 @@ func (p *parser) check(err error) {
 func (p *parser) fail(expected string) {
 	t := p.toks[p.i]
 	if t.typ == t_ERROR {
-		panic(parseError{diagram.SyntaxError("flowchart", p.src, t.start, "", true)})
+		panic(parseError{common.SyntaxError("flowchart", p.src, t.start, "", true)})
 	}
-	panic(parseError{diagram.SyntaxError("flowchart", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
+	panic(parseError{common.SyntaxError("flowchart", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 }
 
 // expect gives the text of the token the parser is at and moves past it, or fails if the

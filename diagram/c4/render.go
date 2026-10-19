@@ -185,7 +185,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 			}
 		}
 		if a == nil || b == nil {
-			return nil, 0, diagram.NewError(`C4 rel "`+rel.From+`" -> "`+rel.To+`" references an unknown shape or boundary`, diagram.Semantic, "c4")
+			return nil, 0, common.NewError(`C4 rel "`+rel.From+`" -> "`+rel.To+`" references an unknown shape or boundary`, diagram.Semantic, "c4")
 		}
 		ends = append(ends, a, b)
 		if pairs[a] == nil {

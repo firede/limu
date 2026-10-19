@@ -1,7 +1,7 @@
 package ishikawa
 
 import (
-	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -18,7 +18,7 @@ func parseIshikawa(src string, db *db) error {
 	i := 0
 
 	fail := func(expected string) error {
-		return diagram.SyntaxError("ishikawa", src, starts[i], "Expecting "+expected+", got '"+tokenNames[types[i]]+"'", false)
+		return common.SyntaxError("ishikawa", src, starts[i], "Expecting "+expected+", got '"+tokenNames[types[i]]+"'", false)
 	}
 	stops := func(typ int) bool { return typ == tokSpaceLine || typ == tokNL || typ == tokEOF }
 

@@ -78,16 +78,16 @@ func TestPreprocessMatchesPele(t *testing.T) {
 	}
 	failed := 0
 	for _, c := range p.Preprocessed {
-		got, err := Preprocess(c.Source)
+		got, err := preprocess(c.Source)
 		if c.Error != nil {
 			if !sameError(err, c.Error) {
-				t.Errorf("Preprocess(%q)\n got error %#v\nPele %#v", c.Source, err, c.Error)
+				t.Errorf("preprocess(%q)\n got error %#v\nPele %#v", c.Source, err, c.Error)
 				failed++
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("Preprocess(%q): %v, Pele had none", c.Source, err)
+			t.Errorf("preprocess(%q): %v, Pele had none", c.Source, err)
 			failed++
 			continue
 		}
@@ -105,10 +105,10 @@ func TestPreprocessMatchesPele(t *testing.T) {
 		}
 		sameConfig, config := sameJSON(yaml.Encode(got.Config, true), c.Config)
 		if got.Text != c.Text || got.WithComments != withComments || got.Title != title || got.HasTitle != hasTitle ||
-			got.LineOffset != c.LineOffset || !sameConfig || string(Detect(got.Text)) != typ {
+			got.LineOffset != c.LineOffset || !sameConfig || string(detect(got.Text)) != typ {
 			want, _ := json.Marshal(c)
-			t.Errorf("Preprocess(%q)\n got text %q, with comments %q, title %q (%v), line offset %d, type %q, config %s\nPele %s",
-				c.Source, got.Text, got.WithComments, got.Title, got.HasTitle, got.LineOffset, Detect(got.Text), config, want)
+			t.Errorf("preprocess(%q)\n got text %q, with comments %q, title %q (%v), line offset %d, type %q, config %s\nPele %s",
+				c.Source, got.Text, got.WithComments, got.Title, got.HasTitle, got.LineOffset, detect(got.Text), config, want)
 			failed++
 		}
 		if failed > 20 {
@@ -124,8 +124,8 @@ func TestEncodeEntitiesMatchesPele(t *testing.T) {
 		t.Fatalf("only %d cases", len(p.Encoded))
 	}
 	for _, c := range p.Encoded {
-		if got := EncodeEntities(c.Text); got != c.Encoded {
-			t.Errorf("EncodeEntities(%q)\n got %q\nPele %q", c.Text, got, c.Encoded)
+		if got := encodeEntities(c.Text); got != c.Encoded {
+			t.Errorf("encodeEntities(%q)\n got %q\nPele %q", c.Text, got, c.Encoded)
 		}
 	}
 }

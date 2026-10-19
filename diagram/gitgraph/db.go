@@ -6,12 +6,13 @@ import (
 	"strconv"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
 // fail panics with Pele's semantic error, which buildGit recovers.
 func fail(message string) {
-	panic(diagram.NewError(message, diagram.Semantic, "gitGraph"))
+	panic(common.NewError(message, diagram.Semantic, "gitGraph"))
 }
 
 // typeCode is the commitType of a type's name, as Pele's typeCode gives it.

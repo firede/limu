@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 )
 
 // The tokens a statement and a style's value may start with, as Mermaid's grammar lists them
@@ -48,9 +49,9 @@ func parseVenn(src string, db *db) (err error) {
 	}
 	fail := func(expected string) {
 		if peek() == tError {
-			throw(diagram.SyntaxError("venn", src, lex.start, "", true))
+			throw(common.SyntaxError("venn", src, lex.start, "", true))
 		}
-		throw(diagram.SyntaxError("venn", src, lex.start, "Expecting "+expected+", got '"+tokenNames[typ]+"'", false))
+		throw(common.SyntaxError("venn", src, lex.start, "Expecting "+expected+", got '"+tokenNames[typ]+"'", false))
 	}
 	take := func() string {
 		typ = -1
@@ -91,7 +92,7 @@ func parseVenn(src string, db *db) (err error) {
 		}
 		if union {
 			if len(ids) < 2 {
-				throw(diagram.NewError("union requires multiple identifiers", diagram.Semantic, "venn"))
+				throw(common.NewError("union requires multiple identifiers", diagram.Semantic, "venn"))
 			}
 			throw(db.validateUnionIdentifiers(ids))
 		}
@@ -171,7 +172,7 @@ func parseVenn(src string, db *db) (err error) {
 			text(func() []string {
 				current := db.getCurrentSets()
 				if current == nil {
-					throw(diagram.NewError("text requires set", diagram.Semantic, "venn"))
+					throw(common.NewError("text requires set", diagram.Semantic, "venn"))
 				}
 				return current
 			})

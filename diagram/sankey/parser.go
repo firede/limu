@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -129,7 +130,7 @@ func parseSankey(src string, m *Model) (err error) {
 		if t == tSTUCK {
 			got = tokenNames[types[i-1]]
 		}
-		panic(parseFailure{diagram.SyntaxError("sankey", src, tk.Starts[i], "Expecting "+expected+", got '"+got+"'", false)})
+		panic(parseFailure{common.SyntaxError("sankey", src, tk.Starts[i], "Expecting "+expected+", got '"+got+"'", false)})
 	}
 	expect := func(typ int, also string) {
 		if types[i] != typ {

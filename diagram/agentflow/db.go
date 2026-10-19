@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/internal/yaml"
@@ -785,7 +786,7 @@ func assignProp(props []Prop, p Prop) []Prop {
 // agentError is an error of an agent flow with a code, as Pele's database throws a PeleError
 // of type agentflow.
 func agentError(message string, code diagram.Code) *diagram.Error {
-	return diagram.NewError(message, code, "agentflow")
+	return common.NewError(message, code, "agentflow")
 }
 
 // addSingleLink adds an edge, as Pele's addSingleLink does; id is the arrow's own, if hasID.

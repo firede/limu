@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -127,7 +128,7 @@ func (db *DB) Element(name string) *Element { return db.elements[name] }
 func (db *DB) copyStyles(target *[]string, styles []string) {
 	db.styleCopies += len(styles)
 	if db.styleCopies > maxStyleCopies {
-		panic(parseError{diagram.NewError("Requirement diagram applies too many style declarations.", diagram.Limit, "requirement")})
+		panic(parseError{common.NewError("Requirement diagram applies too many style declarations.", diagram.Limit, "requirement")})
 	}
 	*target = append(*target, styles...)
 }

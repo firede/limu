@@ -1,6 +1,9 @@
 package wardley
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // Node is a thing placed on the map, Pele's WardleyNode: an anchor, a component, or a
 // component of a pipeline. X is its evolution and Y its visibility, as percentages.
@@ -243,5 +246,5 @@ func (b *builder) build() *buildResult {
 }
 
 func semantic(message string) *diagram.Error {
-	return diagram.NewError(message, diagram.Semantic, "wardley")
+	return common.NewError(message, diagram.Semantic, "wardley")
 }

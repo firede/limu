@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/yaml"
 )
@@ -47,7 +48,7 @@ func newDB(config diagram.Config) *DB {
 
 // semantic is a semantic error of a sequence diagram, the PeleError that Pele's fail throws.
 func semantic(message string) *diagram.Error {
-	return diagram.NewError(message, diagram.Semantic, "sequence")
+	return common.NewError(message, diagram.Semantic, "sequence")
 }
 
 // failure carries an error of the DB up through the parser, as Pele's throw does.
@@ -219,7 +220,7 @@ func (db *DB) addActor(id, name string, desc *description, typ string, hasType b
 		}
 		parsed, err := yaml.Parse(src)
 		if err != nil {
-			panic(failure{diagram.NewError(`Config of participant "`+id+`" is not valid YAML. `+err.Error(), diagram.Syntax, "sequence")})
+			panic(failure{common.NewError(`Config of participant "`+id+`" is not valid YAML. `+err.Error(), diagram.Syntax, "sequence")})
 		}
 		if m, ok := parsed.(*yaml.Map); ok {
 			doc = m

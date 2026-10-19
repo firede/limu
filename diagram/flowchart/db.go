@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/internal/yaml"
@@ -293,7 +294,7 @@ func destructEndLink(raw string) LinkInfo {
 // flowError is an error of a flowchart, the PeleError of type flowchart that Pele's FlowDb
 // throws.
 func flowError(message string, code diagram.Code) *diagram.Error {
-	return diagram.NewError(message, code, "flowchart")
+	return common.NewError(message, code, "flowchart")
 }
 
 // addVertex adds a node, or adds to it, as Pele's addVertex does. text is nil, typ "", and

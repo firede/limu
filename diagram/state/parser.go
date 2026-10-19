@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -54,13 +55,13 @@ func (p *parser) fail(expected string) {
 	t := p.lex.toks[p.i]
 	if t.typ == t_ERROR {
 		if p.lex.hasError {
-			loc := diagram.Locate(p.src, t.start)
+			loc := common.Locate(p.src, t.start)
 			panic(parseError{&diagram.Error{Code: diagram.Syntax, Message: p.lex.error, Type: "state",
 				Line: loc.Line, Column: loc.Column, Snippet: loc.Snippet}})
 		}
-		panic(parseError{diagram.SyntaxError("state", p.src, t.start, "", true)})
+		panic(parseError{common.SyntaxError("state", p.src, t.start, "", true)})
 	}
-	panic(parseError{diagram.SyntaxError("state", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
+	panic(parseError{common.SyntaxError("state", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 }
 
 func (p *parser) expect(typ token) string {

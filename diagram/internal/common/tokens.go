@@ -128,7 +128,7 @@ scan:
 			p = end
 			continue scan
 		}
-		return nil, diagram.SyntaxError(typ, src, p, "", true)
+		return nil, SyntaxError(typ, src, p, "", true)
 	}
 	out.Kinds = append(out.Kinds, -1)
 	out.Starts = append(out.Starts, n)
@@ -613,5 +613,5 @@ func (r *Reader) Fail(expected string) {
 	if r.Kind() != -1 {
 		found = "`" + r.Text(r.I) + "`"
 	}
-	panic(diagram.SyntaxError(r.Diagram, r.Tokens.Src, r.Tokens.Starts[r.I], "Expecting "+expected+" but found "+found+".", false))
+	panic(SyntaxError(r.Diagram, r.Tokens.Src, r.Tokens.Starts[r.I], "Expecting "+expected+" but found "+found+".", false))
 }

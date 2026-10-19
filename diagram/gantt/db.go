@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsdate"
 	"github.com/firede/limu/internal/url"
@@ -177,10 +178,10 @@ func (db *DB) addTask(descr, dataStr string) error {
 	}
 	// Mermaid fails with a TypeError on both of these.
 	if len(data) == 0 {
-		return diagram.NewError(`Task "`+trim(descr)+`" needs a duration or an end date.`, diagram.Semantic, "gantt")
+		return common.NewError(`Task "`+trim(descr)+`" needs a duration or an end date.`, diagram.Semantic, "gantt")
 	}
 	if len(data) > 3 {
-		return diagram.NewError(`Task "`+trim(descr)+`" has too many fields. A task takes an id, a start, and an end or duration.`,
+		return common.NewError(`Task "`+trim(descr)+`" has too many fields. A task takes an id, a start, and an end or duration.`,
 			diagram.Semantic, "gantt")
 	}
 	for i := range data {
@@ -359,7 +360,7 @@ func (db *DB) isInvalidDate(date float64) (bool, error) {
 func (db *DB) spend(units float64) error {
 	db.work += units
 	if db.work > workLimit {
-		return diagram.NewError("The gantt chart takes too much work to schedule.", diagram.Limit, "gantt")
+		return common.NewError("The gantt chart takes too much work to schedule.", diagram.Limit, "gantt")
 	}
 	return nil
 }
@@ -521,7 +522,7 @@ func isDigits(s string) bool {
 // invalidDate is the error of a date that cannot be read, as Pele's getStartDate and checked
 // throw it.
 func invalidDate(str string) error {
-	return diagram.NewError("Invalid date:"+str, diagram.Semantic, "gantt")
+	return common.NewError("Invalid date:"+str, diagram.Semantic, "gantt")
 }
 
 // getStartDate is Pele's getStartDate, with its checked inlined: the start a task's raw start
@@ -664,7 +665,7 @@ func (db *DB) checkTaskDates(task *Task) error {
 		if invalid {
 			endTime = z.SetDate(endTime, z.Date(endTime)+1)
 			if endTime > maxEndTime {
-				return diagram.NewError("Failed to find a valid date that was not excluded by `excludes` after 10,000 iterations.",
+				return common.NewError("Failed to find a valid date that was not excluded by `excludes` after 10,000 iterations.",
 					diagram.Semantic, "gantt")
 			}
 		}

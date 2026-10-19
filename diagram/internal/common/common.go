@@ -13,7 +13,9 @@
 //     (tokens.go: Tokenize, Reader, Keyword, AccDescr and the rest);
 //   - the scanning helpers of the hand-written Jison lexers (scan.go: KeywordAt, WordAt,
 //     Accessibility and the rest);
-//   - the indented outlines of kanban boards and mindmaps (outline.go).
+//   - the indented outlines of kanban boards and mindmaps (outline.go);
+//   - the errors of diagrams' text, as Pele's src/errors.ts makes them (errors.go: NewError,
+//     SyntaxError, Locate).
 package common
 
 import (
