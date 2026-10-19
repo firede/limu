@@ -16,8 +16,10 @@ export async function resolve(spec, ctx, next) {
 // to work with them sets globalThis.limuExactNumbers while Pele draws, and num then writes
 // them whole; the suite rounds them as num would once it is done with them. While it is set,
 // classMarker also writes what it draws a marker from, so that the marker can be drawn again
-// where a group moves it, and a kanban board's textBlock writes, in place of each line of
-// text, where the line starts or ends and what is in it, as the scene holds a label.
+// where a group moves it, a kanban board's textBlock writes, in place of each line of
+// text, where the line starts or ends and what is in it, as the scene holds a label, and a
+// sankey diagram's labels write the middle of their line as y, with an m before it, in place
+// of the baseline, as the scene holds a label by its middle.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -26,6 +28,7 @@ const NUM = 'export function num(value: number): string {';
 const EXACT = 'if ((globalThis as any).limuExactNumbers)';
 const CLASS_MARKER = 'export function classMarker(';
 const TEXT_BLOCK = 'function textBlock(';
+const SANKEY_Y = 'y="${num(y + small * 0.35)}"';
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -63,6 +66,11 @@ function textBlock(label: Label, x: number, y: number, attrs: string, icons: Ico
   return out;
 }
 `;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/sankey/render.ts')) {
+    const loaded = await next(url, ctx);
+    const source = patch(url, String(loaded.source), SANKEY_Y, `y="\${${EXACT.slice(4, -1)} ? 'm' + y : num(y + small * 0.35)}"`);
     return { ...loaded, source, shortCircuit: true };
   }
   if (url.endsWith('.json')) {
