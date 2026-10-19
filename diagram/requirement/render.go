@@ -8,6 +8,7 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -90,7 +91,7 @@ func restyle(l text.Label, bits text.Face, m text.Measurer) text.Label {
 // does. The layout attaches every edge to the middle of a side; ends that share one are
 // spread along it, in the order of where they head, so their markers do not sit on each
 // other.
-func spreadEnds(cnodes []layout.CNode, cedges []layout.CEdge, views []view) {
+func spreadEnds(cnodes []graphs.CNode, cedges []graphs.CEdge, views []view) {
 	type end struct {
 		route  []float64
 		at     int
@@ -190,7 +191,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 
 	index := make(map[string]int, len(graph.Nodes))
 	views := make([]view, 0, len(graph.Nodes))
-	cnodes := make([]layout.CNode, 0, len(graph.Nodes))
+	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for i := range graph.Nodes {
 		node := &graph.Nodes[i]
 		author := style.Declarations(node.CSSStyles)
@@ -243,19 +244,19 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		if _, ok := index[node.ID]; !ok {
 			index[node.ID] = len(views)
 		}
-		c := layout.NewCNode(w, headHeight+bodyHeight, -1)
+		c := graphs.NewCNode(w, headHeight+bodyHeight, -1)
 		c.Seq = float64(len(views))
 		views = append(views, view{node: node, author: author, kind: kind, name: name, rows: rows,
 			keyWidth: keyWidth, headHeight: headHeight, w: w, h: headHeight + bodyHeight})
 		cnodes = append(cnodes, c)
 	}
 
-	rootDir := layout.Direction(graph.Direction)
+	rootDir := graphs.Direction(graph.Direction)
 	if down {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
-	sideways := rootDir == layout.LR || rootDir == layout.RL
-	var cedges []layout.CEdge
+	sideways := rootDir == graphs.LR || rootDir == graphs.RL
+	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
 	var drawn []*GraphEdge
 	for i := range graph.Edges {
@@ -276,12 +277,12 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		}
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, label)
-		cedges = append(cedges, layout.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: label.Width + 12, LabelH: label.Height + 4})
+		cedges = append(cedges, graphs.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: label.Width + 12, LabelH: label.Height + 4})
 	}
 
 	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
 	curve := common.RoutingCurve(o.Routing)
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
 		Tracks:   curve == "step",
 		Straight: curve == "linear",
 		NodeSep:  nodeSep,
@@ -300,7 +301,7 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 	inner := max(result.Width, title.Width)
 	ox := padding + (inner-result.Width)/2
 	oy := padding + titleHeight
-	layout.Shift(cnodes, cedges, ox, oy)
+	graphs.Shift(cnodes, cedges, ox, oy)
 	sc := &scene.Scene{
 		Type:     "requirement",
 		Width:    math.Ceil(inner + 2*padding),

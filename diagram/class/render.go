@@ -8,6 +8,7 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
@@ -113,9 +114,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	tiny := jsmath.Round(float64(size * 0.8))
 	tinyHeight := jsmath.Round(float64(tiny * 1.4))
 	measure := o.Measure()
-	rootDir := layout.Direction(db.Direction)
+	rootDir := graphs.Direction(db.Direction)
 	if turned {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
 	// labelOf lays out a label's text, as Pele's draw does with layoutLabel.
 	labelOf := func(raw string, markdown bool, size, max float64, face text.Face) text.Label {
@@ -224,16 +225,16 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	}
 
 	views := make([]view, 0, len(nodes))
-	cnodes := make([]layout.CNode, 0, len(nodes))
+	cnodes := make([]graphs.CNode, 0, len(nodes))
 	for i, node := range nodes {
 		var v view
-		var c layout.CNode
+		var c graphs.CNode
 		switch {
 		case node.IsGroup:
 			label := labelOf(node.Label, false, size, 4000, 0)
 			v = view{node: node, label: label, fontSize: size}
 			if children[i] > 0 {
-				c = layout.NewCNode(0, 0, -1)
+				c = graphs.NewCNode(0, 0, -1)
 				c.IsGroup = true
 				c.PadX = groupPad
 				c.PadTop = groupPad
@@ -249,19 +250,19 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			} else {
 				v.w = max(label.Width+2*groupPad, 80)
 				v.h = label.Height + 2*groupPad
-				c = layout.NewCNode(v.w, v.h, -1)
+				c = graphs.NewCNode(v.w, v.h, -1)
 			}
 		case node.Class != nil:
 			v = classView(node, node.Class)
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		case node.Shape == "note":
 			label := labelOf(node.Label, true, small, 260, 0)
 			v = view{node: node, label: label, w: max(label.Width+2*padX, 40), h: label.Height + 2*titlePad, fontSize: small}
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		default:
 			label := labelOf(node.Label, false, small, 200, 0)
 			v = view{node: node, label: label, w: max(label.Width, 12) + 4, h: max(label.Height, 12), fontSize: small}
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		}
 		c.Parent = node.Parent
 		c.Seq = float64(i)
@@ -269,7 +270,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		cnodes = append(cnodes, c)
 	}
 
-	var cedges []layout.CEdge
+	var cedges []graphs.CEdge
 	var drawn []*GraphEdge
 	var edgeLabels []text.Label
 	var startRoom, endRoom []float64
@@ -311,7 +312,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		endRoom = append(endRoom, endW)
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, label)
-		ce := layout.CEdge{Src: edge.Source, Dst: edge.Target, Minlen: 1}
+		ce := graphs.CEdge{Src: edge.Source, Dst: edge.Target, Minlen: 1}
 		if label.Width > 0 {
 			ce.LabelW = label.Width + 12
 		}
@@ -321,7 +322,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		cedges = append(cedges, ce)
 	}
 
-	if rootDir == layout.TB || rootDir == layout.BT {
+	if rootDir == graphs.TB || rootDir == graphs.BT {
 		for i := range views {
 			if views[i].node.Class == nil {
 				continue
@@ -355,7 +356,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	}
 	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
 	curve := common.RoutingCurve(o.Routing)
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
 		Tracks:   curve == "step",
 		Straight: curve == "linear",
 		NodeSep:  numberOption(conf, "nodeSpacing", nodeSep),
@@ -380,7 +381,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	var sideKeys []int
 	// attach records where an end of an edge meets the side of a class, as the attach of
 	// Pele's draw does, and gives the end, or nil where it meets no side.
-	attach := func(ce *layout.CEdge, at, item int, room float64, order int) *end {
+	attach := func(ce *graphs.CEdge, at, item int, room float64, order int) *end {
 		route := ce.Route
 		side := draw.EndSide(route, at, node(item))
 		if side < 0 {

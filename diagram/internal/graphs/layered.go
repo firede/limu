@@ -1,4 +1,8 @@
-package layout
+// Package graphs lays out the graphs that more than one diagram places its things with, as
+// Pele's src/layout does in layered.ts, compound.ts and lanes.ts: the layered layout of a
+// flat graph (Layered), the compound one of a graph with groups (Compound), and the lanes of
+// a swimlane diagram (Lanes).
+package graphs
 
 import (
 	"math"

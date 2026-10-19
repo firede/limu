@@ -304,7 +304,7 @@ export default async function ({ src, cases, write, random }) {
     hypot.push({ a, b, hypot: Math.hypot(a, b) });
   }
 
-  write('layout/testdata/pele/layout.json', finite({ ease, hypot, layered, compound }));
+  write('diagram/internal/graphs/testdata/pele/layout.json', finite({ ease, hypot, layered, compound }));
 }
 
 // A random number with more of its bits set than one from the generator alone.

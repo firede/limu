@@ -4,8 +4,8 @@ import (
 	"math"
 	"slices"
 
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
-	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/text"
 )
@@ -218,7 +218,7 @@ func RoutePath(route []float64, curve string, startTrim, endTrim, startReach, en
 			if down {
 				run, across = across, run
 			}
-			k := float64(math.Abs(run) * layout.Ease(across, run))
+			k := float64(math.Abs(run) * graphs.Ease(across, run))
 			var ux, uy float64
 			if down {
 				uy = float64(jsmath.Sign(run) * k)
