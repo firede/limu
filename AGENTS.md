@@ -31,6 +31,11 @@ docs/design.md first: it says what each stage owns and why style is kept out of 
   `./scripts/oracle.sh <pele> [suite…]` runs suites, and the package's tests compare with
   the fixture in its `testdata/pele`. Compare numbers exactly; a difference in the last bit
   is a difference in the port.
+- Matching Pele to the last bit is how the port is checked, not what limu is for. Go as
+  far as porting the function JavaScript calls, as `internal/jsmath` ports V8's sine; don't
+  write code that has no use but to match a platform's library to the last bit, as one
+  copying the C library's `pow` would be. Where such a difference can't be avoided, note it
+  as a difference of the platform, and leave the cases it reaches out of the comparison.
 - The port follows Pele 1.6.0, commit 44da152. To follow a newer Pele, write the fixtures
   anew from it and port what its diff changed.
 

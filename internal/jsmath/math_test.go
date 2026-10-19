@@ -8,13 +8,12 @@ import (
 	"github.com/firede/limu/internal/fixture"
 )
 
-// The fixture is what V8 makes of Math.sin, Math.cos, Math.atan2, Math.acos and Math.pow;
+// The fixture is what V8 makes of Math.sin, Math.cos, Math.atan2 and Math.acos;
 // ./scripts/oracle.sh writes it, with its jsmath suite.
 type mathFixture struct {
 	Trig  [][3]json.RawMessage `json:"trig"`
 	Atan2 [][3]json.RawMessage `json:"atan2"`
 	Acos  [][2]json.RawMessage `json:"acos"`
-	Pow   [][3]json.RawMessage `json:"pow"`
 }
 
 func readMath(t *testing.T) mathFixture {
@@ -95,53 +94,4 @@ func TestAcosMatchesV8(t *testing.T) {
 		ac.see(Acos(x), decode(c[1]), x)
 	}
 	ac.done(20000)
-}
-
-func TestPowMatchesV8(t *testing.T) {
-	p := readMath(t)
-	exact := check{t: t, name: "Pow"}
-	near, n := 0, 0
-	for _, c := range p.Pow {
-		x, y := decode(c[0]), decode(c[1])
-		got, want := Pow(x, y), decode(c[2])
-		if powIsExact(x, y, want) {
-			exact.see(got, want, x, y)
-			continue
-		}
-		// Elsewhere V8 has the platform's pow, which on macOS is Apple's: a result it puts
-		// one ulp from the nearest is allowed, if they are rare.
-		n++
-		if same(got, want) {
-			continue
-		}
-		if d := int64(math.Float64bits(got)) - int64(math.Float64bits(want)); (d == 1 || d == -1) && math.Signbit(got) == math.Signbit(want) {
-			near++
-			continue
-		}
-		t.Errorf("Pow(%v, %v) = %v (%#x), V8 %v (%#x)", x, y, got, math.Float64bits(got), want, math.Float64bits(want))
-	}
-	exact.done(8000)
-	t.Logf("Pow: %d of %d exact, %d of %d one ulp from V8's", exact.n, exact.n, near, n)
-	if near*500 > n || n < 20000 {
-		t.Errorf("Pow: %d of %d one ulp from V8's", near, n)
-	}
-}
-
-// powIsExact reports whether Pow must give what V8 gives to the last bit: for the special
-// values, the exponents V8 works out itself, and the powers Pele takes, of 10, 2 and 1/2 to
-// whole exponents and of 0.99 to the first few, which Apple's pow rounds correctly.
-func powIsExact(x, y, want float64) bool {
-	finite := func(v float64) bool { return !math.IsInf(v, 0) && !math.IsNaN(v) }
-	whole := y == math.Trunc(y)
-	switch {
-	case !finite(x) || !finite(y) || x == 0 || y == 0 || !finite(want) || want == 0:
-		return true
-	case y == 2 || y == 0.5:
-		return true
-	case whole && (x == 10 || x == 2 || x == 0.5):
-		return true
-	case whole && x == 0.99 && y >= 0 && y < 6:
-		return true
-	}
-	return false
 }
