@@ -12,9 +12,9 @@ import (
 // float64.
 type Config = map[string]any
 
-// Preprocessed is a diagram's text read for its front matter and directives, as Pele's
+// preprocessed is a diagram's text read for its front matter and directives, as Pele's
 // preprocess gives it.
-type Preprocessed struct {
+type preprocessed struct {
 	// Text is the text after its front matter, with directives and comment lines taken out
 	// and the white space it starts with trimmed.
 	Text string
@@ -30,9 +30,9 @@ type Preprocessed struct {
 
 var unsafeKeys = map[string]bool{"__proto__": true, "constructor": true, "prototype": true}
 
-// CleanupComments takes out the lines that are comments, `%%` and not `%%{`, and the white
+// cleanupComments takes out the lines that are comments, `%%` and not `%%{`, and the white
 // space the text starts with, as Pele's cleanupComments does.
-func CleanupComments(text string) string {
+func cleanupComments(text string) string {
 	if strings.Contains(text, "%%") {
 		text = dropComments(text)
 	}
@@ -408,9 +408,9 @@ func singleQuoted(attrs string) string {
 	return b.String()
 }
 
-// Preprocess reads a diagram's front matter and directives and takes out its comment lines,
+// preprocess reads a diagram's front matter and directives and takes out its comment lines,
 // as Pele's preprocess does.
-func Preprocess(source string) (Preprocessed, error) {
+func preprocess(source string) (preprocessed, error) {
 	text := source
 	if strings.Contains(text, "\r") {
 		text = strings.ReplaceAll(text, "\r\n", "\n")
@@ -423,7 +423,7 @@ func Preprocess(source string) (Preprocessed, error) {
 		}
 	}
 
-	pre := Preprocessed{Config: Config{}}
+	pre := preprocessed{Config: Config{}}
 	if strings.Contains(text, "---") {
 		if front, ok := matchFrontMatter(text); ok {
 			body := front.body
@@ -436,7 +436,7 @@ func Preprocess(source string) (Preprocessed, error) {
 			}
 			parsed, err := yaml.Parse(body)
 			if err != nil {
-				return Preprocessed{}, NewError("Front matter is not valid YAML. "+err.Error(), Syntax, "")
+				return preprocessed{}, newError("Front matter is not valid YAML. "+err.Error(), Syntax, "")
 			}
 			if m, ok := parsed.(*yaml.Map); ok {
 				if title := m.Value("title"); yaml.Truthy(title) {
@@ -461,7 +461,7 @@ func Preprocess(source string) (Preprocessed, error) {
 	}
 
 	text = directives(text, pre.Config)
-	pre.Text = CleanupComments(text)
+	pre.Text = cleanupComments(text)
 	pre.WithComments = text
 	return pre, nil
 }
@@ -520,9 +520,9 @@ func dropColorSemicolons(text, keyword string) string {
 	return out.String()
 }
 
-// EncodeEntities hides `#name;` entity codes behind placeholder characters so `#` and `;`
+// encodeEntities hides `#name;` entity codes behind placeholder characters so `#` and `;`
 // survive parsing, as Mermaid does and Pele's encodeEntities does.
-func EncodeEntities(text string) string {
+func encodeEntities(text string) string {
 	if !strings.Contains(text, "#") {
 		return text
 	}

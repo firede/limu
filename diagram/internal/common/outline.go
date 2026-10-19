@@ -371,9 +371,9 @@ func ParseOutline(src string, db OutlineDB, kanban bool) error {
 	fail := func(expected string) error {
 		t := types[i]
 		if t == TokError {
-			return diagram.SyntaxError(typ, src, starts[i], "", true)
+			return SyntaxError(typ, src, starts[i], "", true)
 		}
-		return diagram.SyntaxError(typ, src, starts[i], "Expecting "+expected+", got '"+outlineTokenName(t, kanban)+"'", false)
+		return SyntaxError(typ, src, starts[i], "Expecting "+expected+", got '"+outlineTokenName(t, kanban)+"'", false)
 	}
 
 	keyword := "'" + outlineTokenName(TokKeyword, kanban) + "'"

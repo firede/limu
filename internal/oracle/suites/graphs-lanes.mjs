@@ -210,5 +210,5 @@ export default async function ({ src, write, random }) {
   for (let i = 0; i < 600; i++) cases.push(randomGraph(next, i));
   cases.push(...large());
   for (const c of cases) c.out = run(L, c);
-  write('layout/testdata/pele/lanes.json', finite({ cases }));
+  write('diagram/internal/graphs/testdata/pele/lanes.json', finite({ cases }));
 }

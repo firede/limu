@@ -1,4 +1,4 @@
-package layout
+package graphs
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 )
 
 // The fixture is what Pele's laneLayout makes of the same graphs; ./scripts/oracle.sh writes
-// it with the lanes suite.
+// it with the graphs-lanes suite.
 
 type peleLanes struct {
 	Cases []struct {

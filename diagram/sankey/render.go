@@ -6,6 +6,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -81,7 +82,7 @@ func fillStyle(color any) (style.Style, bool) {
 	if !ok {
 		return style.Style{}, false
 	}
-	if style.ShapeCSS([]string{"fill:" + s}) == "" {
+	if css.ShapeCSS([]string{"fill:" + s}) == "" {
 		return style.Style{}, false
 	}
 	// Pele writes the style without the control characters XML does not allow, and that is
@@ -92,7 +93,7 @@ func fillStyle(color any) (style.Style, bool) {
 		}
 		return r
 	}, s)
-	return style.Declarations([]string{"fill:" + s}).Style, true
+	return css.Declarations([]string{"fill:" + s}).Style, true
 }
 
 // Layout lays a sankey diagram out as a scene, as Pele's renderSankey draws it: the chart at

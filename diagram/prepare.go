@@ -1,6 +1,8 @@
 // Package diagram reads what all Mermaid diagrams share, as Pele's src/preprocess.ts,
-// src/detect.ts, src/errors.ts and the parse path of src/core.ts do: a diagram's front
-// matter, its directives and comments, its type, and the errors of its text.
+// src/detect.ts and the parse path of src/core.ts do: a diagram's front matter, its
+// directives and comments, and its type. Its Error is the error of a diagram's text, as
+// Pele's PeleError in src/errors.ts is; the diagrams make theirs with the helpers of
+// diagram/internal/common.
 //
 // Prepare does what Pele's parseSource does before it hands a diagram's text to the parser
 // of its type; the diagram packages under it, as flowchart, parse what it gives.
@@ -44,7 +46,7 @@ type Limits struct {
 type Prepared struct {
 	Type Type
 	// Text is the text after its front matter, with directives and comment lines taken out:
-	// what Detect read.
+	// what detect read.
 	Text string
 	// WithComments is the text with its comment lines, for a diagram that keeps them.
 	WithComments string
@@ -66,7 +68,7 @@ func (p *Prepared) Source(keepComments bool) string {
 	if keepComments {
 		text = p.WithComments
 	}
-	return EncodeEntities(text) + "\n"
+	return encodeEntities(text) + "\n"
 }
 
 // Prepare reads a diagram's front matter, directives and type, as Pele's parseSource does
@@ -84,15 +86,15 @@ func Prepare(source string, opt Options) (*Prepared, error) {
 		limit = DefaultLimit
 	}
 	if limit > 0 && chars.Len16(source) > limit {
-		return nil, NewError("Diagram source is longer than the limit of "+strconv.Itoa(limit)+" characters.", Limit, "")
+		return nil, newError("Diagram source is longer than the limit of "+strconv.Itoa(limit)+" characters.", Limit, "")
 	}
-	pre, err := Preprocess(source)
+	pre, err := preprocess(source)
 	if err != nil {
 		return nil, err
 	}
-	typ := Detect(pre.Text)
+	typ := detect(pre.Text)
 	if typ == "" {
-		return nil, NewError("No diagram type detected for the given text.", UnsupportedDiagram, "")
+		return nil, newError("No diagram type detected for the given text.", UnsupportedDiagram, "")
 	}
 	config := pre.Config
 	if opt.Config != nil {
@@ -123,5 +125,5 @@ func Prepare(source string, opt Options) (*Prepared, error) {
 // Unsupported is the error of a diagram of a type that has no parser, as Pele's parseSource
 // gives it.
 func Unsupported(typ Type) *Error {
-	return NewError(`Diagram type "`+string(typ)+`" is not supported yet.`, UnsupportedDiagram, typ)
+	return newError(`Diagram type "`+string(typ)+`" is not supported yet.`, UnsupportedDiagram, typ)
 }

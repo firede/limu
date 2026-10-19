@@ -122,10 +122,10 @@ func collapsed(sg *Subgraph) bool {
 	return v == "collapsed"
 }
 
-// BuildGraph resolves a parsed flowchart into the nodes and edges that are drawn, as Pele's
+// buildGraph resolves a parsed flowchart into the nodes and edges that are drawn, as Pele's
 // buildFlowGraph does: group membership, collapsed subgraphs, class styles and edge defaults.
 // defaultCurve is the flowchart config's curve, "" where it has none.
-func BuildGraph(model *DB, defaultCurve string) *Graph {
+func buildGraph(model *DB, defaultCurve string) *Graph {
 	g := &Graph{Nodes: []*GraphNode{}, Edges: []*GraphEdge{}}
 	subgraphs := model.Subgraphs
 

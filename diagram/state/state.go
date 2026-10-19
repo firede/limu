@@ -16,11 +16,11 @@ import "github.com/firede/limu/diagram"
 // what diagram.Prepared.Source gives, and title the title its front matter gives, "" for none.
 // An error is a *diagram.Error.
 func Parse(source string, title string) (*DB, error) {
-	db := NewDB()
+	db := newDB()
 	if title != "" {
 		db.Title = title
 	}
-	if err := ParseInto(source, db); err != nil {
+	if err := parseInto(source, db); err != nil {
 		return nil, err
 	}
 	return db, nil

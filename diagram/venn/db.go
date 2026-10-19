@@ -6,6 +6,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -127,7 +128,7 @@ func (d *db) validateUnionIdentifiers(ids []string) error {
 		}
 	}
 	if len(unknown) > 0 {
-		return diagram.NewError("unknown set identifier: "+strings.Join(unknown, ", "), diagram.Semantic, "venn")
+		return common.NewError("unknown set identifier: "+strings.Join(unknown, ", "), diagram.Semantic, "venn")
 	}
 	return nil
 }

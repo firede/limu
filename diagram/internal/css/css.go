@@ -1,17 +1,22 @@
-package style
+// Package css reads what a diagram's author sets in its text with classDef and style lines,
+// in the declarations of CSS they are written in, as Pele's resolveStyle does: the style
+// they give a thing, and the weight, slant and size of its text, which layout takes.
+package css
 
 import (
+	"math"
 	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/style"
 )
 
 // Author is what a diagram's author set in its text, with classDef and style lines, in the
 // declarations of CSS they are written in.
 type Author struct {
-	Style Style
+	Style style.Style
 	// What changes the size of text, which layout takes.
 	Bold, Italic bool
 	FontSize     float64 // 0 when it was not set
@@ -52,21 +57,21 @@ func Declarations(decls []string) Author {
 		case "opacity":
 			a.Style.Opacity = opacity(value)
 		case "stroke-width":
-			a.Style.StrokeWidth = Num{}
+			a.Style.StrokeWidth = style.Num{}
 			if f, ok := length(value); ok && f >= 0 {
-				a.Style.StrokeWidth = N(f)
+				a.Style.StrokeWidth = style.N(f)
 			}
 		case "stroke-dasharray":
 			a.Style.Dash = dashes(value)
 		case "stroke-linecap":
 			// Pele keeps the last value of a property alone, and one the browser drops
 			// leaves the property to what is under it.
-			a.Style.Cap = Cap(keyword(value, caps))
+			a.Style.Cap = style.Cap(keyword(value, caps))
 		case "stroke-linejoin":
-			a.Style.Join = Join(keyword(value, joins))
+			a.Style.Join = style.Join(keyword(value, joins))
 		case "rx", "ry":
 			if f, ok := length(value); ok && f >= 0 {
-				a.Style.Radius = N(f)
+				a.Style.Radius = style.N(f)
 			}
 		case "font-weight":
 			weight = value
@@ -169,8 +174,8 @@ func ShapeCSS(decls []string) string {
 // is what an unset style takes from under it here. It takes no others: SVG 2's miter-clip
 // and arcs are not drawn by browsers, and a value they do not take is dropped.
 var (
-	caps  = map[string]uint8{"butt": uint8(CapButt), "round": uint8(CapRound), "square": uint8(CapSquare), "initial": uint8(CapButt), "inherit": 0, "unset": 0}
-	joins = map[string]uint8{"miter": uint8(JoinMiter), "round": uint8(JoinRound), "bevel": uint8(JoinBevel), "initial": uint8(JoinMiter), "inherit": 0, "unset": 0}
+	caps  = map[string]uint8{"butt": uint8(style.CapButt), "round": uint8(style.CapRound), "square": uint8(style.CapSquare), "initial": uint8(style.CapButt), "inherit": 0, "unset": 0}
+	joins = map[string]uint8{"miter": uint8(style.JoinMiter), "round": uint8(style.JoinRound), "bevel": uint8(style.JoinBevel), "initial": uint8(style.JoinMiter), "inherit": 0, "unset": 0}
 )
 
 // keyword reads a keyword of CSS, in either case of its ASCII letters, from those given, or
@@ -185,25 +190,30 @@ func keyword(value string, of map[string]uint8) uint8 {
 }
 
 // paint is a paint of a color, None for none, or unset for one it cannot read.
-func paint(value string) Paint {
+func paint(value string) style.Paint {
 	if chars.EqualFoldASCII(value, "none") {
-		return None
+		return style.None
 	}
-	if c, ok := ParseColor(value); ok {
+	if c, ok := style.ParseColor(value); ok {
 		if c.A == 0 {
-			return None
+			return style.None
 		}
-		return Of(c)
+		return style.Of(c)
 	}
-	return Paint{}
+	return style.Paint{}
 }
 
 // opacity reads an opacity, as 0.5 or 50%, kept from 0 to 1, or unset for one it cannot read.
-func opacity(value string) Num {
-	if f, _, ok := number(value, 1); ok {
-		return N(max(0, min(1, f)))
+func opacity(value string) style.Num {
+	pct := strings.HasSuffix(value, "%")
+	f, err := strconv.ParseFloat(strings.TrimSuffix(value, "%"), 64)
+	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+		return style.Num{}
 	}
-	return Num{}
+	if pct {
+		f /= 100
+	}
+	return style.N(max(0, min(1, f)))
 }
 
 // fontPixels reads a font size as Pele's resolveStyle does: one that /^[\d.]+(px)?$/ takes,
@@ -247,22 +257,22 @@ func lowerASCII(s string) string {
 	return string(b)
 }
 
-func dashes(value string) Dash {
+func dashes(value string) style.Dash {
 	if chars.EqualFoldASCII(value, "none") {
-		return Solid
+		return style.Solid
 	}
 	var out []float64
 	for f := range strings.FieldsFuncSeq(value, func(r rune) bool { return r == ',' || strings.ContainsRune(" \t\n\r\f", r) }) {
 		n, ok := length(f)
 		if !ok || n < 0 {
-			return Dash{}
+			return style.Dash{}
 		}
 		out = append(out, n)
 	}
 	if len(out) == 0 {
-		return Dash{}
+		return style.Dash{}
 	}
-	return Dashes(out...)
+	return style.Dashes(out...)
 }
 
 // unsafe matches Pele's RE_UNSAFE, /url\s*\(|expression\s*\(|javascript:|[<>{};\\]|@import|image-set|\/\*/i:

@@ -4,6 +4,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -148,9 +149,9 @@ func parseSequence(src string, db *DB) {
 	failAt := func(expected string) {
 		t := toks[i]
 		if t.typ == tERROR {
-			panic(syntaxFailure{diagram.SyntaxError("sequence", src, t.start, "", true)})
+			panic(syntaxFailure{common.SyntaxError("sequence", src, t.start, "", true)})
 		}
-		panic(syntaxFailure{diagram.SyntaxError("sequence", src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
+		panic(syntaxFailure{common.SyntaxError("sequence", src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 	}
 	// expect reads a token of a type and gives its text, failing on any other, as the expect of
 	// Pele's parseSequence does.

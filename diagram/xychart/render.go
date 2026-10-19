@@ -117,7 +117,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 		o = &layout.Options{}
 	}
 	if len(m.Plots) == 0 {
-		return nil, diagram.NewError("No Plot to render, please provide a plot with some data", diagram.Semantic, "xychart")
+		return nil, common.NewError("No Plot to render, please provide a plot with some data", diagram.Semantic, "xychart")
 	}
 	chart := record(config["xyChart"])
 	size := o.Size()

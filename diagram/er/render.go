@@ -7,7 +7,9 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
@@ -88,8 +90,8 @@ type row struct {
 
 // A view is an entity or a subgraph as it is drawn: Pele's NodeView.
 type view struct {
-	node   *GraphNode
-	author style.Author
+	node   *graphNode
+	author css.Author
 	label  text.Label
 	w, h   float64
 	headH  float64
@@ -124,7 +126,7 @@ func cellText(raw string) string {
 // across as one that runs down.
 func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
 	padding := o.Pad()
-	graph := BuildGraph(db)
+	graph := buildGraph(db)
 	size := o.Size()
 	smallSize := jsmath.Round(float64(size * 0.875))
 	measure := o.Measure()
@@ -139,9 +141,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		index[n.ID] = i
 	}
 
-	var cedges []layout.CEdge
+	var cedges []graphs.CEdge
 	var edgeLabels []*text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	loops := map[int][]*selfLoop{}
 	var loopOrder []int
 	var loopOf []*selfLoop
@@ -163,7 +165,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		loopOf = append(loopOf, lp)
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, &label)
-		ce := layout.CEdge{Src: src, Dst: dst, Minlen: 1}
+		ce := graphs.CEdge{Src: src, Dst: dst, Minlen: 1}
 		if label.Width > 0 {
 			ce.LabelW = label.Width + 12
 		}
@@ -196,13 +198,13 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	}
 
 	views := make([]view, 0, len(graph.Nodes))
-	cnodes := make([]layout.CNode, 0, len(graph.Nodes))
+	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for i, node := range graph.Nodes {
 		decls := node.CSSCompiledStyles
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold
@@ -244,12 +246,12 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if below {
 			minW = max(minWidth, bands+8)
 		}
-		var c layout.CNode
+		var c graphs.CNode
 		if node.IsGroup {
-			c = layout.NewCNode(0, 0, -1)
+			c = graphs.NewCNode(0, 0, -1)
 			c.IsGroup = true
 			if node.Dir != "" {
-				c.Dir = layout.Direction(node.Dir)
+				c.Dir = graphs.Direction(node.Dir)
 			}
 			c.PadX = groupPad
 			if label.Height > 0 {
@@ -326,9 +328,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				room = float64(2 * (markerLength + loopLength*0.75 + 10 + reach))
 			}
 			if below {
-				c = layout.NewCNode(v.w, v.h+room, -1)
+				c = graphs.NewCNode(v.w, v.h+room, -1)
 			} else {
-				c = layout.NewCNode(v.w+room, v.h, -1)
+				c = graphs.NewCNode(v.w+room, v.h, -1)
 			}
 		}
 		c.Seq = float64(len(views))
@@ -343,13 +345,13 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		}
 	}
 
-	rootDir := layout.Direction(db.Direction)
+	rootDir := graphs.Direction(db.Direction)
 	if turned {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
 	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
 	curve := common.RoutingCurve(o.Routing)
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
 		Tracks:   curve == "step",
 		Straight: curve == "linear",
 		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
@@ -383,7 +385,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	inner := max(layoutWidth, title.Width)
 	ox := padding + (inner-layoutWidth)/2
 	oy := padding + titleHeight
-	layout.Shift(cnodes, cedges, ox, oy)
+	graphs.Shift(cnodes, cedges, ox, oy)
 	sc := &scene.Scene{
 		Type:     "er",
 		Width:    math.Ceil(inner + 2*padding),
@@ -696,7 +698,7 @@ type end struct {
 // spreadEnds spaces the ends of the edges on each side of a box along it, in the order they
 // fan out, as Pele's spreadEnds does: the layout brings every edge that ends on one side to
 // its middle, where their markers would cover each other.
-func spreadEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
+func spreadEnds(cedges []graphs.CEdge, cnodes []graphs.CNode, views []view) {
 	sides := map[int][]*end{}
 	var order []int
 	// add files the end of a route at index at under the side of node's box it lies on, with
@@ -768,7 +770,7 @@ func spreadEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
 
 // inset moves a route's end from the side of the larger box an entity with a
 // self-relationship is laid out in onto the entity's own side, as Pele's inset does.
-func inset(route []float64, at int, v *view, c *layout.CNode) {
+func inset(route []float64, at int, v *view, c *graphs.CNode) {
 	if c.IsGroup {
 		return
 	}

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/jsmath"
@@ -95,11 +96,11 @@ func authorLine(line string) string {
 	} else {
 		end += at + 1
 	}
-	css, err := url.PathUnescape(line[at+len(" css=") : end])
+	written, err := url.PathUnescape(line[at+len(" css=") : end])
 	if err != nil {
 		return line
 	}
-	s := style.Declarations(strings.Split(css, ";")).Style
+	s := css.Declarations(strings.Split(written, ";")).Style
 	return line[:at] + " author=" + fmt.Sprintf("%+v", s) + line[end:]
 }
 

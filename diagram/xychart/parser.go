@@ -2,6 +2,7 @@ package xychart
 
 import (
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -49,9 +50,9 @@ func parseXyChart(src string, m *Model) (err error) {
 	fail := func(expected string) {
 		t := types[i]
 		if t == tERROR {
-			panic(parseFailure{diagram.SyntaxError("xychart", src, tk.Starts[i], "", true)})
+			panic(parseFailure{common.SyntaxError("xychart", src, tk.Starts[i], "", true)})
 		}
-		panic(parseFailure{diagram.SyntaxError("xychart", src, tk.Starts[i], "Expecting "+expected+", got '"+tokenNames[t]+"'", false)})
+		panic(parseFailure{common.SyntaxError("xychart", src, tk.Starts[i], "Expecting "+expected+", got '"+tokenNames[t]+"'", false)})
 	}
 	expect := func(typ int) string {
 		if types[i] != typ {

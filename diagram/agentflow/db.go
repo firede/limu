@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/internal/yaml"
@@ -20,15 +21,15 @@ const (
 	LabelMarkdown LabelType = "markdown"
 )
 
-// Text is a label as written, with how it is read. Pele's FlowText.
-type Text struct {
+// flowText is a label as written, with how it is read. Pele's FlowText.
+type flowText struct {
 	Text string
 	Type LabelType
 }
 
-// Loc is a span of the source as Jison reports it: lines from 1, columns from 0, in UTF-16
+// loc is a span of the source as Jison reports it: lines from 1, columns from 0, in UTF-16
 // code units. Pele's Loc.
-type Loc struct {
+type loc struct {
 	FirstLine, FirstColumn, LastLine, LastColumn int
 }
 
@@ -108,13 +109,13 @@ type Tooltip struct {
 	ID, Text string
 }
 
-// LinkInfo is what an arrow says of an edge: Pele's LinkInfo.
-type LinkInfo struct {
+// linkInfo is what an arrow says of an edge: Pele's LinkInfo.
+type linkInfo struct {
 	Type         string
 	Stroke       string
 	Length       int
 	EdgeSemantic string
-	Text         *Text
+	Text         *flowText
 	ID           string
 	HasID        bool
 }
@@ -160,8 +161,8 @@ type Diagnostic struct {
 	Position *ElementPosition
 }
 
-// Options are Pele's AgentflowDbOptions.
-type Options struct {
+// options are Pele's AgentflowDbOptions.
+type options struct {
 	// MaxEdges is the most edges the flow may have; no limit when it is negative.
 	MaxEdges int
 	// InheritDir gives a flow that sets no direction the diagram's.
@@ -215,13 +216,13 @@ type DB struct {
 	bareMappings   map[*ElementMapping]bool
 	firstMapping   map[string]*ElementMapping
 	reported       map[string][]*Diagnostic
-	options        Options
-	graph          *Graph
+	options        options
+	graph          *graph
 }
 
-// NewDB is an empty agent flow.
+// newDB is an empty agent flow.
 // It is the constructor of Pele's AgentflowDb.
-func NewDB(options Options) *DB {
+func newDB(options options) *DB {
 	return &DB{
 		LineOffset:     options.LineOffset,
 		nodes:          map[string]int{},
@@ -478,7 +479,7 @@ func edgeSemantic(typ, stroke string) string {
 
 // destructEndLink reads the type, stroke and length of an arrow, or of the end of one, as
 // Pele's destructEndLink does.
-func destructEndLink(raw string) LinkInfo {
+func destructEndLink(raw string) linkInfo {
 	str := chars.Trim(raw)
 	line := ""
 	last := byte(0)
@@ -501,7 +502,7 @@ func destructEndLink(raw string) LinkInfo {
 		stroke = "dotted"
 		length = dots
 	}
-	return LinkInfo{Type: typ, Stroke: stroke, Length: length}
+	return linkInfo{Type: typ, Stroke: stroke, Length: length}
 }
 
 // semanticMetadata is metadata without the keys that say only how a thing is drawn, nil where
@@ -532,7 +533,7 @@ func syntaxAt(message string, line, column int) *diagram.Error {
 // metadata reads a metadata block, as Pele's metadata does: a block of one line as a flow
 // mapping, and one of more lines as block YAML, without the commas that end its lines if it
 // does not read with them.
-func (d *DB) metadata(id, source string, loc *Loc) (yaml.Value, error) {
+func (d *DB) metadata(id, source string, loc *loc) (yaml.Value, error) {
 	multiline := strings.Contains(source, "\n")
 	var src string
 	if multiline {
@@ -569,7 +570,7 @@ func (d *DB) metadata(id, source string, loc *Loc) (yaml.Value, error) {
 
 // shapeError is the error of a metadata block's unknown shape, at the place of the block, as
 // Pele's shapeError makes it.
-func (d *DB) shapeError(message string, loc *Loc) *diagram.Error {
+func (d *DB) shapeError(message string, loc *loc) *diagram.Error {
 	e := &diagram.Error{Code: diagram.Semantic, Message: message, Type: "agentflow"}
 	if loc != nil {
 		e.Line, e.Column = loc.FirstLine+d.LineOffset, loc.FirstColumn+1
@@ -655,7 +656,7 @@ func jsonString(v yaml.Value) string {
 // metadata block, if hasMetadata, and loc where it is. text is nil, typ "", and style and
 // classes nil where Pele's are undefined. Metadata on the id of a flow, a connector or an
 // edge is theirs.
-func (d *DB) addVertex(id string, text *Text, typ string, style, classes []string, props []Prop, metadata string, hasMetadata bool, loc *Loc) error {
+func (d *DB) addVertex(id string, text *flowText, typ string, style, classes []string, props []Prop, metadata string, hasMetadata bool, loc *loc) error {
 	if id == "" || chars.Trim(id) == "" {
 		return nil
 	}
@@ -785,11 +786,11 @@ func assignProp(props []Prop, p Prop) []Prop {
 // agentError is an error of an agent flow with a code, as Pele's database throws a PeleError
 // of type agentflow.
 func agentError(message string, code diagram.Code) *diagram.Error {
-	return diagram.NewError(message, code, "agentflow")
+	return common.NewError(message, code, "agentflow")
 }
 
 // addSingleLink adds an edge, as Pele's addSingleLink does; id is the arrow's own, if hasID.
-func (d *DB) addSingleLink(start, end string, info *LinkInfo, id string, hasID bool) error {
+func (d *DB) addSingleLink(start, end string, info *linkInfo, id string, hasID bool) error {
 	edge := &Edge{Start: start, End: end, LabelType: LabelText, Classes: []string{}}
 	if d.DefaultInterpolate != "" {
 		edge.Interpolate = d.DefaultInterpolate
@@ -830,7 +831,7 @@ func (d *DB) addSingleLink(start, end string, info *LinkInfo, id string, hasID b
 
 // addLink adds an edge from each of starts to each of ends, as Pele's addLink does. The id the
 // arrow gives goes to the edge from the last start to the first end.
-func (d *DB) addLink(starts, ends []string, info *LinkInfo) error {
+func (d *DB) addLink(starts, ends []string, info *linkInfo) error {
 	id, hasID := "", false
 	if info != nil && info.HasID {
 		id, hasID = strings.Replace(info.ID, "@", "", 1), true
@@ -1040,7 +1041,7 @@ const (
 
 // addSubGraph adds a flow of what its body gave, or adds to the one of the same id, as Pele's
 // addSubGraph does, and gives its id. idText and titleText are nil for a flow with neither.
-func (d *DB) addSubGraph(idText *Text, list []docItem, titleText *Text) string {
+func (d *DB) addSubGraph(idText *flowText, list []docItem, titleText *flowText) string {
 	id, hasID := "", idText != nil
 	if hasID {
 		id = chars.Trim(idText.Text)
@@ -1158,7 +1159,7 @@ func (d *DB) addGlobal(list []docItem) {
 
 // addConnector declares a connector, or retitles it, as Pele's addConnector does, and gives
 // its id: "" for one with none.
-func (d *DB) addConnector(textObj, titleObj *Text) string {
+func (d *DB) addConnector(textObj, titleObj *flowText) string {
 	id := ""
 	if textObj != nil {
 		id = chars.Trim(textObj.Text)
@@ -1187,7 +1188,7 @@ func (d *DB) addConnector(textObj, titleObj *Text) string {
 // destructLink reads an arrow, as Pele's destructLink does: end is the arrow, or its end where
 // start is the start of an arrow with a label between. An arrow whose start and end do not
 // agree on being dotted is of type and stroke "INVALID".
-func (d *DB) destructLink(end, start string) LinkInfo {
+func (d *DB) destructLink(end, start string) linkInfo {
 	info := destructEndLink(end)
 	if start != "" {
 		// The first half of a split arrow only says whether the line is dotted.
@@ -1196,7 +1197,7 @@ func (d *DB) destructLink(end, start string) LinkInfo {
 			stroke = "dotted"
 		}
 		if stroke != info.Stroke {
-			return LinkInfo{Type: "INVALID", Stroke: "INVALID"}
+			return linkInfo{Type: "INVALID", Stroke: "INVALID"}
 		}
 	}
 	info.EdgeSemantic = edgeSemantic(info.Type, info.Stroke)
@@ -1297,7 +1298,7 @@ func (d *DB) SemanticModel() *SemanticModel {
 
 // position is where a span of the source is, with the lines of the front matter counted, as
 // Pele's position gives it: a statement with no span is at line 0 of the text, column 0.
-func (d *DB) position(loc *Loc) *ElementPosition {
+func (d *DB) position(loc *loc) *ElementPosition {
 	if loc == nil {
 		return &ElementPosition{StartLine: d.LineOffset, EndLine: d.LineOffset}
 	}
@@ -1324,7 +1325,7 @@ func (d *DB) pushMapping(id, typ string, position *ElementPosition) *ElementMapp
 // if a metadata block follows it.
 // It is Pele's addVertexMapping, which is told the shape where this is told whether there is
 // none.
-func (d *DB) addVertexMapping(id string, bare bool, loc *Loc) {
+func (d *DB) addVertexMapping(id string, bare bool, loc *loc) {
 	if id == "" {
 		return
 	}
@@ -1336,7 +1337,7 @@ func (d *DB) addVertexMapping(id string, bare bool, loc *Loc) {
 
 // extendVertexMapping widens a node's span over the metadata block that follows it.
 // It is Pele's extendVertexMapping.
-func (d *DB) extendVertexMapping(id string, loc *Loc) {
+func (d *DB) extendVertexMapping(id string, loc *loc) {
 	if id == "" || loc == nil {
 		return
 	}
@@ -1362,7 +1363,7 @@ func (d *DB) extendVertexMapping(id string, loc *Loc) {
 
 // addEdgeMapping records where an edge statement is, under the ids of the nodes it ends at,
 // as Pele's addEdgeMapping does.
-func (d *DB) addEdgeMapping(toNodes []string, loc *Loc) {
+func (d *DB) addEdgeMapping(toNodes []string, loc *loc) {
 	var ids []string
 	for _, n := range toNodes {
 		if n != "" {
@@ -1378,7 +1379,7 @@ func (d *DB) addEdgeMapping(toNodes []string, loc *Loc) {
 
 // blockMapping records where a block is, from its keyword to its end, as Pele's blockMapping
 // does.
-func (d *DB) blockMapping(id, typ string, startLoc, endLoc *Loc) {
+func (d *DB) blockMapping(id, typ string, startLoc, endLoc *loc) {
 	if id == "" {
 		return
 	}
@@ -1392,7 +1393,7 @@ func (d *DB) blockMapping(id, typ string, startLoc, endLoc *Loc) {
 }
 
 // addSubgraphMapping records where a flow is, as Pele's addSubgraphMapping does.
-func (d *DB) addSubgraphMapping(id *Text, startLoc, endLoc *Loc) {
+func (d *DB) addSubgraphMapping(id *flowText, startLoc, endLoc *loc) {
 	text := ""
 	if id != nil {
 		text = id.Text
@@ -1401,7 +1402,7 @@ func (d *DB) addSubgraphMapping(id *Text, startLoc, endLoc *Loc) {
 }
 
 // addConnectorMapping records where a connector is, as Pele's addConnectorMapping does.
-func (d *DB) addConnectorMapping(id *Text, startLoc, endLoc *Loc) {
+func (d *DB) addConnectorMapping(id *flowText, startLoc, endLoc *loc) {
 	text := ""
 	if id != nil {
 		text = chars.Trim(id.Text)

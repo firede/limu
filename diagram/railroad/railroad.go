@@ -12,6 +12,7 @@ import (
 	"math"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -187,7 +188,7 @@ func populate(m *Model, source string, notation Notation) error {
 func Parse(source, title string) (*Model, error) {
 	notation := notationOf(source)
 	if notation == "" {
-		return nil, diagram.NewError("No railroad diagram keyword found.", diagram.Syntax, "railroad")
+		return nil, common.NewError("No railroad diagram keyword found.", diagram.Syntax, "railroad")
 	}
 	m := &Model{Notation: NotationRailroad}
 	if title != "" {

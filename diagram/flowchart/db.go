@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/internal/yaml"
@@ -20,8 +21,8 @@ const (
 	LabelMarkdown LabelType = "markdown"
 )
 
-// Text is a label as written, with how it is read. Pele's FlowText.
-type Text struct {
+// flowText is a label as written, with how it is read. Pele's FlowText.
+type flowText struct {
 	Text string
 	Type LabelType
 }
@@ -106,17 +107,17 @@ type Tooltip struct {
 	ID, Text string
 }
 
-// LinkInfo is what an arrow says of an edge: Pele's LinkInfo.
-type LinkInfo struct {
+// linkInfo is what an arrow says of an edge: Pele's LinkInfo.
+type linkInfo struct {
 	Type   string
 	Stroke string
 	Length int
-	Text   *Text
+	Text   *flowText
 	ID     string
 }
 
-// Options are Pele's FlowDbOptions.
-type Options struct {
+// options are Pele's FlowDbOptions.
+type options struct {
 	// MaxEdges is the most edges the flowchart may have; no limit when it is negative.
 	MaxEdges int
 	// InheritDir gives a subgraph that sets no direction the flowchart's.
@@ -156,12 +157,12 @@ type DB struct {
 	edgeByID       map[string]*Edge
 	pairCount      map[string]int
 	subCount       int
-	options        Options
+	options        options
 }
 
-// NewDB is an empty flowchart.
+// newDB is an empty flowchart.
 // It is the constructor of Pele's FlowDb.
-func NewDB(options Options) *DB {
+func newDB(options options) *DB {
 	return &DB{
 		nodes:          map[string]*Node{},
 		classes:        map[string]*ClassDef{},
@@ -218,7 +219,7 @@ func unquote(text string) string {
 
 // destructStartLink reads the start of an arrow that has a label between its start and its
 // end, its head and its stroke, as Pele's destructStartLink does.
-func destructStartLink(raw string) LinkInfo {
+func destructStartLink(raw string) linkInfo {
 	str := chars.Trim(raw)
 	typ := "arrow_open"
 	if str != "" {
@@ -241,12 +242,12 @@ func destructStartLink(raw string) LinkInfo {
 	if strings.Contains(str, ".") {
 		stroke = "dotted"
 	}
-	return LinkInfo{Type: typ, Stroke: stroke}
+	return linkInfo{Type: typ, Stroke: stroke}
 }
 
 // destructEndLink reads an arrow, or the end of one with a label between, its heads, stroke
 // and length, as Pele's destructEndLink does; Pele's countChar is strings.Count here.
-func destructEndLink(raw string) LinkInfo {
+func destructEndLink(raw string) linkInfo {
 	str := chars.Trim(raw)
 	line := ""
 	last := byte(0)
@@ -287,19 +288,19 @@ func destructEndLink(raw string) LinkInfo {
 		stroke = "dotted"
 		length = dots
 	}
-	return LinkInfo{Type: typ, Stroke: stroke, Length: length}
+	return linkInfo{Type: typ, Stroke: stroke, Length: length}
 }
 
 // flowError is an error of a flowchart, the PeleError of type flowchart that Pele's FlowDb
 // throws.
 func flowError(message string, code diagram.Code) *diagram.Error {
-	return diagram.NewError(message, code, "flowchart")
+	return common.NewError(message, code, "flowchart")
 }
 
 // addVertex adds a node, or adds to it, as Pele's addVertex does. text is nil, typ "", and
 // style and classes nil where Pele's are undefined; metadata is the text of a metadata block,
 // if hasMetadata.
-func (d *DB) addVertex(id string, text *Text, typ string, style, classes []string, dir string, props []Prop, metadata string, hasMetadata bool) error {
+func (d *DB) addVertex(id string, text *flowText, typ string, style, classes []string, dir string, props []Prop, metadata string, hasMetadata bool) error {
 	if id == "" || chars.Trim(id) == "" {
 		return nil
 	}
@@ -440,7 +441,7 @@ func assignProp(props []Prop, p Prop) []Prop {
 }
 
 // addSingleLink adds an edge, as Pele's addSingleLink does; id "" gives it one of its own.
-func (d *DB) addSingleLink(start, end string, info *LinkInfo, id string) error {
+func (d *DB) addSingleLink(start, end string, info *linkInfo, id string) error {
 	edge := &Edge{Start: start, End: end, LabelType: LabelText, Classes: []string{}}
 	if d.DefaultInterpolate != "" {
 		edge.Interpolate = d.DefaultInterpolate
@@ -479,7 +480,7 @@ func (d *DB) addSingleLink(start, end string, info *LinkInfo, id string) error {
 
 // addLink adds an edge from each of starts to each of ends, as Pele's addLink does. The id the
 // arrow gives goes to the edge from the last start to the first end.
-func (d *DB) addLink(starts, ends []string, info *LinkInfo) error {
+func (d *DB) addLink(starts, ends []string, info *linkInfo) error {
 	id := ""
 	if info != nil {
 		id = strings.Replace(info.ID, "@", "", 1)
@@ -695,7 +696,7 @@ func hasSpace(s string) bool { return strings.ContainsFunc(s, chars.IsSpaceRune)
 // addSubGraph adds a subgraph of what its body gave, or adds to the one of the same id, as
 // Pele's addSubGraph does, and gives its id. A title that is the id itself, with white space
 // in it, is a title only.
-func (d *DB) addSubGraph(idText *Text, list []docItem, titleText *Text) string {
+func (d *DB) addSubGraph(idText *flowText, list []docItem, titleText *flowText) string {
 	id := ""
 	hasID := idText != nil
 	if hasID {
@@ -769,20 +770,20 @@ func (d *DB) addSubGraph(idText *Text, list []docItem, titleText *Text) string {
 // destructLink reads an arrow, as Pele's destructLink does: end is the arrow, or its end where
 // start is the start of an arrow with a label between. An arrow whose start and end do not
 // agree is of type and stroke "INVALID".
-func (d *DB) destructLink(end, start string) LinkInfo {
+func (d *DB) destructLink(end, start string) linkInfo {
 	info := destructEndLink(end)
 	if start == "" {
 		return info
 	}
 	startInfo := destructStartLink(start)
 	if startInfo.Stroke != info.Stroke {
-		return LinkInfo{Type: "INVALID", Stroke: "INVALID"}
+		return linkInfo{Type: "INVALID", Stroke: "INVALID"}
 	}
 	if startInfo.Type == "arrow_open" {
 		startInfo.Type = info.Type
 	} else {
 		if startInfo.Type != info.Type {
-			return LinkInfo{Type: "INVALID", Stroke: "INVALID"}
+			return linkInfo{Type: "INVALID", Stroke: "INVALID"}
 		}
 		startInfo.Type = "double_" + startInfo.Type
 	}

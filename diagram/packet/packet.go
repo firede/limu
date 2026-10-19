@@ -11,6 +11,7 @@ import (
 	"math"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -45,7 +46,7 @@ func packetOption(config diagram.Config, key string, fallback, lo, hi float64) f
 }
 
 func invalid(message string) *diagram.Error {
-	return diagram.NewError(message, diagram.Semantic, "packet")
+	return common.NewError(message, diagram.Semantic, "packet")
 }
 
 // buildPacket makes the model of a packet's tree, as Pele's buildPacket does: each field

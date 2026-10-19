@@ -1,4 +1,4 @@
-package layout
+package graphs
 
 import (
 	"math"
@@ -125,11 +125,11 @@ func Lanes(nodes []CNode, edges []CEdge, dir Dir, opt LayeredOptions, lanePad fl
 	along := func(c *CNode) float64 { return pick(sideways, c.W, c.H) }
 	cross := func(c *CNode) float64 { return pick(sideways, c.H, c.W) }
 
-	lnodes := make([]LNode, len(real))
+	lnodes := make([]lNode, len(real))
 	for k, i := range real {
-		lnodes[k] = NewLNode(cross(&nodes[i]), along(&nodes[i]), KindNode)
+		lnodes[k] = newLNode(cross(&nodes[i]), along(&nodes[i]), kindNode)
 	}
-	var ledges []LEdge
+	var ledges []lEdge
 	var edgeOf []int
 	step := 1
 	{
@@ -146,12 +146,12 @@ func Lanes(nodes []CNode, edges []CEdge, dir Dir, opt LayeredOptions, lanePad fl
 				step = 2
 			}
 			seen[key] = true
-			ledges = append(ledges, NewLEdge(a, b, e.Minlen, pick(sideways, e.LabelH, e.LabelW), pick(sideways, e.LabelW, e.LabelH)))
+			ledges = append(ledges, newLEdge(a, b, e.Minlen, pick(sideways, e.LabelH, e.LabelW), pick(sideways, e.LabelW, e.LabelH)))
 			edgeOf = append(edgeOf, ei)
 		}
 	}
-	Orient(lnodes, ledges)
-	Rank(lnodes, ledges, step)
+	orient(lnodes, ledges)
+	rank(lnodes, ledges, step)
 
 	m := len(ledges)
 	itemLane := make([]int, len(real))
@@ -159,7 +159,7 @@ func Lanes(nodes []CNode, edges []CEdge, dir Dir, opt LayeredOptions, lanePad fl
 		itemLane[k] = laneOf(i)
 	}
 	// ends is a relation's ends in the direction of the flow.
-	ends := func(e *LEdge) (int, int) {
+	ends := func(e *lEdge) (int, int) {
 		if e.Reversed {
 			return e.Head, e.Tail
 		}

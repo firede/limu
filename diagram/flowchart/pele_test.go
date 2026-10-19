@@ -252,20 +252,20 @@ func TestParseMatchesPele(t *testing.T) {
 			t.Errorf("type of %q: %q, Pele %v", c.Src, typ, c.Type)
 			ok = false
 		case typ != diagram.Flowchart:
-			db := NewDB(Options{MaxEdges: -1})
-			if err := ParseInto(c.Src, db); err != nil {
+			db := newDB(options{MaxEdges: -1})
+			if err := parseInto(c.Src, db); err != nil {
 				if c.Direct.Error == nil {
-					t.Errorf("ParseInto(%q): %v, Pele had none", c.Src, err)
+					t.Errorf("parseInto(%q): %v, Pele had none", c.Src, err)
 					ok = false
 				} else {
 					ok = compare(t, "direct error", c.Src, dumpError(err), c.Direct.Error)
 				}
 			} else if c.Direct.Error != nil {
-				t.Errorf("ParseInto(%q): no error, Pele %v", c.Src, c.Direct.Error)
+				t.Errorf("parseInto(%q): no error, Pele %v", c.Src, c.Direct.Error)
 				ok = false
 			} else {
 				ok = compare(t, "direct db", c.Src, dumpDB(db), c.Direct.DB) &&
-					compare(t, "direct graph", c.Src, dumpGraph(BuildGraph(db, "")), c.Direct.Graph)
+					compare(t, "direct graph", c.Src, dumpGraph(buildGraph(db, "")), c.Direct.Graph)
 			}
 		default:
 			db, err := ParsePrepared(p)
@@ -281,7 +281,7 @@ func TestParseMatchesPele(t *testing.T) {
 				ok = false
 			} else {
 				ok = compare(t, "db", c.Src, dumpDB(db), c.DB) &&
-					compare(t, "graph", c.Src, dumpGraph(BuildGraph(db, DefaultCurve(p.Config))), c.Graph)
+					compare(t, "graph", c.Src, dumpGraph(buildGraph(db, defaultCurve(p.Config))), c.Graph)
 			}
 		}
 		if !ok {
@@ -296,8 +296,8 @@ func TestParseMatchesPele(t *testing.T) {
 // minutes for it, as Pele's parser test has it.
 func TestHuge(t *testing.T) {
 	body := strings.Repeat(strings.Repeat("A-->B;B-->A;", 415)+"A-->B;", 57) + strings.Repeat("A-->B;B-->A;", 275)
-	db := NewDB(Options{MaxEdges: -1})
-	if err := ParseInto("graph LR;"+body, db); err != nil {
+	db := newDB(options{MaxEdges: -1})
+	if err := parseInto("graph LR;"+body, db); err != nil {
 		t.Fatal(err)
 	}
 	if db.Edges[0].Type != "arrow_point" || len(db.Edges) != 47917 || len(db.Nodes) != 2 {

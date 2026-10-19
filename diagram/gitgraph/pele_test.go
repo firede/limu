@@ -63,7 +63,7 @@ func (o object) opt(key, v string) {
 	}
 }
 
-func dumpAST(a *AST) object {
+func dumpAST(a *gitGraphAst) object {
 	o := object{"$type": a.Type}
 	o.opt("dir", a.Dir)
 	o.ptr("title", a.Title)

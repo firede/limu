@@ -86,7 +86,7 @@ func dumpDB(db *DB) object {
 	return o
 }
 
-func dumpGraph(g *Graph) object {
+func dumpGraph(g *graph) object {
 	nodes := []any{}
 	for _, n := range g.Nodes {
 		v := object{"id": n.ID, "label": n.Label, "alias": n.Alias, "attributes": dumpAttributes(n.Attributes),
@@ -153,7 +153,7 @@ func result(t *testing.T, what, src string, db *DB, err error, want *peleCaseRes
 		t.Errorf("%s of %q: no error, Pele %v", what, src, want.Error)
 		return false
 	}
-	return compare(t, what+" db", src, dumpDB(db), want.DB) && compare(t, what+" graph", src, dumpGraph(BuildGraph(db)), want.Graph)
+	return compare(t, what+" db", src, dumpDB(db), want.DB) && compare(t, what+" graph", src, dumpGraph(buildGraph(db)), want.Graph)
 }
 
 func TestParseMatchesPele(t *testing.T) {
@@ -188,8 +188,8 @@ func TestParseMatchesPele(t *testing.T) {
 			t.Errorf("type of %q: %q, Pele %v", c.Src, typ, c.Type)
 			ok = false
 		case typ != diagram.ER:
-			db := NewDB()
-			err := ParseInto(c.Src, db)
+			db := newDB()
+			err := parseInto(c.Src, db)
 			ok = result(t, "direct", c.Src, db, err, c.Direct)
 		default:
 			db, err := ParsePrepared(pre)

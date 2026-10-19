@@ -7,7 +7,9 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/url"
 	"github.com/firede/limu/layout"
@@ -78,7 +80,7 @@ var roles = [...]scene.Role{
 type view struct {
 	node     *GraphNode
 	kind     kind
-	author   style.Author
+	author   css.Author
 	hasStyle bool
 	label    text.Label
 	lines    []text.Label
@@ -99,7 +101,7 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) *scene.Scene {
 	return common.TurnToFit(o, func(down bool) *scene.Scene { return lay(db, config, o, down) })
 }
 
-func vertical(dir layout.Dir) bool { return dir == layout.TB || dir == layout.BT }
+func vertical(dir graphs.Dir) bool { return dir == graphs.TB || dir == graphs.BT }
 
 // numberOption is a number of the state diagram's config, if it is one above 0, at most 2000,
 // as Pele's numberOption reads it.
@@ -128,8 +130,8 @@ func clamp(value, lo, hi float64) float64 {
 }
 
 // group is a cnode for a group, as Pele's group makes.
-func group(dir layout.Dir, padX, padTop, padBottom float64) layout.CNode {
-	c := layout.NewCNode(0, 0, -1)
+func group(dir graphs.Dir, padX, padTop, padBottom float64) graphs.CNode {
+	c := graphs.NewCNode(0, 0, -1)
 	c.IsGroup = true
 	c.Dir = dir
 	c.PadX = padX
@@ -161,9 +163,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 	measure := o.Measure()
 	wrapWidth := numberOption(config, "wrappingWidth", 200)
 	pad := o.Pad()
-	rootDir := layout.Direction(db.Direction())
+	rootDir := graphs.Direction(db.Direction())
 	if turned {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
 	labelOf := func(raw string, fontSize, wrap float64, face text.Face) text.Label {
 		return text.Layout(raw, text.Options{Measurer: measure, Size: fontSize, MaxWidth: wrap, Face: face, Markdown: true, Icons: o.Icons})
@@ -171,8 +173,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 
 	index := map[string]int{}
 	var views []view
-	var cnodes []layout.CNode
-	add := func(node *GraphNode, k kind, c *layout.CNode) int {
+	var cnodes []graphs.CNode
+	add := func(node *GraphNode, k kind, c *graphs.CNode) int {
 		views = append(views, view{node: node, kind: k})
 		if c != nil {
 			cnodes = append(cnodes, *c)
@@ -269,7 +271,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 
 	// As in Mermaid, a composite that sets no direction runs top to bottom whatever surrounds
 	// it.
-	innerDir := func(composite int) layout.Dir { return layout.Direction(views[composite].node.Dir) }
+	innerDir := func(composite int) graphs.Dir { return graphs.Direction(views[composite].node.Dir) }
 	// Whether the flow around a state runs top to bottom or bottom to top.
 	across := func(i int) bool {
 		if logical[i] == -1 {
@@ -324,7 +326,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var face text.Face
 		if author.Bold {
 			face |= text.Bold
@@ -337,7 +339,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			fontSize = author.FontSize
 		}
 		v.author, v.hasStyle = author, true
-		var c layout.CNode
+		var c graphs.CNode
 		made := false
 		switch v.kind {
 		case kComposite:
@@ -391,7 +393,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			v.h = height
 		}
 		if !made {
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		}
 		// The transitions on one side of a state's box spread along it, clear of its corners.
 		if v.kind == kState || v.kind == kDescribed {
@@ -404,7 +406,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		cnodes = append(cnodes, c)
 	}
 
-	var cedges []layout.CEdge
+	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
 	var drawn []*GraphEdge
 	// The transitions each state makes to itself: how many, their widest label, and their
@@ -433,7 +435,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		} else {
 			appear = append(appear, math.Inf(1))
 		}
-		c := layout.NewCNode(0, 0, composite)
+		c := graphs.NewCNode(0, 0, composite)
 		return add(nil, kHidden, &c)
 	}
 	for _, edge := range graph.Edges {
@@ -459,7 +461,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		}
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, label)
-		ce := layout.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: labelW}
+		ce := graphs.CEdge{Src: src, Dst: dst, Minlen: 1, LabelW: labelW}
 		if label.Height > 0 {
 			ce.LabelH = label.Height + 4
 		}
@@ -497,11 +499,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			cnodes[i].Parent = logical[i]
 			continue
 		}
-		var c layout.CNode
+		var c graphs.CNode
 		if across(i) {
-			c = group(layout.LR, room, 0, 0)
+			c = group(graphs.LR, room, 0, 0)
 		} else {
-			c = group(layout.TB, 0, room, room)
+			c = group(graphs.TB, 0, room, room)
 		}
 		c.Parent = logical[i]
 		appear = append(appear, appear[i])
@@ -563,7 +565,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 
 	// Pele's transitions are smooth; the host may ask for them at right angles, or straight.
 	curve := common.RoutingCurve(o.Routing)
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
 		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
 		EdgeSep:  edgeSep,
 		RankSep:  numberOption(config, "rankSpacing", rankSep),
@@ -904,7 +906,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				if inward {
 					at = 0
 				}
-				near := (g.Dir == layout.TB || g.Dir == layout.LR) == inward
+				near := (g.Dir == graphs.TB || g.Dir == graphs.LR) == inward
 				var point []float64
 				if vertical(g.Dir) {
 					py := g.Y + pad + g.H/2
@@ -977,7 +979,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 
 // titleX picks where a composite's title sits in its title bar so that edges entering from
 // above do not cross it, as Pele's titleX does.
-func titleX(c *layout.CNode, width float64, crossings map[float64][]float64) float64 {
+func titleX(c *graphs.CNode, width float64, crossings map[float64][]float64) float64 {
 	xs, ok := crossings[jsmath.Round(c.Y-c.H/2)]
 	if !ok || width == 0 {
 		return c.X

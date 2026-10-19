@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -162,7 +163,7 @@ func peleLine(line string) string {
 			opacity = f
 		}
 		strokeOpacity, hasStrokeOpacity := lastOpacity(decls, "stroke-opacity")
-		s := style.Declarations(without(without(decls, "fill-opacity"), "stroke-opacity")).Style
+		s := css.Declarations(without(without(decls, "fill-opacity"), "stroke-opacity")).Style
 		s.Text = style.Paint{}
 		if !s.Fill.Set() {
 			s.Fill = fill
@@ -180,7 +181,7 @@ func peleLine(line string) string {
 		bar := afterCSS(line)
 		head := strings.Split(line[:bar], " ")
 		n := len(head)
-		s := style.Declarations(declarations(head[n-1])).Style
+		s := css.Declarations(declarations(head[n-1])).Style
 		s.Text = style.Paint{}
 		s = s.Over(style.Style{Fill: style.None, Stroke: style.None})
 		return strings.Join(head[:n-4], " ") + " " + strings.Join(head[n-3:n-1], " ") + " style=" + view(s) + " | " +
@@ -196,7 +197,7 @@ func peleLine(line string) string {
 				decls[i] = "color:" + d[len("fill:"):]
 			}
 		}
-		s := style.Declarations(decls).Style
+		s := css.Declarations(decls).Style
 		return strings.Join(head[:n-1], " ") + " author=" + view(style.Style{Text: s.Text, Opacity: s.Opacity}) + line[bar:]
 	}
 	return line

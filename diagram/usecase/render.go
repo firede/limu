@@ -7,7 +7,9 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
-	"github.com/firede/limu/draw"
+	"github.com/firede/limu/diagram/internal/css"
+	"github.com/firede/limu/diagram/internal/draw"
+	"github.com/firede/limu/diagram/internal/graphs"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -45,9 +47,9 @@ const (
 // A view is a node as it is drawn: Pele's View. w and h are the size of what is drawn; the
 // layout's box is larger when the node carries a self-relationship.
 type view struct {
-	node       *GraphNode
+	node       *graphNode
 	kind       int
-	author     style.Author
+	author     css.Author
 	label      text.Label
 	stereotype text.Label
 	w, h       float64
@@ -95,7 +97,7 @@ func literal(s string) string {
 // anchor is the point of a node's outline on one of its four sides (0 top, 1 right, 2
 // bottom, 3 left), along away from the middle of that side, as Pele's anchor finds it. Lines
 // meet an actor at its figure, not at its label.
-func anchor(v *view, c *layout.CNode, side int, along float64) (float64, float64) {
+func anchor(v *view, c *graphs.CNode, side int, along float64) (float64, float64) {
 	sign := -1.0
 	if side == 1 || side == 2 {
 		sign = 1
@@ -150,7 +152,7 @@ func sideLength(v *view, side int) float64 {
 // attachEnds spaces the edges that end on one side of a node along the side, in the order
 // they fan out, and puts each on the node's outline, as Pele's attachEnds does: the layout
 // brings them all to the middle of the side.
-func attachEnds(cedges []layout.CEdge, cnodes []layout.CNode, views []view) {
+func attachEnds(cedges []graphs.CEdge, cnodes []graphs.CNode, views []view) {
 	type end struct {
 		route  []float64
 		at     int
@@ -325,7 +327,7 @@ func figure(v *view, fx, fy float64) (parts []scene.Part, picture *scene.Picture
 // titleX is where a boundary's title sits along its top, as Pele's titleX places it: in the
 // middle, unless edges enter through the top there, and then in the stretch between them
 // that is nearest the middle, or the widest if none has room.
-func titleX(c *layout.CNode, width float64, crossings draw.Crossings) float64 {
+func titleX(c *graphs.CNode, width float64, crossings draw.Crossings) float64 {
 	xs, ok := crossings[jsmath.Round(c.Y-c.H/2)]
 	if width == 0 || !ok {
 		return c.X
@@ -396,17 +398,17 @@ func leftLabel(l *text.Label, x, y, left, cy float64, it scene.Item) []scene.Ite
 // lay lays the diagram out once, as Pele's draw does. turned lays out a diagram that runs
 // across as one that runs down.
 func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene.Scene {
-	graph := BuildGraph(m)
+	graph := buildGraph(m)
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	tiny := jsmath.Round(size * 0.8125)
 	measure := o.Measure()
 	pad := o.Pad()
-	rootDir := layout.Direction(m.Direction)
+	rootDir := graphs.Direction(m.Direction)
 	if turned {
-		rootDir = layout.TB
+		rootDir = graphs.TB
 	}
-	sideways := rootDir == layout.LR || rootDir == layout.RL
+	sideways := rootDir == graphs.LR || rootDir == graphs.RL
 	// labelOf lays a label out, a plain one handed over as literal makes it, as Pele's text
 	// does.
 	labelOf := func(raw string, markdown bool, size, wrap float64, face text.Face) text.Label {
@@ -431,7 +433,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	for _, b := range m.SystemBoundaries {
 		boundaryClasses[b.ID] = b.Classes
 	}
-	relationClasses := map[*GraphEdge][]string{}
+	relationClasses := map[*graphEdge][]string{}
 	for i, r := range m.Relationships {
 		relationClasses[graph.Edges[i]] = r.Classes
 	}
@@ -441,13 +443,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		index[n.ID] = i
 	}
 	views := make([]view, 0, len(graph.Nodes))
-	cnodes := make([]layout.CNode, 0, len(graph.Nodes))
+	cnodes := make([]graphs.CNode, 0, len(graph.Nodes))
 	for _, node := range graph.Nodes {
 		decls := node.CSSCompiledStyles
 		if len(node.CSSStyles) > 0 {
 			decls = append(append([]string(nil), node.CSSCompiledStyles...), node.CSSStyles...)
 		}
-		author := style.Declarations(decls)
+		author := css.Declarations(decls)
 		var base text.Face
 		if author.Bold {
 			base |= text.Bold
@@ -465,13 +467,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			stereotype = labelOf("«"+node.Stereotype+"»", false, tiny, 200, base)
 		}
 		v := view{node: node, kind: kindBox, author: author, label: stereotype, stereotype: stereotype}
-		var c layout.CNode
+		var c graphs.CNode
 		switch {
 		case node.IsGroup:
 			v.kind = kindBoundary
 			v.label = labelOf(node.Label, markdown, fontSize, 4000, base)
 			titleH := v.label.Height
-			c = layout.NewCNode(0, 0, -1)
+			c = graphs.NewCNode(0, 0, -1)
 			c.IsGroup = true
 			c.PadX = groupPad
 			c.PadBottom = groupPad
@@ -508,13 +510,13 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			v.w = max(v.label.Width+2*cellPad, rowsW, 72)
 			v.h += v.headH
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		case node.ActorType != "":
 			v.kind = kindActor
 			v.label = labelOf(node.Label, markdown, fontSize, 140, base)
 			v.w = max(figureW, v.label.Width, stereotype.Width)
 			v.h = figureH + figureGap + stereotype.Height + v.label.Height
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		default:
 			labelSize := fontSize
 			if node.Shape == "note" {
@@ -541,7 +543,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				v.w = max(tw+2*node.Padding+12, 80)
 				v.h = max(th+24, 44)
 			}
-			c = layout.NewCNode(v.w, v.h, -1)
+			c = graphs.NewCNode(v.w, v.h, -1)
 		}
 		c.Seq = float64(len(views))
 		views = append(views, v)
@@ -556,9 +558,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		}
 	}
 
-	var cedges []layout.CEdge
+	var cedges []graphs.CEdge
 	var edgeLabels []text.Label
-	var drawn []*GraphEdge
+	var drawn []*graphEdge
 	for _, edge := range graph.Edges {
 		src, ok1 := index[edge.Start]
 		dst, ok2 := index[edge.End]
@@ -591,7 +593,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		}
 		drawn = append(drawn, edge)
 		edgeLabels = append(edgeLabels, label)
-		ce := layout.CEdge{Src: src, Dst: dst, Minlen: float64(edge.MinLen)}
+		ce := graphs.CEdge{Src: src, Dst: dst, Minlen: float64(edge.MinLen)}
 		if label.Width > 0 {
 			ce.LabelW = label.Width + 12
 		}
@@ -603,7 +605,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 
 	// The host may ask for edges at right angles, or straight, as it may of a flowchart.
 	curve := common.RoutingCurve(o.Routing)
-	result := layout.Compound(cnodes, cedges, rootDir, layout.LayeredOptions{
+	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
 		Tracks:   curve == "step",
 		Straight: curve == "linear",
 		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
@@ -620,7 +622,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	inner := max(result.Width, title.Width)
 	ox := pad + (inner-result.Width)/2
 	oy := pad + titleHeight
-	layout.Shift(cnodes, cedges, ox, oy)
+	graphs.Shift(cnodes, cedges, ox, oy)
 	sc := &scene.Scene{
 		Type:     "usecase",
 		Width:    math.Ceil(inner + 2*pad),
@@ -797,9 +799,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		ce := &cedges[i]
 		edge := drawn[i]
 		label := &edgeLabels[i]
-		var author style.Author
+		var author css.Author
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
-			author = style.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
+			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
 			// What styles an edge's line styles its markers, and fills nothing.
 			author.Style.Fill = style.Paint{}
 		}

@@ -75,7 +75,7 @@ func sample() *scene.Scene {
 				Parts: []scene.Part{{Rounded: true, Box: scene.Rect{X: 60, Y: 40, W: 80, H: 40}}},
 				Label: start, At: scene.Point{X: 100, Y: 60},
 				Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
-				Author: style.Declarations([]string{"fill:#f9f", "stroke-width:2px"}).Style,
+				Author: style.Style{Fill: style.Of(style.Hex("#f9f")), StrokeWidth: style.N(2)},
 				Link:   "https://example.com/?a=1&b=2", Tooltip: "Where it starts",
 			},
 			{
@@ -136,8 +136,8 @@ func TestRenderShade(t *testing.T) {
 	if got := Render(sc, nil); !strings.Contains(got, `height="10" fill="var(--limu-bg,#ffffff)" stroke="none"/>`) {
 		t.Errorf("no stripe of the background:\n%s", got)
 	}
-	for _, fill := range []string{"fill:#ff9966", "fill:#ff996680"} {
-		sc.Items[0] = item(style.Declarations([]string{fill}).Style)
+	for _, fill := range []string{"#ff9966", "#ff996680"} {
+		sc.Items[0] = item(style.Style{Fill: style.Of(style.Hex(fill))})
 		if got := Render(sc, nil); !strings.Contains(got, `height="10" fill="var(--limu-bg,#ffffff)" fill-opacity="0.6" stroke="none"/>`) {
 			t.Errorf("%s: no stripe of the background at 60%%:\n%s", fill, got)
 		}
@@ -151,7 +151,7 @@ func TestRenderShade(t *testing.T) {
 // not twice: fill:#ff000080 is drawn at 0.5, not at 0.25.
 func TestRenderOwnAlpha(t *testing.T) {
 	sc := sample()
-	sc.Items[3].Author = style.Declarations([]string{"fill:#ff000080", "stroke:#00ff0040"}).Style
+	sc.Items[3].Author = style.Style{Fill: style.Of(style.Hex("#ff000080")), Stroke: style.Of(style.Hex("#00ff0040"))}
 	for _, literal := range []bool{false, true} {
 		got := Render(sc, &Options{Literal: literal})
 		if !strings.Contains(got, `fill="#ff0000" fill-opacity="0.5" stroke="#00ff00" stroke-opacity="0.25"`) {
@@ -164,7 +164,7 @@ func TestRenderOwnAlpha(t *testing.T) {
 // a marker is filled in the stroke's color alone and stroked at the stroke opacity.
 func TestRenderFillOpacity(t *testing.T) {
 	sc := sample()
-	sc.Items[3].Author = style.Declarations([]string{"fill:#ff000080", "fill-opacity:0.5", "stroke-opacity:0.25"}).Style
+	sc.Items[3].Author = style.Style{Fill: style.Of(style.Hex("#ff000080")), FillOpacity: style.N(0.5), StrokeOpacity: style.N(0.25)}
 	got := Render(sc, &Options{Literal: true})
 	if !strings.Contains(got, `fill="#ff0000" fill-opacity="0.25"`) || !strings.Contains(got, `stroke-opacity="0.25"`) {
 		t.Errorf("opacities not written:\n%s", got)
@@ -300,7 +300,7 @@ func TestRenderCapJoin(t *testing.T) {
 			t.Errorf("no %s in\n%s", want, got)
 		}
 	}
-	sc.Items[0].Author = style.Declarations([]string{"stroke-linecap:square", "stroke-linejoin:bevel"}).Style
+	sc.Items[0].Author = style.Style{Cap: style.CapSquare, Join: style.JoinBevel}
 	got = Render(sc, nil)
 	if !strings.Contains(got, `L40,30" fill="none" stroke="var(--limu-line,#1f1f1f)" stroke-linecap="square" stroke-linejoin="bevel"/>`) ||
 		!strings.Contains(got, `stroke-linecap="square" stroke-linejoin="round"/>`) {

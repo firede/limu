@@ -2,6 +2,7 @@ package timeline
 
 import (
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -16,7 +17,7 @@ func parseTimeline(src string, m *Model) error {
 		if t.Types[i] != tEND {
 			got = tokenNames[t.Types[i]]
 		}
-		return diagram.SyntaxError("timeline", src, t.Starts[i], "Expecting "+expected+", got '"+got+"'", false)
+		return common.SyntaxError("timeline", src, t.Starts[i], "Expecting "+expected+", got '"+got+"'", false)
 	}
 
 	head := t.Types[0]
@@ -91,7 +92,7 @@ func (m *Model) addTask(period, event string) {
 func (m *Model) addEvent(event string) error {
 	if len(m.Periods) == 0 {
 		// Mermaid fails here too, with a TypeError.
-		return diagram.NewError("An event needs a time period before it.", diagram.Semantic, "timeline")
+		return common.NewError("An event needs a time period before it.", diagram.Semantic, "timeline")
 	}
 	p := m.Periods[len(m.Periods)-1]
 	p.Events = append(p.Events, event)

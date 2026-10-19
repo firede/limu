@@ -125,8 +125,8 @@ type classSet struct {
 	has  map[*Class]bool
 }
 
-// NewDB is an empty diagram, as Pele's ClassDb is when it is made.
-func NewDB() *DB {
+// newDB is an empty diagram, as Pele's ClassDb is when it is made.
+func newDB() *DB {
 	return &DB{
 		Direction:    "TB",
 		classes:      map[string]*Class{},

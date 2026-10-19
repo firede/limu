@@ -1,8 +1,6 @@
-// Package layout holds what is shared by the layouts of diagrams: the options that change
-// where things are, and the layouts that more than one diagram places its things with, as
-// Pele's src/layout does: the layered layout of a graph (Layered), the compound one of a
-// graph with groups (Compound), and the lanes of a swimlane diagram (Lanes). A change of the
-// options lays a diagram out again; a change of style does not.
+// Package layout holds the options that change where things are: the measurer and the size
+// of text, the width the host has, a grid to snap to, how edges are routed, and the like. A
+// change of them lays a diagram out again; a change of style does not.
 package layout
 
 import (
