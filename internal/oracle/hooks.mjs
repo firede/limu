@@ -23,9 +23,11 @@ export async function resolve(spec, ctx, next) {
 // label, the point it is centered on, its size and the text of its lines; a sankey
 // diagram's labels write the middle of their line as y, with an m before it; an
 // architecture diagram's labels write, in place of their text, the point they are centered on
-// and all that is in them, and its markers their tips and the way they point; and a block
+// and all that is in them, and its markers their tips and the way they point; a block
 // diagram's labelSvg writes, before each label, the point it is centered on, its size and its
-// spans, and its blocks write the size they are drawn at as data-limu.
+// spans, and its blocks write the size they are drawn at as data-limu; and a Wardley
+// map's labels write, before each, the point it is drawn about, its measures, its
+// attributes and its spans, and its markers where their tips are and the way they point.
 const patch = (url, source, find, replace) => {
   if (!source.includes(find)) throw new Error(`no ${find} in ${url}`);
   return source.replace(find, replace);
@@ -41,6 +43,9 @@ const RADAR_IMPORT = "import { escText, labelSvg, num } from '../../svg/builder.
 const SANKEY_Y = 'y="${num(y + small * 0.35)}"';
 const ARCH_EDGES = "import { edgeLabelSvg, marker, markerTrim } from '../../svg/edges.js';";
 const BLOCK_NODE = 'transform="translate(${num(v.x)},${num(v.y)})">`';
+const WARDLEY_BUILDER = "import { esc, escText, labelSvg, num, sharedStyle, spanStyle, textStyle } from '../../svg/builder.js';";
+const WARDLEY_EDGES = "import { marker, markerTrim } from '../../svg/edges.js';";
+const WARDLEY_START = 'function startLabel(';
 
 export async function load(url, ctx, next) {
   if (url.endsWith('/src/svg/builder.ts')) {
@@ -142,6 +147,35 @@ function labelSvg(label: Label, cx: number, cy: number, attrs: string, icons?: a
   if (!(globalThis as any).limuExactNumbers || s === '') return s;
   const lines = label.lines.map((line) => line.map((span) => [span.text, span.style, span.icon ?? null, span.width]));
   return \`<limu-label x="\${cx}" y="\${cy}" w="\${label.width}" h="\${label.height}" lines="\${encodeURIComponent(JSON.stringify(lines))}"/>\` + s;
+}
+`;
+    return { ...loaded, source, shortCircuit: true };
+  }
+  if (url.endsWith('/src/diagrams/wardley/render.ts')) {
+    const loaded = await next(url, ctx);
+    let source = String(loaded.source);
+    source = patch(url, source, WARDLEY_BUILDER, WARDLEY_BUILDER.replace('labelSvg,', 'labelSvg as labelSvgPele,'));
+    source = patch(url, source, WARDLEY_EDGES, WARDLEY_EDGES.replace('marker,', 'marker as markerPele,'));
+    source = patch(url, source, WARDLEY_START, 'function startLabelPele(');
+    source += `
+function limuLabel(tag: string, label: Label, x: number, y: number, attrs: string): string {
+  const lines = label.lines.map((line) => line.map((s) => (s.icon !== undefined ? ['i', s.icon] : ['t', s.style, s.text])));
+  return \`<\${tag} x="\${x}" y="\${y}" w="\${label.width}" h="\${label.height}" size="\${label.size}" lh="\${label.lineHeight}" attrs="\${encodeURIComponent(attrs)}" lines="\${encodeURIComponent(JSON.stringify(lines))}"/>\`;
+}
+function labelSvg(label: Label, cx: number, cy: number, attrs: string, icons?: any): string {
+  const s = labelSvgPele(label, cx, cy, attrs, icons);
+  if (!(globalThis as any).limuExactNumbers || s === '') return s;
+  return limuLabel('limu-label', label, cx, cy, attrs) + s;
+}
+function startLabel(label: Label, x: number, y: number, attrs: string): string {
+  const s = startLabelPele(label, x, y, attrs);
+  if (!(globalThis as any).limuExactNumbers || s === '') return s;
+  return limuLabel('limu-start', label, x, y, attrs) + s;
+}
+function marker(type: string, x: number, y: number, dx: number, dy: number, color: string): string {
+  const s = markerPele(type, x, y, dx, dy, color);
+  if (!(globalThis as any).limuExactNumbers) return s;
+  return \`<limu-marker type="\${type}" x="\${x}" y="\${y}" dx="\${dx}" dy="\${dy}" color="\${color}"/>\` + s;
 }
 `;
     return { ...loaded, source, shortCircuit: true };
