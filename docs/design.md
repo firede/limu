@@ -24,15 +24,27 @@ line it takes.
 
 It also carries what a plain backend needs to draw it:
 
-- `Parts`: its outline, as paths and boxes, filled and stroked, or stroked only for the
-  details of a shape (`Line`). A box whose corners take the theme's radius is a box with
-  `Rounded` set, not a path, so the radius stays a matter of style.
+- `Parts`: its outline, as paths and boxes, each with how it is painted in the item's style
+  (below). A box whose corners take the theme's radius is a box with `Rounded` set, not a
+  path, so the radius stays a matter of style.
 - `Ends`: the markers at the ends of an edge, with where their tips are and the way they
-  point. `Marker.Outline` draws the ones Pele does.
+  point. `Marker.Outline` gives the parts Pele draws them with.
 - `Label`: text laid out in lines and spans, measured, with the point it is drawn about,
   its alignment and its rotation.
 - `Style`: the diagram's own colors for it, as tokens of the theme, and `Author`: what the
   diagram's author set with `classDef` and `style` lines.
+
+A part's `Painting` says which of the style's colors it takes, so that a part keeps its
+role in a theme that changes them:
+
+| Painting | Fill | Stroke | For |
+|---|---|---|---|
+| `FillAndStroke` | the style's fill | the style's stroke | most outlines |
+| `StrokeOnly` | none | the style's stroke | an edge, the lid of a cylinder |
+| `FillOnly` | the style's fill | none | the body of a datastore |
+| `Solid` | the theme's line | the style's stroke | the dot of a final state, the bar of a fork |
+| `Hollow` | the theme's background | the style's stroke | the ring of a final state, which hides what is under it |
+| `Shade` | the theme's background, or over a fill the author set, the background at 60% over it | none | a stripe of an entity's table |
 
 Paths have four kinds of step — move, line, quadratic and cubic curves — and close. Arcs
 become cubic curves as they are added, since MyGo's paths have no arcs.
@@ -65,8 +77,20 @@ The scene needed two things for them that flowcharts do not: labels aligned at t
 or end (`Align`, which journey, kanban, packet, railroad, requirement and treemap diagrams
 use too) and labels turned (`Rotate`, for the axes of charts). Markers of other kinds —
 sequence diagrams' open and asynchronous arrows, class diagrams' diamonds, entity
-relationship diagrams' crow's feet — are added to `Marker.Outline` with the diagrams that
-use them.
+relationship diagrams' crow's feet — are added with the diagrams that use them.
+
+### Markers
+
+The scene keeps a table of the types of marker it knows (`scene/marker.go`): for each, how
+far an edge stops short of its end to leave room for it, and its outline, as parts drawn
+from its tip and its direction. Pele's flowchart markers are in the table itself; a diagram
+with markers of its own adds them from an init function, in a file of its own
+(`scene/markers_er.go`), under names with the diagram's prefix (`"er.zero_or_more"`).
+
+A marker's parts are painted in the color of the edge's line, whatever its style's fill:
+`FillOnly` fills a part in it, `FillAndStroke` strokes it too, `StrokeOnly` strokes it only,
+and `Hollow` fills it with the background and strokes it, so that the line beneath does not
+show through. A marker is drawn solid on a dashed edge, as Pele draws it.
 
 ## Style
 
@@ -93,11 +117,24 @@ Parsing, layout and the geometry of shapes are ported from Pele, function for fu
 that limu lays out what Pele does to the last bit when both measure text with the same
 table of Arial's advances (`text.Arial`, Pele's `metricsMeasurer`). Where JavaScript's
 meaning differs from Go's, the port keeps JavaScript's: strings counted in UTF-16 code
-units, `\s` and `trim` with Unicode's spaces, `Math.round`'s halves.
+units, `\s` and `trim` with Unicode's spaces, `Math.round`'s halves and V8's `Math.hypot`
+(`internal/jsmath`), and products kept apart from the sums they are in, as Go on arm64
+would fuse them into one multiply-add that JavaScript never does.
+
+What the diagrams share beyond layout and drawing is in `diagram/internal/common`, as Pele
+keeps it in `diagrams/common`: the padding about a diagram, fitting it to the host's width,
+reading generic types, and the title above it.
 
 `scripts/oracle.sh` runs Pele's TypeScript sources with Node, with no install, over the
 cases in `internal/oracle/cases`, and writes what Pele makes of them as fixtures in the
 packages' `testdata/pele`. The tests compare with those, so they run without Node.
+
+Most diagrams' tests compare what Pele's SVG draws, read back as one line per thing drawn,
+with lines written from limu's scene. Pele writes the insides of a node or a group about
+the group's origin, where the scene holds every place on the page, and a number moved
+back from one to the other can round the other way at two decimals. A suite that needs it
+sets `limuExactNumbers` while Pele draws, and the oracle's hooks then have Pele write its
+numbers in full, for the suite to move as the scene's are and round as Pele does.
 
 The port follows Pele 1.6.0, commit `44da152`. The fixtures record the version and the
 commit they were written from.
@@ -108,7 +145,7 @@ commit they were written from.
 |---|---|---|
 | M0 | the stages and their types, text measured and laid out, styles, the svg backend, the oracle | done |
 | M1 | flowcharts from text to pixels: the parser, the layered and compound layouts, the shapes; a backend for MyGo's native UI; a look in the Platinum style in mygo-platinum | done |
-| M2 | the diagrams on the layered layout: state, class, entity relationship, requirement, use case, agent flow, swimlane | |
+| M2 | the diagrams on the layered layout: state, class, entity relationship, requirement, use case, agent flow, swimlane | done |
 | M3 | sequence, gantt, timeline, journey, git graph, packet, kanban | |
 | M4 | the charts: pie, xy, quadrant, radar, sankey, treemap, venn | |
 | M5 | the rest: mindmap, architecture, C4, block, wardley, railroad, ishikawa, cynefin, event modeling, tree view, info | |
