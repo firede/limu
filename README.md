@@ -66,6 +66,10 @@ What changes where things are goes to layout; everything else is style, and a
 change of it only redraws. [docs/design.md](docs/design.md) has the details and
 the roadmap.
 
+To try limu on a diagram of your own, run the playground, which shows the text
+beside its diagram, drawn by mygoui, and its SVG:
+`cd mygoui && go run ./examples/playground`.
+
 ## Style
 
 ```go

@@ -61,6 +61,9 @@ sc, err := d.Layout(&layout.Options{MaxWidth: 480, Padding: new(0.0)})
 会改变位置的参数交给布局；其余都属于样式，改动后只需重画。细节和路线图见
 [docs/design.md](docs/design.md)。
 
+想用自己的图表试试 limu，可以运行 playground，它把文本和由 mygoui 绘制的图、
+以及它的 SVG 并排显示：`cd mygoui && go run ./examples/playground`。
+
 ## 样式
 
 ```go
