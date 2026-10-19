@@ -59,3 +59,47 @@ func TestLog10MatchesV8(t *testing.T) {
 		t.Errorf("%d of %d differ", failed, len(p.Cases))
 	}
 }
+
+// The fixture of format is what V8's toFixed, toExponential and toPrecision write of
+// numbers: each case is a number, the digits given to toFixed and toExponential and what
+// they write, and the precision given to toPrecision and what it writes.
+func TestFormatMatchesV8(t *testing.T) {
+	data, err := fixture.Read("testdata/pele/format.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var p struct {
+		Cases [][6]json.RawMessage `json:"cases"`
+	}
+	if err := json.Unmarshal(data, &p); err != nil {
+		t.Fatal(err)
+	}
+	str := func(raw json.RawMessage) string {
+		var s string
+		json.Unmarshal(raw, &s)
+		return s
+	}
+	failed := 0
+	for _, c := range p.Cases {
+		x := decode(c[0])
+		f, prec := int(decode(c[1])), int(decode(c[4]))
+		for _, check := range []struct {
+			name      string
+			n         int
+			got, want string
+		}{
+			{"ToFixed", f, ToFixed(x, f), str(c[2])},
+			{"ToExponential", f, ToExponential(x, f), str(c[3])},
+			{"ToPrecision", prec, ToPrecision(x, prec), str(c[5])},
+		} {
+			if check.got != check.want {
+				if failed++; failed <= 20 {
+					t.Errorf("%s(%v, %d) = %s, V8 %s", check.name, x, check.n, check.got, check.want)
+				}
+			}
+		}
+	}
+	if failed > 0 || len(p.Cases) < 20000 {
+		t.Errorf("%d of %d differ", failed, len(p.Cases))
+	}
+}
