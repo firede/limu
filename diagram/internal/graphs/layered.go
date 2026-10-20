@@ -124,10 +124,11 @@ type nodeGroups struct {
 }
 
 // layeredResult is the size of a layered layout, as Pele's LayeredResult is, and with
-// orderOnly, how often edges cross between ranks once the nodes are in order.
+// orderOnly, how often edges cross between ranks once the nodes are in order, and how often they
+// did in the order the nodes came in, before any groups were put together.
 type layeredResult struct {
-	Width, Height float64
-	crossings     int
+	Width, Height       float64
+	crossings, declared int
 }
 
 // newLNode is a node of the given size and kind, as Pele's lnode makes.
@@ -687,9 +688,9 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 		g.groupParent = opt.groups.parent
 	}
 
-	crossings := 0
+	crossings, declared := 0, 0
 	if segments > 0 && maxRank > 0 {
-		crossings = reduceCrossings(g, nodes)
+		crossings, declared = reduceCrossings(g, nodes)
 		setPositions()
 	}
 	if opt.orderOnly {
@@ -713,7 +714,7 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 			}
 			e.Points = append(pts, float64(RANK[b]), at[b])
 		}
-		return layeredResult{crossings: crossings}
+		return layeredResult{crossings: crossings, declared: declared}
 	}
 
 	if EFK != nil && ETK != nil {

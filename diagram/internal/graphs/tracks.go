@@ -7,6 +7,9 @@ import (
 	"github.com/firede/limu/internal/jsmath"
 )
 
+// How many short lines a curve is taken as when measuring how near two pass.
+const samples = 16
+
 // assignTracks gives every piece that does not run straight down a track across its gap, and
 // counts the tracks of each gap, as Pele's assignTracks does. Two pieces in one gap share a
 // track only where they cannot be mistaken for each other: where they do not overlap, or where
@@ -236,9 +239,9 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 		return rows
 	}
 
-	// The least distance between a and b as plain curves across a gap that leaves them height
-	// to turn in: between points along each and the other drawn as a run of short lines.
-	const samples = 16
+	// near says whether a and b come nearer than limit as plain curves across a gap that leaves
+	// them height to turn in: between points along each and the other drawn as a run of short
+	// lines.
 	sample := func(k int, h float64, out []float64) {
 		c := Ease(to[k]-from[k], h)
 		for i := 0; i <= samples; i++ {
@@ -250,10 +253,13 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 			out[2*i+1] = h * (a + b + float64(t*t*t))
 		}
 	}
+	// Pele shares these between layouts; here each has its own, as layouts may run at once.
 	lineA := make([]float64, 2*samples+2)
 	lineB := make([]float64, 2*samples+2)
-	reach := func(points, line []float64) float64 {
-		least := math.Inf(1)
+	reaches := func(points, line []float64, limit float64) bool {
+		// A square of a distance that is this far past the square of the limit is past it,
+		// rounding and all.
+		bound := limit * limit * (1 + 1e-9)
 		for i := 0; i <= samples; i++ {
 			px := points[2*i]
 			py := points[2*i+1]
@@ -261,19 +267,20 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 				dx := line[2*j+2] - line[2*j]
 				dy := line[2*j+3] - line[2*j+1]
 				t := math.Max(0, math.Min(1, (float64((px-line[2*j])*dx)+float64((py-line[2*j+1])*dy))/or(float64(dx*dx)+float64(dy*dy), 1)))
-				d := jsmath.Hypot(px-line[2*j]-float64(t*dx), py-line[2*j+1]-float64(t*dy))
-				if d < least {
-					least = d
+				ex := px - line[2*j] - float64(t*dx)
+				ey := py - line[2*j+1] - float64(t*dy)
+				if float64(ex*ex)+float64(ey*ey) < bound && jsmath.Hypot(ex, ey) < limit {
+					return true
 				}
 			}
 		}
-		return least
+		return false
 	}
-	nearest := func(a, b int, height float64) float64 {
+	near := func(a, b int, height, limit float64) bool {
 		h := math.Max(height/2, height-2*levelLead)
 		sample(a, h, lineA)
 		sample(b, h, lineB)
-		return math.Min(reach(lineA, lineB), reach(lineB, lineA))
+		return reaches(lineA, lineB, limit) || reaches(lineB, lineA, limit)
 	}
 
 	for _, r := range ranks {
@@ -312,7 +319,7 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 			if wide[a] || wide[b] {
 				limit = levelClear
 			}
-			if nearest(a, b, room[r]) < limit {
+			if near(a, b, room[r], limit) {
 				level.add(a)
 				level.add(b)
 			}

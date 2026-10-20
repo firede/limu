@@ -1,6 +1,7 @@
 package graphs
 
 import (
+	"github.com/firede/limu/internal/jsmath"
 	"math"
 	"slices"
 )
@@ -172,50 +173,180 @@ func (s *snapshot) restore(nodes []CNode, edges []CEdge, levels []*level) Compou
 }
 
 // Where two edges meet at a node, they are not counted as crossing within this much of it,
-// where they fan out. A curve is taken as this many straight pieces.
+// where they fan out.
+const fan = 24
+
+// The straight pieces a curve is taken as: an S, and a rounded corner, which turns half as far.
+// stepPieces is the most pieces one step of a route can make: a step at right angles, an S, or
+// a straight run into a rounded corner.
 const (
-	fan         = 24
-	curvePieces = 4
+	curvePieces  = 3
+	cornerPieces = 2
+	stepPieces   = max(3, curvePieces, cornerPieces+1)
 )
 
-// routeCrossings is how often the routes of edges cross, taking each as straight lines between
-// its points, as Pele's routeCrossings does.
-func routeCrossings(nodes []CNode, edges []CEdge) int {
-	var ax, ay, bx, by []float64
-	var owner []int
+// handle is how far the handles of a rounded corner reach along its two legs, as the drawing has
+// them. It is a variable, so that 1 - handle is worked out in float64, as JavaScript does.
+var handle = 0.62
+
+// routeStyle is how the drawing joins the points of a route, as Pele's Style is: with curves
+// that round its corners, with steps at right angles, or with straight lines.
+type routeStyle uint8
+
+const (
+	styleCurved routeStyle = iota
+	styleStepped
+	styleLinear
+)
+
+// styleOf is how a drawing laid out with opt joins the points of its routes, as Pele's styleOf
+// says.
+func styleOf(opt LayeredOptions) routeStyle {
+	switch {
+	case opt.Tracks:
+		return styleStepped
+	case opt.Straight:
+		return styleLinear
+	}
+	return styleCurved
+}
+
+// The most pieces in a band that are put in order one at a time.
+const maxInsert = 128
+
+// routeCrossings is how often the routes of edges cross, joining their points as the drawing
+// will, as Pele's routeCrossings does. Where two edges meet at one node, they are not counted as
+// crossing near it, where they fan out, or where they join one straight run to it.
+func routeCrossings(nodes []CNode, edges []CEdge, style routeStyle) int {
+	size := 0
+	for i := range edges {
+		if e := &edges[i]; e.Src != e.Dst && len(e.Route) > 3 {
+			size += (len(e.Route)/3 - 1) * stepPieces
+		}
+	}
+	ax := make([]float64, size)
+	ay := make([]float64, size)
+	bx := make([]float64, size)
+	by := make([]float64, size)
+	low := make([]float64, size)
+	high := make([]float64, size)
+	owner := make([]int, size)
 	// 1 for a piece of the first part of a route, 2 for one of the last.
-	var ends []int
+	ends := make([]int, size)
+	count := 0
+	top := math.Inf(1)
+	bottom := math.Inf(-1)
+	// The ends of the last piece, to run it on where its route goes on straight the same way.
+	fromX, fromY, toX, toY := math.NaN(), math.NaN(), math.NaN(), math.NaN()
+	add := func(ei, part int, x0, y0, x1, y1 float64) {
+		p := count - 1
+		on := x0 == toX && y0 == toY && ((y1 == y0 && fromY == y0) || (x1 == x0 && fromX == x0))
+		if on && owner[p] == ei && ends[p] == part && float64((x0-fromX)*(x1-x0))+float64((y0-fromY)*(y1-y0)) > 0 {
+			count--
+			x0, y0 = fromX, fromY
+		}
+		fromX, fromY, toX, toY = x0, y0, x1, y1
+		ends[count] = part
+		ax[count] = math.Min(x0, x1)
+		bx[count] = math.Max(x0, x1)
+		if x0 <= x1 {
+			ay[count], by[count] = y0, y1
+		} else {
+			ay[count], by[count] = y1, y0
+		}
+		low[count] = math.Min(y0, y1)
+		high[count] = math.Max(y0, y1)
+		if low[count] < top {
+			top = low[count]
+		}
+		if high[count] > bottom {
+			bottom = high[count]
+		}
+		owner[count] = ei
+		count++
+	}
 	for ei := range edges {
 		e := &edges[ei]
 		if e.Src == e.Dst {
 			continue
 		}
 		r := e.Route
-		part := 0
-		add := func(x0, y0, x1, y1 float64) {
-			ends = append(ends, part)
-			ax = append(ax, math.Min(x0, x1))
-			bx = append(bx, math.Max(x0, x1))
-			if x0 <= x1 {
-				ay = append(ay, y0)
-				by = append(by, y1)
-			} else {
-				ay = append(ay, y1)
-				by = append(by, y0)
-			}
-			owner = append(owner, ei)
+		aligned := func(k int) bool { return math.Abs(r[k]-r[k-3]) < 0.01 || math.Abs(r[k+1]-r[k-2]) < 0.01 }
+		length := func(k int) float64 { return math.Abs(r[k]-r[k-3]) + math.Abs(r[k+1]-r[k-2]) }
+		// Whether the route turns a corner at point k, which a smooth drawing rounds.
+		turns := func(k int) bool {
+			return style == styleCurved && k > 0 && k < len(r)-3 && aligned(k) && aligned(k+3) &&
+				length(k) >= 0.01 && length(k+3) >= 0.01 && (math.Abs(r[k]-r[k-3]) < 0.01) != (math.Abs(r[k+3]-r[k]) < 0.01)
 		}
+		if len(r) < 6 {
+			continue
+		}
+		atX, atY := r[0], r[1]
 		for k := 3; k < len(r); k += 3 {
-			part = 0
+			part := 0
 			if k == 3 {
 				part |= 1
 			}
 			if k == len(r)-3 {
 				part |= 2
 			}
-			x0, y0, x1, y1 := r[k-3], r[k-2], r[k], r[k+1]
-			if math.Abs(x1-x0) < 0.01 || math.Abs(y1-y0) < 0.01 {
-				add(x0, y0, x1, y1)
+			x0, y0, x1, y1 := atX, atY, r[k], r[k+1]
+			atX, atY = x1, y1
+			if aligned(k) || style == styleLinear {
+				if !turns(k) {
+					add(ei, part, x0, y0, x1, y1)
+					continue
+				}
+				// The turn takes all of a leg that ends at a node and half of one it shares with
+				// the next turn.
+				before := length(k)
+				if turns(k - 3) {
+					before = length(k) / 2
+				}
+				after := length(k + 3)
+				if turns(k + 3) {
+					after = length(k+3) / 2
+				}
+				ux := (x1 - r[k-3]) / length(k)
+				uy := (y1 - r[k-2]) / length(k)
+				vx := (r[k+3] - x1) / length(k+3)
+				vy := (r[k+4] - y1) / length(k+3)
+				sx := x1 - float64(ux*before)
+				sy := y1 - float64(uy*before)
+				add(ei, part, x0, y0, sx, sy)
+				c1x := x1 - float64(ux*before*(1-handle))
+				c1y := y1 - float64(uy*before*(1-handle))
+				c2x := x1 + float64(vx*after*(1-handle))
+				c2y := y1 + float64(vy*after*(1-handle))
+				atX = x1 + float64(vx*after)
+				atY = y1 + float64(vy*after)
+				turn := part
+				if k+3 == len(r)-3 {
+					turn |= 2
+				}
+				px, py := sx, sy
+				for i := 1; i <= cornerPieces; i++ {
+					t := float64(i) / cornerPieces
+					u := 1 - t
+					x := float64(u*u*u*sx) + float64(3*u*u*t*c1x) + float64(3*u*t*t*c2x) + float64(t*t*t*atX)
+					y := float64(u*u*u*sy) + float64(3*u*u*t*c1y) + float64(3*u*t*t*c2y) + float64(t*t*t*atY)
+					add(ei, turn, px, py, x, y)
+					px, py = x, y
+				}
+				continue
+			}
+			if style == styleStepped {
+				// A step at right angles, halfway along the flow.
+				down := r[k+2] == 0
+				mx, my := (x0+x1)/2, y0
+				nx, ny := mx, y1
+				if down {
+					mx, my = x0, (y0+y1)/2
+					nx, ny = x1, my
+				}
+				add(ei, part, x0, y0, mx, my)
+				add(ei, part, mx, my, nx, ny)
+				add(ei, part, nx, ny, x1, y1)
 				continue
 			}
 			// An S along the flow, as the drawing has it, in a few straight pieces.
@@ -236,71 +367,142 @@ func routeCrossings(nodes []CNode, edges []CEdge) int {
 				}
 				x := x0 + float64((x1-x0)*fx)
 				y := y0 + float64((y1-y0)*fy)
-				add(px, py, x, y)
+				add(ei, part, px, py, x, y)
 				px, py = x, y
 			}
 		}
 	}
-	near := func(v int, x, y float64) bool {
-		return math.Abs(x-nodes[v].X) < nodes[v].W/2+fan && math.Abs(y-nodes[v].Y) < nodes[v].H/2+fan
+	// Bands across the drawing, each swept from left to right on its own. A pair of pieces is
+	// looked at in the band that the lower of their tops falls in.
+	bands := 1
+	scale := 0.0
+	if bottom > top {
+		bands = int(jsmath.Round(math.Sqrt(float64(count))))
+		scale = float64(bands) / (bottom - top)
 	}
-	count := len(ax)
-	ids := make([]int, count)
-	for i := range ids {
-		ids[i] = i
+	bandOf := func(y float64) int { return min(bands-1, int(math.Floor((y-top)*scale))) }
+	first := make([]int, count)
+	bandStart := make([]int, bands+1)
+	for p := 0; p < count; p++ {
+		first[p] = bandOf(low[p])
+		for b, last := first[p], bandOf(high[p]); b <= last; b++ {
+			bandStart[b+1]++
+		}
 	}
-	slices.SortStableFunc(ids, func(p, q int) int { return sign(or(ax[p]-ax[q], float64(p-q))) })
-	left := make([]float64, count)
-	right := make([]float64, count)
-	low := make([]float64, count)
-	high := make([]float64, count)
-	for i, p := range ids {
-		left[i] = ax[p]
-		right[i] = bx[p]
-		low[i] = math.Min(ay[p], by[p])
-		high[i] = math.Max(ay[p], by[p])
+	for b := 0; b < bands; b++ {
+		bandStart[b+1] += bandStart[b]
+	}
+	fill := slices.Clone(bandStart[:bands])
+	inBand := make([]int, bandStart[bands])
+	for p := 0; p < count; p++ {
+		for b, last := first[p], bandOf(high[p]); b <= last; b++ {
+			inBand[fill[b]] = p
+			fill[b]++
+		}
+	}
+	// The straight run each route leaves its first node by and the one it reaches its last node
+	// by. Edges that meet at a node and join into one run to it merge there rather than cross.
+	runs := make([]float64, len(edges)*8)
+	lined := func(r []float64, a, b, c int) bool {
+		return (math.Abs(r[a]-r[b]) < inLine && math.Abs(r[a]-r[c]) < inLine) ||
+			(math.Abs(r[a+1]-r[b+1]) < inLine && math.Abs(r[a+1]-r[c+1]) < inLine)
+	}
+	for ei := range edges {
+		r := edges[ei].Route
+		if len(r) < 6 {
+			continue
+		}
+		k := 3
+		for k+3 < len(r) && lined(r, 0, k, k+3) {
+			k += 3
+		}
+		last := len(r) - 3
+		j := last - 3
+		for j >= 3 && lined(r, last, j, j-3) {
+			j -= 3
+		}
+		copy(runs[ei*8:], []float64{r[0], r[1], r[k], r[k+1], r[j], r[j+1], r[last], r[last+1]})
+	}
+	// Whether a point lies on the first (1) or last (2) run of an edge's route.
+	onRun := func(ei, end int, x, y float64) bool {
+		o := ei * 8
+		if end != 1 {
+			o += 4
+		}
+		x0 := runs[o]
+		y0 := runs[o+1]
+		dx := runs[o+2] - x0
+		dy := runs[o+3] - y0
+		length := float64(dx*dx) + float64(dy*dy)
+		t := 0.0
+		if length > 0 {
+			t = math.Max(0, math.Min(1, (float64((x-x0)*dx)+float64((y-y0)*dy))/length))
+		}
+		return jsmath.Hypot(x-x0-float64(t*dx), y-y0-float64(t*dy)) < inLine
 	}
 	total := 0
-	for i := 0; i < count; i++ {
-		p := ids[i]
-		dx := bx[p] - ax[p]
-		dy := by[p] - ay[p]
-		for j := i + 1; j < count && left[j] <= right[i]; j++ {
-			if high[j] < low[i] || low[j] > high[i] {
-				continue
+	for band := 0; band < bands; band++ {
+		bandEnd := bandStart[band+1]
+		// In order of the pieces' left ends, and of where they were added among those level.
+		if bandEnd-bandStart[band] > maxInsert {
+			slices.SortStableFunc(inBand[bandStart[band]:bandEnd], func(p, q int) int { return sign(or(ax[p]-ax[q], float64(p-q))) })
+		} else {
+			for i := bandStart[band] + 1; i < bandEnd; i++ {
+				p := inBand[i]
+				j := i
+				for ; j > bandStart[band] && ax[inBand[j-1]] > ax[p]; j-- {
+					inBand[j] = inBand[j-1]
+				}
+				inBand[j] = p
 			}
-			q := ids[j]
-			if owner[p] == owner[q] {
-				continue
+		}
+		for s := bandStart[band]; s < bandEnd; s++ {
+			p := inBand[s]
+			dx := bx[p] - ax[p]
+			dy := by[p] - ay[p]
+			here := first[p] == band
+			for t := s + 1; t < bandEnd; t++ {
+				q := inBand[t]
+				if ax[q] > bx[p] {
+					break
+				}
+				if high[q] < low[p] || low[q] > high[p] || owner[p] == owner[q] || (!here && first[q] != band) {
+					continue
+				}
+				d1 := float64(dx*(ay[q]-ay[p])) - float64(dy*(ax[q]-ax[p]))
+				d2 := float64(dx*(by[q]-ay[p])) - float64(dy*(bx[q]-ax[p]))
+				// A point that lies on the other line counts as on one side of it, so that a
+				// crossing at the end of one piece is counted once, in one of the two pieces it
+				// joins.
+				if (d1 > 0) == (d2 > 0) {
+					continue
+				}
+				ex := bx[q] - ax[q]
+				ey := by[q] - ay[q]
+				d3 := float64(ex*(ay[p]-ay[q])) - float64(ey*(ax[p]-ax[q]))
+				d4 := float64(ex*(by[p]-ay[q])) - float64(ey*(bx[p]-ax[q]))
+				if (d3 > 0) == (d4 > 0) {
+					continue
+				}
+				ep := &edges[owner[p]]
+				eq := &edges[owner[q]]
+				at := d3 / (d3 - d4)
+				x := ax[p] + float64(at*dx)
+				y := ay[p] + float64(at*dy)
+				// Where two edges meet at a node, the parts of them that lead to it fan in.
+				fans := func(v, pe, qe int) bool {
+					return (ends[p]&pe != 0 && ends[q]&qe != 0) ||
+						(math.Abs(x-nodes[v].X) < nodes[v].W/2+fan && math.Abs(y-nodes[v].Y) < nodes[v].H/2+fan) ||
+						(onRun(owner[p], pe, x, y) && onRun(owner[q], qe, x, y))
+				}
+				if ep.Src == eq.Src && fans(ep.Src, 1, 1) ||
+					ep.Src == eq.Dst && fans(ep.Src, 1, 2) ||
+					ep.Dst == eq.Src && fans(ep.Dst, 2, 1) ||
+					ep.Dst == eq.Dst && fans(ep.Dst, 2, 2) {
+					continue
+				}
+				total++
 			}
-			d1 := float64(dx*(ay[q]-ay[p])) - float64(dy*(ax[q]-ax[p]))
-			d2 := float64(dx*(by[q]-ay[p])) - float64(dy*(bx[q]-ax[p]))
-			// A point that lies on the other line counts as on one side of it, so that a crossing
-			// at the end of one piece is counted once, in one of the two pieces it joins.
-			if (d1 > 0) == (d2 > 0) {
-				continue
-			}
-			ex := bx[q] - ax[q]
-			ey := by[q] - ay[q]
-			d3 := float64(ex*(ay[p]-ay[q])) - float64(ey*(ax[p]-ax[q]))
-			d4 := float64(ex*(by[p]-ay[q])) - float64(ey*(bx[p]-ax[q]))
-			if (d3 > 0) == (d4 > 0) {
-				continue
-			}
-			ep := &edges[owner[p]]
-			eq := &edges[owner[q]]
-			t := d3 / (d3 - d4)
-			x := ax[p] + float64(t*dx)
-			y := ay[p] + float64(t*dy)
-			// Where two edges meet at a node, the parts of them that lead to it fan in.
-			fans := func(v, pe, qe int) bool { return near(v, x, y) || (ends[p]&pe != 0 && ends[q]&qe != 0) }
-			if ep.Src == eq.Src && fans(ep.Src, 1, 1) ||
-				ep.Src == eq.Dst && fans(ep.Src, 1, 2) ||
-				ep.Dst == eq.Src && fans(ep.Dst, 2, 1) ||
-				ep.Dst == eq.Dst && fans(ep.Dst, 2, 2) {
-				continue
-			}
-			total++
 		}
 	}
 	return total
@@ -629,12 +831,15 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 		return lnodes, ledges, dummies
 	}
 
+	// Whether the drawing is small enough to be laid out more than once.
+	ordered := ports > 1 && ports <= maxOrderedPorts && len(edges) <= maxOrderedEdges
+
 	// The flat layout: the groups are laid out one at a time, each on its own, so this is what
 	// gives them an order for their nodes, and for the ports on the far sides of their borders,
 	// that agrees with the rest of the drawing. A group's place is the average of its nodes'.
 	// Only where every group runs the way the whole drawing does.
 	flatCrossings := 0
-	flat := len(order) > 1 && ports > 1 && len(edges) <= maxOrderedEdges && ports <= maxOrderedPorts
+	flat := len(order) > 1 && ordered
 	for _, l := range order {
 		if l.dir != rootDir {
 			flat = false
@@ -687,7 +892,10 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 		flatOpt := opt
 		flatOpt.groups = &nodeGroups{of: of, parent: parent}
 		flatOpt.orderOnly = true
-		flatCrossings = layered(lnodes, ledges, flatOpt).crossings
+		flatLayout := layered(lnodes, ledges, flatOpt)
+		// The fewest crossings the drawing has been seen to need as one flat graph: in the order
+		// of the flat layout, or in the order it was written, where groups are not kept together.
+		flatCrossings = min(flatLayout.crossings, flatLayout.declared)
 		sum := make([]float64, n)
 		count := make([]int, n)
 		// The last rank each group reaches.
@@ -730,6 +938,40 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 			}
 			return inside + float64(outside*1e-6)
 		}
+	}
+
+	// What each level's layout was given and gave back, every time it was laid out, where the
+	// drawing may be laid out again. A level given the same again, as it is where neither its
+	// ports nor its groups changed, comes out the same.
+	type laidOut struct {
+		given  []float64
+		lnodes []lNode
+		ledges []lEdge
+		size   layeredResult
+	}
+	laid := make(map[int][]*laidOut)
+	layOut := func(l *level, lnodes []lNode, ledges []lEdge) ([]lNode, []lEdge, layeredResult) {
+		if !ordered {
+			return lnodes, ledges, layered(lnodes, ledges, opt)
+		}
+		var given []float64
+		for i := range lnodes {
+			ln := &lnodes[i]
+			given = append(given, ln.W, ln.H, float64(ln.Kind), ln.Pin, ln.Hint, ln.Key, ln.Span)
+		}
+		for i := range ledges {
+			le := &ledges[i]
+			given = append(given, float64(le.Tail), float64(le.Head), le.Minlen, le.LabelW, le.LabelH, le.TailDx, le.HeadDx,
+				boolNumber(le.TailFixed), boolNumber(le.HeadFixed))
+		}
+		for _, p := range laid[l.id] {
+			if slices.EqualFunc(p.given, given, sameValue) {
+				return p.lnodes, p.ledges, p.size
+			}
+		}
+		done := &laidOut{given, lnodes, ledges, layered(lnodes, ledges, opt)}
+		laid[l.id] = append(laid[l.id], done)
+		return done.lnodes, done.ledges, done.size
 	}
 
 	var total CompoundResult
@@ -788,7 +1030,7 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 			vertical := l.dir == TB || l.dir == BT
 			flip := l.dir == BT || l.dir == RL
 			lnodes, ledges, dummies := build(l, true)
-			size := layered(lnodes, ledges, opt)
+			lnodes, ledges, size := layOut(l, lnodes, ledges)
 			contentW, contentH := size.Height, size.Width
 			if vertical {
 				contentW, contentH = size.Width, size.Height
@@ -985,16 +1227,17 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 	// the flat layout did, they are laid out again in their own order too, and whichever crosses
 	// less is kept: the flat layout does not see the groups as the boxes they are drawn as, and
 	// now and then its order does not suit them.
+	style := styleOf(opt)
 	keyed = flat
 	place()
 	crossings := -1
 	if flat {
-		crossings = routeCrossings(nodes, edges)
+		crossings = routeCrossings(nodes, edges, style)
 		if float64(crossings) > float64(float64(flatCrossings)*flatSlack)+flatSpare {
 			first := takeSnapshot(nodes, edges, order, total)
 			keyed = false
 			place()
-			own := routeCrossings(nodes, edges)
+			own := routeCrossings(nodes, edges, style)
 			if own >= crossings {
 				keyed = true
 				total = first.restore(nodes, edges, order)
@@ -1005,10 +1248,11 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 	}
 
 	// The groups were laid out from the inside out, so the ports on a group's border are in an
-	// order that only guesses where their edges go once they leave it. Where more than one edge
-	// passes the far side of a group, the drawing is laid out again with those ports in the order
-	// of where their edges went the first time, and kept if that crosses less.
-	if ports > 1 && ports <= maxOrderedPorts && len(edges) <= maxOrderedEdges {
+	// order that only guesses where their edges go once they leave it. Where the ports on the far
+	// side of a group are not in the order of where their edges went, the drawing is laid out
+	// again with them in that order, and kept if that crosses less. Not where the groups kept
+	// their own order instead, where it gains little for the time it takes.
+	if keyed == flat && ordered {
 		again := false
 		for _, l := range order {
 			if l.id < 0 {
@@ -1017,12 +1261,15 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 			box := &nodes[l.id]
 			vertical := l.dir == TB || l.dir == BT
 			end := opposite(startSide(l.dir))
-			count := 0
+			// Where each port is across the flow, and where its edge goes.
+			var seen [][2]float64
 			for _, port := range l.ports {
 				if port.side != end {
 					continue
 				}
-				// The port's place in the route, and the point next to it outside the group.
+				// The port's place in the route, and the first point after it, outside the group,
+				// that is not in line with it: where the edge turns to, past a straight run out of
+				// the port.
 				route := edges[port.e].Route
 				bx := l.x + port.px
 				by := l.y + port.py
@@ -1032,33 +1279,50 @@ func Compound(nodes []CNode, edges []CEdge, rootDir Dir, opt LayeredOptions) Com
 						at = k
 					}
 				}
-				next := at - 3
-				if port.out {
-					next = at + 3
+				if at < 0 {
+					continue
 				}
-				if at < 0 || next < 0 || next >= len(route) {
+				a, step := 1, -3
+				if vertical {
+					a = 0
+				}
+				if port.out {
+					step = 3
+				}
+				next := at + step
+				for next >= 0 && next < len(route) && math.Abs(route[next+a]-route[at+a]) < inLine {
+					next += step
+				}
+				if next < 0 || next >= len(route) {
 					continue
 				}
 				if vertical {
-					port.hint = route[next] - (box.X - box.W/2)
+					port.hint = route[next+a] - (box.X - box.W/2)
 				} else {
-					port.hint = route[next+1] - (box.Y - box.H/2)
+					port.hint = route[next+a] - (box.Y - box.H/2)
 				}
-				count++
+				if vertical {
+					seen = append(seen, [2]float64{port.px, port.hint})
+				} else {
+					seen = append(seen, [2]float64{port.py, port.hint})
+				}
 			}
-			if count > 1 {
-				again = true
+			slices.SortStableFunc(seen, func(p, q [2]float64) int { return sign(p[0] - q[0]) })
+			for i := 1; i < len(seen); i++ {
+				if seen[i-1][1] > seen[i][1] {
+					again = true
+				}
 			}
 		}
 		if again {
 			before := crossings
 			if crossings < 0 {
-				before = routeCrossings(nodes, edges)
+				before = routeCrossings(nodes, edges, style)
 			}
 			if before > 0 {
 				first := takeSnapshot(nodes, edges, order, total)
 				place()
-				if routeCrossings(nodes, edges) >= before {
+				if routeCrossings(nodes, edges, style) >= before {
 					total = first.restore(nodes, edges, order)
 				}
 			}
@@ -1089,4 +1353,20 @@ func portKey(e int, out bool) int {
 		return e * 2
 	}
 	return e*2 + 1
+}
+
+// boolNumber is what JavaScript's unary + makes of a boolean.
+func boolNumber(b bool) float64 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// sameValue is JavaScript's Object.is for numbers: NaN is itself, and 0 is not -0.
+func sameValue(a, b float64) bool {
+	if a != a {
+		return b != b
+	}
+	return a == b && math.Signbit(a) == math.Signbit(b)
 }

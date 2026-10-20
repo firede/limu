@@ -52,8 +52,8 @@ func sortByBary(list []int, count int, bary []float64, pos []int, right bool, sp
 // reduceCrossings orders the nodes of each rank so that edges cross as little as they can, as
 // Pele's reduceCrossings does: sweeps up and down that sort each rank by the mean place of its
 // nodes' neighbours, keeping the order with the fewest crossings. It returns how often edges
-// cross.
-func reduceCrossings(g *graph, nodes []lNode) int {
+// cross in that order, and how often they did in the order the nodes came in.
+func reduceCrossings(g *graph, nodes []lNode) (int, int) {
 	n, real, maxRank, W := g.n, g.real, g.maxRank, g.W
 	EF, ET, EFD, ETD := g.EF, g.ET, g.EFD, g.ETD
 	succStart, succE, predStart, predE := g.succStart, g.succE, g.predStart, g.predE
@@ -64,12 +64,49 @@ func reduceCrossings(g *graph, nodes []lNode) int {
 		widest = max(widest, layerStart[r+1]-layerStart[r])
 	}
 	if widest < 2 {
-		return 0
+		return 0, 0
 	}
 	// With offsets, edges that reach one node at different offsets take separate places along it.
 	var place []int
 	if offsets {
 		place = make([]int, len(EF))
+	}
+	// Neither changes with the order: which of its node's places each edge reaches, counted from
+	// the first, and how many places each node has.
+	var placeIn, places []int
+	// Each node's edges down, in the order of their offsets where those differ, which mixed marks.
+	leaving := succE
+	var mixed []bool
+	if place != nil {
+		placeIn = make([]int, len(EF))
+		places = make([]int, n)
+		leaving = slices.Clone(succE)
+		mixed = make([]bool, n)
+		arriving := slices.Clone(predE)
+		byOffset := func(list []int, from, to int, dx []float64) bool {
+			for k := from + 1; k < to; k++ {
+				if dx[list[k]] == dx[list[from]] {
+					continue
+				}
+				slices.SortStableFunc(list[from:to], func(a, b int) int { return sign(dx[a] - dx[b]) })
+				return true
+			}
+			return false
+		}
+		for v := 0; v < n; v++ {
+			places[v] = 1
+			if byOffset(arriving, predStart[v], predStart[v+1], ETD) {
+				for k := predStart[v] + 1; k < predStart[v+1]; k++ {
+					if ETD[arriving[k]] != ETD[arriving[k-1]] {
+						places[v]++
+					}
+					placeIn[arriving[k]] = places[v] - 1
+				}
+			}
+			if byOffset(leaving, succStart[v], succStart[v+1], EFD) {
+				mixed[v] = true
+			}
+		}
 	}
 	size := 1
 	limit := widest
@@ -81,40 +118,21 @@ func reduceCrossings(g *graph, nodes []lNode) int {
 	}
 	tree := make([]int, 2*size)
 	targets := make([]int, len(EF))
-	var ids []int
 
 	count := func() int {
 		total := 0
 		for r := 0; r < maxRank; r++ {
 			southLen := layerStart[r+2] - layerStart[r+1]
 			if place != nil {
-				places := 0
+				next := 0
 				for i := layerStart[r+1]; i < layerStart[r+2]; i++ {
-					from := predStart[order[i]]
-					to := predStart[order[i]+1]
-					mixed := false
-					for k := from + 1; k < to; k++ {
-						if ETD[predE[k]] != ETD[predE[from]] {
-							mixed = true
-						}
+					v := order[i]
+					for k := predStart[v]; k < predStart[v+1]; k++ {
+						place[predE[k]] = next + placeIn[predE[k]]
 					}
-					if mixed {
-						ids = append(ids[:0], predE[from:to]...)
-						slices.SortStableFunc(ids, func(a, b int) int { return sign(ETD[a] - ETD[b]) })
-						for k := range ids {
-							if k > 0 && ETD[ids[k]] != ETD[ids[k-1]] {
-								places++
-							}
-							place[ids[k]] = places
-						}
-					} else {
-						for k := from; k < to; k++ {
-							place[predE[k]] = places
-						}
-					}
-					places++
+					next += places[v]
 				}
-				southLen = places
+				southLen = next
 			}
 			if southLen < 2 {
 				continue
@@ -127,7 +145,7 @@ func reduceCrossings(g *graph, nodes []lNode) int {
 				t0 := t
 				for k := from; k < to; k++ {
 					if place != nil {
-						targets[t] = place[succE[k]]
+						targets[t] = place[leaving[k]]
 					} else {
 						targets[t] = pos[ET[succE[k]]]
 					}
@@ -137,21 +155,17 @@ func reduceCrossings(g *graph, nodes []lNode) int {
 				if d < 2 {
 					continue
 				}
-				mixed := false
-				if place != nil {
-					for k := from + 1; k < to; k++ {
-						if EFD[succE[k]] != EFD[succE[from]] {
-							mixed = true
+				if place != nil && mixed[v] {
+					// Edges that leave at one offset go in the order of their places.
+					for a := t0 + 1; a < t; a++ {
+						item := targets[a]
+						dx := EFD[leaving[from+a-t0]]
+						b := a - 1
+						for b >= t0 && EFD[leaving[from+b-t0]] == dx && targets[b] > item {
+							targets[b+1] = targets[b]
+							b--
 						}
-					}
-				}
-				if place != nil && mixed {
-					ids = append(ids[:0], succE[from:to]...)
-					slices.SortStableFunc(ids, func(a, b int) int {
-						return sign(or(EFD[a]-EFD[b], float64(place[a]-place[b])))
-					})
-					for k := 0; k < d; k++ {
-						targets[t0+k] = place[ids[k]]
+						targets[b+1] = item
 					}
 				} else if d <= 12 {
 					for a := t0 + 1; a < t; a++ {
@@ -190,11 +204,8 @@ func reduceCrossings(g *graph, nodes []lNode) int {
 		return total
 	}
 
-	best := count()
-	if best == 0 {
-		return 0
-	}
-	bestOrder := slices.Clone(order)
+	// How often edges cross in the order the nodes came in, before any groups are put together.
+	declared := count()
 	bary := make([]float64, n)
 	moving := make([]int, widest)
 	spare := make([]int, widest)
@@ -286,6 +297,17 @@ func reduceCrossings(g *graph, nodes []lNode) int {
 			arrange(r, at)
 		}
 	}
+	best := declared
+	if GRP != nil {
+		best = count()
+	}
+	if best == 0 {
+		return 0, declared
+	}
+	bestOrder := slices.Clone(order)
+	// The order the nodes came in, with groups put together, is kept unless the sweeps find one
+	// that crosses less than it and less than the nodes did before that.
+	start := min(best, declared)
 
 	sweep := func(down, biasRight bool) {
 		start, list, other, otherDx := succStart, succE, ET, ETD
@@ -463,7 +485,6 @@ func reduceCrossings(g *graph, nodes []lNode) int {
 	// Only for graphs small enough to be read node by node: a second run costs as much as the
 	// first.
 	initial := slices.Clone(order)
-	start := best
 	small := n <= 600
 	chosen := bestOrder
 	chosenOut := -1 // Pele's Infinity: no attempt is chosen yet
@@ -512,18 +533,22 @@ func reduceCrossings(g *graph, nodes []lNode) int {
 	copy(order, chosen)
 	settlePositions()
 	copy(bestOrder, chosen)
+	// With groups, the order kept can cross more than the count it was kept by.
+	if GRP != nil {
+		best = count()
+	}
 
 	// A drawing and its mirror image cross as often too. Of those two, likewise.
 	if !small {
-		return best
+		return best, declared
 	}
 	for i := 0; i < real; i++ {
 		if nodes[i].Pin != 0 {
-			return best
+			return best, declared
 		}
 	}
 	if chosenOut == 0 || fixed[0] || fixed[maxRank] {
-		return best
+		return best, declared
 	}
 	for r := 0; r <= maxRank; r++ {
 		slices.Reverse(order[layerStart[r]:layerStart[r+1]])
@@ -532,5 +557,5 @@ func reduceCrossings(g *graph, nodes []lNode) int {
 	if count() > best || outOfOrder() >= chosenOut {
 		copy(order, bestOrder)
 	}
-	return best
+	return best, declared
 }
