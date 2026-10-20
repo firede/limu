@@ -282,6 +282,71 @@ func reduceCrossings(g *graph, nodes []lNode) {
 		}
 	}
 
+	// transpose swaps neighbours in a rank wherever that leaves fewer crossings with the ranks on
+	// either side, until no swap does. Sweeps move nodes by the average place of their
+	// neighbours, which can leave two side by side that would cross less the other way round.
+	pinOf := func(v int) float64 {
+		if v < real {
+			return nodes[v].Pin
+		}
+		return 0
+	}
+	// Where an edge meets the node at its other end, along that node's rank.
+	at := func(e int, up bool) float64 {
+		u, dx := ET[e], ETD[e]
+		if up {
+			u, dx = EF[e], EFD[e]
+		}
+		if offsets && W[u] > 0 {
+			return float64(pos[u]) + dx/W[u]
+		}
+		return float64(pos[u])
+	}
+	// How often the edges of a cross those of b, with a left of b.
+	between := func(a, b int) int {
+		c := 0
+		for k := predStart[a]; k < predStart[a+1]; k++ {
+			x := at(predE[k], true)
+			for j := predStart[b]; j < predStart[b+1]; j++ {
+				if x > at(predE[j], true) {
+					c++
+				}
+			}
+		}
+		for k := succStart[a]; k < succStart[a+1]; k++ {
+			x := at(succE[k], false)
+			for j := succStart[b]; j < succStart[b+1]; j++ {
+				if x > at(succE[j], false) {
+					c++
+				}
+			}
+		}
+		return c
+	}
+	transpose := func() {
+		for pass := 0; pass < 8; pass++ {
+			improved := false
+			for r := 0; r <= maxRank; r++ {
+				s := layerStart[r]
+				for i := s; i+1 < layerStart[r+1]; i++ {
+					a := order[i]
+					b := order[i+1]
+					if pinOf(a) != pinOf(b) || between(b, a) >= between(a, b) {
+						continue
+					}
+					order[i] = b
+					order[i+1] = a
+					pos[b] = i - s
+					pos[a] = i + 1 - s
+					improved = true
+				}
+			}
+			if !improved {
+				break
+			}
+		}
+	}
+
 	// The sweeps are run twice from the same start, going down first and going up first. They
 	// often end with as few crossings either way but a different order, and then the one that
 	// keeps more of the nodes in the order they were given is the less surprising.
@@ -316,6 +381,14 @@ func reduceCrossings(g *graph, nodes []lNode) {
 			}
 		}
 		copy(order, foundOrder)
+		if small && found > 0 {
+			settlePositions()
+			transpose()
+			if c := count(); c < found {
+				found = c
+				copy(foundOrder, order)
+			}
+		}
 		out := 0
 		if small {
 			out = outOfOrder()
