@@ -200,7 +200,7 @@ func (it *Item) LabelBox() Rect {
 	sin, cos := math.Sincos(it.Rotate * math.Pi / 180)
 	turn := func(px, py float64) (float64, float64) {
 		dx, dy := px-it.At.X, py-it.At.Y
-		return it.At.X + dx*cos - dy*sin, it.At.Y + dx*sin + dy*cos
+		return it.At.X + float64(dx*cos) - float64(dy*sin), it.At.Y + float64(dx*sin) + float64(dy*cos)
 	}
 	x0, y0 := math.Inf(1), math.Inf(1)
 	x1, y1 := math.Inf(-1), math.Inf(-1)

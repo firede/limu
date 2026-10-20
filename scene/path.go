@@ -96,7 +96,7 @@ func (p *Path) Polygon(xy ...float64) *Path {
 // Ellipse adds a closed ellipse with its center at cx, cy, in four curves.
 func (p *Path) Ellipse(cx, cy, rx, ry float64) *Path {
 	const k = 0.5522847498307936 // 4/3 (√2 − 1)
-	kx, ky := rx*k, ry*k
+	kx, ky := float64(rx*k), float64(ry*k)
 	p.MoveTo(cx+rx, cy)
 	p.CubeTo(cx+rx, cy+ky, cx+kx, cy+ry, cx, cy+ry)
 	p.CubeTo(cx-kx, cy+ry, cx-rx, cy+ky, cx-rx, cy)
@@ -112,7 +112,7 @@ func (p *Path) RoundRect(r Rect, radius float64) *Path {
 		return p.Polygon(r.X, r.Y, r.X+r.W, r.Y, r.X+r.W, r.Y+r.H, r.X, r.Y+r.H)
 	}
 	const k = 0.5522847498307936
-	c := radius * (1 - k)
+	c := float64(radius * (1 - k))
 	x0, y0, x1, y1 := r.X, r.Y, r.X+r.W, r.Y+r.H
 	p.MoveTo(x0+radius, y0)
 	p.LineTo(x1-radius, y0)
@@ -143,22 +143,24 @@ func (p *Path) ArcTo(rx, ry, rot float64, large, sweep bool, x, y float64) *Path
 	phi := rot * math.Pi / 180
 	sin, cos := math.Sincos(phi)
 	dx, dy := (x1-x)/2, (y1-y)/2
-	x1p := cos*dx + sin*dy
-	y1p := -sin*dx + cos*dy
+	x1p := float64(cos*dx) + float64(sin*dy)
+	y1p := float64(-sin*dx) + float64(cos*dy)
 	if l := x1p*x1p/(rx*rx) + y1p*y1p/(ry*ry); l > 1 {
 		s := math.Sqrt(l)
 		rx, ry = rx*s, ry*s
 	}
-	num := rx*rx*ry*ry - rx*rx*y1p*y1p - ry*ry*x1p*x1p
-	den := rx*rx*y1p*y1p + ry*ry*x1p*x1p
+	num := float64(rx*rx*ry*ry) - float64(rx*rx*y1p*y1p) - float64(ry*ry*x1p*x1p)
+	den := float64(rx*rx*y1p*y1p) + float64(ry*ry*x1p*x1p)
 	co := math.Sqrt(max(0, num/den))
 	if large == sweep {
 		co = -co
 	}
 	cxp, cyp := co*rx*y1p/ry, -co*ry*x1p/rx
-	cx := cos*cxp - sin*cyp + (x1+x)/2
-	cy := sin*cxp + cos*cyp + (y1+y)/2
-	angle := func(ux, uy, vx, vy float64) float64 { return math.Atan2(ux*vy-uy*vx, ux*vx+uy*vy) }
+	cx := float64(cos*cxp) - float64(sin*cyp) + (x1+x)/2
+	cy := float64(sin*cxp) + float64(cos*cyp) + (y1+y)/2
+	angle := func(ux, uy, vx, vy float64) float64 {
+		return math.Atan2(float64(ux*vy)-float64(uy*vx), float64(ux*vx)+float64(uy*vy))
+	}
 	t1 := angle(1, 0, (x1p-cxp)/rx, (y1p-cyp)/ry)
 	dt := angle((x1p-cxp)/rx, (y1p-cyp)/ry, (-x1p-cxp)/rx, (-y1p-cyp)/ry)
 	if !sweep && dt > 0 {
@@ -185,7 +187,8 @@ func (p *Path) ArcTo(rx, ry, rot float64, large, sweep bool, x, y float64) *Path
 		st, ct := math.Sincos(t)
 		ex, ey := rx*ct, ry*st  // on the ellipse
 		tx, ty := -rx*st, ry*ct // along it
-		return cos*ex - sin*ey + cx, sin*ex + cos*ey + cy, cos*tx - sin*ty, sin*tx + cos*ty
+		return float64(cos*ex) - float64(sin*ey) + cx, float64(sin*ex) + float64(cos*ey) + cy,
+			float64(cos*tx) - float64(sin*ty), float64(sin*tx) + float64(cos*ty)
 	}
 	t := t1
 	ax, ay, adx, ady := point(t)
@@ -195,7 +198,7 @@ func (p *Path) ArcTo(rx, ry, rot float64, large, sweep bool, x, y float64) *Path
 		if i == n-1 {
 			bx, by = x, y
 		}
-		p.CubeTo(ax+k*adx, ay+k*ady, bx-k*bdx, by-k*bdy, bx, by)
+		p.CubeTo(ax+float64(k*adx), ay+float64(k*ady), bx-float64(k*bdx), by-float64(k*bdy), bx, by)
 		ax, ay, adx, ady = bx, by, bdx, bdy
 	}
 	return p

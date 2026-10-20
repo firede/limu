@@ -13,6 +13,10 @@ type Polyline struct {
 // straight lines that stray from them by no more than tol (0.1 when it is not above zero).
 // It is for backends that draw no curves, or no dashes, and for finding what is near a
 // point. A figure of a single point is left out.
+//
+// A product added to a sum is written float64(x*y), which Go rounds on its own, so that Go
+// does not fuse the two where it would, on arm64, and the points are the same on every
+// platform. A backend that puts them on pixels draws the same pixels everywhere.
 func (p *Path) Flatten(tol float64) []Polyline {
 	if tol <= 0 {
 		tol = 0.1
@@ -55,7 +59,10 @@ func (p *Path) Flatten(tol float64) []Polyline {
 			for i := 1; i <= n; i++ {
 				t := float64(i) / float64(n)
 				u := 1 - t
-				cur = append(cur, Point{u*u*at.X + 2*u*t*c.X + t*t*end.X, u*u*at.Y + 2*u*t*c.Y + t*t*end.Y})
+				cur = append(cur, Point{
+					float64(u*u*at.X) + float64(2*u*t*c.X) + float64(t*t*end.X),
+					float64(u*u*at.Y) + float64(2*u*t*c.Y) + float64(t*t*end.Y),
+				})
 			}
 			cur[len(cur)-1] = end
 			at = end
@@ -70,7 +77,10 @@ func (p *Path) Flatten(tol float64) []Polyline {
 				t := float64(i) / float64(n)
 				u := 1 - t
 				k0, k1, k2, k3 := u*u*u, 3*u*u*t, 3*u*t*t, t*t*t
-				cur = append(cur, Point{k0*at.X + k1*c1.X + k2*c2.X + k3*end.X, k0*at.Y + k1*c1.Y + k2*c2.Y + k3*end.Y})
+				cur = append(cur, Point{
+					float64(k0*at.X) + float64(k1*c1.X) + float64(k2*c2.X) + float64(k3*end.X),
+					float64(k0*at.Y) + float64(k1*c1.Y) + float64(k2*c2.Y) + float64(k3*end.Y),
+				})
 			}
 			cur[len(cur)-1] = end
 			at = end
@@ -156,7 +166,7 @@ func Dash(lines []Polyline, pattern []float64, offset float64) []Polyline {
 					return b
 				}
 				k := pos / length
-				return Point{a.X + (b.X-a.X)*k, a.Y + (b.Y-a.Y)*k}
+				return Point{a.X + float64((b.X-a.X)*k), a.Y + float64((b.Y-a.Y)*k)}
 			}
 			pos := 0.0
 			for {

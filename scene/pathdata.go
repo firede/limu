@@ -105,9 +105,9 @@ func (p *Path) Scaled(s, dx, dy float64) *Path {
 	q := &Path{Ops: append([]Op(nil), p.Ops...), Args: make([]float64, len(p.Args))}
 	for i, v := range p.Args {
 		if i%2 == 0 {
-			q.Args[i] = v*s + dx
+			q.Args[i] = float64(v*s) + dx
 		} else {
-			q.Args[i] = v*s + dy
+			q.Args[i] = float64(v*s) + dy
 		}
 	}
 	return q

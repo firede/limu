@@ -48,6 +48,12 @@ func TestFlatten(t *testing.T) {
 	if end := q[0].Points[len(q[0].Points)-1]; end != (Point{20, 0.3}) {
 		t.Errorf("quad ends at %v", end)
 	}
+	// The points are the same on every platform: where Go fuses the products into the sum,
+	// on arm64, this one's x would be 169.94974746830584.
+	o := new(Path).Ellipse(165, 83, 7, 7).Flatten(0.25)
+	if p := o[0].Points[2]; p != (Point{169.94974746830582, 87.94974746830583}) {
+		t.Errorf("circle's third point %v", p)
+	}
 }
 
 func TestDash(t *testing.T) {
