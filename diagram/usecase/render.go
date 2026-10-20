@@ -496,7 +496,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				v.rows = append(v.rows, [2]text.Label{key, value})
 				v.keyW = max(v.keyW, key.Width)
 				valueW = max(valueW, value.Width)
-				v.h += max(value.Height, jsmath.Round(small*1.5)) + rowPad
+				v.h += max(key.Height, value.Height, jsmath.Round(small*1.5)) + rowPad
 			}
 			// The root of an empty object has a value and no key, and then there is no key
 			// column.
@@ -731,7 +731,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			it.At = scene.Point{X: x, Y: y + (-h/2 + v.headH/2)}
 			for k := range v.rows {
 				key, value := &v.rows[k][0], &v.rows[k][1]
-				rowH := max(value.Height, jsmath.Round(small*1.5)) + rowPad
+				rowH := max(key.Height, value.Height, jsmath.Round(small*1.5)) + rowPad
 				cells = append(cells, scene.Item{
 					Kind: scene.Text, Role: RoleJsonKey, ID: n.ID, Label: key,
 					At:    scene.Point{X: x + (x0 + cellPad + key.Width/2), Y: y + (ry + rowH/2)},
