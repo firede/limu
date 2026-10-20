@@ -49,7 +49,7 @@ The home page says what limu is for, which is drawing diagrams natively. Its fir
 example draws a diagram with limumygo, and the SVG backend comes second. It credits Pele,
 which most of limu is ported from.
 
-Its section on how limu works has two pictures, which the Architecture page also shows.
+Its section on how limu works has three pictures, which the Architecture page also shows.
 
 1. **Where the pipeline branches.** A renderer of SVG goes from text to a layout to an SVG
    string to a browser. limu goes from text to a layout to a scene and branches there, to
@@ -69,6 +69,17 @@ Its section on how limu works has two pictures, which the Architecture page also
 scene is SVG in `currentColor`, so it takes the page's color, and the other three are PNG at
 twice their size. `lib/pictures.mjs` writes them as a figure. The home page shows it, and so
 does any document with a paragraph of nothing but those images, as Architecture has.
+
+The third shows how far a backend can go. It's the same flowchart in
+mygo-platinum's Platinum look, laid out again because the look measures text in its own
+bitmap faces, and drawn a pixel at a time in a window of the look. mygo-platinum depends on
+limu, so the picture is drawn there and only the PNG is committed here, as
+`public/pictures/platinum.png`. To draw it again, write the flowchart of
+`limumygo/examples/pictures` to `review.mmd` and run this in mygo-platinum.
+
+```sh
+go run ./examples/diagrams -src review.mmd -png platinum.png -frame Review -scale 2
+```
 
 After the pictures come the code, with a switch between MyGo and SVG, then cards linking to
 the examples, the playground, Getting started and Theming, and a paragraph on limu and Pele.

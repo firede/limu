@@ -60,6 +60,10 @@ That's why a scene holds no colors. Each part refers to colors by token, such as
 
 The last picture keeps the scene's geometry and replaces only the drawing. Its nodes and edge labels are panes of MyGo's Liquid Glass, which bend what lies under them at the rim. That's hard to do with SVG in a browser. The program that draws these pictures is [limumygo/examples/pictures](https://github.com/firede/limu/tree/main/limumygo/examples/pictures).
 
+A backend can go further and lay the diagram out again for a look of its own. [mygo-platinum](https://github.com/firede/mygo-platinum) draws Mermaid in the Platinum look of late-1990s desktops. It measures text in its own bitmap faces, so the boxes take other sizes, and it draws every line and arrowhead a pixel at a time. Its [examples/diagrams](https://github.com/firede/mygo-platinum/tree/main/examples/diagrams) drew this picture.
+
+![Laid out again in bitmap faces, and drawn a pixel at a time.](/pictures/platinum.png "Platinum")
+
 ## Writing a backend
 
 A backend walks the scene's items in order and draws each one. It fills and strokes the item's `Parts` as their `Paint` says, using the colors the look resolves for the item (`style.Look.Resolve`). It then draws the markers at an edge's ends (`Marker.Outline`), the item's picture, and its label, setting each span of each line in its face around `At`. A backend with its own look can instead draw items from their `Role`, `Shape`, `Box` and `Route`. The svg package is a complete backend in about 700 lines, and the [API](/api#the-scene) page describes what an item holds.

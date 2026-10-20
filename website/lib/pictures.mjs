@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // The pictures that limumygo/examples/pictures draws into public/pictures: one scene, laid
-// out once and drawn four ways. A page shows them in a figure, the home page through
-// renderPictures and a document through a paragraph of nothing but their images, which
-// pictureParagraphs turns into the same figure.
+// out once and drawn four ways. platinum.png beside them is drawn by mygo-platinum's
+// examples/diagrams, as docs/website.md says. A page shows them in a figure, the home page
+// through renderPictures and a document through a paragraph of nothing but their images,
+// which pictureParagraphs turns into the same figure.
 
 // The PNG pictures are drawn at twice their size in DIPs, as the program draws them by
 // default.
@@ -23,6 +24,11 @@ export const scenePictures = [
   { src: '/pictures/glass.png', title: 'Liquid Glass', alt: 'Each part drawn its own way, with MyGo’s glass.' },
 ];
 
+// The same diagram laid out again and drawn in mygo-platinum's Platinum look.
+export const platinumPicture = [
+  { src: '/pictures/platinum.png', title: 'Platinum', alt: 'Laid out again in bitmap faces, and drawn a pixel at a time.' },
+];
+
 // picture writes a picture: the SVG in the page, so that it takes the page's color, and a
 // PNG as an image the size it was drawn in DIPs.
 const picture = ({ src, alt }) => {
@@ -36,10 +42,11 @@ const picture = ({ src, alt }) => {
 };
 
 // renderPictures writes pictures as a figure, each in a row with its name and what it
-// shows.
+// shows. Several pictures are the scene drawn several ways, and say so; one stands alone.
 export const renderPictures = (pictures) => {
   const rows = pictures.map((p) => `<div class="scene-picture"><p class="scene-picture-name"><strong>${escapeHtml(p.title)}</strong> <span>${escapeHtml(p.alt)}</span></p><div class="scene-picture-frame">${picture(p)}</div></div>`);
-  return `<figure class="diagram-figure scene-pictures"><figcaption>One scene, laid out once and drawn four ways</figcaption>${rows.join('')}</figure>`;
+  const caption = pictures.length > 1 ? '<figcaption>One scene, laid out once and drawn four ways</figcaption>' : '';
+  return `<figure class="diagram-figure scene-pictures">${caption}${rows.join('')}</figure>`;
 };
 
 const isPicture = (node) => node.type === 'image' && node.url.startsWith('/pictures/');

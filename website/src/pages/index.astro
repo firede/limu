@@ -9,7 +9,7 @@ import SiteHeader from '../components/SiteHeader.astro';
 import home from '../generated/home.json';
 import { installs } from '../lib/home';
 import { repositoryUrl } from '../lib/site';
-import { renderPictures, scenePictures } from '../../lib/pictures.mjs';
+import { platinumPicture, renderPictures, scenePictures } from '../../lib/pictures.mjs';
 
 const headings = [
   { depth: 2, slug: 'how-it-works', text: 'How it works' },
@@ -51,6 +51,8 @@ const explore = [
           </figure>
           <p>Because the scene holds no colors, it's laid out once and can be drawn any number of ways. Switching themes only redraws it, and a backend can also draw each part its own way.</p>
           <Fragment set:html={renderPictures(scenePictures)} />
+          <p>A backend can go further and lay a diagram out again for a look of its own, as <a href="https://github.com/firede/mygo-platinum">mygo-platinum</a> does for the Platinum desktop.</p>
+          <Fragment set:html={renderPictures(platinumPicture)} />
           <p>An app can also ask the scene which part is under the pointer.</p>
         </section>
 
