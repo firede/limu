@@ -710,7 +710,7 @@ func peleFigures(t *testing.T, svg string, x, y float64) []figure {
 			rx0 := at.x + attrNum(t, a, "x")
 			ry0 := at.y + attrNum(t, a, "y")
 			f.box = scene.Rect{X: rx0, Y: ry0, W: w, H: h}
-			if strings.HasPrefix(rx, "var(--pele-radius") {
+			if strings.HasPrefix(a["style"], "rx:var(--_r)") {
 				f.rounded, f.exact = true, true
 			} else if rx == "" {
 				x0, y0 := attrNum(t, a, "x"), attrNum(t, a, "y")
