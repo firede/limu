@@ -9,7 +9,7 @@ import (
 )
 
 // An author's fill and fill opacity cascade each on their own, as a browser takes the style
-// Pele writes over the attributes it writes beside it. Pele 1.6.0 draws these diagrams so:
+// Pele writes over the attributes it writes beside it. Pele 1.7.0 draws these diagrams so:
 //
 //	style A fill-opacity:0.5,stroke-opacity:0.25 on a flowchart's node:
 //	  <rect fill="var(--_s)" stroke="var(--_b)" style="rx:var(--_r);fill-opacity:0.5;stroke-opacity:0.25;"/>

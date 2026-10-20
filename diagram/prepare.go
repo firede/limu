@@ -45,7 +45,8 @@ type Limits struct {
 
 // Prepared is a diagram's text made ready for the parser of its type.
 type Prepared struct {
-	Type Type
+	// Detected is the diagram's type, as Pele and as Mermaid name it.
+	Detected
 	// Text is the text after its front matter, with directives and comment lines taken out:
 	// what detect read.
 	Text string
@@ -93,8 +94,8 @@ func Prepare(source string, opt Options) (*Prepared, error) {
 	if err != nil {
 		return nil, err
 	}
-	typ := detect(pre.Text)
-	if typ == "" {
+	found, ok := detectDiagram(pre.Text)
+	if !ok {
 		return nil, newError("No diagram type detected for the given text.", UnsupportedDiagram, "")
 	}
 	config := pre.Config
@@ -112,7 +113,7 @@ func Prepare(source string, opt Options) (*Prepared, error) {
 		maxEdges = DefaultMaxEdges
 	}
 	return &Prepared{
-		Type:         typ,
+		Detected:     found,
 		Text:         pre.Text,
 		WithComments: pre.WithComments,
 		Config:       config,
@@ -125,6 +126,22 @@ func Prepare(source string, opt Options) (*Prepared, error) {
 
 // Unsupported is the error of a diagram of a type that has no parser, as Pele's parseSource
 // gives it.
-func Unsupported(typ Type) *Error {
-	return newError(`Diagram type "`+string(typ)+`" is not supported yet.`, UnsupportedDiagram, typ)
+func Unsupported(found Detected) *Error {
+	e := newError(`Diagram type "`+string(found.Type)+`" is not supported yet.`, UnsupportedDiagram, found.Type)
+	e.MermaidType = found.MermaidType
+	return e
+}
+
+// TagError gives err, if it is an *Error, the diagram's type where it has none, as Pele's
+// tagErrors does for the errors of a diagram's parser and of its layout. It is err.
+func TagError(found Detected, err error) error {
+	if e, ok := err.(*Error); ok {
+		if e.Type == "" {
+			e.Type = found.Type
+		}
+		if e.MermaidType == "" {
+			e.MermaidType = found.MermaidType
+		}
+	}
+	return err
 }

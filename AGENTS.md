@@ -52,7 +52,7 @@ docs/design.md first: it says what each stage owns and why style is kept out of 
   write code that has no use but to match a platform's library to the last bit, as one
   copying the C library's `pow` would be. Where such a difference can't be avoided, note it
   as a difference of the platform, and leave the cases it reaches out of the comparison.
-- The port follows Pele 1.6.0, commit 44da152. To follow a newer Pele, write the fixtures
+- The port follows Pele 1.7.0, commit 8603bf3. To follow a newer Pele, write the fixtures
   anew from it and port what its diff changed.
 
 ## Writing

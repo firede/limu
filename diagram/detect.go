@@ -46,6 +46,18 @@ const (
 	EventModeling Type = "eventmodeling"
 )
 
+// MermaidType is a type of diagram as Mermaid names it, as Pele's MermaidType is: the name
+// Mermaid's detectType gives, such as "flowchart-v2" for `graph TD`. It is the Type, but for
+// "flowchart-v2", "flowchart-elk", "classDiagram", "stateDiagram" and the railroad diagrams'
+// "railroadEbnf", "railroadAbnf" and "railroadPeg".
+type MermaidType string
+
+// Detected is a diagram's type, as Pele's Detected is: as Pele names it and as Mermaid does.
+type Detected struct {
+	Type        Type
+	MermaidType MermaidType
+}
+
 // startsWith tests /^\s*word/, with fold for the i flag, which folds ASCII only.
 func startsWith(s, word string, fold bool) (rest string, ok bool) {
 	s = s[chars.SpaceRun(s, 0):]
@@ -68,6 +80,8 @@ func prefix(word string) func(string) bool {
 	}
 }
 
+func always(string) bool { return true }
+
 func beta(word string, fold bool, after func(string) bool) func(string) bool {
 	return func(s string) bool {
 		rest, ok := startsWith(s, word, fold)
@@ -77,16 +91,17 @@ func beta(word string, fold bool, after func(string) bool) func(string) bool {
 
 // Mermaid's detectors, in the order Mermaid registers them. The first match wins.
 var detectors = []struct {
-	typ   Type
-	match func(string) bool
+	typ     Type
+	mermaid MermaidType
+	match   func(string) bool
 }{
-	{Flowchart, prefix("flowchart-elk")},
-	{Mindmap, prefix("mindmap")},
-	{Architecture, prefix("architecture")},
-	{AgentFlow, beta("agentflow-beta", false, wordEnds)},
+	{Flowchart, "flowchart-elk", prefix("flowchart-elk")},
+	{Mindmap, "mindmap", prefix("mindmap")},
+	{Architecture, "architecture", prefix("architecture")},
+	{AgentFlow, "agentflow", beta("agentflow-beta", false, wordEnds)},
 	// /^\s*C4Context|C4Container|C4Component|C4Dynamic|C4Deployment/: only the first is held to
 	// the start.
-	{C4, func(s string) bool {
+	{C4, "c4", func(s string) bool {
 		if _, ok := startsWith(s, "C4Context", false); ok {
 			return true
 		}
@@ -97,61 +112,65 @@ var detectors = []struct {
 		}
 		return false
 	}},
-	{Kanban, prefix("kanban")},
-	{Class, prefix("classDiagram")},
-	{ER, prefix("erDiagram")},
-	{Gantt, prefix("gantt")},
-	{Info, prefix("info")},
-	{Pie, prefix("pie")},
-	{Requirement, prefix("requirement")},
-	{Sequence, prefix("sequenceDiagram")},
-	{Swimlane, beta("swimlane-beta", false, wordEnds)},
-	{Flowchart, func(s string) bool { return prefix("graph")(s) || prefix("flowchart")(s) }},
-	{Timeline, prefix("timeline")},
-	{GitGraph, prefix("gitGraph")},
-	{State, prefix("stateDiagram")},
-	{Journey, prefix("journey")},
-	{QuadrantChart, prefix("quadrantChart")},
-	{Sankey, prefix("sankey")},
-	{Packet, prefix("packet")},
-	{XYChart, prefix("xychart")},
-	{Block, prefix("block")},
-	{EventModeling, prefix("eventmodeling")},
-	{TreeView, prefix("treeView-beta")},
-	{Radar, prefix("radar-beta")},
+	{Kanban, "kanban", prefix("kanban")},
+	{Class, "classDiagram", prefix("classDiagram")},
+	{ER, "er", prefix("erDiagram")},
+	{Gantt, "gantt", prefix("gantt")},
+	{Info, "info", prefix("info")},
+	{Pie, "pie", prefix("pie")},
+	{Requirement, "requirement", prefix("requirement")},
+	{Sequence, "sequence", prefix("sequenceDiagram")},
+	{Swimlane, "swimlane", beta("swimlane-beta", false, wordEnds)},
+	{Flowchart, "flowchart-v2", func(s string) bool { return prefix("graph")(s) || prefix("flowchart")(s) }},
+	{Timeline, "timeline", prefix("timeline")},
+	{GitGraph, "gitGraph", prefix("gitGraph")},
+	{State, "stateDiagram", prefix("stateDiagram")},
+	{Journey, "journey", prefix("journey")},
+	{QuadrantChart, "quadrantChart", prefix("quadrantChart")},
+	{Sankey, "sankey", prefix("sankey")},
+	{Packet, "packet", prefix("packet")},
+	{XYChart, "xychart", prefix("xychart")},
+	{Block, "block", prefix("block")},
+	{EventModeling, "eventmodeling", prefix("eventmodeling")},
+	{TreeView, "treeView", prefix("treeView-beta")},
+	{Radar, "radar", prefix("radar-beta")},
 	// /^\s*ishikawa(-beta)?\b/i: the optional -beta gives way to the word's end.
-	{Ishikawa, beta("ishikawa", true, wordEnds)},
-	{Treemap, prefix("treemap")},
-	// /^\s*railroad-(?:ebnf-|abnf-|peg-)?beta/i
-	{Railroad, beta("railroad-", true, func(rest string) bool {
-		for _, w := range []string{"beta", "ebnf-beta", "abnf-beta", "peg-beta"} {
-			if chars.HasPrefixFold(rest, w) {
-				return true
-			}
-		}
-		return false
-	})},
-	{Venn, prefix("venn-beta")},
-	{Wardley, beta("wardley-beta", true, func(string) bool { return true })},
+	{Ishikawa, "ishikawa", beta("ishikawa", true, wordEnds)},
+	{Treemap, "treemap", prefix("treemap")},
+	// /^\s*railroad-beta/i, and one for each dialect, as /^\s*railroad-ebnf-beta/i, with a name of
+	// its own.
+	{Railroad, "railroad", beta("railroad-beta", true, always)},
+	{Railroad, "railroadEbnf", beta("railroad-ebnf-beta", true, always)},
+	{Railroad, "railroadAbnf", beta("railroad-abnf-beta", true, always)},
+	{Railroad, "railroadPeg", beta("railroad-peg-beta", true, always)},
+	{Venn, "venn", prefix("venn-beta")},
+	{Wardley, "wardley", beta("wardley-beta", true, always)},
 	// /^\s*cynefin-beta(?:[\s:]|$)/
-	{Cynefin, beta("cynefin-beta", false, func(rest string) bool {
+	{Cynefin, "cynefin", beta("cynefin-beta", false, func(rest string) bool {
 		return rest == "" || rest[0] == ':' || chars.IsSpace(chars.Unit(rest, 0))
 	})},
 	// /^\s*usecase-beta(?:\s|$)/
-	{UseCase, beta("usecase-beta", false, func(rest string) bool {
+	{UseCase, "usecase", beta("usecase-beta", false, func(rest string) bool {
 		return rest == "" || chars.IsSpace(chars.Unit(rest, 0))
 	})},
+}
+
+// detectDiagram is the type of diagram a preprocessed text is, as Pele's detectDiagram finds
+// it, and false when it is none.
+func detectDiagram(cleaned string) (Detected, bool) {
+	for _, d := range detectors {
+		if d.match(cleaned) {
+			return Detected{d.typ, d.mermaid}, true
+		}
+	}
+	return Detected{}, false
 }
 
 // detect is the type of diagram a preprocessed text is, as Pele's detect finds it, or "" when
 // it is none.
 func detect(cleaned string) Type {
-	for _, d := range detectors {
-		if d.match(cleaned) {
-			return d.typ
-		}
-	}
-	return ""
+	found, _ := detectDiagram(cleaned)
+	return found.Type
 }
 
 // DetectType is the type of diagram a text is, or "" when it is none, as Pele's detectType

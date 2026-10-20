@@ -166,7 +166,7 @@ func Supports(src string) bool {
 // times, with other options, and from many goroutines at once: a host that lays a diagram
 // out again when its width changes parses it once.
 type Diagram struct {
-	typ    diagram.Type
+	found  diagram.Detected
 	config diagram.Config
 	model  any
 	kind   kind
@@ -176,7 +176,8 @@ type Diagram struct {
 // type, and then its body, with the parser of its type. opt holds what Pele's ParseOptions
 // do, the limits the text is held to and the configuration under its own; what changes where
 // things are is given to Layout. Its errors are *diagram.Error: text of no type limu reads,
-// text it cannot parse, or text past a limit.
+// text it cannot parse, or text past a limit. An error that comes once the type is known
+// holds it, as Pele's tagErrors gives it, and so do the errors of Layout.
 func Parse(src string, opt diagram.Options) (*Diagram, error) {
 	p, err := diagram.Prepare(src, opt)
 	if err != nil {
@@ -184,17 +185,21 @@ func Parse(src string, opt diagram.Options) (*Diagram, error) {
 	}
 	k, ok := kinds[p.Type]
 	if !ok {
-		return nil, diagram.Unsupported(p.Type)
+		return nil, diagram.Unsupported(p.Detected)
 	}
 	m, err := k.parse(p)
 	if err != nil {
-		return nil, err
+		return nil, diagram.TagError(p.Detected, err)
 	}
-	return &Diagram{typ: p.Type, config: p.Config, model: m, kind: k}, nil
+	return &Diagram{found: p.Detected, config: p.Config, model: m, kind: k}, nil
 }
 
 // Type is the diagram's type.
-func (d *Diagram) Type() diagram.Type { return d.typ }
+func (d *Diagram) Type() diagram.Type { return d.found.Type }
+
+// MermaidType is the diagram's type as Mermaid names it, as Pele's parse gives it: as
+// "flowchart-v2" for `graph TD`, where Type is "flowchart".
+func (d *Diagram) MermaidType() diagram.MermaidType { return d.found.MermaidType }
 
 // Config is the diagram's configuration: its own, over the Options.Config it was parsed
 // with. It is not a copy; a host that changes it must not lay the diagram out meanwhile.
@@ -216,13 +221,13 @@ func (d *Diagram) Layout(o *layout.Options) (*scene.Scene, error) {
 	}
 	sc, err := d.kind.layout(d.model, d.config, o)
 	if err != nil {
-		return nil, err
+		return nil, diagram.TagError(d.found, err)
 	}
 	if o.Snap > 0 {
 		sc.Snap(o.Snap)
 	}
 	if !sc.Finite() {
-		return nil, &diagram.Error{Code: diagram.Limit, Message: "Diagram cannot be laid out in finite numbers.", Type: d.typ}
+		return nil, diagram.TagError(d.found, &diagram.Error{Code: diagram.Limit, Message: "Diagram cannot be laid out in finite numbers."})
 	}
 	return sc, nil
 }

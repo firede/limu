@@ -26,6 +26,7 @@ Every package except `limumygo` uses only Go's standard library.
 | `Parse(src, opt)` | Reads a diagram into a `Diagram` to lay out later. |
 | `Diagram.Layout(o)` | Lays out the diagram. You can call it many times, with different options, from several goroutines at once. |
 | `Diagram.Type()` | Returns the diagram's type, such as `diagram.Flowchart`. |
+| `Diagram.MermaidType()` | Returns the type as Mermaid names it, such as `flowchart-v2` for `graph TD`. |
 | `Diagram.Config()` | Returns the diagram's configuration, with its own settings over the ones it was parsed with. |
 | `Types()` | Lists the diagram types limu supports. |
 | `Supports(src)` | Reports whether limu supports the type a text declares. It doesn't parse the rest, so the text may still have errors. |
@@ -62,6 +63,7 @@ Text over a limit gives an error with code `diagram.Limit`. A negative limit tur
 | `Code` | The kind of error. |
 | `Message` | A description of the problem, which may quote the diagram. |
 | `Type` | The diagram's type, if known. |
+| `MermaidType` | The type as Mermaid names it, if known. |
 | `Line`, `Column` | The position of the error, counted from 1, with the column in UTF-16 code units. Both are 0 when the error has no position. |
 | `Snippet` | The line with the error and a caret under the position, when there is one. |
 

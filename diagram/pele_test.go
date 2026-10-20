@@ -29,6 +29,7 @@ type peleParse struct {
 		Config       any        `json:"config"`
 		LineOffset   int        `json:"lineOffset"`
 		Type         *string    `json:"type"`
+		MermaidType  *string    `json:"mermaidType"`
 		Error        *peleError `json:"error"`
 	} `json:"preprocessed"`
 	Encoded []struct {
@@ -99,16 +100,18 @@ func TestPreprocessMatchesPele(t *testing.T) {
 		if hasTitle {
 			title = *c.Title
 		}
-		typ := ""
+		typ, mermaidType := "", ""
 		if c.Type != nil {
-			typ = *c.Type
+			typ, mermaidType = *c.Type, *c.MermaidType
 		}
+		found, _ := detectDiagram(got.Text)
 		sameConfig, config := sameJSON(yaml.Encode(got.Config, true), c.Config)
 		if got.Text != c.Text || got.WithComments != withComments || got.Title != title || got.HasTitle != hasTitle ||
-			got.LineOffset != c.LineOffset || !sameConfig || string(detect(got.Text)) != typ {
+			got.LineOffset != c.LineOffset || !sameConfig || string(found.Type) != typ ||
+			string(found.MermaidType) != mermaidType {
 			want, _ := json.Marshal(c)
-			t.Errorf("preprocess(%q)\n got text %q, with comments %q, title %q (%v), line offset %d, type %q, config %s\nPele %s",
-				c.Source, got.Text, got.WithComments, got.Title, got.HasTitle, got.LineOffset, detect(got.Text), config, want)
+			t.Errorf("preprocess(%q)\n got text %q, with comments %q, title %q (%v), line offset %d, type %q (%q), config %s\nPele %s",
+				c.Source, got.Text, got.WithComments, got.Title, got.HasTitle, got.LineOffset, found.Type, found.MermaidType, config, want)
 			failed++
 		}
 		if failed > 20 {

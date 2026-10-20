@@ -21,10 +21,12 @@ type Error struct {
 	Code    Code
 	Message string
 	// Type is the type of the diagram the error is in, where it is known.
-	Type    Type
-	Line    int
-	Column  int
-	Snippet string
+	Type Type
+	// MermaidType is that type as Mermaid names it, where it is known.
+	MermaidType MermaidType
+	Line        int
+	Column      int
+	Snippet     string
 }
 
 func (e *Error) Error() string { return e.Message }

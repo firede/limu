@@ -3,7 +3,7 @@ title: "Compatibility"
 description: "Supported diagram types, and how limu differs from Pele and Mermaid."
 ---
 
-limu parses Mermaid text the way [Pele](https://pele.run) 1.6.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
+limu parses Mermaid text the way [Pele](https://pele.run) 1.7.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
 
 ## Diagram types
 
@@ -60,6 +60,7 @@ Pele renders SVG in a browser, while limu lays out a scene for a backend to draw
 | `render(source, options)` | `limu.Layout`, then a backend such as `svg.Render` |
 | `parse(source, options)` | `limu.Parse` |
 | `detectType`, `supports` | `diagram.DetectType`, `limu.Supports` |
+| `type`, `mermaidType` | `Diagram.Type()`, `Diagram.MermaidType()` |
 | `PeleError` and its codes | `diagram.Error` and its codes |
 | `limit`, `maxEdges`, `config` | `diagram.Options` |
 | `measurer`, `fontSize`, `maxWidth`, `autoDirection`, `directionBreakpoint`, `padding`, `now` | `layout.Options`, where `KeepDirection` is the opposite of `autoDirection` |

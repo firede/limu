@@ -1,6 +1,6 @@
 // What every diagram's text goes through before its own parser: front matter, directives and
-// comments read (preprocess), the type found (detect), entity codes hidden (encodeEntities),
-// and the limit on a source's length.
+// comments read (preprocess), the type found as Pele and as Mermaid name it (detectDiagram),
+// entity codes hidden (encodeEntities), and the limit on a source's length.
 import { enc, peleError } from '../lib/value.mjs';
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
@@ -114,7 +114,7 @@ const WRITTEN = [
 
 export default async function ({ src, cases, write, random }) {
   const { preprocess, encodeEntities } = await src('preprocess.ts');
-  const { detect } = await src('detect.ts');
+  const { detectDiagram } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
   const c = cases('parse');
   const next = mutator(c.extracted, FRAGMENTS, random(20261019));
@@ -127,6 +127,7 @@ export default async function ({ src, cases, write, random }) {
   const preprocessed = all.map((source) => {
     try {
       const pre = preprocess(source);
+      const found = detectDiagram(pre.text);
       return {
         source,
         text: pre.text,
@@ -135,7 +136,8 @@ export default async function ({ src, cases, write, random }) {
         title: pre.title,
         config: enc(pre.config, true),
         lineOffset: pre.lineOffset,
-        type: detect(pre.text),
+        type: found?.type ?? null,
+        mermaidType: found?.mermaidType ?? null,
       };
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;

@@ -12,6 +12,7 @@
 // otherwise:
 //
 //   parse         diagram/testdata/pele/parse.json, for what every diagram's text goes through
+//   limu          testdata/pele/limu.json, for what Parse and Layout give a text as a whole
 //   common        diagram/internal/common/testdata/pele/common.json
 //   draw          diagram/internal/draw/testdata/pele/draw.json
 //   graphs-layout diagram/internal/graphs/testdata/pele/layout.json
