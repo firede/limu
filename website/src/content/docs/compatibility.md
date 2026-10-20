@@ -3,7 +3,7 @@ title: "Compatibility"
 description: "Supported diagram types, and how limu differs from Pele and Mermaid."
 ---
 
-limu parses Mermaid text the way [Pele](https://pele.run) 1.7.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
+limu parses Mermaid text the way [Pele](https://pele.run) 1.8.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
 
 ## Diagram types
 
@@ -70,6 +70,8 @@ Pele renders SVG in a browser, while limu lays out a scene for a backend to draw
 | `--pele-*` variables, `pele-*` classes | `--limu-*` variables, `limu-*` classes |
 
 Features that only make sense in a browser aren't ported. `mount`, its zoom and `refresh` are left to the app, which can do the same with the scene, for example through limumygo's `Options.Scale`. The SVG options `responsive`, `idPrefix`, `linkRel`, `outputLimit` and `sanitize` aren't ported either. Neither are the entry points that load diagram types on demand, since a Go program only links what it imports.
+
+Pele's `math` option isn't ported. With it, Pele typesets `$$…$$` in a label through a function the app gives. Without it, Pele keeps the label as text, and limu always does.
 
 ### Drawing
 
