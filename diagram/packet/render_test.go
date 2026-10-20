@@ -98,8 +98,9 @@ func sceneLines(sc *scene.Scene) []string {
 		if l == nil || l.Empty() {
 			return
 		}
-		y := it.At.Y - l.Height/2 + l.LineHeight/2 + float64(l.Size*0.35)
+		top := it.At.Y - l.Height/2
 		for _, line := range l.Lines {
+			y := top + l.LineHeight/2 + float64(l.Size*0.35)
 			at := prefix + "t " + pt(it.At.X, y) + " " + kind + " " + anchors[it.Align] + " "
 			if len(line) == 0 {
 				lines = append(lines, at+" ")
@@ -111,7 +112,7 @@ func sceneLines(sc *scene.Scene) []string {
 					lines = append(lines, prefix+"+ "+written(span.Text))
 				}
 			}
-			y += l.LineHeight
+			top += l.LineHeight
 		}
 	}
 	for i := range sc.Items {

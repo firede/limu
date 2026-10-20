@@ -385,7 +385,7 @@ Pele draws with lines and curves. A circle, an ellipse, a box with corners of it
 path with an arc are drawn by a `scene.Path` in cubic curves that only come close, so they
 are compared as figures, within a tolerance.
 
-The port follows Pele 1.7.0, commit `8603bf3`. Each fixture records the version and commit
+The port follows Pele 1.8.0, commit `8fad23b`. Each fixture records the version and commit
 it was written from, and the architecture and Node version that wrote it. The tests read
 fixtures with `fixture.Load`, which fails on a fixture written from another version or
 commit of Pele, or on one with an empty list at its top level, as a suite that found no

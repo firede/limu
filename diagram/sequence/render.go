@@ -1076,7 +1076,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 						Style: style.Style{Text: style.Fg},
 					})
 				}
-				lineY = bottom
+				// A label taller than the loop reaches below it, so the next row starts under
+				// the label.
+				lineY = max(bottom, (top+bottom)/2+label.Height/2)
 			} else {
 				dir := -1.0
 				if b.x > a.x {

@@ -505,9 +505,11 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 	draw := func() {
 		cx, cy := it.At.X, it.At.Y
 		shift := l.Size * 0.35
-		y := cy - l.Height/2 + l.LineHeight/2 + shift
+		// Each line is placed from the top of the label down, as the svg package places them.
+		top := cy - l.Height/2
 		size := p.Len(l.Size)
 		for i, line := range l.Lines {
+			y := top + l.LineHeight/2 + shift
 			var x float64
 			switch it.Align {
 			case scene.Start:
@@ -534,7 +536,7 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 				}
 				x += sp.Width
 			}
-			y += l.LineHeight
+			top += l.LineHeight
 		}
 	}
 	if it.Rotate != 0 {

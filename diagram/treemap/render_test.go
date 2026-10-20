@@ -179,8 +179,9 @@ func sceneLines(sc *scene.Scene) []string {
 			return
 		}
 		y := it.At.Y + float64(l.Size*0.35)
+		top := it.At.Y - l.Height/2
 		if it.Role == RoleTitle {
-			y = it.At.Y - l.Height/2 + l.LineHeight/2 + float64(l.Size*0.35)
+			y = top + l.LineHeight/2 + float64(l.Size*0.35)
 		}
 		if size == "" {
 			size = num(l.Size)
@@ -198,7 +199,13 @@ func sceneLines(sc *scene.Scene) []string {
 					lines = append(lines, prefix+"+ "+written(span.Text))
 				}
 			}
-			y += l.LineHeight
+			if it.Role == RoleTitle {
+				// A title's lines are placed from its top down, as Pele's labelSvg places them.
+				top += l.LineHeight
+				y = top + l.LineHeight/2 + float64(l.Size*0.35)
+			} else {
+				y += l.LineHeight
+			}
 		}
 	}
 	for i := range sc.Items {

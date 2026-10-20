@@ -281,10 +281,16 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 			for _, i := range g.periods {
 				color := colorOf(g, i)
 				h := chipHeight(&periodLabels[i])
-				cy := y + h/2
+				// A period and its first event share one center line, so the line between
+				// them runs straight.
+				first := h
+				if len(eventLabels[i]) > 0 {
+					first = eventHeight(&eventLabels[i][0])
+				}
+				cy := y + max(h, first)/2
 				d := new(scene.Path).MoveTo(left+colW, cy).LineTo(axisX, cy)
 				var cards []scene.Item
-				ey := y
+				ey := cy - first/2
 				last := cy
 				for k := range eventLabels[i] {
 					label := &eventLabels[i][k]
@@ -297,11 +303,11 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 				if len(cards) > 0 {
 					d.MoveTo(axisX, cy).LineTo(spineX, cy).LineTo(spineX, last)
 				}
-				period(i, color, left, y, h)
+				period(i, color, left, cy-h/2, h)
 				connector(d)
 				dot(axisX, cy, color)
 				items = append(items, cards...)
-				y = max(y+h, ey-eventGap) + gap
+				y = max(cy+h/2, ey-eventGap) + gap
 			}
 			if len(g.periods) == 0 {
 				y += gap - sectionGap - 4

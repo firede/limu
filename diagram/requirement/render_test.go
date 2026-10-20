@@ -245,9 +245,12 @@ func textLine(l *text.Label, align scene.Align, class, size, weight string, x, y
 		spans = append(spans, pos+":"+quoted)
 	}
 	shift := float64(l.Size * 0.35)
-	ly := y - l.Height/2 + l.LineHeight/2 + shift
+	top := y - l.Height/2
+	ly := top + l.LineHeight/2 + shift
 	if align == scene.Start {
-		for _, line := range l.Lines {
+		for i, line := range l.Lines {
+			// startText places each line by its middle, as Pele's lineMiddle gives it.
+			ly = top + float64((float64(i)+0.5)*l.LineHeight) + shift
 			first := true
 			for _, s := range line {
 				if s.Icon != "" || s.Text == "" {
@@ -260,7 +263,6 @@ func textLine(l *text.Label, align scene.Align, class, size, weight string, x, y
 				span(pos, s.Face&^shared, s.Text)
 				first = false
 			}
-			ly += l.LineHeight
 		}
 	} else if len(l.Lines) == 1 && len(l.Lines[0]) == 1 && l.Lines[0][0].Icon == "" && l.Lines[0][0].Face == 0 {
 		// Pele writes a label of one plain run without a tspan, and no emphasis.
@@ -278,7 +280,8 @@ func textLine(l *text.Label, align scene.Align, class, size, weight string, x, y
 			if len(line) == 0 {
 				span("@"+num(x)+","+num(ly), 0, " ")
 			}
-			ly += l.LineHeight
+			top += l.LineHeight
+			ly = top + l.LineHeight/2 + shift
 		}
 	}
 	if len(spans) == 0 {

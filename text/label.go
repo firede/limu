@@ -93,9 +93,11 @@ func Layout(raw string, o Options) Label {
 	var lines [][]Span
 	var widths []float64
 	width := 0.0
+	// HTML tags can span the breaks, while markdown's emphasis stays within its line.
+	htmlFace := o.Face
 	for _, part := range splitBreaks(source) {
 		var line []Span
-		inline(&line, chars.Trim(part), o.Markdown, o.Face, &o)
+		htmlFace = inline(&line, chars.Trim(part), o.Markdown, o.Face, htmlFace, &o)
 		w := measureSpans(line, &o)
 		if w > o.MaxWidth {
 			wrap(line, &o, &lines, &widths)
@@ -408,9 +410,11 @@ func tagAt(s string, i int) (name string, end int) {
 	return "", -1
 }
 
-// inline splits inline HTML and, for markdown, emphasis markers into spans.
-func inline(line *[]Span, source string, markdown bool, base Face, o *Options) {
-	f := base
+// inline splits inline HTML and, for markdown, emphasis markers into spans, as Pele's inline
+// does. A line starts in htmlFace, the emphasis that HTML tags left open on the lines before
+// it, and inline gives the emphasis they leave open at its end.
+func inline(line *[]Span, source string, markdown bool, base, htmlFace Face, o *Options) Face {
+	f := htmlFace
 	var marked Face
 	var text strings.Builder
 	flush := func() {
@@ -434,8 +438,10 @@ func inline(line *[]Span, source string, markdown bool, base Face, o *Options) {
 				if bit != 0 {
 					flush()
 					if closingTag {
+						htmlFace = htmlFace&^bit | base&bit
 						f = f&^bit | base&bit
 					} else {
+						htmlFace |= bit
 						f |= bit
 					}
 				}
@@ -480,6 +486,7 @@ func inline(line *[]Span, source string, markdown bool, base Face, o *Options) {
 		i++
 	}
 	flush()
+	return htmlFace
 }
 
 func measureSpans(line []Span, o *Options) float64 {
