@@ -51,18 +51,20 @@ func sortByBary(list []int, count int, bary []float64, pos []int, right bool, sp
 
 // reduceCrossings orders the nodes of each rank so that edges cross as little as they can, as
 // Pele's reduceCrossings does: sweeps up and down that sort each rank by the mean place of its
-// nodes' neighbours, keeping the order with the fewest crossings.
-func reduceCrossings(g *graph, nodes []lNode) {
+// nodes' neighbours, keeping the order with the fewest crossings. It returns how often edges
+// cross.
+func reduceCrossings(g *graph, nodes []lNode) int {
 	n, real, maxRank, W := g.n, g.real, g.maxRank, g.W
 	EF, ET, EFD, ETD := g.EF, g.ET, g.EFD, g.ETD
 	succStart, succE, predStart, predE := g.succStart, g.succE, g.predStart, g.predE
 	layerStart, order, pos, offsets := g.layerStart, g.order, g.pos, g.offsets
+	fixed, GRP, groupParent := g.fixed, g.GRP, g.groupParent
 	widest := 0
 	for r := 0; r <= maxRank; r++ {
 		widest = max(widest, layerStart[r+1]-layerStart[r])
 	}
 	if widest < 2 {
-		return
+		return 0
 	}
 	// With offsets, edges that reach one node at different offsets take separate places along it.
 	var place []int
@@ -190,12 +192,100 @@ func reduceCrossings(g *graph, nodes []lNode) {
 
 	best := count()
 	if best == 0 {
-		return
+		return 0
 	}
 	bestOrder := slices.Clone(order)
 	bary := make([]float64, n)
 	moving := make([]int, widest)
 	spare := make([]int, widest)
+
+	// arrange puts the nodes of rank r in the order of key, keeping the nodes of each group
+	// together: a group goes where the average of its nodes' keys puts it among the nodes and
+	// groups beside it.
+	groups := len(groupParent)
+	depth := make([]int, groups)
+	for gr := 0; gr < groups; gr++ {
+		for p := gr; p >= 0; p = groupParent[p] {
+			depth[gr]++
+		}
+	}
+	groupSum := make([]float64, groups)
+	groupCount := make([]int, groups)
+	groupFirst := make([]int, groups)
+	arrange := func(r int, key []float64) {
+		s := layerStart[r]
+		e := layerStart[r+1]
+		for i := s; i < e; i++ {
+			for gr := GRP[order[i]]; gr >= 0; gr = groupParent[gr] {
+				groupSum[gr] = 0
+				groupCount[gr] = 0
+			}
+		}
+		for i := s; i < e; i++ {
+			v := order[i]
+			for gr := GRP[v]; gr >= 0; gr = groupParent[gr] {
+				if groupCount[gr] == 0 {
+					groupFirst[gr] = i
+				}
+				groupSum[gr] += key[v]
+				groupCount[gr]++
+			}
+		}
+		// Nodes are items numbered as they are, and groups after them. Two nodes compare as the
+		// two items they are in, side by side in the group that holds both.
+		value := func(item int) float64 {
+			if item >= n {
+				return groupSum[item-n] / float64(groupCount[item-n])
+			}
+			return key[item]
+		}
+		// Items that tie keep the order they had.
+		first := func(item int) int {
+			if item >= n {
+				return groupFirst[item-n]
+			}
+			return s + pos[item]
+		}
+		compare := func(a, b int) int {
+			ia, ib := a, b
+			ca, cb := GRP[a], GRP[b]
+			da, db := 0, 0
+			if ca >= 0 {
+				da = depth[ca]
+			}
+			if cb >= 0 {
+				db = depth[cb]
+			}
+			for ; da > db; da-- {
+				ia = n + ca
+				ca = groupParent[ca]
+			}
+			for ; db > da; db-- {
+				ib = n + cb
+				cb = groupParent[cb]
+			}
+			for ca != cb {
+				ia = n + ca
+				ca = groupParent[ca]
+				ib = n + cb
+				cb = groupParent[cb]
+			}
+			return sign(or(value(ia)-value(ib), float64(first(ia)-first(ib))))
+		}
+		slices.SortStableFunc(order[s:e], compare)
+		for i := s; i < e; i++ {
+			pos[order[i]] = i - s
+		}
+	}
+	if GRP != nil {
+		at := make([]float64, n)
+		for r := 0; r <= maxRank; r++ {
+			for i := layerStart[r]; i < layerStart[r+1]; i++ {
+				at[order[i]] = float64(i - layerStart[r])
+			}
+			arrange(r, at)
+		}
+	}
 
 	sweep := func(down, biasRight bool) {
 		start, list, other, otherDx := succStart, succE, ET, ETD
@@ -206,6 +296,9 @@ func reduceCrossings(g *graph, nodes []lNode) {
 			r := maxRank - step
 			if down {
 				r = step
+			}
+			if fixed[r] {
+				continue
 			}
 			s := layerStart[r]
 			e := layerStart[r+1]
@@ -225,6 +318,16 @@ func reduceCrossings(g *graph, nodes []lNode) {
 				from := start[v]
 				to := start[v+1]
 				if from == to {
+					if GRP != nil {
+						// Where groups keep their nodes together, one with no neighbours stays about
+						// where it is.
+						across := layerStart[r+2] - layerStart[r+1]
+						if down {
+							across = layerStart[r] - layerStart[r-1]
+						}
+						bary[v] = float64((i-s)*across) / float64(e-s)
+						continue
+					}
 					bary[v] = -1
 					continue
 				}
@@ -239,6 +342,10 @@ func reduceCrossings(g *graph, nodes []lNode) {
 				bary[v] = sum / float64(to-from)
 				moving[movable] = v
 				movable++
+			}
+			if GRP != nil {
+				arrange(r, bary)
+				continue
 			}
 			if movable < 2 {
 				continue
@@ -327,11 +434,14 @@ func reduceCrossings(g *graph, nodes []lNode) {
 		for pass := 0; pass < 8; pass++ {
 			improved := false
 			for r := 0; r <= maxRank; r++ {
+				if fixed[r] {
+					continue
+				}
 				s := layerStart[r]
 				for i := s; i+1 < layerStart[r+1]; i++ {
 					a := order[i]
 					b := order[i+1]
-					if pinOf(a) != pinOf(b) || between(b, a) >= between(a, b) {
+					if pinOf(a) != pinOf(b) || (GRP != nil && GRP[a] != GRP[b]) || between(b, a) >= between(a, b) {
 						continue
 					}
 					order[i] = b
@@ -405,15 +515,15 @@ func reduceCrossings(g *graph, nodes []lNode) {
 
 	// A drawing and its mirror image cross as often too. Of those two, likewise.
 	if !small {
-		return
+		return best
 	}
 	for i := 0; i < real; i++ {
 		if nodes[i].Pin != 0 {
-			return
+			return best
 		}
 	}
-	if chosenOut == 0 {
-		return
+	if chosenOut == 0 || fixed[0] || fixed[maxRank] {
+		return best
 	}
 	for r := 0; r <= maxRank; r++ {
 		slices.Reverse(order[layerStart[r]:layerStart[r+1]])
@@ -422,4 +532,5 @@ func reduceCrossings(g *graph, nodes []lNode) {
 	if count() > best || outOfOrder() >= chosenOut {
 		copy(order, bestOrder)
 	}
+	return best
 }

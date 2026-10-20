@@ -59,6 +59,13 @@ type lNode struct {
 	Kind kind
 	// Pin keeps a node at one end of its rank: below zero at the start, above zero at the end.
 	Pin float64
+	// Hint is, for a port on a group's border, where its edge goes across the flow, from a layout
+	// of the whole drawing. A rank of ports that all have one keeps them in that order. NaN for
+	// none.
+	Hint float64
+	// Key is where the node sits across the flow in a layout of the whole drawing, which the
+	// order of a rank whose nodes all have one starts from. NaN for none.
+	Key float64
 	// Span is how much of the side that edges meet may be shared out between them; 0 keeps them
 	// all at its middle.
 	Span float64
@@ -101,16 +108,31 @@ type LayeredOptions struct {
 	// midway along the line that shows, and the curves either side of it have the same room to
 	// turn in.
 	HeadRoom float64
+
+	// groups are groups that the nodes belong to, which keep their nodes side by side in every
+	// rank while the crossings are reduced. Compound uses them to order a whole drawing of groups
+	// as one flat graph.
+	groups *nodeGroups
+	// orderOnly stops once the nodes have their places across the flow, in X.
+	orderOnly bool
 }
 
-// layeredResult is the size of a layered layout, as Pele's LayeredResult is.
+// nodeGroups are Pele's LayeredOptions.groups: of gives each node's group or -1, and parent
+// each group's parent or -1.
+type nodeGroups struct {
+	of, parent []int
+}
+
+// layeredResult is the size of a layered layout, as Pele's LayeredResult is, and with
+// orderOnly, how often edges cross between ranks once the nodes are in order.
 type layeredResult struct {
 	Width, Height float64
+	crossings     int
 }
 
 // newLNode is a node of the given size and kind, as Pele's lnode makes.
 func newLNode(w, h float64, kind kind) lNode {
-	return lNode{W: w, H: h, Kind: kind}
+	return lNode{W: w, H: h, Kind: kind, Hint: math.NaN(), Key: math.NaN()}
 }
 
 // newLEdge is an edge from tail to head, as Pele's ledge makes; Pele's defaults are a minlen
@@ -234,6 +256,11 @@ type graph struct {
 	layerStart, order []int
 	pos               []int
 	offsets           bool
+	// fixed marks the ranks whose order is set before the crossings are reduced, and stays.
+	fixed []bool
+	// GRP is the group of each node, and groupParent the parent of each group, where groups keep
+	// their nodes together; nil for none.
+	GRP, groupParent []int
 }
 
 // pieces is Pele's Pieces: the pieces of edges that each cross one gap: where they leave the
@@ -371,6 +398,15 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 	}
 	firstSeg := filled(m, -1)
 	lastSeg := filled(m, -1)
+	// Where each node starts across the flow, where a layout of the whole drawing says: a bend
+	// part of the way along the line between the ends of its edge.
+	KEY := make([]float64, n)
+	for i := range KEY {
+		KEY[i] = math.NaN()
+	}
+	for i := 0; i < real; i++ {
+		KEY[i] = nodes[i].Key
+	}
 	offsets := false
 	{
 		next := real
@@ -421,6 +457,7 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 				d := next
 				next++
 				RANK[d] = r
+				KEY[d] = KEY[a] + float64((KEY[b]-KEY[a])*float64(r-ra))/float64(rb-ra)
 				if r == labelRank {
 					W[d] = e.LabelW
 					H[d] = e.LabelH
@@ -456,6 +493,47 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 			}
 			lastSeg[ei] = ce
 			ce++
+		}
+	}
+
+	// The group of every node and bend: a bend belongs to the innermost group that holds both
+	// ends of its edge.
+	var GRP []int
+	if opt.groups != nil {
+		of, parent := opt.groups.of, opt.groups.parent
+		GRP = make([]int, n)
+		copy(GRP, of[:real])
+		depth := func(gr int) int {
+			d := 0
+			for ; gr >= 0; gr = parent[gr] {
+				d++
+			}
+			return d
+		}
+		lca := func(x, y int) int {
+			dx := depth(x)
+			dy := depth(y)
+			for ; dx > dy; dx-- {
+				x = parent[x]
+			}
+			for ; dy > dx; dy-- {
+				y = parent[y]
+			}
+			for x != y {
+				x = parent[x]
+				y = parent[y]
+			}
+			return x
+		}
+		for ei := 0; ei < m; ei++ {
+			if firstDummy[ei] < 0 {
+				continue
+			}
+			e := &edges[ei]
+			gr := lca(of[e.Tail], of[e.Head])
+			for d, end := firstDummy[ei], firstDummy[ei]+span[ei]-1; d < end; d++ {
+				GRP[d] = gr
+			}
 		}
 	}
 
@@ -527,6 +605,33 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 		}
 	}
 
+	// sortRank puts rank r in the order of key, where every node in it has one, and says whether
+	// it did.
+	sortRank := func(r int, key func(v int) float64) bool {
+		s := layerStart[r]
+		e := layerStart[r+1]
+		if e-s < 2 {
+			return false
+		}
+		for i := s; i < e; i++ {
+			if math.IsNaN(key(order[i])) {
+				return false
+			}
+		}
+		layer := order[s:e]
+		index := make(map[int]int, e-s)
+		for i, v := range layer {
+			index[v] = i
+		}
+		slices.SortStableFunc(layer, func(a, b int) int {
+			return sign(or(key(a)-key(b), float64(index[a]-index[b])))
+		})
+		return true
+	}
+	for r := 0; r <= maxRank; r++ {
+		sortRank(r, func(v int) float64 { return KEY[v] })
+	}
+
 	pinned := false
 	for i := 0; i < real; i++ {
 		if nodes[i].Pin != 0 {
@@ -551,6 +656,20 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 			})
 		}
 	}
+	// A rank of ports that know where their edges go outside the group keeps them in that order,
+	// so that the edges do not cross on their way there.
+	fixed := make([]bool, maxRank+1)
+	hint := func(v int) float64 {
+		if v < real && (nodes[v].Kind == kindStartPort || nodes[v].Kind == kindEndPort) {
+			return nodes[v].Hint
+		}
+		return math.NaN()
+	}
+	for _, r := range [2]int{0, maxRank} {
+		if sortRank(r, hint) {
+			fixed[r] = true
+		}
+	}
 	setPositions := func() {
 		for r := 0; r <= maxRank; r++ {
 			s := layerStart[r]
@@ -562,11 +681,39 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 	setPositions()
 
 	g := &graph{n: n, real: real, maxRank: maxRank, W: W, KIND: KIND, RANK: RANK, EF: EF, ET: ET, EFD: EFD, ETD: ETD,
-		succStart: succStart, succE: succE, predStart: predStart, predE: predE, layerStart: layerStart, order: order, pos: pos, offsets: offsets}
+		succStart: succStart, succE: succE, predStart: predStart, predE: predE, layerStart: layerStart, order: order, pos: pos, offsets: offsets,
+		fixed: fixed, GRP: GRP}
+	if opt.groups != nil {
+		g.groupParent = opt.groups.parent
+	}
 
+	crossings := 0
 	if segments > 0 && maxRank > 0 {
-		reduceCrossings(g, nodes)
+		crossings = reduceCrossings(g, nodes)
 		setPositions()
+	}
+	if opt.orderOnly {
+		// Each edge's points are pairs of a rank and the place across the flow where the edge
+		// passes it.
+		at := position(g, opt)
+		for i := 0; i < real; i++ {
+			nodes[i].X = at[i]
+		}
+		for ei := 0; ei < m; ei++ {
+			e := &edges[ei]
+			a, b := e.Tail, e.Head
+			if e.Reversed {
+				a, b = e.Head, e.Tail
+			}
+			pts := []float64{float64(RANK[a]), at[a]}
+			if !direct[ei] && firstDummy[ei] >= 0 {
+				for d, end := firstDummy[ei], firstDummy[ei]+span[ei]-1; d < end; d++ {
+					pts = append(pts, float64(RANK[d]), at[d])
+				}
+			}
+			e.Points = append(pts, float64(RANK[b]), at[b])
+		}
+		return layeredResult{crossings: crossings}
 	}
 
 	if EFK != nil && ETK != nil {
