@@ -515,7 +515,8 @@ func (w *Writer) text(it *scene.Item, st style.Style, halo bool) {
 	l := it.Label
 	cx, cy := it.At.X, it.At.Y
 	shift := l.Size * 0.35
-	y := cy - l.Height/2 + l.LineHeight/2 + shift
+	// Each line is placed from the top of the label down, as Pele's labelSvg places them.
+	top := cy - l.Height/2
 	b.WriteString(`<text text-anchor="middle" xml:space="preserve"`)
 	switch {
 	case halo:
@@ -534,6 +535,7 @@ func (w *Writer) text(it *scene.Item, st style.Style, halo bool) {
 	}
 	b.WriteByte('>')
 	for i, line := range l.Lines {
+		y := top + l.LineHeight/2 + shift
 		var x float64
 		switch it.Align {
 		case scene.Start:
@@ -578,7 +580,7 @@ func (w *Writer) text(it *scene.Item, st style.Style, halo bool) {
 			}
 			x += s.Width
 		}
-		y += l.LineHeight
+		top += l.LineHeight
 	}
 	b.WriteString("</text>")
 	for _, ic := range w.icons {

@@ -150,7 +150,8 @@ func sceneLines(sc *scene.Scene) []string {
 		if l == nil || l.Empty() {
 			return
 		}
-		y := cy - l.Height/2 + l.LineHeight/2 + float64(l.Size*0.35)
+		lineTop := cy - l.Height/2
+		y := lineTop + l.LineHeight/2 + float64(l.Size*0.35)
 		head := func(face text.Face) string {
 			return "t " + pt(cx, y) + " " + n(l.Size) + " " + paintName(it.Style.Text) + " " + faceName(face) + " "
 		}
@@ -176,7 +177,8 @@ func sceneLines(sc *scene.Scene) []string {
 			if len(line) == 0 {
 				lines = append(lines, head(top)+" ")
 			}
-			y += l.LineHeight
+			lineTop += l.LineHeight
+			y = lineTop + l.LineHeight/2 + float64(l.Size*0.35)
 		}
 	}
 	for i := range sc.Items {

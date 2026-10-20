@@ -19,6 +19,8 @@ const namedEntities = "amp:38,lt:60,gt:62,quot:34,apos:39,nbsp:160,iexcl:161,cen
 	"radic:8730,infin:8734,and:8743,or:8744,cap:8745,cup:8746,int:8747,there4:8756,sim:8764,cong:8773," +
 	"asymp:8776,ne:8800,equiv:8801,le:8804,ge:8805,sub:8834,sup:8835,sube:8838,supe:8839,oplus:8853,otimes:8855," +
 	"perp:8869,sdot:8901,loz:9674,spades:9824,clubs:9827,hearts:9829,diams:9830,check:10003,cross:10007," +
+	"AMP:38,LT:60,GT:62,QUOT:34,lsqb:91,rsqb:93,lcub:123,rcub:125,verbar:124,VerticalLine:124,midast:42," +
+	"DiacriticalGrave:96,Hat:94,UnderBar:95," +
 	"equals:61,colon:58,semi:59,num:35,percnt:37,lpar:40,rpar:41,lbrack:91,rbrack:93,lbrace:123,rbrace:125," +
 	"vert:124,sol:47,bsol:92,quest:63,excl:33,ast:42,plus:43,comma:44,period:46,dollar:36,commat:64,grave:96," +
 	"hat:94,lowbar:95,tilde:126,Alpha:913,Beta:914,Gamma:915,Delta:916,Epsilon:917,Zeta:918,Eta:919,Theta:920," +
@@ -50,9 +52,10 @@ const (
 	placeholderClose = "¶ß"
 )
 
-// decodePlaceholders turns Mermaid's placeholders, from `ﬂ°` to `¶ß` with a second `°`
-// marking a numeric code, into characters.
-func decodePlaceholders(s string) string {
+// restorePlaceholders turns Mermaid's placeholders, from `ﬂ°` to `¶ß` with a second `°`
+// marking a numeric code, back into entities, as Mermaid does, so that each code is decoded
+// once. It is Pele's restorePlaceholders.
+func restorePlaceholders(s string) string {
 	var out strings.Builder
 	last := 0
 	from := strings.Index(s, placeholderOpen)
@@ -65,21 +68,13 @@ func decodePlaceholders(s string) string {
 		stop := body + rel
 		after := stop + len("¶")
 		if strings.HasPrefix(s[after:], "ß") {
-			end := after + len("ß")
-			numeric := strings.HasPrefix(s[body:], "°")
-			if numeric {
-				body += len("°")
-			}
-			raw := s[from:end]
 			out.WriteString(s[last:from])
-			if numeric {
-				out.WriteString(codePoint(jsNumber(s[body:stop]), raw))
-			} else if c, ok := named()[s[body:stop]]; ok {
-				out.WriteString(c)
+			if strings.HasPrefix(s[body:], "°") {
+				out.WriteString("&#" + s[body+len("°"):stop] + ";")
 			} else {
 				out.WriteString("&" + s[body:stop] + ";")
 			}
-			last = end
+			last = after + len("ß")
 		}
 		next := strings.Index(s[after:], placeholderOpen)
 		if next == -1 {
@@ -94,46 +89,11 @@ func decodePlaceholders(s string) string {
 	return out.String()
 }
 
-// jsNumber is JavaScript's Number() of a code's digits, as far as a code point can come of
-// it: anything else is -1, which names no character.
-func jsNumber(s string) int64 {
-	s = chars.Trim(s)
-	if s == "" {
-		return 0
-	}
-	base := 10
-	if len(s) > 2 && s[0] == '0' {
-		switch s[1] {
-		case 'x', 'X':
-			base = 16
-		case 'o', 'O':
-			base = 8
-		case 'b', 'B':
-			base = 2
-		}
-		if base != 10 {
-			s = s[2:]
-		}
-	}
-	if base == 10 {
-		f, err := strconv.ParseFloat(s, 64)
-		if err != nil || f != float64(int64(f)) || strings.ContainsAny(s, "_xXpP") {
-			return -1
-		}
-		return int64(f)
-	}
-	n, err := strconv.ParseInt(s, base, 64)
-	if err != nil || strings.Contains(s, "_") {
-		return -1
-	}
-	return n
-}
-
 // DecodeEntities turns Mermaid's `#35;` and `#quot;` codes, as Mermaid hides them, and HTML
 // entities into characters.
 func DecodeEntities(s string) string {
 	if strings.Contains(s, placeholderClose) {
-		s = decodePlaceholders(s)
+		s = restorePlaceholders(s)
 	}
 	if !strings.Contains(s, "&") {
 		return s

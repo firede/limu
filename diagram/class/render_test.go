@@ -69,9 +69,10 @@ func sceneLines(sc *scene.Scene) []string {
 	var icons []string
 	textAt := func(l *text.Label, cx, cy float64) string {
 		shift := float64(l.Size * 0.35)
-		y := cy - l.Height/2 + l.LineHeight/2 + shift
+		top := cy - l.Height/2
 		var at []string
 		for i, line := range l.Lines {
+			y := top + l.LineHeight/2 + shift
 			iconic := false
 			for _, s := range line {
 				iconic = iconic || s.Icon != ""
@@ -90,7 +91,7 @@ func sceneLines(sc *scene.Scene) []string {
 					x += s.Width
 				}
 			}
-			y += l.LineHeight
+			top += l.LineHeight
 		}
 		return strings.Join(at, " ")
 	}
