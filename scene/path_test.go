@@ -127,4 +127,20 @@ func TestSnap(t *testing.T) {
 	if b := sc.Items[0].Parts[0].Box; b != (Rect{0.4, 0.4, 1, 1}) {
 		t.Errorf("a path part's box snapped to %v", b)
 	}
+
+	// An edge's lines land on the grid, and a rounded corner's control points stay on the
+	// lines it joins. A mark's path of the same steps moves as a whole.
+	corner := func() *Path {
+		return new(Path).MoveTo(0.4, 0.6).LineTo(10.3, 0.6).CubeTo(12.3, 0.6, 13.3, 1.6, 13.3, 3.6).
+			LineTo(13.3, 20.2).QuadTo(13.3, 22.6, 15.7, 22.6)
+	}
+	edge, mark := corner(), corner()
+	sc = &Scene{Items: []Item{{Kind: Edge, Parts: []Part{{Path: edge}}}, {Kind: Mark, Parts: []Part{{Path: mark}}}}}
+	sc.Snap(1)
+	if want := []float64{0, 1, 10, 1, 12, 1, 13, 2, 13, 4, 13, 20, 13, 23, 16, 23}; !slices.Equal(edge.Args, want) {
+		t.Errorf("an edge's corner snapped to %v, not %v", edge.Args, want)
+	}
+	if a := mark.Args; a[0] != 0 || a[1] != 1 || math.Abs(a[10]-12.9) > 1e-9 || math.Abs(a[11]-20.6) > 1e-9 {
+		t.Errorf("a mark's path moved to %v", a)
+	}
 }

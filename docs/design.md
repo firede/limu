@@ -99,9 +99,12 @@ MyGo's paths have no arcs, so an arc becomes cubic curves as it's added, one for
 quarter turn or less. An arc whose radii or ends describe no ellipse becomes a line to its
 end.
 
-`Scene.Snap` moves everything onto a grid, which means each side of a box and each point of
-a path of straight lines. A path with curves moves as a whole, by whatever puts its first
-point on the grid, so its curves keep their shape.
+`Scene.Snap` moves everything onto a grid, which means each side of a box and each point a
+path passes through. In the path of an edge, a node, a group or a text item, each control
+point of a curve moves with the point it leans on, so a rounded corner still turns from one
+line into the next, and the lines meet the boxes and markers they lead to. A path of curves
+alone, such as a circle, and the path of a mark, such as an icon, move as a whole, by
+whatever puts the first point on the grid, so they keep their shape.
 
 An item has at most one label. Something with more than one, such as a sequence diagram's
 frame with its kind and its condition, is several items, with the shape first.
