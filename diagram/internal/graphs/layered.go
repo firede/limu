@@ -262,6 +262,15 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 		return layeredResult{}
 	}
 	m := len(edges)
+	// A node on its own, such as the one in a group that holds only that, has nothing to order
+	// or route.
+	if real == 1 && m == 0 && nodes[0].Kind == kindNode {
+		node := &nodes[0]
+		node.Rank = 0
+		node.X = node.W / 2
+		node.Y = node.H / 2
+		return layeredResult{Width: node.W, Height: node.H}
+	}
 
 	// Every edge gets a middle rank of its own when labels or parallel edges need the room.
 	step := 1

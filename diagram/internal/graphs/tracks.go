@@ -35,6 +35,9 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 		}
 		byRank[rank[k]] = append(byRank[rank[k]], k)
 	}
+	if len(ranks) == 0 {
+		return
+	}
 	// The pieces are compared pair by pair, so where each begins and ends across the flow is
 	// worked out once.
 	LO := make([]float64, total)
@@ -60,6 +63,26 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 	// How often a and b cross with a on the higher track: a's way down through b, and b's way
 	// down to itself through a.
 	crossings := func(a, b int) int { return within(to[a], b) + within(from[b], a) }
+	// nearPairs gives the pairs of pieces in list that come near enough across the flow to meet,
+	// as places in the list, the smaller first. Pieces further apart than this cannot meet or
+	// clash.
+	nearPairs := func(list []int) []int {
+		byLo := make([]int, len(list))
+		for i := range byLo {
+			byLo[i] = i
+		}
+		slices.SortStableFunc(byLo, func(a, b int) int { return sign(LO[list[a]] - LO[list[b]]) })
+		var pairs []int
+		for x := 0; x < len(byLo); x++ {
+			i := byLo[x]
+			reach := HI[list[i]] + 4*inLine
+			for y := x + 1; y < len(byLo) && LO[list[byLo[y]]] <= reach; y++ {
+				j := byLo[y]
+				pairs = append(pairs, min(i, j), max(i, j))
+			}
+		}
+		return pairs
+	}
 
 	// lay gives the pieces of one gap in list their tracks, and each the number of tracks that
 	// the pieces it has to do with take between them, counting its own from the first of those.
@@ -84,39 +107,57 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 			}
 			return i
 		}
-		sequence := list
-		if count <= maxWeighed {
+		weighed := count <= maxWeighed
+		// Past maxWeighed, pairs are not kept: in a dense gap nearly every pair is near.
+		var pairs []int
+		var clashes [][]int // the pieces that each may not share a track with
+		if weighed {
+			pairs = nearPairs(list)
+			clashes = make([][]int, count)
+		}
+		for p := 0; p < len(pairs); p += 2 {
+			i, j := pairs[p], pairs[p+1]
+			if !clash(list[i], list[j]) {
+				continue
+			}
+			clashes[i] = append(clashes[i], j)
+			clashes[j] = append(clashes[j], i)
+		}
+		sequence := make([]int, count)
+		for i := range sequence {
+			sequence[i] = i
+		}
+		if weighed {
 			// above[j] lists the pieces that should be above list[j]. The order follows as many
 			// of these as it can: a piece is placed once all that should be above it are, and
 			// when none is free, the one with the fewest still waiting.
 			waiting := make([]int, count)
 			above = make([][]int, count)
 			after := make([][]int, count)
-			for i := 0; i < count; i++ {
-				for j := i + 1; j < count; j++ {
-					a := list[i]
-					b := list[j]
-					if !meet(a, b) {
-						continue
-					}
-					ri := find(i)
-					group[ri] = find(j)
-					ab := crossings(a, b)
-					ba := crossings(b, a)
-					if ab == ba {
-						continue
-					}
-					first, second := j, i
-					if ab < ba {
-						first, second = i, j
-					}
-					above[second] = append(above[second], first)
-					after[first] = append(after[first], second)
-					waiting[second]++
+			for p := 0; p < len(pairs); p += 2 {
+				i, j := pairs[p], pairs[p+1]
+				a := list[i]
+				b := list[j]
+				if !meet(a, b) {
+					continue
 				}
+				ri := find(i)
+				group[ri] = find(j)
+				ab := crossings(a, b)
+				ba := crossings(b, a)
+				if ab == ba {
+					continue
+				}
+				first, second := j, i
+				if ab < ba {
+					first, second = i, j
+				}
+				above[second] = append(above[second], first)
+				after[first] = append(after[first], second)
+				waiting[second]++
 			}
 			placed := make([]bool, count)
-			result := make([]int, 0, count)
+			sequence = sequence[:0]
 			for done := 0; done < count; done++ {
 				pick := -1
 				for i := 0; i < count; i++ {
@@ -131,67 +172,68 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 					}
 				}
 				placed[pick] = true
-				result = append(result, pick)
+				sequence = append(sequence, pick)
 				for _, j := range after[pick] {
 					waiting[j]--
 				}
 			}
-			sequence = make([]int, count)
-			for i, r := range result {
-				sequence[i] = list[r]
-			}
 		}
-		// Each piece takes the first track below those it should be under that has room for it.
-		place := make(map[int]int, count)
-		for i, k := range list {
-			place[k] = i
-		}
-		var rows [][]int
-		for _, k := range sequence {
+		// Each piece takes the first track below those it should be under that no piece it
+		// clashes with is on. Unweighed, the pieces already on each track are looked through
+		// instead.
+		taken := make(map[int]bool)
+		var onTrack [][]int
+		rows := 0
+		for _, at := range sequence {
+			k := list[at]
 			t := 0
 			if above != nil {
-				for _, i := range above[place[k]] {
+				for _, i := range above[at] {
 					if track[list[i]] >= t {
 						t = track[list[i]] + 1
 					}
 				}
 			}
-			for ; ; t++ {
-				for len(rows) <= t {
-					rows = append(rows, nil)
+			if weighed {
+				clear(taken)
+				for _, i := range clashes[at] {
+					taken[track[list[i]]] = true
 				}
-				free := true
-				for _, other := range rows[t] {
-					if clash(k, other) {
-						free = false
-					}
+				for taken[t] {
+					t++
 				}
-				if free {
-					rows[t] = append(rows[t], k)
-					break
+			} else {
+				for t < len(onTrack) && slices.ContainsFunc(onTrack[t], func(other int) bool { return clash(k, other) }) {
+					t++
 				}
+				for len(onTrack) <= t {
+					onTrack = append(onTrack, nil)
+				}
+				onTrack[t] = append(onTrack[t], k)
 			}
 			track[k] = t
+			if t >= rows {
+				rows = t + 1
+			}
 		}
-		first := make(map[int]int)
-		lastOf := make(map[int]int)
-		for i, k := range list {
-			root := find(i)
-			if f, ok := first[root]; !ok || track[k] < f {
-				first[root] = track[k]
-			}
-			if l, ok := lastOf[root]; !ok || track[k] > l {
-				lastOf[root] = track[k]
-			}
+		first := make([]int, count)
+		last := make([]int, count)
+		for i := range first {
+			first[i], last[i] = rows, -1
 		}
 		for i, k := range list {
 			root := find(i)
-			levels[k] = lastOf[root] - first[root] + 1
+			first[root] = min(first[root], track[k])
+			last[root] = max(last[root], track[k])
+		}
+		for i, k := range list {
+			root := find(i)
+			levels[k] = last[root] - first[root] + 1
 			if curved {
 				track[k] -= first[root]
 			}
 		}
-		return len(rows)
+		return rows
 	}
 
 	// The least distance between a and b as plain curves across a gap that leaves them height
@@ -259,21 +301,20 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 				level.add(k)
 			}
 		}
-		for i := 0; i < len(all); i++ {
-			for j := i + 1; j < len(all); j++ {
-				a := all[i]
-				b := all[j]
-				if (level.has(a) && level.has(b)) || !clash(a, b) || (from[a] < to[a]) != (from[b] < to[b]) {
-					continue
-				}
-				limit := float64(levelTouch)
-				if wide[a] || wide[b] {
-					limit = levelClear
-				}
-				if nearest(a, b, room[r]) < limit {
-					level.add(a)
-					level.add(b)
-				}
+		pairs := nearPairs(all)
+		for p := 0; p < len(pairs); p += 2 {
+			a := all[pairs[p]]
+			b := all[pairs[p+1]]
+			if (level.has(a) && level.has(b)) || !clash(a, b) || (from[a] < to[a]) != (from[b] < to[b]) {
+				continue
+			}
+			limit := float64(levelTouch)
+			if wide[a] || wide[b] {
+				limit = levelClear
+			}
+			if nearest(a, b, room[r]) < limit {
+				level.add(a)
+				level.add(b)
 			}
 		}
 		for _, k := range far {
@@ -285,11 +326,12 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 		}
 		crossing := 0
 		alongside := 0
-		turning := level.list
-		for i := 0; i < len(turning); i++ {
-			for j := i + 1; j < len(turning); j++ {
-				a := turning[i]
-				b := turning[j]
+		// The pieces that could cross one of those that turn.
+		beside := make(map[int]bool)
+		for p := 0; p < len(pairs); p += 2 {
+			a := all[pairs[p]]
+			b := all[pairs[p+1]]
+			if level.has(a) && level.has(b) {
 				if !overlap(a, b) {
 					continue
 				}
@@ -298,6 +340,9 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 				} else if !mates(a, b) {
 					alongside++
 				}
+			} else if (level.has(a) || level.has(b)) && meet(a, b) {
+				beside[a] = true
+				beside[b] = true
 			}
 		}
 		if crossing > alongside {
@@ -310,17 +355,9 @@ func assignTracks(p *pieces, trackCount []int, curved bool, room, tall []float64
 		}
 		// With them go the short pieces that could cross one of them, so that each has its place
 		// among the levels and crosses none.
-		beside := func(k int) bool {
-			for _, j := range level.list {
-				if meet(k, j) {
-					return true
-				}
-			}
-			return false
-		}
 		var members []int
 		for _, k := range all {
-			if level.has(k) || (!wide[k] && beside(k)) {
+			if level.has(k) || (!wide[k] && beside[k]) {
 				members = append(members, k)
 			}
 		}

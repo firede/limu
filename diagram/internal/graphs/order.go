@@ -4,6 +4,51 @@ import (
 	"slices"
 )
 
+// sortByBary sorts the first count nodes of list by barycenter, and those with the same one by
+// position, the leftmost first or, with right, the rightmost, as Pele's sortByBary does: a
+// merge sort over runs put in order by insertion. spare is room to merge into.
+func sortByBary(list []int, count int, bary []float64, pos []int, right bool, spare []int) {
+	before := func(a, b int) bool {
+		return bary[a] < bary[b] || (bary[a] == bary[b] && (right && pos[a] > pos[b] || !right && pos[a] < pos[b]))
+	}
+	const run = 8
+	for s := 0; s < count; s += run {
+		for i, end := s+1, min(count, s+run); i < end; i++ {
+			item := list[i]
+			j := i - 1
+			for j >= s && before(item, list[j]) {
+				list[j+1] = list[j]
+				j--
+			}
+			list[j+1] = item
+		}
+	}
+	from, to := list, spare
+	for width := run; width < count; width *= 2 {
+		for s := 0; s < count; s += 2 * width {
+			mid := min(count, s+width)
+			end := min(count, s+2*width)
+			i, j, k := s, mid, s
+			for i < mid && j < end {
+				if before(from[j], from[i]) {
+					to[k] = from[j]
+					j++
+				} else {
+					to[k] = from[i]
+					i++
+				}
+				k++
+			}
+			k += copy(to[k:end], from[i:mid])
+			copy(to[k:end], from[j:end])
+		}
+		from, to = to, from
+	}
+	if &from[0] != &list[0] {
+		copy(list[:count], from[:count])
+	}
+}
+
 // reduceCrossings orders the nodes of each rank so that edges cross as little as they can, as
 // Pele's reduceCrossings does: sweeps up and down that sort each rank by the mean place of its
 // nodes' neighbours, keeping the order with the fewest crossings.
@@ -15,6 +60,9 @@ func reduceCrossings(g *graph, nodes []lNode) {
 	widest := 0
 	for r := 0; r <= maxRank; r++ {
 		widest = max(widest, layerStart[r+1]-layerStart[r])
+	}
+	if widest < 2 {
+		return
 	}
 	// With offsets, edges that reach one node at different offsets take separate places along it.
 	var place []int
@@ -147,8 +195,7 @@ func reduceCrossings(g *graph, nodes []lNode) {
 	bestOrder := slices.Clone(order)
 	bary := make([]float64, n)
 	moving := make([]int, widest)
-	leftBias := func(a, b int) int { return sign(or(bary[a]-bary[b], float64(pos[a]-pos[b]))) }
-	rightBias := func(a, b int) int { return sign(or(bary[a]-bary[b], float64(pos[b]-pos[a]))) }
+	spare := make([]int, widest)
 
 	sweep := func(down, biasRight bool) {
 		start, list, other, otherDx := succStart, succE, ET, ETD
@@ -196,11 +243,7 @@ func reduceCrossings(g *graph, nodes []lNode) {
 			if movable < 2 {
 				continue
 			}
-			if biasRight {
-				slices.SortStableFunc(moving[:movable], rightBias)
-			} else {
-				slices.SortStableFunc(moving[:movable], leftBias)
-			}
+			sortByBary(moving, movable, bary, pos, biasRight, spare)
 			k := 0
 			for i := s; i < e; i++ {
 				if bary[order[i]] != -1 {

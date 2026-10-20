@@ -7,8 +7,9 @@ import (
 
 // sideEnds lists in ids the ends of edges that may move along one side of node v (0 the side
 // its edges arrive at, 1 the other), in the order of the nodes at their other ends, so that no
-// two cross, as Pele's sideEnds does. room receives the least distance between each end and the
-// one before it, and the result is their sum. When there is too little room for a full pitch
+// two cross, as Pele's sideEnds does: ids, which comes empty, receives them. room, empty too,
+// receives the least distance between each end and the one before it, and the result is their
+// sum. When there is too little room for a full pitch
 // between each pair, the edges that leave side by side move closer together, since they have no
 // arrowheads to keep apart. With less room still, neighbours that run the same way share a
 // place, which keeps an arrowhead apart from an edge that leaves beside it.
@@ -18,7 +19,6 @@ func sideEnds(g *graph, v, side int, span float64, kinds []end, ids *[]int, room
 		start, list, other = g.succStart, g.succE, g.ET
 	}
 	pos := g.pos
-	*ids = (*ids)[:0]
 	for k := start[v]; k < start[v+1]; k++ {
 		if kinds[list[k]] != endHeld {
 			*ids = append(*ids, list[k])
@@ -37,11 +37,10 @@ func sideEnds(g *graph, v, side int, span float64, kinds []end, ids *[]int, room
 	fill := func(share func(leaves, same bool) float64) float64 {
 		total := 0.0
 		r := *room
-		if cap(r) < len(id) {
+		if len(r) != len(id) {
 			r = make([]float64, len(id))
+			*room = r
 		}
-		r = r[:len(id)]
-		*room = r
 		r[0] = 0
 		for k := 1; k < len(id); k++ {
 			same := kinds[id[k]] == kinds[id[k-1]]
@@ -81,8 +80,6 @@ func sideEnds(g *graph, v, side int, span float64, kinds []end, ids *[]int, room
 // spread gives the edges that meet one side of a node places of their own along it, around
 // its middle, as Pele's spread does.
 func spread(g *graph, nodes []lNode, EFK, ETK []end) {
-	var ids []int
-	var room []float64
 	for v := 0; v < g.real; v++ {
 		span := math.Min(nodes[v].Span, g.W[v])
 		if span <= 0 || nodes[v].Kind != kindNode {
@@ -93,6 +90,8 @@ func spread(g *graph, nodes []lNode, EFK, ETK []end) {
 			if side != 0 {
 				kinds, dx = EFK, g.EFD
 			}
+			var ids []int
+			var room []float64
 			total := sideEnds(g, v, side, span, kinds, &ids, &room)
 			if total == 0 {
 				continue
@@ -296,11 +295,6 @@ func settle(g *graph, nodes []lNode, xs []float64, EFK, ETK []end, free [2][]int
 	real, W := g.real, g.W
 	EF, ET, EFD, ETD := g.EF, g.ET, g.EFD, g.ETD
 	succStart, succE, predStart, predE, pos := g.succStart, g.succE, g.predStart, g.predE, g.pos
-	var ids []int
-	var room []float64
-	var all []int
-	var sum []float64
-	var count []int
 	// Where the end of segment e on node v should be, from the middle of its side. The edge is
 	// followed up from the segment (side 0) or down, past the bends in ranks that hold nothing
 	// else, to where it next comes to a point that is held in place or to another node's side.
@@ -348,111 +342,127 @@ func settle(g *graph, nodes []lNode, xs []float64, EFK, ETK []end, free [2][]int
 		place := (float64(xs[v]*width) + float64(middle*span)) / (width + span)
 		return math.Max(lo, math.Min(hi, place)) - xs[v]
 	}
+	// The ends that may move on each side in order, the room between them, and every end on the
+	// side in order, the held ones among them, which divide the rest into runs. None of these
+	// change from pass to pass.
+	type sideOf struct {
+		v, side int
+		span    float64
+		ids     []int
+		room    []float64
+		all     []int
+	}
+	var sides []sideOf
+	for v := 0; v < real; v++ {
+		span := math.Min(nodes[v].Span, W[v])
+		if span <= 0 || nodes[v].Kind != kindNode {
+			continue
+		}
+		for side := 0; side < 2; side++ {
+			kinds, other, start, list := ETK, EF, predStart, predE
+			if side != 0 {
+				kinds, other, start, list = EFK, ET, succStart, succE
+			}
+			var ids []int
+			var room []float64
+			sideEnds(g, v, side, span, kinds, &ids, &room)
+			if len(ids) == 0 {
+				continue
+			}
+			if len(ids) == 1 {
+				room = []float64{0}
+			}
+			var all []int
+			for k := start[v]; k < start[v+1]; k++ {
+				all = append(all, list[k])
+			}
+			slices.SortStableFunc(all, func(a, b int) int {
+				if c := pos[other[a]] - pos[other[b]]; c != 0 {
+					return c
+				}
+				return a - b
+			})
+			sides = append(sides, sideOf{v, side, span, ids, room, all})
+		}
+	}
 	// The ends of an edge follow each other, so the nodes are gone over until none moves: a few
 	// times at most, in practice.
 	for pass, moved := 0, true; moved && pass < 6; pass++ {
 		moved = false
-		for v := 0; v < real; v++ {
-			span := math.Min(nodes[v].Span, W[v])
-			if span <= 0 || nodes[v].Kind != kindNode {
-				continue
+		for _, sd := range sides {
+			v, side, span, ids, room, all := sd.v, sd.side, sd.span, sd.ids, sd.room, sd.all
+			kinds, dx := ETK, ETD
+			if side != 0 {
+				kinds, dx = EFK, EFD
 			}
-			for side := 0; side < 2; side++ {
-				kinds, dx, other, start, list := ETK, ETD, EF, predStart, predE
-				if side != 0 {
-					kinds, dx, other, start, list = EFK, EFD, ET, succStart, succE
-				}
-				sideEnds(g, v, side, span, kinds, &ids, &room)
-				if len(ids) == 0 {
+			k := 0
+			lo := -span / 2
+			for i := 0; i <= len(all); i++ {
+				held := i < len(all) && kinds[all[i]] == endHeld
+				if i < len(all) && !held {
 					continue
 				}
-				if len(ids) == 1 {
-					if len(room) == 0 {
-						room = append(room, 0)
-					}
-					room[0] = 0
+				// The run of free ends before this point is ids[k:], as many as were passed
+				// since the last held end.
+				size := 0
+				for j := i - 1; j >= 0 && kinds[all[j]] != endHeld; j-- {
+					size++
 				}
-				// Every end on the side in order, the held ones among them, which divide the rest
-				// into runs.
-				all = all[:0]
-				for k := start[v]; k < start[v+1]; k++ {
-					all = append(all, list[k])
+				hi := span / 2
+				if held {
+					hi = dx[all[i]] - portPitch
 				}
-				slices.SortStableFunc(all, func(a, b int) int {
-					if c := pos[other[a]] - pos[other[b]]; c != 0 {
-						return c
+				if size > 0 {
+					// The places nearest the wanted ones that keep the order and the room
+					// between neighbours: an isotonic fit, by pooling neighbours that would
+					// otherwise be too close.
+					var sum []float64
+					var count []int
+					before := 0.0
+					for j := 0; j < size; j++ {
+						if j > 0 {
+							before += room[k+j]
+						}
+						sum = append(sum, wanted(ids[k+j], side, v, span, pass > 0)-before)
+						count = append(count, 1)
+						// Ends that share a place for want of room stay together.
+						together := j > 0 && room[k+j] == 0
+						for len(sum) > 1 && (together || sum[len(sum)-2]/float64(count[len(count)-2]) > sum[len(sum)-1]/float64(count[len(count)-1])) {
+							together = false
+							top := sum[len(sum)-1]
+							sum = sum[:len(sum)-1]
+							pooled := count[len(count)-1]
+							count = count[:len(count)-1]
+							sum[len(sum)-1] += top
+							count[len(count)-1] += pooled
+						}
 					}
-					return a - b
-				})
-				k := 0
-				lo := -span / 2
-				for i := 0; i <= len(all); i++ {
-					held := i < len(all) && kinds[all[i]] == endHeld
-					if i < len(all) && !held {
-						continue
-					}
-					// The run of free ends before this point is ids[k:], as many as were passed
-					// since the last held end.
-					size := 0
-					for j := i - 1; j >= 0 && kinds[all[j]] != endHeld; j-- {
-						size++
-					}
-					hi := span / 2
-					if held {
-						hi = dx[all[i]] - portPitch
-					}
-					if size > 0 {
-						// The places nearest the wanted ones that keep the order and the room
-						// between neighbours: an isotonic fit, by pooling neighbours that would
-						// otherwise be too close.
-						sum = sum[:0]
-						count = count[:0]
-						before := 0.0
-						for j := 0; j < size; j++ {
+					total := before
+					j := 0
+					before = 0
+					for b := range sum {
+						// With too little room between two held ends, the run sits in the
+						// middle of what there is.
+						var level float64
+						if hi-total < lo {
+							level = (lo + hi - total) / 2
+						} else {
+							level = math.Max(lo, math.Min(hi-total, sum[b]/float64(count[b])))
+						}
+						for c := 0; c < count[b]; c, j = c+1, j+1 {
 							if j > 0 {
 								before += room[k+j]
 							}
-							sum = append(sum, wanted(ids[k+j], side, v, span, pass > 0)-before)
-							count = append(count, 1)
-							// Ends that share a place for want of room stay together.
-							together := j > 0 && room[k+j] == 0
-							for len(sum) > 1 && (together || sum[len(sum)-2]/float64(count[len(count)-2]) > sum[len(sum)-1]/float64(count[len(count)-1])) {
-								together = false
-								top := sum[len(sum)-1]
-								sum = sum[:len(sum)-1]
-								pooled := count[len(count)-1]
-								count = count[:len(count)-1]
-								sum[len(sum)-1] += top
-								count[len(count)-1] += pooled
+							if math.Abs(dx[ids[k+j]]-level-before) > 0.01 {
+								moved = true
 							}
+							dx[ids[k+j]] = level + before
 						}
-						total := before
-						j := 0
-						before = 0
-						for b := range sum {
-							// With too little room between two held ends, the run sits in the
-							// middle of what there is.
-							var level float64
-							if hi-total < lo {
-								level = (lo + hi - total) / 2
-							} else {
-								level = math.Max(lo, math.Min(hi-total, sum[b]/float64(count[b])))
-							}
-							for c := 0; c < count[b]; c, j = c+1, j+1 {
-								if j > 0 {
-									before += room[k+j]
-								}
-								if math.Abs(dx[ids[k+j]]-level-before) > 0.01 {
-									moved = true
-								}
-								dx[ids[k+j]] = level + before
-							}
-						}
-						k += size
 					}
-					if held {
-						lo = dx[all[i]] + portPitch
-					}
+					k += size
+				}
+				if held {
+					lo = dx[all[i]] + portPitch
 				}
 			}
 		}
