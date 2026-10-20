@@ -12,8 +12,11 @@ pnpm playground  # builds the playground for browsers, which dev and build need
 pnpm dev         # writes what gen writes, then serves the site at localhost:4321
 pnpm build       # the same, then builds the site into dist
 pnpm check       # checks the site's types
-pnpm deploy      # builds the playground and the site, and deploys them with wrangler
+pnpm run deploy  # builds the playground and the site, and deploys them with wrangler
 ```
+
+Publishing a release of limu on GitHub deploys the site too, through
+`.github/workflows/site.yml`.
 
 ## What is written, and from what
 

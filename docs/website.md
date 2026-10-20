@@ -8,7 +8,9 @@ document holds what has been decided about it; the parts still open say so.
 
 The site is built with Astro, as Pele's is, from a directory `website/` in this repository,
 and is served by Cloudflare as the static assets of a Worker, as mygo-platinum's site is.
-It is in English only. The import path stays `github.com/firede/limu`: the site's domain is
+Publishing a release of limu on GitHub deploys it from the release's tag
+(`.github/workflows/site.yml`), as publishing one of mygo-platinum does its site; a release
+of limumygo does not. It is in English only. The import path stays `github.com/firede/limu`: the site's domain is
 not a vanity import path.
 
 A Go program, `website/gen`, run before Astro builds, writes what the site shows of limu's
@@ -123,7 +125,7 @@ and the documents, and the header's icons, and does not use the documents' layou
 `pnpm playground` (`scripts/playground.mjs`) builds it into `public/playground`, which is
 not committed, and writes the files' names and size to `src/generated/playground.json`;
 `pnpm build` does not, so that a change to the documents does not compile it again, and
-fails when it has not been built. `pnpm deploy` builds both.
+fails when it has not been built. `pnpm run deploy` builds both and deploys them.
 
 The web playground and the desktop one are one program, so that the two do not drift
 apart, and both are made simpler: the playground is a place for a user to try limu, not an
