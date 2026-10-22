@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/egoist/mygo v0.6.2
-	github.com/firede/limu v0.2.0
+	github.com/firede/limu v0.2.1
 	golang.org/x/image v0.46.0
 )
 
