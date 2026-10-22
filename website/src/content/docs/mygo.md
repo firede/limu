@@ -100,7 +100,7 @@ ui.Box(c).Size(float32(sc.Width*2), float32(sc.Height*2)).Draw(func(p *ui.Painte
 })
 ```
 
-`Options.Scale` sets how many DIPs one scene unit takes. To zoom or pan, change the scale and the point you draw at. Don't draw under `ui.Painter.Transform` or inside a transformed element. MyGo clips very large paths to the visible area in window coordinates, and it can't account for a transform, so a transformed diagram may be drawn only in part.
+`Options.Scale` sets how many DIPs one scene unit takes. To zoom or pan, change the scale and the point you draw at, rather than draw under `ui.Painter.Transform` or inside a transformed element. A transformed diagram is still drawn whole. But MyGo draws each path from a mask made at the painter's scale, and a transform stretches it, so a diagram zoomed in this way looks blurred. A very large path can also show faint lines where its tiles meet.
 
 limumygo draws the same picture as the svg package, with a few differences.
 

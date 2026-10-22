@@ -92,7 +92,8 @@ func TestView(t *testing.T) {
 	}
 }
 
-// Paths too large for one of MyGo's masks are drawn in pieces.
+// Paths too large for one of MyGo's masks are drawn, and under a transform, which zooms
+// in here on a scene drawn at half the scale, as well.
 func TestLargePaths(t *testing.T) {
 	sc := &scene.Scene{Width: 100, Height: 100, Items: []scene.Item{
 		{
@@ -107,23 +108,31 @@ func TestLargePaths(t *testing.T) {
 		},
 		{
 			Kind:  scene.Edge,
-			Parts: []scene.Part{{Path: new(scene.Path).MoveTo(25, -3000).LineTo(25, 3000), Paint: scene.StrokeOnly}},
+			Parts: []scene.Part{{Path: new(scene.Path).MoveTo(24, -3000).LineTo(24, 3000), Paint: scene.StrokeOnly}},
 			Style: style.Style{Stroke: style.Of(style.Hex("#0f0")), StrokeWidth: style.N(4), Dash: style.Dashes(1000, 1)},
 		},
 	}}
-	img := ui.Render(func(c *ui.Context) {
-		ui.Box(c).Size(100, 100).Draw(func(p *ui.Painter, r ui.Rect) { Paint(p, sc, r.X, r.Y, nil) })
-	}, 100, 100, 1)
-	for _, c := range []struct {
-		x, y int
-		want color.RGBA
-	}{
-		{80, 80, color.RGBA{0, 0, 255, 255}},
-		{80, 50, color.RGBA{255, 0, 0, 255}},
-		{25, 80, color.RGBA{0, 255, 0, 255}},
-	} {
-		if got := img.RGBAAt(c.x, c.y); got != c.want {
-			t.Errorf("at %d,%d: %v, want %v", c.x, c.y, got, c.want)
+	for _, zoom := range []bool{false, true} {
+		img := ui.Render(func(c *ui.Context) {
+			ui.Box(c).Size(100, 100).Draw(func(p *ui.Painter, r ui.Rect) {
+				if !zoom {
+					Paint(p, sc, r.X, r.Y, nil)
+					return
+				}
+				p.Transform(ui.Scaling(2, 2), r.X, r.Y, func() { Paint(p, sc, r.X, r.Y, &Options{Scale: 0.5}) })
+			})
+		}, 100, 100, 1)
+		for _, c := range []struct {
+			x, y int
+			want color.RGBA
+		}{
+			{80, 80, color.RGBA{0, 0, 255, 255}},
+			{80, 50, color.RGBA{255, 0, 0, 255}},
+			{24, 80, color.RGBA{0, 255, 0, 255}},
+		} {
+			if got := img.RGBAAt(c.x, c.y); got != c.want {
+				t.Errorf("zoom %v, at %d,%d: %v, want %v", zoom, c.x, c.y, got, c.want)
+			}
 		}
 	}
 }

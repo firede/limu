@@ -14,11 +14,11 @@
 // SVG.
 //
 // A scene is drawn where Paint's x and y and Options.Scale place it, in the painter's DIPs.
-// To zoom or pan it, change those, and do not draw it under a ui.Painter.Transform, nor in
-// an element that is transformed: a path too large for one of MyGo's masks is drawn only
-// where ui.Painter.Visible says the painter shows, which is in the window's DIPs, and MyGo
-// does not tell a painter the transform that would take the scene's DIPs there. Under a
-// transform, such a path is drawn in part, or not at all.
+// To zoom or pan it, change those rather than draw it under a ui.Painter.Transform or in an
+// element that is transformed. A scene is drawn whole under a transform too, but MyGo draws
+// each path from a mask of coverage made at the painter's scale, which the transform
+// stretches: a scene zoomed in so is blurred, and a path too large for one mask shows faint
+// lines where its tiles meet.
 package limumygo
 
 import (
@@ -268,21 +268,12 @@ func (p *Painter) Ends(it *scene.Item, s style.Resolved) {
 }
 
 // MyGo draws a path from a mask of coverage, the size of the path's bounds, which it keeps
-// in an atlas of 4096 by 4096 pixels that it shares with the glyphs of text, and draws none
-// wider or taller than 4096 pixels. So that a scene with many long lines leaves room in the
-// atlas, an opaque line longer than piece device pixels is stroked in pieces no larger than
-// that, whose masks are thin along any line; and a path too large for a mask is drawn in
-// pieces, only where the painter shows (ui.Painter.Visible).
-//
-// The drawing of a path too large for a mask, maxMask, fillTiles, clipPolygon and the large
-// lines of strokeLines, works around MyGo, and goes once MyGo draws such a path itself, in
-// tiles of a mask, as egoist/mygo#529 ("Draw paths too large for one mask in tiles of it")
-// would have it. The cutting of opaque lines longer than piece stays after that: it is for
-// the room the masks of many lines take in the atlas, which #529 does not change.
-const (
-	maxMask = 4000
-	piece   = 256
-)
+// in an atlas of 4096 by 4096 pixels that it shares with the glyphs of text, and draws a
+// path too large for one mask in tiles of it. So that a scene with many long lines leaves
+// room in the atlas, an opaque line longer than piece device pixels is stroked in pieces no
+// larger than that, whose masks are thin along any line, and only the pieces that show
+// (ui.Painter.Visible) are drawn.
+const piece = 256
 
 // tolerance is how far from a curve the lines it is cut into may stray, in the scene's
 // units: a quarter of a device pixel.
@@ -294,13 +285,7 @@ func (p *Painter) across(b scene.Rect, w float32) float32 {
 	return (max(p.Len(b.W), p.Len(b.H)) + w + 2) * p.Scale()
 }
 
-func (p *Painter) fill(sp *scene.Path, c ui.Color) {
-	if p.across(sp.Bounds(), 0) < maxMask {
-		p.FillPath(p.Path(sp), c)
-		return
-	}
-	p.fillTiles(sp.Flatten(p.tolerance()), c, maxMask)
-}
+func (p *Painter) fill(sp *scene.Path, c ui.Color) { p.FillPath(p.Path(sp), c) }
 
 // stroke strokes a path of the scene with a pen. MyGo strokes it when its ends and corners
 // are round, which are all MyGo draws; with others, its outline is filled. The filling of
@@ -320,9 +305,7 @@ func (p *Painter) stroke(sp *scene.Path, c ui.Color, pn pen) {
 		return
 	}
 	w := p.Len(pn.width)
-	size := p.across(sp.Bounds(), w)
-	large := size >= maxMask
-	if len(pn.dash) == 0 && !large && (size <= piece || c.A < 255) {
+	if len(pn.dash) == 0 && (c.A < 255 || p.across(sp.Bounds(), w) <= piece) {
 		p.StrokePath(p.Path(sp), w, c)
 		return
 	}
@@ -330,27 +313,25 @@ func (p *Painter) stroke(sp *scene.Path, c ui.Color, pn pen) {
 	if len(pn.dash) > 0 {
 		lines = scene.Dash(lines, pn.dash, 0)
 	}
-	// Translucent pieces would show darker where their caps overlap: they are cut only
-	// when they must be.
-	most := float32(maxMask)
+	// Translucent pieces would show darker where their caps overlap: a translucent line's
+	// dashes are stroked as one path.
+	limit := float32(math.MaxFloat32)
 	if c.A == 255 {
-		most = piece
+		limit = max(piece/p.Scale()-w-2, 8)
 	}
-	p.strokeLines(lines, w, c, max(most/p.Scale()-w-2, 8), large)
+	p.strokeLines(lines, w, c, limit)
 }
 
 // strokeLines strokes polylines of the scene w DIPs wide, in pieces no more than limit DIPs
-// across, and with cull only those that show, which is right only with no transform (see
-// the package's documentation). With round joins and caps, a closed polyline is drawn as an
-// open one back to its start. Its large lines work around MyGo until egoist/mygo#529; its
-// pieces of opaque lines stay after it.
-func (p *Painter) strokeLines(lines []scene.Polyline, w float32, c ui.Color, limit float32, cull bool) {
+// across, and only those that show. With round joins and caps, a closed polyline is drawn as
+// an open one back to its start.
+func (p *Painter) strokeLines(lines []scene.Polyline, w float32, c ui.Color, limit float32) {
 	view := p.Visible()
 	var path ui.Path
 	var x0, y0, x1, y1 float32 // the piece's bounds
 	empty := true
 	flush := func() {
-		if !empty && (!cull || overlaps(ui.Rect{X: x0 - w, Y: y0 - w, W: x1 - x0 + 2*w, H: y1 - y0 + 2*w}, view)) {
+		if !empty && overlaps(ui.Rect{X: x0 - w, Y: y0 - w, W: x1 - x0 + 2*w, H: y1 - y0 + 2*w}, view) {
 			p.StrokePath(&path, w, c)
 		}
 		path.Reset()
@@ -400,9 +381,7 @@ func (p *Painter) strokeLines(lines []scene.Polyline, w float32, c ui.Color, lim
 // pixels at a time: each polygon is clipped to the tile, which keeps how many times it winds
 // about each point inside it, and so what a fill with the non-zero rule covers. The tiles'
 // sides are on the edges of device pixels, so that where two meet neither covers a part of
-// a pixel the other covers too, and no seam shows. What shows is taken to be in the scene's
-// DIPs, which it is only with no transform (see the package's documentation). It works
-// around MyGo until egoist/mygo#529.
+// a pixel the other covers too, and no seam shows.
 func (p *Painter) fillTiles(polys []scene.Polyline, c ui.Color, tile int) {
 	var dips [][][2]float32
 	x0, y0 := float32(math.Inf(1)), float32(math.Inf(1))
@@ -447,7 +426,7 @@ func (p *Painter) fillTiles(polys []scene.Polyline, c ui.Color, tile int) {
 }
 
 // clipPolygon is a polygon clipped to a box, as Sutherland and Hodgman do it, for
-// fillTiles, until egoist/mygo#529.
+// fillTiles.
 func clipPolygon(poly [][2]float32, r ui.Rect) [][2]float32 {
 	edges := [4]struct {
 		axis int

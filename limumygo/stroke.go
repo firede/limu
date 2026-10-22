@@ -166,9 +166,7 @@ func (p *Painter) strokeOutline(lines []scene.Polyline, c ui.Color, pn pen) {
 	if len(polys) == 0 {
 		return
 	}
-	b := bounds(polys)
-	size := p.across(b, 0)
-	if size < maxMask && (size <= piece || c.A < 255) {
+	if c.A < 255 || p.across(bounds(polys), 0) <= piece {
 		var path ui.Path
 		for _, l := range polys {
 			for i, pt := range l.Points {
@@ -185,12 +183,8 @@ func (p *Painter) strokeOutline(lines []scene.Polyline, c ui.Color, pn pen) {
 		return
 	}
 	// An opaque outline is filled in tiles no larger than a piece, as the round strokes
-	// are cut into pieces, and any too large for a mask in tiles as large as one.
-	tile := maxMask
-	if c.A == 255 {
-		tile = piece
-	}
-	p.fillTiles(polys, c, tile)
+	// are cut into pieces.
+	p.fillTiles(polys, c, piece)
 }
 
 // bounds is the box about polylines.
