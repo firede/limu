@@ -29,6 +29,15 @@ const reference = (text) => text.replaceAll(/^[^\S\n\r]+|[^\S\n\r]+$/g, '').repl
 // Cases written here, for the corners of the grammar and of the drawing.
 export const WRITTEN = [
   '',
+  // Names in Unicode, and entity codes for characters XML does not allow, which are errors.
+  'sankey\nÉlectricité,水力,5\n😀,"b, 中",2',
+  'sankey\n"Ünïcödé ""q""",ab c,1',
+  'sankey\na&#1;b,c,1',
+  'sankey\na,"b&#xFFFE;",1',
+  'sankey\na&#9;b,c&#xFFFF;,1',
+  'sankey\na&#x1F600;b,c&#65533;,1',
+  'sankey\na\u0085b,c,1',
+  'sankey\na￾b,c,1',
   'sankey',
   'sankey\n',
   'sankey-beta',

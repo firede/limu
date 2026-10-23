@@ -48,10 +48,14 @@ const (
 	sEscapedText
 )
 
-// isTextData reports whether c is RFC 4180's TEXTDATA: printable ASCII but for the double
-// quote and the comma.
-func isTextData(c int) bool {
-	return c >= 32 && c <= 126 && c != 34 && c != 44
+// isTextData reports whether c is RFC 4180's TEXTDATA, printable ASCII but for the double
+// quote and the comma, extended to Unicode but for controls and the characters XML does not
+// allow, as Pele's isTextData does.
+func isTextData(c rune) bool {
+	return c >= 32 && c <= 126 && c != 34 && c != 44 ||
+		c >= 0xa0 && c <= 0xd7ff ||
+		c >= 0xe000 && c <= 0xfffd ||
+		c >= 0x10000 && c <= 0x10ffff
 }
 
 // keyword reports whether word, in lowercase ASCII, is at byte p of src in any case, and not
@@ -103,9 +107,9 @@ func tokenize(src string) tokens {
 				continue
 			}
 			for q < n {
-				d := int(src[q])
+				d, size := utf8.DecodeRuneInString(src[q:])
 				if isTextData(d) || d == 44 || d == 13 || d == 10 {
-					q++
+					q += size
 				} else if d == 34 && chars.Unit(src, q+1) == 34 {
 					q += 2
 				} else {
@@ -144,8 +148,12 @@ func tokenize(src string) tokens {
 				emit(tDQUOTE, p, p+1)
 				continue
 			}
-			for q < n && isTextData(int(src[q])) {
-				q++
+			for q < n {
+				d, size := utf8.DecodeRuneInString(src[q:])
+				if !isTextData(d) {
+					break
+				}
+				q += size
 			}
 			emit(tNON_ESCAPED_TEXT, p, q)
 		}

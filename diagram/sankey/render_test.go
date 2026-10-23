@@ -168,7 +168,16 @@ func sceneLines(sc *scene.Scene) []string {
 		items = items[1:]
 	}
 	lines = append(lines, "links 0.4")
-	labelsLine := "labels " + n(jsmath.Round(float64(sc.FontSize*0.875)))
+	// The labels' size, which Pele writes on their group: that of every label, which shrinks
+	// with a narrow or crowded chart, or with none, the size it starts from.
+	labelSize := jsmath.Round(float64(sc.FontSize * 0.875))
+	for i := range items {
+		if items[i].Role == RoleLabel {
+			labelSize = items[i].Label.Size
+			break
+		}
+	}
+	labelsLine := "labels " + n(labelSize)
 	labelled := false
 	// Where each node's bar starts, by its id.
 	bars := map[string]float64{}
