@@ -67,6 +67,17 @@
   {"text": "   ", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
   {"text": "<br>", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
   {"text": "a\ufffdb", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
-  {"text": "\ufffd\ufffd\ufffd word \ufffd", "markdown": true, "size": 14, "maxWidth": 30, "face": 0}
+  {"text": "\ufffd\ufffd\ufffd word \ufffd", "markdown": true, "size": 14, "maxWidth": 30, "face": 0},
+  {"text": "RRCConnection\u200bReconfiguration\u200bComplete", "markdown": false, "size": 16, "maxWidth": 140, "face": 0},
+  {"text": "RRCConnection\u00adReconfiguration\u00adComplete", "markdown": false, "size": 16, "maxWidth": 140, "face": 0},
+  {"text": "RRCConnection&shy;Reconfiguration&shy;Complete", "markdown": false, "size": 16, "maxWidth": 140, "face": 0},
+  {"text": "Re\u00adcon\u00adfig", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
+  {"text": "a uni\u00adt test", "markdown": false, "size": 16, "maxWidth": 39.2, "face": 0},
+  {"text": "a uni\u00adt\u00aded", "markdown": false, "size": 16, "maxWidth": 39.2, "face": 0},
+  {"text": "a uni\u00ad<b>t</b> test", "markdown": false, "size": 16, "maxWidth": 39.2, "face": 0},
+  {"text": "a uni\u00ad t test", "markdown": false, "size": 16, "maxWidth": 39.2, "face": 0},
+  {"text": "ab\u00ad<i> cd</i>", "markdown": false, "size": 16, "maxWidth": 25, "face": 0},
+  {"text": "<b>uni\u00ad</b>t\u00adtest\u00ad", "markdown": false, "size": 16, "maxWidth": 30, "face": 0},
+  {"text": "ab cd ab cd\u00ad", "markdown": false, "size": 16, "maxWidth": 40, "face": 0}
  ]
 }
