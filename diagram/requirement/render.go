@@ -73,7 +73,7 @@ func restyle(l text.Label, bits text.Face, m text.Measurer) text.Label {
 		for j, s := range line {
 			s.Face |= bits
 			if s.Icon == "" {
-				s.Width = m.Width(s.Text, l.Size, s.Face)
+				s.Width = text.Width(m, s.Text, l.Size, s.Face)
 			}
 			total += s.Width
 			spans[j] = s

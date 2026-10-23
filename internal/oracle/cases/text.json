@@ -1,6 +1,13 @@
 {
  "measure": [
   {"text": "Hello, world", "size": 16, "face": 0},
+  {"text": "Hello, world", "size": 16, "face": 8},
+  {"text": "Hello, world", "size": 14, "face": 16},
+  {"text": "Hello, world", "size": 13.5, "face": 9},
+  {"text": "Hello, world", "size": 16, "face": 20},
+  {"text": "Hello, world", "size": 16, "face": 32},
+  {"text": "Hello, world", "size": 16, "face": 35},
+  {"text": "soft\u00adhyphen zero\u200bwidth", "size": 16, "face": 0},
   {"text": "Hello, world", "size": 16, "face": 1},
   {"text": "Hello, world", "size": 14, "face": 2},
   {"text": "Hello, world", "size": 16, "face": 4},
