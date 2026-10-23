@@ -569,17 +569,26 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 					x += sp.Width
 				}
 			}
+			// underline draws a run's line, a fifteenth of its size thick and a tenth of it below
+			// the baseline, grown by grow on each side.
+			underline := func(r run, grow float32, c ui.Color) {
+				x0, y0 := r.x-grow, r.y+r.size/10-grow
+				x1, y1 := r.x+r.width+grow, y0+max(1, r.size/15)+2*grow
+				p.FillPath(new(ui.Path).MoveTo(x0, y0).LineTo(x1, y0).LineTo(x1, y1).LineTo(x0, y1).Close(), c)
+			}
 			if halo.A > 0 && s.HaloWidth > 0 {
+				// The halo goes about the underline too, as SVG strokes a text's decoration.
 				for _, r := range runs {
 					p.halo(r.glyphs, r.x, r.y, p.Len(s.HaloWidth/2), halo)
+					if r.underlined {
+						underline(r, p.Len(s.HaloWidth/2), halo)
+					}
 				}
 			}
 			for _, r := range runs {
 				p.Glyphs(r.glyphs, r.x, r.y, c)
 				if r.underlined {
-					// A line a fifteenth of the run's size thick, a tenth of it below the baseline.
-					y0, h := r.y+r.size/10, max(1, r.size/15)
-					p.FillPath(new(ui.Path).MoveTo(r.x, y0).LineTo(r.x+r.width, y0).LineTo(r.x+r.width, y0+h).LineTo(r.x, y0+h).Close(), c)
+					underline(r, 0, c)
 				}
 			}
 			top += l.LineHeight

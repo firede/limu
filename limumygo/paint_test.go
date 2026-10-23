@@ -102,15 +102,16 @@ func TestLabelAlign(t *testing.T) {
 }
 
 // A Sub span is drawn lower than the text beside it and a Sup span higher, and an Underline
-// span with a line under it.
+// span with a line under it, which a halo goes about as it goes about the letters.
 func TestLabelFaces(t *testing.T) {
-	draw := func(raw string) *image.RGBA {
+	drawIn := func(raw string, st style.Style) *image.RGBA {
 		l := text.Layout(raw, text.Options{Measurer: goFonts, Size: 20})
 		sc := &scene.Scene{Width: 200, Height: 100, FontSize: 20, Items: []scene.Item{
-			{Kind: scene.Text, Label: &l, At: scene.Point{X: 20, Y: 50}, Align: scene.Start},
+			{Kind: scene.Text, Label: &l, At: scene.Point{X: 20, Y: 50}, Align: scene.Start, Style: st},
 		}}
 		return ui.Render(func(c *ui.Context) { View(c, sc, &Options{Fonts: goFonts}) }, 200, 100, 1)
 	}
+	draw := func(raw string) *image.RGBA { return drawIn(raw, style.Style{}) }
 	inked := func(img *image.RGBA, x, y int) bool { px := img.RGBAAt(x, y); return px.A > 128 && px.R < 128 }
 	// The first and last rows with ink in them between columns x0 and x1.
 	rows := func(img *image.RGBA, x0, x1 int) (int, int) {
@@ -156,5 +157,23 @@ func TestLabelFaces(t *testing.T) {
 	}
 	if !full(draw("<u>under</u>")) || full(draw("under")) {
 		t.Error("underline: no line under the underlined text alone")
+	}
+	// A halo goes about the underline as well as the letters, so it reaches lower than the
+	// letters' halo does.
+	haloed := style.Style{Halo: style.Of(style.Color{R: 255, A: 255}), HaloWidth: style.N(6)}
+	lowest := func(img *image.RGBA) int {
+		last := -1
+		for y := 0; y < 100; y++ {
+			for x := 0; x < 200; x++ {
+				if px := img.RGBAAt(x, y); px.R > 200 && px.G < 80 {
+					last = y
+					break
+				}
+			}
+		}
+		return last
+	}
+	if u, plain := lowest(drawIn("<u>under</u>", haloed)), lowest(drawIn("under", haloed)); u <= plain+1 {
+		t.Errorf("underline: its halo reaches row %d, not below the letters' halo at %d", u, plain)
 	}
 }
