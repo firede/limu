@@ -384,24 +384,66 @@ func TestSafeLink(t *testing.T) {
 }
 
 func TestAlign(t *testing.T) {
-	l := text.Layout("ab<br>abcd", text.Options{Measurer: text.Arial, Size: 10})
-	w0, w1 := l.Widths[0], l.Widths[1]
-	// Each span is written centered on itself.
-	for align, xs := range map[scene.Align][2]float64{
-		scene.Middle: {50, 50},
-		scene.Start:  {50 + w0/2, 50 + w1/2},
-		scene.End:    {50 - w0/2, 50 - w1/2},
-	} {
+	icons := &Options{IconMarkup: func(string) string { return "<path/>" }}
+	write := func(l *text.Label, align scene.Align) []string {
+		t.Helper()
 		sc := &scene.Scene{Type: "t", Width: 100, Height: 100, FontSize: 10, Items: []scene.Item{
-			{Kind: scene.Text, Label: &l, At: scene.Point{X: 50, Y: 50}, Align: align},
+			{Kind: scene.Text, Label: l, At: scene.Point{X: 50, Y: 50}, Align: align},
 		}}
-		got := Render(sc, nil)
-		for _, x := range xs {
-			var b strings.Builder
-			num(&b, x)
-			if !strings.Contains(got, `<tspan x="`+b.String()+`"`) {
-				t.Errorf("align %d: no line at x %s:\n%s", align, b.String(), got)
+		got, err := readLabel(Render(sc, icons))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	// wider is the label as a measurer that finds text a third wider would measure it.
+	wider := func(l text.Label) *text.Label {
+		l.Widths = append([]float64(nil), l.Widths...)
+		for i := range l.Widths {
+			l.Widths[i] *= 4.0 / 3
+		}
+		l.Lines = append([][]text.Span(nil), l.Lines...)
+		for i, line := range l.Lines {
+			l.Lines[i] = append([]text.Span(nil), line...)
+			for j := range l.Lines[i] {
+				l.Lines[i][j].Width *= 4.0 / 3
 			}
+		}
+		return &l
+	}
+
+	// A line of text is anchored at At itself, and its spans follow one another, so that
+	// where it starts, ends or is centered does not hang on how its text was measured.
+	l := text.Layout("ab<br>a <b>bold</b> c", text.Options{Measurer: text.Arial, Size: 10})
+	middle := write(&l, scene.Middle)
+	if want := []string{"t middle 50,46 ab", "t middle 50,61 a [b:bold] c"}; strings.Join(middle, "\n") != strings.Join(want, "\n") {
+		t.Errorf("middle: got %q, want %q", middle, want)
+	}
+	for align, anchor := range map[scene.Align]string{scene.Middle: "middle", scene.Start: "start", scene.End: "end"} {
+		var want []string
+		for _, line := range middle {
+			want = append(want, strings.Replace(line, "middle", anchor, 1))
+		}
+		for _, got := range [][]string{write(&l, align), write(wider(l), align)} {
+			if strings.Join(got, "\n") != strings.Join(want, "\n") {
+				t.Errorf("align %s: got %q, want %q", anchor, got, want)
+			}
+		}
+	}
+
+	// A line with an icon is placed span by span where layout measured them, starting,
+	// centered or ending at At.
+	l = text.Layout("fa:fa-car go", text.Options{Measurer: text.Arial, Size: 10, Icons: func(string) bool { return true }})
+	icon, w := l.Lines[0][0].Width, l.Widths[0]
+	n := func(f float64) string {
+		var b strings.Builder
+		num(&b, f)
+		return b.String()
+	}
+	for align, x := range map[scene.Align]float64{scene.Middle: 50 - w/2, scene.Start: 50, scene.End: 50 - w} {
+		want := []string{"t start " + n(x+icon) + ",53.5  go", "icon fa:fa-car " + n(x) + ",44.5,11,11"}
+		if got := write(&l, align); strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Errorf("align %d, with an icon: got %q, want %q", align, got, want)
 		}
 	}
 }
