@@ -55,3 +55,47 @@ func TestShade(t *testing.T) {
 		t.Errorf("over an author's fill: %v", got)
 	}
 }
+
+// The lines of a label start or end at its point however wider than drawn its text was
+// measured, as they would be with a measurer whose fonts are not the ones drawn with.
+func TestLabelAlign(t *testing.T) {
+	l := text.Layout("abc<br>abc abc abc abc", text.Options{Measurer: goFonts, Size: 16})
+	// As a measurer that finds text a third wider than the fonts drawn with would measure it.
+	for i := range l.Widths {
+		l.Widths[i] *= 4.0 / 3
+		for j := range l.Lines[i] {
+			l.Lines[i][j].Width *= 4.0 / 3
+		}
+	}
+	l.Width *= 4.0 / 3
+	for _, align := range []scene.Align{scene.Start, scene.End} {
+		sc := &scene.Scene{Width: 200, Height: 100, FontSize: 16, Items: []scene.Item{
+			{Kind: scene.Text, Label: &l, At: scene.Point{X: 100, Y: 50}, Align: align},
+		}}
+		img := ui.Render(func(c *ui.Context) { View(c, sc, &Options{Fonts: goFonts}) }, 200, 100, 1)
+		// The first and last columns with ink in them in each line's rows.
+		ink := func(y0, y1 int) (int, int) {
+			first, last := -1, -1
+			for x := 0; x < 200; x++ {
+				for y := y0; y < y1; y++ {
+					if px := img.RGBAAt(x, y); px.A > 128 && px.R < 128 {
+						if first < 0 {
+							first = x
+						}
+						last = x
+						break
+					}
+				}
+			}
+			return first, last
+		}
+		f0, l0 := ink(26, 50)
+		f1, l1 := ink(50, 74)
+		if align == scene.Start && (f0 != f1 || f0 < 100 || f0 > 102) {
+			t.Errorf("start: the lines start at %d and %d, not at 100", f0, f1)
+		}
+		if align == scene.End && (l0 != l1 || l0 < 97 || l0 > 100) {
+			t.Errorf("end: the lines end at %d and %d, not at 100", l0, l1)
+		}
+	}
+}

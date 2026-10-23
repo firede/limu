@@ -368,6 +368,16 @@ git ignores, to find which line differs from a digest. The fixture is still what
 compare with. The render suites of pie charts, treemaps and flowcharts include cases with a
 padding of 0, 2.5 and 20.
 
+Those tests write where Pele puts a label's text from the scene's point and alignment, so
+they check the scene but not how a backend draws it. The `svg` suite checks the svg
+package. It has Pele lay labels out and write them with `labelSvg` and `leftLabelSvg`, and
+reads back where each run of text is placed and what it's anchored by. The svg package's
+test writes the same labels as Middle and Start items and reads its own SVG the same way.
+A line of text is anchored at its point and its spans follow one another, so where it
+starts or ends doesn't hang on the widths its text was measured at. Only a line with an icon
+is placed span by span. limumygo's test of the same draws a label measured wider than its
+fonts draw it, since its golden images measure with the fonts they draw with.
+
 Pele writes what's inside a node or a group relative to the group's origin, while the scene
 holds every position on the page, and a number moved from one to the other can round the
 other way at two decimals. A suite that needs it sets `limuExactNumbers` while Pele draws.

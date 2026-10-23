@@ -483,9 +483,12 @@ func (w *Writer) icon(name string, r scene.Rect, c style.Paint) {
 }
 
 // Label writes an item's label about its At, as Pele's labelSvg does: a line's baseline is
-// a little below the middle of its line's height. A halo is the text again under it,
-// stroked. A label turned by its Rotate is written in a group turned about its At, with its
-// icons.
+// a little below the middle of its line's height. A line is anchored at At as the item's
+// Align says, in the middle, at its start or at its end, and its spans follow one another
+// as the font draws them, so that where a line begins or ends does not depend on how its
+// text was measured. A line with an icon in it is placed span by span from where layout
+// measured them, as Pele places one. A halo is the text again under it, stroked. A label
+// turned by its Rotate is written in a group turned about its At, with its icons.
 func (w *Writer) Label(it *scene.Item, st style.Style) {
 	if it.Label == nil || it.Label.Empty() {
 		return
@@ -517,7 +520,16 @@ func (w *Writer) text(it *scene.Item, st style.Style, halo bool) {
 	shift := l.Size * 0.35
 	// Each line is placed from the top of the label down, as Pele's labelSvg places them.
 	top := cy - l.Height/2
-	b.WriteString(`<text text-anchor="middle" xml:space="preserve"`)
+	anchor := "middle"
+	switch it.Align {
+	case scene.Start:
+		anchor = "start"
+	case scene.End:
+		anchor = "end"
+	}
+	b.WriteString(`<text text-anchor="`)
+	b.WriteString(anchor)
+	b.WriteString(`" xml:space="preserve"`)
 	switch {
 	case halo:
 		b.WriteString(` fill="none"`)
@@ -534,51 +546,81 @@ func (w *Writer) text(it *scene.Item, st style.Style, halo bool) {
 		b.WriteByte('"')
 	}
 	b.WriteByte('>')
-	for i, line := range l.Lines {
-		y := top + l.LineHeight/2 + shift
-		var x float64
-		switch it.Align {
-		case scene.Start:
-			x = cx
-		case scene.End:
-			x = cx - l.Widths[i]
-		default:
-			x = cx - l.Widths[i]/2
+	// span writes a span of text, at (x, y) when at is set and otherwise right after the
+	// span before it.
+	span := func(s text.Span, at bool, x, y float64, start bool) {
+		b.WriteString(`<tspan`)
+		if at {
+			b.WriteString(` x="`)
+			w.Num(x)
+			b.WriteString(`" y="`)
+			w.Num(y)
+			b.WriteByte('"')
 		}
+		if start {
+			b.WriteString(` text-anchor="start"`)
+		}
+		if s.Face&text.Bold != 0 {
+			b.WriteString(` font-weight="bold"`)
+		}
+		if s.Face&text.Italic != 0 {
+			b.WriteString(` font-style="italic"`)
+		}
+		if s.Face&text.Mono != 0 {
+			b.WriteString(` font-family="`)
+			w.Text(w.family(true))
+			b.WriteByte('"')
+		}
+		b.WriteByte('>')
+		w.Text(s.Text)
+		b.WriteString("</tspan>")
+	}
+	for i, line := range l.Lines {
+		mid := top + l.LineHeight/2
+		y := mid + shift
 		if len(line) == 0 {
 			b.WriteString(`<tspan x="`)
-			w.Num(x)
+			w.Num(cx)
 			b.WriteString(`" y="`)
 			w.Num(y)
 			b.WriteString(`"> </tspan>`)
 		}
+		placed := false
 		for _, s := range line {
-			if !halo && s.Icon != "" && w.o.IconMarkup != nil {
-				side := l.Size * 1.1
-				w.icons = append(w.icons, icon{s.Icon, scene.Rect{X: x, Y: y - shift - side/2, W: side, H: side}})
+			placed = placed || s.Icon != ""
+		}
+		if !placed {
+			// The first span with text starts the line at At, and the rest follow it.
+			at := true
+			for _, s := range line {
+				if s.Text != "" {
+					span(s, at, cx, y, false)
+					at = false
+				}
 			}
-			if s.Icon == "" && s.Text != "" {
-				b.WriteString(`<tspan x="`)
-				w.Num(x + s.Width/2)
-				b.WriteString(`" y="`)
-				w.Num(y)
-				b.WriteByte('"')
-				if s.Face&text.Bold != 0 {
-					b.WriteString(` font-weight="bold"`)
-				}
-				if s.Face&text.Italic != 0 {
-					b.WriteString(` font-style="italic"`)
-				}
-				if s.Face&text.Mono != 0 {
-					b.WriteString(` font-family="`)
-					w.Text(w.family(true))
-					b.WriteByte('"')
-				}
-				b.WriteByte('>')
-				w.Text(s.Text)
-				b.WriteString("</tspan>")
+		} else {
+			// Each span starts where layout measured it to, as the icons between them do. The
+			// line is centered on its middle, which a line starting or ending at At has half
+			// its width away, as Pele's leftLabelSvg, textLeft and textBlock place one.
+			c := cx
+			switch it.Align {
+			case scene.Start:
+				c = cx + l.Widths[i]/2
+			case scene.End:
+				c = cx - l.Widths[i]/2
 			}
-			x += s.Width
+			x := c - l.Widths[i]/2
+			for _, s := range line {
+				if s.Icon != "" {
+					if !halo && w.o.IconMarkup != nil {
+						side := l.Size * 1.1
+						w.icons = append(w.icons, icon{s.Icon, scene.Rect{X: x, Y: mid - side/2, W: side, H: side}})
+					}
+				} else if s.Text != "" {
+					span(s, true, x, y, anchor != "start")
+				}
+				x += s.Width
+			}
 		}
 		top += l.LineHeight
 	}

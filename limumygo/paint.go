@@ -469,8 +469,10 @@ func abs(v float32) float32 {
 // Label draws an item's label as the svg package writes it, about the item's At: each line
 // centered on it, or starting or ending there as its Align says, the baseline of a line a
 // little below the middle of its line's height, as Pele's labelSvg puts it, and the whole
-// turned by its Rotate. Each span is set in its face at the label's size, and centered on
-// the room layout measured for it.
+// turned by its Rotate. Each span is set in its face at the label's size. The spans of a line
+// follow one another as they are shaped, so that where a line starts, ends or is centered
+// does not depend on how its text was measured. A line with an icon in it is placed span by
+// span from where layout measured them, as the svg package places one.
 func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 	l := it.Label
 	if l == nil || l.Empty() {
@@ -481,6 +483,11 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 		return
 	}
 	halo := Color(s.Halo, s.Opacity)
+	type run struct {
+		glyphs []ui.Glyph
+		x, y   float32
+	}
+	var runs []run
 	draw := func() {
 		cx, cy := it.At.X, it.At.Y
 		shift := l.Size * 0.35
@@ -488,32 +495,65 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 		top := cy - l.Height/2
 		size := p.Len(l.Size)
 		for i, line := range l.Lines {
-			y := top + l.LineHeight/2 + shift
-			var x float64
-			switch it.Align {
-			case scene.Start:
-				x = cx
-			case scene.End:
-				x = cx - l.Widths[i]
-			default:
-				x = cx - l.Widths[i]/2
-			}
+			mid := top + l.LineHeight/2
+			y := mid + shift
+			runs = runs[:0]
+			placed := false
 			for _, sp := range line {
-				switch {
-				case sp.Icon != "":
-					if p.o.DrawIcon != nil {
-						side := l.Size * 1.1
-						p.o.DrawIcon(p.Painter, sp.Icon, p.Rect(scene.Rect{X: x, Y: y - shift - side/2, W: side, H: side}), c)
+				placed = placed || sp.Icon != ""
+			}
+			if !placed {
+				ax, gy := p.Point(scene.Point{X: cx, Y: y})
+				var width float32
+				for _, sp := range line {
+					if sp.Text != "" {
+						glyphs, w := p.fonts.Shape(sp.Text, size, sp.Face)
+						runs = append(runs, run{glyphs, width, gy})
+						width += w
 					}
-				case sp.Text != "":
-					glyphs, w := p.fonts.Shape(sp.Text, size, sp.Face)
-					gx, gy := p.Point(scene.Point{X: x + sp.Width/2, Y: y})
-					if halo.A > 0 && s.HaloWidth > 0 {
-						p.halo(glyphs, gx-w/2, gy, p.Len(s.HaloWidth/2), halo)
-					}
-					p.Glyphs(glyphs, gx-w/2, gy, c)
 				}
-				x += sp.Width
+				switch it.Align {
+				case scene.Start:
+				case scene.End:
+					ax -= width
+				default:
+					ax -= width / 2
+				}
+				for k := range runs {
+					runs[k].x += ax
+				}
+			} else {
+				// The line is centered on its middle, as the svg package places it.
+				mx := cx
+				switch it.Align {
+				case scene.Start:
+					mx = cx + l.Widths[i]/2
+				case scene.End:
+					mx = cx - l.Widths[i]/2
+				}
+				x := mx - l.Widths[i]/2
+				for _, sp := range line {
+					switch {
+					case sp.Icon != "":
+						if p.o.DrawIcon != nil {
+							side := l.Size * 1.1
+							p.o.DrawIcon(p.Painter, sp.Icon, p.Rect(scene.Rect{X: x, Y: mid - side/2, W: side, H: side}), c)
+						}
+					case sp.Text != "":
+						glyphs, _ := p.fonts.Shape(sp.Text, size, sp.Face)
+						gx, gy := p.Point(scene.Point{X: x, Y: y})
+						runs = append(runs, run{glyphs, gx, gy})
+					}
+					x += sp.Width
+				}
+			}
+			if halo.A > 0 && s.HaloWidth > 0 {
+				for _, r := range runs {
+					p.halo(r.glyphs, r.x, r.y, p.Len(s.HaloWidth/2), halo)
+				}
+			}
+			for _, r := range runs {
+				p.Glyphs(r.glyphs, r.x, r.y, c)
 			}
 			top += l.LineHeight
 		}

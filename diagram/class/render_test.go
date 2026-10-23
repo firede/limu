@@ -110,6 +110,16 @@ func sceneLines(sc *scene.Scene) []string {
 			lines = append(lines, held...)
 			held = nil
 		}
+		// Pele writes a member starting at its x, with no anchor, and every other label with
+		// labelSvg, centered on its point. The oracle reads only where a text is, so the
+		// alignment is checked here.
+		align := scene.Middle
+		if it.Role == RoleAttribute || it.Role == RoleMethod {
+			align = scene.Start
+		}
+		if it.Label != nil && !it.Label.Empty() && it.Align != align {
+			lines = append(lines, "misaligned "+string(it.Role))
+		}
 		// Pele's escText writes a data-id with its entities decoded.
 		id := peleText(text.DecodeEntities(it.ID))
 		switch it.Role {
