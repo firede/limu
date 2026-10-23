@@ -238,6 +238,9 @@ limumygo draws what the svg package writes, but not in every way as a browser dr
   would make a narrow box's corners elliptical.
 - On macOS, MyGo curves a box's corners as Apple does, not as arcs.
 - MyGo rounds a box's edges to whole device pixels, while a path is drawn where it falls.
+- Subscript and superscript are set at the size layout measured them at, a fifth of the
+  size lower or a third of it higher, where a browser shifts them as its fonts say. An
+  underline is a filled bar under the span.
 
 ## Porting from Pele
 
@@ -395,7 +398,7 @@ Pele draws with lines and curves. A circle, an ellipse, a box with corners of it
 path with an arc are drawn by a `scene.Path` in cubic curves that only come close, so they
 are compared as figures, within a tolerance.
 
-The port follows Pele 1.8.0, commit `8fad23b`. Each fixture records the version and commit
+The port follows Pele 1.9.0, commit `e7f092a`. Each fixture records the version and commit
 it was written from, and the architecture and Node version that wrote it. The tests read
 fixtures with `fixture.Load`, which fails on a fixture written from another version or
 commit of Pele, or on one with an empty list at its top level, as a suite that found no

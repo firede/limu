@@ -48,7 +48,7 @@ func Version() string {
 
 // Layout lays an info diagram out as a scene, as Pele's renderInfo draws it: the title, if
 // there is one, and under it the renderer's name and version. Pele draws its own, "Pele
-// v1.8.0"; limu draws "limu" and its Version in its place.
+// v1.9.0"; limu draws "limu" and its Version in its place.
 func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 	if o == nil {
 		o = &layout.Options{}

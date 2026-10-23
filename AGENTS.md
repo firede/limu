@@ -54,7 +54,7 @@ layout.
   write code whose only use is to match a platform's library to the last bit, as copying
   the C library's `pow` would be. Where such a difference can't be avoided, note it as a
   difference of the platform and leave the cases it affects out of the comparison.
-- The port follows Pele 1.8.0, commit 8fad23b. To follow a newer Pele, write the fixtures
+- The port follows Pele 1.9.0, commit e7f092a. To follow a newer Pele, write the fixtures
   anew from it and port what its diff changed.
 
 ## Writing
