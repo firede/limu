@@ -70,7 +70,7 @@ func Layout(raw string, o Options) Label {
 
 	if !hasMarkup(raw) && !strings.Contains(raw, "&") && !strings.Contains(raw, "ﬂ") {
 		text := chars.Trim(raw)
-		width := o.Measurer.Width(text, o.Size, o.Face)
+		width := Width(o.Measurer, text, o.Size, o.Face)
 		if width <= o.MaxWidth || !(strings.Contains(text, " ") || hasCJK(text) || hasHint(text)) {
 			return Label{
 				Lines:      [][]Span{{{Text: text, Face: o.Face, Width: width}}},
