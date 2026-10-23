@@ -337,7 +337,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 			technRaw = "[" + rel.Techn + "]"
 		}
 		techn := l.label(technRaw, small, r.room, text.Italic)
-		lw := max(label.Width, techn.Width) + 8
+		lw := max(label.Width, techn.Width) + labelPad
 		lh := label.Height + techn.Height
 		if lh == 0 {
 			continue

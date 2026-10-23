@@ -563,14 +563,19 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		}
 	}
 
-	// Pele's transitions are smooth; the host may ask for them at right angles, or straight.
-	curve := common.RoutingCurve(o.Routing)
+	// State diagrams follow the flowchart curve, as Pele's draw does, unless the host asks for
+	// transitions at right angles, or straight.
+	flow, _ := config["flowchart"].(diagram.Config)
+	curve, _ := flow["curve"].(string)
+	if routed := common.RoutingCurve(o.Routing); routed != "" {
+		curve = routed
+	}
 	result := graphs.Compound(cnodes, cedges, rootDir, graphs.LayeredOptions{
 		NodeSep:  numberOption(config, "nodeSpacing", nodeSep),
 		EdgeSep:  edgeSep,
 		RankSep:  numberOption(config, "rankSpacing", rankSep),
 		PortSep:  20,
-		Tracks:   curve == "step",
+		Tracks:   curve == "step" || curve == "stepBefore" || curve == "stepAfter",
 		Straight: curve == "linear",
 		HeadRoom: scene.MarkerType("arrow_point").Trim(),
 	})

@@ -187,6 +187,11 @@ export default async function ({ src, cases, write, random }) {
     const eol = s.indexOf('\n', i);
     if (i >= 0 && eol >= 0) each(s.slice(0, eol + 1) + 'direction LR\n' + s.slice(eol + 1));
   }
+  // Some again with each flowchart curve, which state diagrams follow.
+  const CURVES = ['step', 'stepBefore', 'stepAfter', 'linear', 'basis', 'monotoneX', 'natural', 'cardinal', 7];
+  seeds.forEach((s, k) => {
+    if (k % 3 === 0 && s.startsWith('stateDiagram')) each(`---\nconfig:\n  flowchart:\n    curve: ${CURVES[(k / 3) % CURVES.length]}\n---\n` + s);
+  });
   const next = mutator(seeds, FRAGMENTS, random(11));
   while (drawn < 2500) {
     const s = next();
