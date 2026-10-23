@@ -15,11 +15,15 @@ import (
 	"github.com/firede/limu/text"
 )
 
-// The measures of Pele's sankey render: the room between a bar and its label, and what the
-// nodes are kept further apart by where their values are shown.
+// The measures of Pele's sankey render: the room between a bar and its label, what the nodes
+// are kept further apart by where their values are shown, about how many lines of label each
+// node of the most crowded column has room for, and the most nodes whose labels are kept
+// apart.
 const (
-	labelGap = 6
-	valueGap = 15
+	labelGap  = 6
+	valueGap  = 15
+	labelRoom = 1.8
+	careful   = 300
 )
 
 // The roles of a sankey diagram's items.
@@ -106,8 +110,9 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 	}
 	conf := record(config["sankey"])
 	var failed error
-	sc := common.FitWidth(o, numberOption(conf, "width", 600, 1, 10000), 160, func(chartWidth float64, _ bool) *scene.Scene {
-		sc, err := draw(m, conf, o, chartWidth)
+	natural := numberOption(conf, "width", 600, 1, 10000)
+	sc := common.FitWidth(o, natural, 160, func(chartWidth float64, _ bool) *scene.Scene {
+		sc, err := draw(m, conf, o, chartWidth, natural)
 		if err != nil {
 			failed = err
 			return &scene.Scene{}
@@ -120,11 +125,15 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 	return sc, nil
 }
 
-// draw lays the diagram out with its chart chartWidth wide, as Pele's draw does.
-func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) (*scene.Scene, error) {
+// draw lays the diagram out with its chart chartWidth wide, of the natural width its config
+// gives, as Pele's draw does.
+func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth, natural float64) (*scene.Scene, error) {
 	pad := o.Pad()
 	size := o.Size()
-	small := jsmath.Round(float64(size * 0.875))
+	least := jsmath.Round(float64(size * 0.625))
+	// Labels shrink with a chart narrowed to fit, as they would if the whole picture were
+	// scaled down.
+	small := max(least, jsmath.Round(float64(size*0.875*min(1, chartWidth/natural))))
 	measure := o.Measure()
 
 	chartHeight := numberOption(conf, "height", 400, 1, 10000)
@@ -147,17 +156,35 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) 
 	if showValues {
 		extra = valueGap
 	}
-	nodes, links, err := layoutSankey(m, layoutOptions{
-		width:       chartWidth,
-		height:      chartHeight,
-		nodeWidth:   nodeWidth,
-		nodePadding: numberOption(conf, "nodePadding", 12, 0, 200) + extra,
-		labelHeight: small * 1.15,
-		alignment:   align,
-	})
+	lay := func(labelSize float64) ([]placedNode, []placedLink, error) {
+		return layoutSankey(m, layoutOptions{
+			width:       chartWidth,
+			height:      chartHeight,
+			nodeWidth:   nodeWidth,
+			nodePadding: numberOption(conf, "nodePadding", 12, 0, 200) + extra,
+			labelHeight: labelSize * 1.15,
+			alignment:   align,
+		})
+	}
+	nodes, links, err := lay(small)
 	if err != nil {
 		return nil, err
 	}
+	// Labels also shrink with the most crowded column, so that each keeps about labelRoom
+	// lines.
+	rows := map[int]int{}
+	fullest := 1
+	for _, node := range nodes {
+		rows[node.layer]++
+		fullest = max(fullest, rows[node.layer])
+	}
+	if crowded := max(least, jsmath.Round(chartHeight/float64(fullest)/labelRoom)); crowded < small {
+		small = crowded
+		if nodes, links, err = lay(small); err != nil {
+			return nil, err
+		}
+	}
+	lineHeight := small * 1.5
 
 	custom := map[string]style.Style{}
 	for id, color := range record(conf["nodeColors"]) {
@@ -166,7 +193,8 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) 
 		}
 	}
 
-	// Labels sit beside the bars, on the side that faces the middle of the chart.
+	// Labels sit beside the bars, on the side that faces the middle of the chart unless that
+	// side is crowded.
 	central := 0
 	most := 0.0
 	for _, node := range nodes {
@@ -177,6 +205,58 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) 
 	}
 	minX, maxX := 0.0, chartWidth
 	minY, maxY := 0.0, chartHeight
+	// placed is where a node's label goes, the whole of its name and value.
+	type placed struct {
+		value   string
+		width   float64
+		after   bool
+		left, y float64
+	}
+	placing := make([]*placed, len(nodes))
+	for i, node := range nodes {
+		name := text.DecodeEntities(m.Nodes[i].ID)
+		value := ""
+		if showValues {
+			value = prefix + chars.NumberString(rounded(node.value)) + suffix
+		}
+		whole := name
+		if value != "" {
+			whole = name + " " + value
+		}
+		width := measure.Width(whole, small, 0)
+		after := node.x < chartWidth/2
+		if outlined {
+			after = node.layer >= central
+		}
+		x := node.x - labelGap
+		left := x - width
+		if after {
+			x = node.x + nodeWidth + labelGap
+			left = x
+		}
+		y := node.y + node.height/2
+		if after {
+			minX = min(minX, x)
+			maxX = max(maxX, x+width)
+		} else {
+			minX = min(minX, x-width)
+			maxX = max(maxX, x)
+		}
+		minY = min(minY, y-float64(small*0.75))
+		maxY = max(maxY, y+float64(small*0.75))
+		placing[i] = &placed{value: value, width: width, after: after, left: left, y: y}
+	}
+	// A label moves at most one line, so each band of a line's height holds the labels two
+	// bands either side of it.
+	nearby := map[float64][]*placed{}
+	if len(nodes) <= careful {
+		for _, l := range placing {
+			band := math.Floor(l.y / lineHeight)
+			for _, key := range []float64{band - 2, band - 1, band, band + 1, band + 2} {
+				nearby[key] = append(nearby[key], l)
+			}
+		}
+	}
 	var labels, bars []scene.Item
 	var halo style.Style
 	if outlined {
@@ -184,6 +264,7 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) 
 	}
 	for i, node := range nodes {
 		id := m.Nodes[i].ID
+		name := text.DecodeEntities(id)
 		height := max(node.height, 1)
 		bars = append(bars, scene.Item{
 			Kind: scene.Node, Role: RoleNode, Shape: "rect", ID: id,
@@ -193,40 +274,63 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth float64) 
 			Author: custom[id],
 		})
 
-		value := ""
-		if showValues {
-			value = prefix + chars.NumberString(rounded(node.value)) + suffix
+		l := placing[i]
+		overlaps := func(left, y float64) bool {
+			for _, other := range nearby[math.Floor(y/lineHeight)] {
+				if other != l && math.Abs(other.y-y) < lineHeight && left < other.left+other.width+labelGap && left+l.width > other.left-labelGap {
+					return true
+				}
+			}
+			return false
 		}
-		after := node.x < chartWidth/2
-		if outlined {
-			after = node.layer >= central
+		// A label that overlaps another tries the other side, and then a line above or below
+		// where both sides are crowded, as Pele's draw places it.
+		if len(nodes) <= careful && overlaps(l.left, l.y) {
+		place:
+			for _, dy := range []float64{0, -lineHeight, lineHeight} {
+				for _, after := range []bool{l.after, !l.after} {
+					left := node.x - labelGap - l.width
+					if after {
+						left = node.x + nodeWidth + labelGap
+					}
+					y := l.y + dy
+					top, bottom := y-float64(small*0.75), y+float64(small*0.75)
+					if overlaps(left, y) || left < minX || left+l.width > maxX || top < minY || bottom > maxY {
+						continue
+					}
+					// A label stays nearer its own bar than any other in the column, so that it
+					// can't name that one.
+					own := math.Max(0, math.Max(node.y-y, y-node.y-node.height))
+					crosses, nearer := false, false
+					for j := range nodes {
+						bar := &nodes[j]
+						if j != i && left < bar.x+nodeWidth+labelGap && left+l.width > bar.x-labelGap && top < bar.y+bar.height && bottom > bar.y {
+							crosses = true
+						}
+						if j != i && bar.x == node.x && math.Max(0, math.Max(bar.y-y, y-bar.y-bar.height)) <= own {
+							nearer = true
+						}
+					}
+					if crosses || nearer {
+						continue
+					}
+					l.left, l.y, l.after = left, y, after
+					break place
+				}
+			}
 		}
-		whole := id
-		if value != "" {
-			whole = id + " " + value
-		}
-		textWidth := measure.Width(whole, small, 0)
+		value, after, y, textWidth := l.value, l.after, l.y, l.width
 		x := node.x - labelGap
 		if after {
 			x = node.x + nodeWidth + labelGap
 		}
-		y := node.y + node.height/2
-		if after {
-			minX = min(minX, x)
-			maxX = max(maxX, x+textWidth)
-		} else {
-			minX = min(minX, x-textWidth)
-			maxX = max(maxX, x)
-		}
-		minY = min(minY, y-float64(small*0.75))
-		maxY = max(maxY, y+float64(small*0.75))
 
 		// Pele writes the value in a span of the muted color after the id, in one text
 		// anchored at x. A label is of one color, so the id and the value are two: the id
 		// starts where the whole starts, and the value ends where it ends.
 		idItem := scene.Item{
 			Kind: scene.Text, Role: RoleLabel, ID: id, At: scene.Point{X: x, Y: y}, Align: scene.End,
-			Label: common.Line(id, measure.Width(id, small, 0), small, 0),
+			Label: common.Line(name, measure.Width(name, small, 0), small, 0),
 			Style: style.Style{Text: style.Fg, Halo: halo.Halo, HaloWidth: halo.HaloWidth},
 		}
 		valueItem := scene.Item{

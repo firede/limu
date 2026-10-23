@@ -3,7 +3,7 @@ title: "Compatibility"
 description: "Supported diagram types, and how limu differs from Pele and Mermaid."
 ---
 
-limu parses Mermaid text the way [Pele](https://pele.run) 1.8.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
+limu parses Mermaid text the way [Pele](https://pele.run) 1.9.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
 
 ## Diagram types
 
@@ -115,7 +115,7 @@ limu limits the length of a diagram's text and the number of edges in flowcharts
 
 ### Labels
 
-Labels support line breaks, bold and italic, written with `<br>`, `<b>` and `<i>` or as Markdown strings. Other HTML in a label is shown as text.
+Labels support line breaks, bold and italic, written with `<br>`, `<b>` and `<i>` or as Markdown strings. They also read `<code>`, `<sub>`, `<sup>` and `<u>`, and their kin such as `<strong>`, `<em>`, `<kbd>` and `<ins>`. Other HTML tags are dropped and their text kept. Text shaped like a tag that HTML doesn't have, such as the type in `List<T>`, is shown as written.
 
 ### Interaction
 

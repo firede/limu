@@ -141,6 +141,8 @@ type Measurer interface {
 
 The default, `text.Arial`, estimates widths from a table of Arial's character widths without loading any font. It matches Pele's widths exactly, and SVG drawn with it should use Arial or a font of the same width. If you draw text in other fonts, pass a measurer for those fonts. `limumygo.Fonts` is one for MyGo.
 
+A label's span can also be `text.Sub`, `text.Sup` or `text.Underline`. Layout asks the measurer only about `Bold`, `Italic` and `Mono`. It measures subscript and superscript at the font size divided by 1.2, as Pele does, so a backend should draw them that much smaller and lowered or raised. An underline takes no room.
+
 ### Chinese, Japanese and Korean
 
 `text.Arial` treats every Chinese, Japanese and Korean character as one em wide, which is only an estimate. Real fonts may be narrower or wider. When a label is too wide, it wraps between words. Like Pele 1.6, it also wraps between any two Chinese or Japanese characters, but never before a closing punctuation mark or after an opening one. Korean wraps only between words. If you draw this kind of text, measure it with the fonts you draw it in.

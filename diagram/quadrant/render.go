@@ -1,6 +1,7 @@
 package quadrant
 
 import (
+	"math"
 	"slices"
 	"strings"
 
@@ -289,9 +290,9 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	slices.Reverse(circles)
 	items = append(items, circles...)
 
-	// A label goes below its point, or above, right or left of it when that is the first
-	// place that is inside the chart and free. A second round lets it cross the gaps between
-	// quadrants. Large charts skip the search for a free place.
+	// A label goes below its point, or above, right or left of it, or below its quadrant's
+	// title, when that is the first place that is inside the chart and free. A second round
+	// lets it cross the gaps between quadrants. Large charts skip the search for a free place.
 	careful := len(dots) <= mostPoints
 	if careful {
 		for _, d := range dots {
@@ -302,21 +303,39 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		halfW := d.text.Width / 2
 		halfH := float64(d.text.Size*0.6) + (d.text.Height-d.text.LineHeight)/2
 		away := d.reach + textPad
-		spots := [8]float64{d.cx, d.cy + away + halfH, d.cx, d.cy - away - halfH, d.cx + away + halfW, d.cy, d.cx - away - halfW, d.cy}
+		inset := math.Min(away, math.Max(0, (tileW-d.text.Width)/2))
+		// The box of the title of the quadrant the point is in, which taken holds from 8 on,
+		// the quadrants' order.
+		heading := 8
+		switch {
+		case d.cx < left+w/2 && d.cy < top+h/2:
+			heading += 4
+		case d.cx < left+w/2:
+			heading += 8
+		case d.cy >= top+h/2:
+			heading += 12
+		}
+		below := math.Max(d.cy+away, taken[heading+3]+textPad) + halfH
+		spots := [10]float64{d.cx, d.cy + away + halfH, d.cx, d.cy - away - halfH, d.cx + away + halfW, d.cy, d.cx - away - halfW, d.cy, d.cx, below}
 		tx, ty := d.cx, spots[1]
 		found := false
-		for k := 0; k < 16; k += 2 {
-			spot := k % 8
+		for k := 0; k < 20; k += 2 {
+			spot := k % 10
+			// A label moved below a title keeps clear of the plot's edge.
+			margin := 0.0
+			if spot == 8 {
+				margin = inset
+			}
 			x := spots[spot]
-			if spot < 4 && d.text.Width < w {
-				x = min(max(spots[spot], left+halfW), left+w-halfW)
+			if (spot < 4 || spot == 8) && d.text.Width < w {
+				x = math.Min(math.Max(spots[spot], left+halfW+margin), left+w-halfW-margin)
 			}
 			y := spots[spot+1]
 			if x-halfW < left || x+halfW > left+w || y-halfH < top || y+halfH > top+h {
 				continue
 			}
 			from := 8
-			if k < 8 {
+			if k < 10 {
 				from = 0
 			}
 			free := !careful || isClear(from, x-halfW, y-halfH, x+halfW, y+halfH)

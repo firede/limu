@@ -416,7 +416,7 @@ func TestAlign(t *testing.T) {
 	// where it starts, ends or is centered does not hang on how its text was measured.
 	l := text.Layout("ab<br>a <b>bold</b> c", text.Options{Measurer: text.Arial, Size: 10})
 	middle := write(&l, scene.Middle)
-	if want := []string{"t middle 50,46 ab", "t middle 50,61 a [b:bold] c"}; strings.Join(middle, "\n") != strings.Join(want, "\n") {
+	if want := []string{"t middle 50,47 ab", "t middle 50,60 a [b:bold] c"}; strings.Join(middle, "\n") != strings.Join(want, "\n") {
 		t.Errorf("middle: got %q, want %q", middle, want)
 	}
 	for align, anchor := range map[scene.Align]string{scene.Middle: "middle", scene.Start: "start", scene.End: "end"} {

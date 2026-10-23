@@ -77,7 +77,7 @@ func fitLabel(raw string, markdown bool, o *layout.Options, size, max float64, b
 			var b strings.Builder
 			from := width
 			for _, ch := range span.Text {
-				w := measure.Width(string(ch), size, span.Face)
+				w := text.Width(measure, string(ch), size, span.Face)
 				if width > 0 && width+w > max {
 					if b.Len() > 0 {
 						line = append(line, text.Span{Text: b.String(), Face: span.Face, Width: width - from})

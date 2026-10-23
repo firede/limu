@@ -1,10 +1,6 @@
 package diagram
 
-import (
-	"strings"
-
-	"github.com/firede/limu/internal/chars"
-)
+import "github.com/firede/limu/internal/chars"
 
 // Type is a type of diagram, as Pele names it.
 type Type string
@@ -99,14 +95,10 @@ var detectors = []struct {
 	{Mindmap, "mindmap", prefix("mindmap")},
 	{Architecture, "architecture", prefix("architecture")},
 	{AgentFlow, "agentflow", beta("agentflow-beta", false, wordEnds)},
-	// /^\s*C4Context|C4Container|C4Component|C4Dynamic|C4Deployment/: only the first is held to
-	// the start.
+	// /^\s*(?:C4Context|C4Container|C4Component|C4Dynamic|C4Deployment)/
 	{C4, "c4", func(s string) bool {
-		if _, ok := startsWith(s, "C4Context", false); ok {
-			return true
-		}
-		for _, w := range []string{"C4Container", "C4Component", "C4Dynamic", "C4Deployment"} {
-			if strings.Contains(s, w) {
+		for _, w := range []string{"C4Context", "C4Container", "C4Component", "C4Dynamic", "C4Deployment"} {
+			if _, ok := startsWith(s, w, false); ok {
 				return true
 			}
 		}

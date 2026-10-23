@@ -14,8 +14,11 @@ const (
 	shapeMinH = 64
 	padX      = 14
 	padY      = 12
-	gapX      = 100
-	gapY      = 88
+	// Room between two columns for the label of a line across them, clear of an arrowhead on
+	// either side, with an arrowhead's length to spare for a word a little wider than the
+	// label's room.
+	gapX = narrow + labelPad + 3*arrow
+	gapY = 88
 	// Room for a relation to run along the inside of a boundary.
 	groupPad = lane + 8
 	groupGap = 48

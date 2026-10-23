@@ -97,9 +97,11 @@ type end struct {
 
 // A card is the text at an end of a relation: its multiplicity.
 type card struct {
-	text  string
-	width float64
-	x, y  float64
+	text   string
+	width  float64
+	height float64
+	x, y   float64
+	parent int // the node of the class it is beside
 }
 
 // lay lays the diagram out once, as Pele's draw does. turned lays out a diagram that runs
@@ -559,7 +561,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 	var cards []card
 	// addCard places the text at an end of a relation beside its line and widens the bounds to
 	// take it, as the card of Pele's draw does.
-	addCard := func(raw string, width, x, y float64, side int, after bool) {
+	addCard := func(parent int, raw string, width, x, y float64, side int, after bool) {
 		if raw == "" {
 			return
 		}
@@ -587,7 +589,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 				cy += 3 + tinyHeight/2
 			}
 		}
-		cards = append(cards, card{text: text.DecodeEntities(raw), width: width, x: cx, y: cy})
+		cards = append(cards, card{text: text.DecodeEntities(raw), width: width, height: tinyHeight, x: cx, y: cy, parent: parent})
 		minX = min(minX, cx-width/2)
 		maxX = max(maxX, cx+width/2)
 		minY = min(minY, cy-tinyHeight/2)
@@ -607,8 +609,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			v := &views[ce.Src]
 			x := c.X + v.w/2
 			spread := min(v.h/2-4, float64(8+k*6))
-			addCard(edge.StartLabelRight, startRoom[i], x, c.Y-spread, 1, false)
-			addCard(edge.EndLabelLeft, endRoom[i], x, c.Y+spread, 1, true)
+			addCard(ce.Src, edge.StartLabelRight, startRoom[i], x, c.Y-spread, 1, false)
+			addCard(ce.Dst, edge.EndLabelLeft, endRoom[i], x, c.Y+spread, 1, true)
+			ce.LabelX = c.X + v.w/2 + loop + float64(k*8) + 4 + ce.LabelW/2
+			ce.LabelY = c.Y
 		} else if len(route) >= 6 {
 			last := len(route) - 3
 			fromSide, fromAfter := 2, true
@@ -619,8 +623,27 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			if e := ends[i]; e != nil {
 				toSide, toAfter = e.side, e.after
 			}
-			addCard(edge.StartLabelRight, startRoom[i], route[0], route[1], fromSide, fromAfter)
-			addCard(edge.EndLabelLeft, endRoom[i], route[last], route[last+1], toSide, toAfter)
+			addCard(ce.Src, edge.StartLabelRight, startRoom[i], route[0], route[1], fromSide, fromAfter)
+			addCard(ce.Dst, edge.EndLabelLeft, endRoom[i], route[last], route[last+1], toSide, toAfter)
+		}
+	}
+
+	// A diagram wider than the host has its parts that nothing joins wrapped into rows, the
+	// cards with the classes they are beside, as Pele's draw wraps them.
+	if o.MaxWidth > 0 && maxX-minX+2*padding > o.MaxWidth {
+		all := append(slices.Clip(cnodes), make([]graphs.CNode, len(cards))...)
+		for i, cd := range cards {
+			n := graphs.NewCNode(cd.width, cd.height, cd.parent)
+			n.X, n.Y = cd.x, cd.y
+			all[len(cnodes)+i] = n
+		}
+		if wrapped, ok := graphs.WrapComponents(all, cedges, max(1, o.MaxWidth-2*padding), numberOption(conf, "nodeSpacing", nodeSep)); ok {
+			copy(cnodes, all)
+			for i := range cards {
+				cards[i].x, cards[i].y = all[len(cnodes)+i].X, all[len(cnodes)+i].Y
+			}
+			minX, minY = 0, 0
+			maxX, maxY = wrapped.Width, wrapped.Height
 		}
 	}
 
@@ -722,8 +745,6 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			p := new(scene.Path).MoveTo(x+startTrim, y-spread).
 				CubeTo(x+reach+startTrim, y-spread, x+reach+endTrim, y+spread, x+endTrim, y+spread)
 			path = draw.EdgePath{Path: p, SX: x, SY: y - spread, SDX: -1, SDY: 0, EX: x, EY: y + spread, EDX: -1, EDY: 0}
-			ce.LabelX = c.X + v.w/2 + reach + 4 + ce.LabelW/2
-			ce.LabelY = c.Y
 		} else {
 			route = ce.Route
 			for k := 0; k+1 < len(route); k += 3 {

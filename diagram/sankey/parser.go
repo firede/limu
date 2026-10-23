@@ -9,6 +9,7 @@ import (
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/text"
 )
 
 // isBlank reports whether code unit c is white space to a regular expression's \s that does
@@ -155,7 +156,15 @@ func parseSankey(src string, m *Model) (err error) {
 		expect(tDQUOTE, "")
 		return text
 	}
-	name := func() string { return strings.ReplaceAll(chars.Trim(field()), `""`, `"`) }
+	name := func() string {
+		start := tk.Starts[i]
+		raw := strings.ReplaceAll(chars.Trim(field()), `""`, `"`)
+		// Entity codes can stand for characters the lexer leaves out.
+		if invalidXML(text.DecodeEntities(raw)) {
+			panic(parseFailure{common.SyntaxError("sankey", src, start, "Invalid XML character in node name", false)})
+		}
+		return raw
+	}
 
 	expect(tSANKEY, "")
 	expect(tNEWLINE, "")
@@ -180,4 +189,17 @@ func parseSankey(src string, m *Model) (err error) {
 		fail("'NEWLINE', 'EOF'")
 	}
 	return nil
+}
+
+// invalidXML reports whether s holds a character XML does not allow, as Pele's
+// RE_INVALID_XML finds one: a control but for the tab, the line feed and the carriage return,
+// or U+FFFE or U+FFFF. A lone surrogate, which the regular expression finds too, is never
+// decoded from an entity, and a Go string holds none.
+func invalidXML(s string) bool {
+	for _, c := range s {
+		if c <= 8 || c == 0xb || c == 0xc || c >= 0xe && c <= 0x1f || c == 0xfffe || c == 0xffff {
+			return true
+		}
+	}
+	return false
 }

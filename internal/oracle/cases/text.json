@@ -1,6 +1,13 @@
 {
  "measure": [
   {"text": "Hello, world", "size": 16, "face": 0},
+  {"text": "Hello, world", "size": 16, "face": 8},
+  {"text": "Hello, world", "size": 14, "face": 16},
+  {"text": "Hello, world", "size": 13.5, "face": 9},
+  {"text": "Hello, world", "size": 16, "face": 20},
+  {"text": "Hello, world", "size": 16, "face": 32},
+  {"text": "Hello, world", "size": 16, "face": 35},
+  {"text": "soft\u00adhyphen zero\u200bwidth", "size": 16, "face": 0},
   {"text": "Hello, world", "size": 16, "face": 1},
   {"text": "Hello, world", "size": 14, "face": 2},
   {"text": "Hello, world", "size": 16, "face": 4},
@@ -60,6 +67,26 @@
   {"text": "   ", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
   {"text": "<br>", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
   {"text": "a\ufffdb", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
-  {"text": "\ufffd\ufffd\ufffd word \ufffd", "markdown": true, "size": 14, "maxWidth": 30, "face": 0}
+  {"text": "\ufffd\ufffd\ufffd word \ufffd", "markdown": true, "size": 14, "maxWidth": 30, "face": 0},
+  {"text": "RRCConnection\u200bReconfiguration\u200bComplete", "markdown": false, "size": 16, "maxWidth": 140, "face": 0},
+  {"text": "RRCConnection\u00adReconfiguration\u00adComplete", "markdown": false, "size": 16, "maxWidth": 140, "face": 0},
+  {"text": "RRCConnection&shy;Reconfiguration&shy;Complete", "markdown": false, "size": 16, "maxWidth": 140, "face": 0},
+  {"text": "Re\u00adcon\u00adfig", "markdown": false, "size": 16, "maxWidth": 200, "face": 0},
+  {"text": "a uni\u00adt test", "markdown": false, "size": 16, "maxWidth": 39.2, "face": 0},
+  {"text": "a uni\u00adt\u00aded", "markdown": false, "size": 16, "maxWidth": 39.2, "face": 0},
+  {"text": "a uni\u00ad<b>t</b> test", "markdown": false, "size": 16, "maxWidth": 39.2, "face": 0},
+  {"text": "a uni\u00ad t test", "markdown": false, "size": 16, "maxWidth": 39.2, "face": 0},
+  {"text": "ab\u00ad<i> cd</i>", "markdown": false, "size": 16, "maxWidth": 25, "face": 0},
+  {"text": "<b>uni\u00ad</b>t\u00adtest\u00ad", "markdown": false, "size": 16, "maxWidth": 30, "face": 0},
+  {"text": "ab cd ab cd\u00ad", "markdown": false, "size": 16, "maxWidth": 40, "face": 0},
+  {"text": "Hello world", "markdown": false, "size": 16, "maxWidth": 200, "face": 8},
+  {"text": "Hello world", "markdown": false, "size": 14, "maxWidth": 200, "face": 16},
+  {"text": "Hello world", "markdown": false, "size": 16, "maxWidth": 200, "face": 9},
+  {"text": "x2", "markdown": false, "size": 16, "maxWidth": 200, "face": 24},
+  {"text": "Hello world", "markdown": false, "size": 16, "maxWidth": 200, "face": 32},
+  {"text": "Hello world again and again", "markdown": false, "size": 16, "maxWidth": 60, "face": 8},
+  {"text": "A label long enough that it has to wrap", "markdown": false, "size": 14, "maxWidth": 90, "face": 16},
+  {"text": "H <b>2</b> O", "markdown": false, "size": 16, "maxWidth": 200, "face": 8},
+  {"text": "e = mc <i>2</i>", "markdown": false, "size": 16, "maxWidth": 200, "face": 16}
  ]
 }

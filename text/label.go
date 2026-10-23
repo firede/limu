@@ -2,6 +2,7 @@ package text
 
 import (
 	"math"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -33,6 +34,10 @@ func (l *Label) Empty() bool { return len(l.Lines) == 0 }
 // LineHeight is the height of a line, in ems.
 const LineHeight = 1.5
 
+// WrappedLineHeight is the height of a line of a label of more than one line, in ems: its
+// lines sit closer, so that it reads as one block.
+const WrappedLineHeight = 1.3
+
 // Options says how to lay out a label.
 type Options struct {
 	Measurer Measurer
@@ -49,9 +54,11 @@ type Options struct {
 }
 
 // Layout lays out a label as Pele's layoutLabel does: <br> and new lines break it, <b>,
-// <strong>, <i> and <em> set emphasis, as do ** and _ in markdown, fa:fa-name is an icon,
-// entities are decoded, and lines wider than MaxWidth wrap between words, and between any
-// two Chinese or Japanese characters.
+// <strong>, <i>, <em>, <code>, <sub>, <sup>, <u> and their kin set its faces (tagFaces), as
+// do ** and _ in markdown, other HTML tags are dropped, fa:fa-name is an icon, entities are
+// decoded, and lines wider than MaxWidth wrap between words, between any two Chinese or
+// Japanese characters, and at a zero-width space or a soft hyphen. A label of more than one
+// line has lines WrappedLineHeight high.
 func Layout(raw string, o Options) Label {
 	if raw == "" {
 		return Label{}
@@ -63,8 +70,8 @@ func Layout(raw string, o Options) Label {
 
 	if !hasMarkup(raw) && !strings.Contains(raw, "&") && !strings.Contains(raw, "ﬂ") {
 		text := chars.Trim(raw)
-		width := o.Measurer.Width(text, o.Size, o.Face)
-		if width <= o.MaxWidth || !(strings.Contains(text, " ") || hasCJK(text)) {
+		width := Width(o.Measurer, text, o.Size, o.Face)
+		if width <= o.MaxWidth || !(strings.Contains(text, " ") || hasCJK(text) || hasHint(text)) {
 			return Label{
 				Lines:      [][]Span{{{Text: text, Face: o.Face, Width: width}}},
 				Widths:     []float64{width},
@@ -83,7 +90,8 @@ func Layout(raw string, o Options) Label {
 				widest = w
 			}
 		}
-		return Label{Lines: lines, Widths: widths, Width: widest, Height: float64(len(lines)) * lineHeight, Size: o.Size, LineHeight: lineHeight}
+		snug := snugLineHeight(len(lines), o.Size, lineHeight)
+		return Label{Lines: lines, Widths: widths, Width: widest, Height: float64(len(lines)) * snug, Size: o.Size, LineHeight: snug}
 	}
 
 	source := chars.Trim(raw)
@@ -94,10 +102,10 @@ func Layout(raw string, o Options) Label {
 	var widths []float64
 	width := 0.0
 	// HTML tags can span the breaks, while markdown's emphasis stays within its line.
-	htmlFace := o.Face
+	open := openTags{face: o.Face}
 	for _, part := range splitBreaks(source) {
 		var line []Span
-		htmlFace = inline(&line, chars.Trim(part), o.Markdown, o.Face, htmlFace, &o)
+		inline(&line, chars.Trim(part), o.Markdown, o.Face, &open, &o)
 		w := measureSpans(line, &o)
 		if w > o.MaxWidth {
 			wrap(line, &o, &lines, &widths)
@@ -111,7 +119,17 @@ func Layout(raw string, o Options) Label {
 			width = w
 		}
 	}
-	return Label{Lines: lines, Widths: widths, Width: width, Height: float64(len(lines)) * lineHeight, Size: o.Size, LineHeight: lineHeight}
+	snug := snugLineHeight(len(lines), o.Size, lineHeight)
+	return Label{Lines: lines, Widths: widths, Width: width, Height: float64(len(lines)) * snug, Size: o.Size, LineHeight: snug}
+}
+
+// snugLineHeight is the height of the lines of a label of n lines: lineHeight for one, and
+// closer for more, as Pele's layoutLabel and layoutLines set it.
+func snugLineHeight(n int, size, lineHeight float64) float64 {
+	if n > 1 {
+		return jsmath.Round(size * WrappedLineHeight)
+	}
+	return lineHeight
 }
 
 // hasMarkup matches /[<\\\n*_]|fa[bklrs]?:fa-/.
@@ -160,9 +178,18 @@ const (
 func isClosing(r rune) bool { return strings.ContainsRune(closing, r) }
 func isOpening(r rune) bool { return strings.ContainsRune(opening, r) }
 
+// softHyphen shows as a hyphen where a line breaks at it, and not otherwise.
+const softHyphen = "\u00ad"
+
+// isHint reports whether r is a break hint, a zero-width space or a soft hyphen, where a
+// line may break.
+func isHint(r rune) bool { return r == 0x200b || r == 0xad }
+
+func hasHint(s string) bool { return strings.ContainsFunc(s, isHint) }
+
 // pieces splits text where a line may break, as Pele's RE_PIECE does:
 //
-//	\s*(?:[OPEN]*[CJK][CLOSE]*|[^\sCJK]+[CLOSE]*)\s*|\s+
+//	\s*(?:[OPEN]*[CJK][CLOSE]*|[^\sCJKHINT]+[HINT]*[CLOSE]*|[HINT]+)\s*|\s+
 //
 // Each piece keeps the space around it.
 func pieces(s string) []string {
@@ -203,12 +230,16 @@ func pieces(s string) []string {
 				}
 			}
 		}
-		// [^\sCJK]+[CLOSE]*
-		k = runAt(j, func(r rune) bool { return !chars.IsSpaceRune(r) && !isCJK(r) })
-		if k == j {
-			return 0, false
+		// [^\sCJKHINT]+[HINT]*[CLOSE]*
+		k = runAt(j, func(r rune) bool { return !chars.IsSpaceRune(r) && !isCJK(r) && !isHint(r) })
+		if k > j {
+			return runAt(runAt(k, isHint), isClosing), true
 		}
-		return runAt(k, isClosing), true
+		// [HINT]+
+		if k = runAt(j, isHint); k > j {
+			return k, true
+		}
+		return 0, false
 	}
 	for i := 0; i < len(s); {
 		lead := runAt(i, chars.IsSpaceRune)
@@ -222,7 +253,8 @@ func pieces(s string) []string {
 			end = runAt(end, chars.IsSpaceRune)
 		}
 		if end == i {
-			// Every character is a space, a CJK character or another, so this is not reached.
+			// Every character is a space, a CJK character, a hint or another, so this is not
+			// reached.
 			_, n := utf8.DecodeRuneInString(s[i:])
 			i += n
 			continue
@@ -410,15 +442,51 @@ func tagAt(s string, i int) (name string, end int) {
 	return "", -1
 }
 
+// tagFaces are the faces HTML tags set, as Pele's TAG_STYLES has them.
+var tagFaces = map[string]Face{
+	"b": Bold, "strong": Bold,
+	"i": Italic, "em": Italic, "cite": Italic, "dfn": Italic, "var": Italic,
+	"code": Mono, "kbd": Mono, "samp": Mono, "tt": Mono,
+	"sub": Sub, "sup": Sup,
+	"u": Underline, "ins": Underline,
+}
+
+// htmlTags are the tags of HTML, as Pele's HTML_TAGS has them. A label drops them and keeps
+// their text, and anything else shaped like a tag, such as the type in List<T>, is text.
+var htmlTags = func() map[string]bool {
+	m := map[string]bool{}
+	for _, t := range strings.Fields("a abbr address article aside audio b bdi bdo big blockquote body br button caption center cite code col " +
+		"colgroup data dd del details dfn dialog div dl dt em embed fieldset figcaption figure font footer form h1 h2 " +
+		"h3 h4 h5 h6 head header hr html i iframe img input ins kbd label legend li link main map mark meta meter nav " +
+		"noscript object ol optgroup option output p picture pre progress q rp rt ruby s samp script section select " +
+		"small source span strike strong style sub summary sup table tbody td template textarea tfoot th thead time " +
+		"title tr track tt u ul var video wbr") {
+		m[t] = true
+	}
+	return m
+}()
+
+// openTags is what the HTML tags of a label leave open from one line to the next, as Pele's
+// Open holds it: the faces they set, and the <sub> and <sup> tags open, innermost last, of
+// which only the innermost shifts text.
+type openTags struct {
+	face   Face
+	shifts []Face
+}
+
 // inline splits inline HTML and, for markdown, emphasis markers into spans, as Pele's inline
-// does. A line starts in htmlFace, the emphasis that HTML tags left open on the lines before
-// it, and inline gives the emphasis they leave open at its end.
-func inline(line *[]Span, source string, markdown bool, base, htmlFace Face, o *Options) Face {
-	f := htmlFace
+// does. A line starts with what HTML tags left open on the lines before it, in open, and
+// leaves there what they leave open at its end.
+func inline(line *[]Span, source string, markdown bool, base Face, open *openTags, o *Options) {
+	f := open.face
 	var marked Face
 	var text strings.Builder
 	flush := func() {
-		pushIcons(line, text.String(), f, o)
+		shift := Face(0)
+		if n := len(open.shifts); n > 0 {
+			shift = open.shifts[n-1]
+		}
+		pushIcons(line, text.String(), f|shift, o)
 		text.Reset()
 	}
 	n := len(source)
@@ -428,25 +496,34 @@ func inline(line *[]Span, source string, markdown bool, base, htmlFace Face, o *
 			if name, end := tagAt(source, i); end > 0 {
 				tag := strings.ToLower(name)
 				closingTag := source[i+1] == '/'
-				var bit Face
-				switch tag {
-				case "b", "strong":
-					bit = Bold
-				case "i", "em":
-					bit = Italic
-				}
-				if bit != 0 {
+				bit := tagFaces[tag]
+				if bit&shifted != 0 {
+					flush()
+					at := -1
+					for k, sh := range open.shifts {
+						if sh == bit {
+							at = k
+						}
+					}
+					if !closingTag {
+						open.shifts = append(open.shifts, bit)
+					} else if at != -1 {
+						open.shifts = slices.Delete(open.shifts, at, at+1)
+					}
+				} else if bit != 0 {
 					flush()
 					if closingTag {
-						htmlFace = htmlFace&^bit | base&bit
+						open.face = open.face&^bit | base&bit
 						f = f&^bit | base&bit
 					} else {
-						htmlFace |= bit
+						open.face |= bit
 						f |= bit
 					}
 				}
-				i = end
-				continue
+				if bit != 0 || htmlTags[tag] {
+					i = end
+					continue
+				}
 			}
 		} else if markdown && (ch == '*' || ch == '_') {
 			double := i+1 < n && source[i+1] == ch
@@ -486,7 +563,6 @@ func inline(line *[]Span, source string, markdown bool, base, htmlFace Face, o *
 		i++
 	}
 	flush()
-	return htmlFace
 }
 
 func measureSpans(line []Span, o *Options) float64 {
@@ -496,22 +572,31 @@ func measureSpans(line []Span, o *Options) float64 {
 		if s.Icon != "" {
 			s.Width = o.Size * 1.25
 		} else {
-			s.Width = o.Measurer.Width(s.Text, o.Size, s.Face)
+			s.Width = Width(o.Measurer, s.Text, o.Size, s.Face)
 		}
 		total += s.Width
 	}
 	return total
 }
 
+// wrap breaks a line into lines no wider than o.MaxWidth where it can, as Pele's wrap does.
+// A line breaks after a piece (pieces), and the spaces it ends with are dropped. A piece
+// ending in a soft hyphen fits if it does with a hyphen in its place, or if the rest of its
+// word does, which hides the hyphen; where the line breaks at it, the hyphen shows.
 func wrap(line []Span, o *Options, out *[][]Span, widths *[]float64) {
 	var current []Span
 	width := 0.0
-	commit := func() {
+	measure := func(s string, f Face) float64 { return Width(o.Measurer, s, o.Size, f) }
+	commit := func(hyphen bool) {
 		if n := len(current); n > 0 && current[n-1].Icon == "" {
 			last := &current[n-1]
-			if trimmed := chars.TrimEnd(last.Text); trimmed != last.Text {
+			trimmed := chars.TrimEnd(last.Text)
+			if hyphen && strings.HasSuffix(last.Text, softHyphen) {
+				trimmed = strings.TrimSuffix(trimmed, softHyphen) + "-"
+			}
+			if trimmed != last.Text {
 				last.Text = trimmed
-				w := o.Measurer.Width(trimmed, o.Size, last.Face)
+				w := measure(trimmed, last.Face)
 				width += w - last.Width
 				last.Width = w
 			}
@@ -521,38 +606,81 @@ func wrap(line []Span, o *Options, out *[][]Span, widths *[]float64) {
 		current = nil
 		width = 0
 	}
-	for _, span := range line {
+	for at, span := range line {
 		if span.Icon != "" {
 			w := o.Size * 1.25
 			if width > 0 && width+w > o.MaxWidth {
-				commit()
+				commit(false)
 			}
 			span.Width = w
 			current = append(current, span)
 			width += w
 			continue
 		}
-		for _, part := range pieces(span.Text) {
-			if width > 0 && width+o.Measurer.Width(chars.TrimEnd(part), o.Size, span.Face) > o.MaxWidth {
-				commit()
+		parts := pieces(span.Text)
+		// own is the width of each piece without its spaces or soft hyphen, and rest that of
+		// what is left of its word from it on, which is not known past the end of the span.
+		soft := strings.Contains(span.Text, softHyphen)
+		var own, rest []float64
+		if soft {
+			n := len(parts)
+			own = make([]float64, n)
+			rest = make([]float64, n+1)
+			for q := n - 1; q >= 0; q-- {
+				// A soft hyphen before a space is no break of its own: the space is.
+				shy := strings.HasSuffix(parts[q], softHyphen)
+				end := chars.TrimEnd(parts[q])
+				if shy {
+					end = strings.TrimSuffix(end, softHyphen)
+				}
+				own[q] = measure(end, span.Face)
+				switch {
+				case !shy:
+					rest[q] = own[q]
+				case q == n-1 && at == len(line)-1:
+					rest[q] = own[q]
+				case q == n-1:
+					rest[q] = math.Inf(1)
+				default:
+					rest[q] = own[q] + rest[q+1]
+				}
+			}
+		}
+		for p, part := range parts {
+			var partWidth float64
+			if soft {
+				partWidth = own[p]
+			} else {
+				partWidth = measure(chars.TrimEnd(part), span.Face)
+			}
+			var fits bool
+			if !soft || !strings.HasSuffix(part, softHyphen) {
+				fits = width+partWidth <= o.MaxWidth
+			} else {
+				fits = width+measure(strings.TrimSuffix(part, softHyphen)+"-", span.Face) <= o.MaxWidth || width+rest[p] <= o.MaxWidth
+			}
+			if width > 0 && !fits {
+				// A break at a space leaves a soft hyphen before it hidden.
+				commit(chars.TrimStart(part) == part)
 				part = chars.TrimStart(part)
 			}
 			if n := len(current); n > 0 && current[n-1].Face == span.Face && current[n-1].Icon == "" {
 				last := &current[n-1]
 				last.Text += part
-				last.Width = o.Measurer.Width(last.Text, o.Size, last.Face)
-				width = 0
-				for _, s := range current {
-					width += s.Width
+				// Measuring again for each piece of no width would take quadratic time.
+				if partWidth > 0 || chars.TrimEnd(part) != part {
+					before := last.Width
+					last.Width = measure(last.Text, last.Face)
+					width += last.Width - before
 				}
 			} else {
-				w := o.Measurer.Width(part, o.Size, span.Face)
+				w := measure(part, span.Face)
 				current = append(current, Span{Text: part, Face: span.Face, Width: w})
 				width += w
 			}
 		}
 	}
 	if len(current) > 0 || len(*out) == 0 {
-		commit()
+		commit(false)
 	}
 }

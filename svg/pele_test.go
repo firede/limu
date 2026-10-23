@@ -83,8 +83,8 @@ func TestLabelMatchesPele(t *testing.T) {
 // "icon name x,y,width,height".
 func readLabel(svg string) ([]string, error) {
 	type el struct {
-		bold, italic bool
-		anchor       string
+		bold, italic, mono, under bool
+		shift, anchor             string
 	}
 	type piece struct{ face, text string }
 	type run struct {
@@ -145,6 +145,18 @@ func readLabel(svg string) ([]string, error) {
 			if s, _ := at("font-style"); s == "italic" {
 				e.italic = true
 			}
+			if _, ok := at("font-family"); ok {
+				e.mono = true
+			}
+			if s, _ := at("text-decoration"); s == "underline" {
+				e.under = true
+			}
+			switch s, _ := at("baseline-shift"); s {
+			case "sub":
+				e.shift = "_"
+			case "super":
+				e.shift = "^"
+			}
 			if name == "text" {
 				e.anchor = "start"
 				if s, ok := at("text-anchor"); ok {
@@ -181,6 +193,13 @@ func readLabel(svg string) ([]string, error) {
 			if top.italic {
 				face += "i"
 			}
+			if top.mono {
+				face += "m"
+			}
+			if top.under {
+				face += "u"
+			}
+			face += top.shift
 			if n := len(cur.spans); n > 0 && cur.spans[n-1].face == face {
 				cur.spans[n-1].text += string(tok)
 			} else {

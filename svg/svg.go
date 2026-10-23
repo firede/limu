@@ -571,6 +571,16 @@ func (w *Writer) text(it *scene.Item, st style.Style, halo bool) {
 			w.Text(w.family(true))
 			b.WriteByte('"')
 		}
+		// Underlined, and lowered or raised and smaller, as Pele's spanStyle writes them.
+		if s.Face&text.Underline != 0 {
+			b.WriteString(` text-decoration="underline"`)
+		}
+		switch {
+		case s.Face&text.Sub != 0:
+			b.WriteString(` baseline-shift="sub" font-size="smaller"`)
+		case s.Face&text.Sup != 0:
+			b.WriteString(` baseline-shift="super" font-size="smaller"`)
+		}
 		b.WriteByte('>')
 		w.Text(s.Text)
 		b.WriteString("</tspan>")

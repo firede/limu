@@ -117,7 +117,7 @@ func fit(label text.Label, maxWidth float64, maxLines int, measure text.Measurer
 					for lo < hi {
 						mid := (lo + hi + 1) >> 1
 						end, _ := prefix16(span.Text, mid)
-						if rest+measure.Width(span.Text[:end], label.Size, span.Face)+dots <= maxWidth {
+						if rest+text.Width(measure, span.Text[:end], label.Size, span.Face)+dots <= maxWidth {
 							lo = mid
 						} else {
 							hi = mid - 1
@@ -128,7 +128,7 @@ func fit(label text.Label, maxWidth float64, maxLines int, measure text.Measurer
 						end, _ = prefix16(span.Text, lo-1)
 					}
 					span.Text = chars.TrimEnd(span.Text[:end]) + "…"
-					span.Width = measure.Width(span.Text, label.Size, span.Face)
+					span.Width = text.Width(measure, span.Text, label.Size, span.Face)
 					width = rest + span.Width
 					break
 				}

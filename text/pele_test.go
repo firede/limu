@@ -55,8 +55,9 @@ func loadPele(t *testing.T) peleText {
 
 func TestArialMatchesPele(t *testing.T) {
 	for _, c := range loadPele(t).Measure {
-		if got := Arial.Width(c.Text, c.Size, c.Face); got != c.Width {
-			t.Errorf("Width(%q, %v, %v) = %v, Pele %v", c.Text, c.Size, c.Face, got, c.Width)
+		// Width sets a Sub or Sup span smaller, where Pele's metricsMeasurer does.
+		if got := Width(Arial, c.Text, c.Size, c.Face); got != c.Width {
+			t.Errorf("Width(Arial, %q, %v, %v) = %v, Pele %v", c.Text, c.Size, c.Face, got, c.Width)
 		}
 	}
 }

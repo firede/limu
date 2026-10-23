@@ -115,14 +115,14 @@ func BreakLabel(label text.Label, measure text.Measurer, room float64) text.Labe
 				joined := last != nil && last.Icon == "" && last.Face == span.Face
 				var added float64
 				if joined {
-					added = measure.Width(last.Text+char, label.Size, span.Face) - last.Width
+					added = text.Width(measure, last.Text+char, label.Size, span.Face) - last.Width
 				} else {
-					added = measure.Width(char, label.Size, span.Face)
+					added = text.Width(measure, char, label.Size, span.Face)
 				}
 				if len(current) > 0 && width+added > room {
 					commit()
 					last = nil
-					added = measure.Width(char, label.Size, span.Face)
+					added = text.Width(measure, char, label.Size, span.Face)
 				}
 				if last != nil && last.Icon == "" && last.Face == span.Face {
 					last.Text += char
