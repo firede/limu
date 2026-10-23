@@ -11,11 +11,11 @@
 //
 // A run starts where a <text> or <tspan> has an x, and the text and spans after it follow it
 // until the next. Its anchor is the text-anchor of the element the run starts at, or of the
-// <text> it is in, start where neither has one. Its spans are its text, each piece set in
-// bold or italic written [b:…], [i:…] or [bi:…], adjacent pieces in one face joined. A run of
-// nothing but spaces draws nothing and is not read, as Pele writes one for an empty line in
-// labelSvg and none in leftLabelSvg. Monospaced text is read as plain, as Pele 1.8.0 writes
-// it as plain and limu sets it in its monospaced family.
+// <text> it is in, start where neither has one. Its spans are its text, each piece in a face
+// of its own written with the face's letters before it, as [bi:…]: b bold, i italic, m
+// monospaced (any font-family), u underlined, and _ lowered or ^ raised (baseline-shift).
+// Adjacent pieces in one face are joined. A run of nothing but spaces draws nothing and is
+// not read, as Pele writes one for an empty line in labelSvg and none in leftLabelSvg.
 import { attr, unescape } from '../lib/svg.mjs';
 
 // Texts written here, for what places a line: one span or many, faces, breaks and empty
@@ -40,11 +40,19 @@ const WRITTEN = [
   '&amp; &lt;b&gt; entities',
   'rules: String?',
   'fragments: [FragmentID]',
+  'Call <code>render()</code> once',
+  '<code>all of it code</code>',
+  'H<sub>2</sub>O and x<sup>2</sup>',
+  'a <sub>b <sup>c</sup> d</sub> e',
+  '<u>under</u> and <ins>inserted</ins>',
+  '<b><code>bold code</code></b> <kbd>Ctrl</kbd>',
+  'soft\u00adly hy\u00adphen\u00adated words that wrap at the width they are given',
 ];
 
 const PIECES = [
   'word', 'Word', 'longerword', 'a', ' ', ' ', '  ', '<b>', '</b>', '<i>', '</i>', '<br>', '**', '_', 'fa:fa-car',
-  'fab:fa-github', '中文', '😀', 'é', '&amp;', ':', '(', ')',
+  'fab:fa-github', '中文', '😀', 'é', '&amp;', ':', '(', ')', '<sub>', '</sub>', '<sup>', '</sup>', '<code>',
+  '</code>', '<u>', '</u>',
 ];
 
 const ICONS = ['fa:fa-car', 'fab:fa-github'];
@@ -67,7 +75,7 @@ export function readLabel(svg) {
     if (data !== undefined) {
       if (!run || open.length === 0) continue;
       const top = open[open.length - 1];
-      const face = (top.bold ? 'b' : '') + (top.italic ? 'i' : '');
+      const face = (top.bold ? 'b' : '') + (top.italic ? 'i' : '') + (top.mono ? 'm' : '') + (top.under ? 'u' : '') + top.shift;
       const last = run.spans[run.spans.length - 1];
       if (last && last.face === face) last.text += unescape(data);
       else run.spans.push({ face, text: unescape(data) });
@@ -86,10 +94,14 @@ export function readLabel(svg) {
       open.pop();
       continue;
     }
-    const up = open[open.length - 1] ?? { bold: false, italic: false, anchor: 'start' };
+    const up = open[open.length - 1] ?? { bold: false, italic: false, mono: false, under: false, shift: '', anchor: 'start' };
+    const shift = attr(attrs, 'baseline-shift');
     const el = {
       bold: up.bold || attr(attrs, 'font-weight') !== undefined,
       italic: up.italic || attr(attrs, 'font-style') === 'italic',
+      mono: up.mono || attr(attrs, 'font-family') !== undefined,
+      under: up.under || attr(attrs, 'text-decoration') === 'underline',
+      shift: shift === 'sub' ? '_' : shift === 'super' ? '^' : up.shift,
       anchor: name === 'text' ? attr(attrs, 'text-anchor') ?? 'start' : up.anchor,
     };
     if (!empty) open.push(el);

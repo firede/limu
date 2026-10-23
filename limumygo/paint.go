@@ -27,6 +27,7 @@ import (
 	"github.com/egoist/mygo/ui"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
+	"github.com/firede/limu/text"
 )
 
 // Options say how a scene is drawn.
@@ -469,7 +470,8 @@ func abs(v float32) float32 {
 // Label draws an item's label as the svg package writes it, about the item's At: each line
 // centered on it, or starting or ending there as its Align says, the baseline of a line a
 // little below the middle of its line's height, as Pele's labelSvg puts it, and the whole
-// turned by its Rotate. Each span is set in its face at the label's size. The spans of a line
+// turned by its Rotate. Each span is set in its face at the label's size, a Sub or Sup span
+// smaller and lowered or raised, and an Underline span underlined. The spans of a line
 // follow one another as they are shaped, so that where a line starts, ends or is centered
 // does not depend on how its text was measured. A line with an icon in it is placed span by
 // span from where layout measured them, as the svg package places one.
@@ -484,10 +486,28 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 	}
 	halo := Color(s.Halo, s.Opacity)
 	type run struct {
-		glyphs []ui.Glyph
-		x, y   float32
+		glyphs     []ui.Glyph
+		x, y       float32
+		width      float32
+		size       float32
+		underlined bool
 	}
 	var runs []run
+	// shape sets a span at size, a Sub or Sup span 1.2 times smaller, as text measures it,
+	// and lowered a fifth or raised a third of size, about where a browser puts SVG's sub and
+	// super baseline shifts.
+	shape := func(sp text.Span, size float32) run {
+		var dy float32
+		if sp.Face&(text.Sub|text.Sup) != 0 {
+			dy = size / 5
+			if sp.Face&text.Sup != 0 {
+				dy = -size / 3
+			}
+			size /= 1.2
+		}
+		glyphs, w := p.fonts.Shape(sp.Text, size, sp.Face)
+		return run{glyphs: glyphs, y: dy, width: w, size: size, underlined: sp.Face&text.Underline != 0}
+	}
 	draw := func() {
 		cx, cy := it.At.X, it.At.Y
 		shift := l.Size * 0.35
@@ -507,9 +527,10 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 				var width float32
 				for _, sp := range line {
 					if sp.Text != "" {
-						glyphs, w := p.fonts.Shape(sp.Text, size, sp.Face)
-						runs = append(runs, run{glyphs, width, gy})
-						width += w
+						r := shape(sp, size)
+						r.x, r.y = width, gy+r.y
+						runs = append(runs, r)
+						width += r.width
 					}
 				}
 				switch it.Align {
@@ -540,9 +561,10 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 							p.o.DrawIcon(p.Painter, sp.Icon, p.Rect(scene.Rect{X: x, Y: mid - side/2, W: side, H: side}), c)
 						}
 					case sp.Text != "":
-						glyphs, _ := p.fonts.Shape(sp.Text, size, sp.Face)
+						r := shape(sp, size)
 						gx, gy := p.Point(scene.Point{X: x, Y: y})
-						runs = append(runs, run{glyphs, gx, gy})
+						r.x, r.y = gx, gy+r.y
+						runs = append(runs, r)
 					}
 					x += sp.Width
 				}
@@ -554,6 +576,11 @@ func (p *Painter) Label(it *scene.Item, s style.Resolved) {
 			}
 			for _, r := range runs {
 				p.Glyphs(r.glyphs, r.x, r.y, c)
+				if r.underlined {
+					// A line a fifteenth of the run's size thick, a tenth of it below the baseline.
+					y0, h := r.y+r.size/10, max(1, r.size/15)
+					p.FillPath(new(ui.Path).MoveTo(r.x, y0).LineTo(r.x+r.width, y0).LineTo(r.x+r.width, y0+h).LineTo(r.x, y0+h).Close(), c)
+				}
 			}
 			top += l.LineHeight
 		}

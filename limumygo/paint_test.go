@@ -2,6 +2,7 @@ package limumygo
 
 import (
 	"fmt"
+	"image"
 	"testing"
 
 	"github.com/egoist/mygo/ui"
@@ -97,5 +98,63 @@ func TestLabelAlign(t *testing.T) {
 		if align == scene.End && (l0 != l1 || l0 < 97 || l0 > 100) {
 			t.Errorf("end: the lines end at %d and %d, not at 100", l0, l1)
 		}
+	}
+}
+
+// A Sub span is drawn lower than the text beside it and a Sup span higher, and an Underline
+// span with a line under it.
+func TestLabelFaces(t *testing.T) {
+	draw := func(raw string) *image.RGBA {
+		l := text.Layout(raw, text.Options{Measurer: goFonts, Size: 20})
+		sc := &scene.Scene{Width: 200, Height: 100, FontSize: 20, Items: []scene.Item{
+			{Kind: scene.Text, Label: &l, At: scene.Point{X: 20, Y: 50}, Align: scene.Start},
+		}}
+		return ui.Render(func(c *ui.Context) { View(c, sc, &Options{Fonts: goFonts}) }, 200, 100, 1)
+	}
+	inked := func(img *image.RGBA, x, y int) bool { px := img.RGBAAt(x, y); return px.A > 128 && px.R < 128 }
+	// The first and last rows with ink in them between columns x0 and x1.
+	rows := func(img *image.RGBA, x0, x1 int) (int, int) {
+		first, last := -1, -1
+		for y := 0; y < 100; y++ {
+			for x := x0; x < x1; x++ {
+				if inked(img, x, y) {
+					if first < 0 {
+						first = y
+					}
+					last = y
+					break
+				}
+			}
+		}
+		return first, last
+	}
+	w := int(goFonts.Width("x", 20, 0))
+	plainTop, plainBottom := rows(draw("xx"), 20+w, 20+2*w)
+	_, subBottom := rows(draw("x<sub>x</sub>"), 20+w, 20+2*w)
+	supTop, _ := rows(draw("x<sup>x</sup>"), 20+w, 20+2*w)
+	if subBottom <= plainBottom {
+		t.Errorf("sub: its bottom is at %d, not below %d", subBottom, plainBottom)
+	}
+	if supTop >= plainTop {
+		t.Errorf("sup: its top is at %d, not above %d", supTop, plainTop)
+	}
+	// Under "under", a row inked nearly all the way across, which plain text has not.
+	full := func(img *image.RGBA) bool {
+		width := int(goFonts.Width("under", 20, 0))
+		for y := 50; y < 100; y++ {
+			n := 0
+			for x := 20; x < 20+width; x++ {
+				if inked(img, x, y) {
+					n++
+				}
+			}
+			if n > width*9/10 {
+				return true
+			}
+		}
+		return false
+	}
+	if !full(draw("<u>under</u>")) || full(draw("under")) {
+		t.Error("underline: no line under the underlined text alone")
 	}
 }
