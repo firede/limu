@@ -326,6 +326,8 @@ func (w *Writer) Parts(it *scene.Item, st style.Style) {
 			fill, fillOpacity = hollow(st), style.Num{}
 		case scene.Shade:
 			fill, stroke, fillOpacity = shade(it), style.None, style.Num{}
+		case scene.Dot:
+			fill, stroke, fillOpacity = st.Stroke, style.None, style.Num{}
 		}
 		w.paintAttr("fill", fill, fillOpacity)
 		w.paintAttr("stroke", stroke, st.StrokeOpacity)

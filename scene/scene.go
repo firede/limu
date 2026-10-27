@@ -233,6 +233,10 @@ const (
 	// an entity's table. When the item's author set a fill, it is the background at 60%
 	// opacity, laid over the parts drawn before it, as Pele draws an entity's stripes.
 	Shade
+	// Dot fills the part in the color of the item's stroke without its opacity, as a marker
+	// is filled, and does not stroke it: the dot of a central connection on a sequence
+	// diagram's message.
+	Dot
 )
 
 // A MarkerType is the kind of marker at an end of an edge, by Mermaid's names:

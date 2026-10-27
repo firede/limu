@@ -230,6 +230,12 @@ type Style struct {
 	// with the ground, as Pele's hollowOn fills a marker. A diagram sets it only on a fill ink
 	// can pick a color on.
 	Ground Paint
+	// TextGround is the fill under the part's text alone, where the text lies inside a fill
+	// its author sets on another part and the rest of the part keeps its own colors, as the
+	// name under a sequence diagram's figure in a box. Unless an override or the part's
+	// author sets one, the text is drawn in the theme's Fg or Bg, whichever stands out more
+	// against it. A diagram sets it only on a fill ink can pick a color on.
+	TextGround Paint
 }
 
 // Over is s laid over base: what s sets, and what base sets where s does not.
@@ -277,6 +283,9 @@ func (s Style) Over(base Style) Style {
 	if !s.Ground.Set() {
 		s.Ground = base.Ground
 	}
+	if !s.TextGround.Set() {
+		s.TextGround = base.TextGround
+	}
 	return s
 }
 
@@ -316,6 +325,11 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 			if !set.Text.Set() {
 				s.Text = on
 			}
+		}
+	}
+	if s.TextGround.Visible() && !set.Text.Set() {
+		if on, ok := ink(th, Style{Fill: s.TextGround}); ok {
+			s.Text = on
 		}
 	}
 	if !s.StrokeWidth.set {

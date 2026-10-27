@@ -168,6 +168,9 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 		case scene.Shade:
 			stroke = ui.Color{}
 			fill = Color(shade(s.Bg, it.Author.Fill.Set()), s.Opacity)
+		case scene.Dot:
+			stroke = ui.Color{}
+			fill = Color(s.Marker, s.Opacity)
 		}
 		if part.Path == nil {
 			radius := 0.0
