@@ -5,6 +5,7 @@ import (
 
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/scene"
+	"github.com/firede/limu/style"
 )
 
 // What lies on a fill a style sets, as Pele's svg/edges.ts finds it: whether an edge runs
@@ -12,9 +13,38 @@ import (
 // author gives them a fill, and records it in the scene; the style then picks the color the
 // edge is drawn in on that fill, or lays a casing under it.
 
-// A Fill is a box a style fills, Pele's Fill: its left, top, right and bottom.
+// A Fill is a box a style fills, Pele's Fill: its left, top, right and bottom, and the style
+// its author gives it.
 type Fill struct {
-	Box [4]float64
+	Box    [4]float64
+	Author style.Style
+}
+
+// Paints reports whether an author's style paints a fill, as Pele's paints does: a fill that
+// is neither none nor transparent, at an opacity above 0.
+func Paints(author style.Style) bool {
+	f := author.Fill
+	if !f.Visible() || f.Token().Name() == "" && f.Own().A == 0 {
+		return false
+	}
+	return author.FillOpacity.Or(1)*author.Opacity.Or(1) > 0
+}
+
+// OnFills is what Pele's overFills makes of an edge on fills: the ground to give the edge's
+// style where it lies inside one fill that ink picks a color on and its author, whose style
+// line is, sets it no stroke (edgeInk); and whether it needs a casing, where it crosses the
+// border of a fill or lies inside one otherwise.
+func OnFills(p *scene.Path, tips []float64, fills []Fill, line style.Style) (ground style.Paint, casing bool) {
+	holder, crossing := FillUnder(p, tips, fills)
+	switch {
+	case crossing:
+		return style.Paint{}, true
+	case holder < 0:
+		return style.Paint{}, false
+	case line.Stroke.Set() || !style.Inks(fills[holder].Author):
+		return style.Paint{}, true
+	}
+	return fills[holder].Author.Fill, false
 }
 
 // written is a number as Pele's num writes it into a path and reads it back: rounded to two
@@ -176,4 +206,58 @@ func FillUnder(p *scene.Path, tips []float64, fills []Fill) (holder int, crossin
 		}
 	}
 	return holder, false
+}
+
+// caseWidth is how much wider than its edge a casing is, Pele's CASE.
+const caseWidth = 4
+
+// Casing is an item of the role given that draws a casing under an edge that crosses the
+// border of a fill: its path and the outlines of its markers stroked in the background, wider
+// than the edge, with round ends and corners, as Pele's edgeCasing and casingsSvg draw it, so
+// that the edge stands out where it runs over the fill. Its width is that of the edge, the
+// width author gives it or 2.5 where it is thick, and four more, and it takes the author's
+// opacities. It gives nil for an edge whose author strokes it in none, which needs none. A
+// diagram puts its casings after its groups and before its edges, as Pele does.
+func Casing(role scene.Role, path *scene.Path, ends [2]scene.Marker, author style.Style, thick bool) *scene.Item {
+	// Pele draws none for a stroke of none or transparent.
+	if s := author.Stroke; s.Set() && (!s.Visible() || s.Token().Name() == "" && s.Own().A == 0) {
+		return nil
+	}
+	width := author.StrokeWidth.Or(1)
+	if thick {
+		width = 2.5
+	}
+	it := &scene.Item{
+		Kind:  scene.Mark,
+		Role:  role,
+		Parts: []scene.Part{{Path: path, Paint: scene.StrokeOnly}},
+		Style: style.Style{
+			Fill: style.Bg, Stroke: style.Bg, StrokeWidth: style.N(width + caseWidth),
+			Cap: style.CapRound, Join: style.JoinRound,
+			StrokeOpacity: author.StrokeOpacity, Opacity: author.Opacity,
+		},
+	}
+	box := path.Bounds()
+	for _, m := range ends {
+		for _, part := range m.Outline() {
+			if part.Paint != scene.StrokeOnly {
+				part.Paint = scene.FillAndStroke
+			}
+			it.Parts = append(it.Parts, part)
+			if part.Path != nil {
+				box = union(box, part.Path.Bounds())
+			} else {
+				box = union(box, part.Box)
+			}
+		}
+	}
+	it.Box = box
+	return it
+}
+
+// union is the box about two boxes.
+func union(a, b scene.Rect) scene.Rect {
+	x0, y0 := min(a.X, b.X), min(a.Y, b.Y)
+	x1, y1 := max(a.X+a.W, b.X+b.W), max(a.Y+a.H, b.Y+b.H)
+	return scene.Rect{X: x0, Y: y0, W: x1 - x0, H: y1 - y0}
 }
