@@ -7,6 +7,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/edit"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsjson"
 )
@@ -443,6 +444,14 @@ func parseOrderedJSON(text string, origin func() (int, int)) (*Object, *KeyOrder
 	units := utf16.Encode([]rune(text))
 	parsed, message := jsjson.Parse(units)
 	if message != "" {
+		// Parse again with the entity codes as written, so that the message and the place it
+		// names are those of the source.
+		if shown := edit.WrittenCodes(text); shown != text {
+			units = utf16.Encode([]rune(shown))
+			if _, again := jsjson.Parse(units); again != "" {
+				message = again
+			}
+		}
 		line, column := origin()
 		l, c, ok := locationFromMessage(message, units, line, column)
 		if !ok {

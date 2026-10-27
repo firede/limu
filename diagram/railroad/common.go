@@ -57,9 +57,19 @@ func accDescrScanner() func(string, int) int {
 // letters are Pele's LETTERS.
 const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-// titleToken is Pele's TITLE of the railroad grammars,
-// /title(?:[\t ][^\n\r]*?(?=%%)|[\t ][^\n\r]*|)/y: common's, tried only where a t is.
-var titleToken = common.TokenType{Name: "TITLE", First: "t", Match: common.TitleToken.Match}
+// title is Pele's title(rest) of the railroad grammars,
+// /title(?:[\t ][^\n\r]*?(?=%%)|[\t ][^\n\r]*|(?!rest))/y: common's titleBefore, tried only
+// where a t is. rest matches a character that goes on a name, so that the word alone does not
+// split a longer name. It reports whether its pattern matches at a byte.
+func title(rest func(c byte) bool) common.TokenType {
+	return common.TokenType{Name: "TITLE", First: "t", Match: common.TitleBefore(func(s string, at int) bool {
+		return at < len(s) && rest(s[at])
+	}).Match}
+}
+
+// wordOrDash is [\w-], the rest of a name that the title of the EBNF, PEG and railroad
+// grammars gives way to.
+func wordOrDash(c byte) bool { return c == '-' || chars.IsWord(int(c)) }
 
 // accTitleToken is Pele's ACC_TITLE, /accTitle[\t ]*:(?:[^\n\r]*?(?=%%)|[^\n\r]*)/y.
 var accTitleToken = common.TokenType{Name: "ACC_TITLE", First: "a", Match: common.AccTitleToken.Match}

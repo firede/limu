@@ -97,6 +97,49 @@ func FillDeclared(decls []string) bool {
 	return strings.HasPrefix(css, "fill:") || strings.Contains(css, ";fill:")
 }
 
+// FontFamilyDeclared reports whether declarations set a font family with a value that is not
+// dropped: whether the text style Pele's resolveStyle writes matches /[";]font-family:/, as
+// the diagrams that set a part in the monospace face where the author gave no font of its
+// own test it. That style holds each property of text that is kept, color written as fill,
+// with the last value given it, in the order the properties first came, and with & and "
+// written as entities.
+func FontFamilyDeclared(decls []string) bool {
+	var props, values []string
+	for _, decl := range decls {
+		prop, value, ok := strings.Cut(decl, ":")
+		if !ok || prop == "" {
+			continue
+		}
+		prop = chars.ToLower(chars.Trim(prop))
+		value = chars.Trim(replaceFold(value, "!important", ""))
+		if value == "" || unsafe(value) {
+			continue
+		}
+		switch prop {
+		case "color":
+			prop = "fill"
+		case "font-size", "font-family", "font-weight", "font-style", "text-decoration", "letter-spacing",
+			"word-spacing", "opacity":
+		default:
+			continue
+		}
+		if k := slices.Index(props, prop); k >= 0 {
+			values[k] = value
+		} else {
+			props, values = append(props, prop), append(values, value)
+		}
+	}
+	var b strings.Builder
+	escape := strings.NewReplacer("&", "&amp;", `"`, "&quot;")
+	for k, prop := range props {
+		b.WriteString(prop + ":")
+		b.WriteString(escape.Replace(values[k]))
+		b.WriteByte(';')
+	}
+	text := b.String()
+	return strings.HasPrefix(text, "font-family:") || strings.Contains(text, ";font-family:")
+}
+
 // LineDeclared reports whether declarations set anything of a line: a property of a shape
 // other than its fill and fill opacity, with a value that is not dropped, whether or not it
 // can be read. It is whether the line of Pele's resolveStyle is not empty.

@@ -466,6 +466,31 @@ func LinkURL(url string, links bool, schemes []string) (string, bool) {
 	return allow(url, schemes)
 }
 
+// InternalLink reports whether the name of an internal link may be its address, as Pele's
+// internalLink does. The address keeps the name as written, so passing SanitizeURL and
+// LinkURL is not enough: the name is checked again as the browser reads it, without the
+// characters Pele's esc drops and the tabs and line breaks a browser takes out, and with the
+// control characters and spaces at its start taken off.
+func InternalLink(name string, links bool, schemes []string) bool {
+	u := SanitizeURL(name)
+	if u == blank {
+		return false
+	}
+	if _, ok := LinkURL(u, links, schemes); !ok {
+		return false
+	}
+	seen := strings.Map(func(r rune) rune {
+		if r <= 0x08 || r == 0x0b || r == 0x0c || r >= 0x0e && r <= 0x1f || r == 0x7f || r == 0xfffe || r == 0xffff ||
+			r == '\t' || r == '\n' || r == '\r' {
+			return -1
+		}
+		return r
+	}, name)
+	seen = strings.TrimLeft(seen, "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f ")
+	_, ok := LinkURL(seen, links, schemes)
+	return ok
+}
+
 // ImageURL is LinkURL for an image, with RenderOptions' images and imageSchemes. Pele's
 // imageUrl.
 func ImageURL(url string, images bool, schemes []string) (string, bool) {
@@ -476,29 +501,4 @@ func ImageURL(url string, images bool, schemes []string) (string, bool) {
 		schemes = ImageSchemes
 	}
 	return allow(url, schemes)
-}
-
-// InternalLink reports whether a note's name may be written as the href of an internal link,
-// as Pele's internalLink does. The href keeps the name as it is, so it must pass as a link both
-// sanitized and as a browser reads it once the SVG is written: without the characters esc
-// drops, without tabs and line breaks, and without the control characters and spaces it starts
-// with.
-func InternalLink(name string, links bool, schemes []string) bool {
-	u := SanitizeURL(name)
-	if u == blank {
-		return false
-	}
-	if _, ok := LinkURL(u, links, schemes); !ok {
-		return false
-	}
-	// RE_INVALID_XML and then /[\t\n\r]/ take out every control character below the space.
-	seen := strings.Map(func(r rune) rune {
-		if r <= 0x1f || r == 0x7f || r == 0xfffe || r == 0xffff {
-			return -1
-		}
-		return r
-	}, name)
-	seen = strings.TrimLeft(seen, " ")
-	_, ok := LinkURL(seen, links, schemes)
-	return ok
 }

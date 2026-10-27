@@ -75,3 +75,17 @@ func TestLinksOff(t *testing.T) {
 		t.Error("images off")
 	}
 }
+
+// The cases of Pele's tests of internalLink, tests/util/url.test.ts.
+func TestInternalLink(t *testing.T) {
+	for _, name := range []string{"Note", `Folder\note`, "Note%23heading", "👩‍💻", "Note#heading", "  Note  "} {
+		if !InternalLink(name, true, nil) {
+			t.Errorf("%q refused", name)
+		}
+	}
+	for _, name := range []string{"javascript:alert(1)", "java￾script:alert(1)", `\\nevil.example`, "\t/\\nevil.example", "/\t/evil.example"} {
+		if InternalLink(name, true, []string{"about"}) {
+			t.Errorf("%q allowed", name)
+		}
+	}
+}

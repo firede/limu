@@ -77,6 +77,9 @@ export const REJECTED = [
   'usecase-beta\nA \'"\'" x\nB',
   'usecase-beta\nA "b\nC',
   'usecase-beta\njson P@{"a":',
+  // JSON errors after entity codes, which Pele reports in the text as written.
+  'usecase-beta\njson P@{"a#35;b":"#quot;", c}',
+  'usecase-beta\njson P@{"#35;": 1\n, "b": #35;}',
   'usecase-beta\n"`a',
 ];
 

@@ -98,6 +98,10 @@ func matchID(s string, at int) int {
 	return end
 }
 
+// wordAt reports whether \w matches at byte at. A title gives way to it in Pele's
+// EVENTMODELING_TOKENS, through titleBefore, so that `titles` is a name.
+func wordAt(s string, at int) bool { return at < len(s) && chars.IsWord(int(s[at])) }
+
 // matchFrameID is EM_FID, /\d{1,3}/y.
 func matchFrameID(s string, at int) int {
 	end := at
@@ -226,7 +230,7 @@ var eventModelingTokens = func() []common.TokenType {
 		common.TokenType{Name: "EM_DATA_BLOCK", Match: matchBlock, Opener: func(s string, at int) bool { return blockOpener(s, at) >= 0 }},
 		common.AccDescr("EM_ACC_DESCR"),
 		renamed(common.AccTitleToken, "EM_ACC_TITLE"),
-		renamed(common.TitleToken, "EM_TITLE"),
+		renamed(common.TitleBefore(wordAt), "EM_TITLE"),
 		common.TokenType{Name: "EM_WS", Match: matchSpace, Hidden: true},
 		renamed(common.YAMLToken, "EM_YAML"),
 		renamed(common.DirectiveToken, "EM_DIRECTIVE"),

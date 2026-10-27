@@ -118,6 +118,29 @@ func matchDirection(src string, p, end int, word string) int {
 	return -1
 }
 
+// bareTitle is the end of what /title[^\S\r\n]*(?=[\r\n]|$)\s*/y matches at p, or -1. That is a
+// title with nothing after it on its line, with the line breaks and white space after it, which
+// the grammar would reject as blank statements. It is Pele's RE_BARE_TITLE, written out. Giving
+// back white space before the line break never lets the lookahead see a break, so only the
+// longest run is tried.
+func bareTitle(src string, p int) int {
+	if !strings.HasPrefix(src[p:], "title") {
+		return -1
+	}
+	q := p + len("title")
+	for q < len(src) {
+		c, size := chars.UnitAt(src, q)
+		if !chars.IsSpace(c) || c == '\r' || c == '\n' {
+			break
+		}
+		q += size
+	}
+	if q < len(src) && src[q] != '\r' && src[q] != '\n' {
+		return -1
+	}
+	return chars.SpaceRun(src, q)
+}
+
 // tokenize reads a text into tokens as Pele's tokenize does, which follows the lexer Jison
 // compiles from c4Diagram.jison: its rule order, its start conditions, and what it returns once
 // the input runs out in each of them.
@@ -226,8 +249,14 @@ func tokenize(src string) tokens {
 					}
 				}
 			}
-			if c == 't' && statement("title", tTitle) {
-				continue
+			if c == 't' {
+				if e := bareTitle(src, p); e >= 0 {
+					p = e
+					continue
+				}
+				if statement("title", tTitle) {
+					continue
+				}
 			}
 			if c == 'a' {
 				if statement("accDescription", tAccDescription) {

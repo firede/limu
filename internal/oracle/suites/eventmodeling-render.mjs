@@ -11,9 +11,6 @@
 // family, and the text of each of its lines. Under a frame tinted in its series color Pele
 // draws the box in the background first; where that box has a stroke, down, the frame's own
 // stroke covers it, and the line leaves it out.
-//
-// Cases whose example data or notes Pele's hardWrap would cut between the two halves of a
-// character past the Basic Multilingual Plane are left out: a Go string holds no half of one.
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
 import { unescape, attr, n, pt, readHead } from '../lib/svg.mjs';
@@ -148,19 +145,7 @@ export function readSvg(svg, fontSize) {
 export default async function ({ pele, src, write, random }) {
   const { render, parse, PeleError } = await src('index.ts');
   const { metricsMeasurer } = await src('text/measurer.ts');
-  const { decodeEntities } = await src('text/entities.ts');
 
-  // Whether Pele's hardWrap cuts a line of the text between the halves of a character.
-  const splits = (s, columns) =>
-    decodeEntities(s)
-      .split('\n')
-      .some((line) => {
-        for (let i = columns; i < line.length; i += columns) {
-          const c = line.charCodeAt(i - 1);
-          if (c >= 0xd800 && c <= 0xdbff) return true;
-        }
-        return false;
-      });
   const out = [];
   const draw = (source, maxWidth, fontSize, autoDirection, directionBreakpoint) => {
     let r;
@@ -169,7 +154,6 @@ export default async function ({ pele, src, write, random }) {
       const options = { measurer: metricsMeasurer, maxWidth, fontSize, autoDirection, directionBreakpoint, outputLimit: Infinity };
       const model = parse(source, options);
       if (model.type !== 'eventmodeling') return false;
-      if (model.boxes.some((b) => b.data && splits(b.data, 48)) || model.notes.some((note) => splits(note.text, 80))) return false;
       r = render(source, options);
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
@@ -207,5 +191,9 @@ export default async function ({ pele, src, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, FRAGMENTS, random(62));
   while (drawn < 2500) each(next());
+  // Data wrapped past characters beyond the Basic Multilingual Plane, which Pele's hardWrap
+  // keeps whole, from Pele's test of it.
+  each(`eventmodeling\ntf 01 cmd A {${'a'.repeat(47)}😀Z}`);
+  each(`eventmodeling\ntf 01 cmd A {${'😀'.repeat(30)}${'中'.repeat(30)}}`);
   write('diagram/eventmodeling/testdata/pele/render.json', { cases: out });
 }

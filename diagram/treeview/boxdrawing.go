@@ -3,8 +3,10 @@ package treeview
 import (
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 )
@@ -98,9 +100,9 @@ func commentLine(line string) bool {
 }
 
 // remapErrorLines writes the line numbers an error's message names as those of the original
-// text, as Pele's remapErrorLines does with /\bline\s+(\d+)\b/gi. lineMap holds, for each
-// line of the text read, from 1, the line of the original it came from.
-func remapErrorLines(message string, lineMap []int) string {
+// text, as Pele's remapErrorLines does with /\bline\s+(\d+)\b/gi. lineMap holds, for lines
+// of the text read, from 1, the line of the original each came from.
+func remapErrorLines(message string, lineMap map[int]int) string {
 	word := func(i int) bool { return i >= 0 && i < len(message) && chars.IsWord(int(message[i])) }
 	var b strings.Builder
 	last := 0
@@ -134,30 +136,61 @@ func remapErrorLines(message string, lineMap []int) string {
 
 // lookup is lineMap.get(parseInt(digits, 10)) for a line number written in digits, or 0
 // where the map has none.
-func lookup(lineMap []int, digits string) int {
+func lookup(lineMap map[int]int, digits string) int {
 	digits = strings.TrimLeft(digits, "0")
 	if len(digits) > 15 {
 		return 0
 	}
 	n, _ := strconv.Atoi(digits)
-	if n < 1 || n > len(lineMap) {
-		return 0
-	}
-	return lineMap[n-1]
+	return lineMap[n]
 }
 
-// failAt is the error of a line of the original text, Pele's fail.
-func failAt(line int, message string) *diagram.Error {
+// lineStart is the byte at which line, from 1, of text starts, as Pele's lineStart finds it.
+func lineStart(text string, line int) int {
+	at := 0
+	for n := 1; n < line; n++ {
+		at += strings.IndexByte(text[at:], '\n') + 1
+	}
+	return at
+}
+
+// failAt is the error of the line at index, from 0, of the input, as Pele's fail makes it.
+// The line is found in the text as written (common.Locate).
+func failAt(input string, index int, message string) *diagram.Error {
+	line := common.Locate(input, lineStart(input, index+1)).Line
 	return &diagram.Error{Code: diagram.Syntax, Message: "Line " + strconv.Itoa(line) + ": " + message, Type: "treeView", Line: line}
+}
+
+// beforeTabs undoes the expansion of a line's tabs to four spaces, as Pele's beforeTabs does.
+// It is the byte of line where the character is that the expanded line has at code unit at.
+func beforeTabs(line string, at int) int {
+	i, n := 0, 0
+	for i < len(line) && n < at {
+		if line[i] == '\t' {
+			n += 4
+			i++
+			continue
+		}
+		_, size := utf8.DecodeRuneInString(line[i:])
+		if size == 4 {
+			n += 2
+		} else {
+			n++
+		}
+		i += size
+	}
+	return i
 }
 
 // preprocessBoxDrawing turns a tree drawn with box-drawing characters into one indented as
 // the grammar reads it, as Pele's preprocessBoxDrawing does. The line map holds, for each
 // line of the text given back, the line of the input it came from; it is empty when the
-// text is the input unchanged.
-func preprocessBoxDrawing(input string) (string, []int, error) {
+// text is the input unchanged. The columns are Pele's columns. For each line of the text
+// given back, they hold nil or a function that finds the byte of the input's line that a code
+// unit of the line given back came from.
+func preprocessBoxDrawing(input string) (string, []int, []func(at int) int, error) {
 	if !strings.ContainsAny(input, allBoxChars) {
-		return input, nil, nil
+		return input, nil, nil, nil
 	}
 	lines := strings.Split(input, "\n")
 
@@ -169,7 +202,7 @@ func preprocessBoxDrawing(input string) (string, []int, error) {
 		}
 	}
 	if keywordIdx == -1 {
-		return input, nil, nil
+		return input, nil, nil, nil
 	}
 
 	passes := func(line string) bool {
@@ -184,24 +217,26 @@ func preprocessBoxDrawing(input string) (string, []int, error) {
 		contentLines = append(contentLines, strings.ReplaceAll(line, "\t", "    "))
 	}
 	if !isBoxDrawingFormat(contentLines) {
-		return input, nil, nil
+		return input, nil, nil, nil
 	}
 
 	segmentWidth := inferSegmentWidth(contentLines)
 	var out []string
 	var lineMap []int
-	keep := func(text string, index int) {
+	var columns []func(at int) int
+	keep := func(text string, index int, column func(at int) int) {
 		out = append(out, text)
 		lineMap = append(lineMap, index+1)
+		columns = append(columns, column)
 	}
 
 	for i := 0; i <= keywordIdx; i++ {
-		keep(lines[i], i)
+		keep(lines[i], i, nil)
 	}
 	for i := keywordIdx + 1; i < len(lines); i++ {
 		line := lines[i]
 		if passes(line) {
-			keep(line, i)
+			keep(line, i, nil)
 			continue
 		}
 		if decorationOnly(line) {
@@ -220,21 +255,23 @@ func preprocessBoxDrawing(input string) (string, []int, error) {
 			}
 			content := chars.TrimEnd(normalized[pos:])
 			if content == "" {
-				return "", nil, failAt(i+1, "Empty node — expected a filename or directory name after the box-drawing prefix")
+				return "", nil, nil, failAt(input, i, "Empty node — expected a filename or directory name after the box-drawing prefix")
 			}
-			keep(strings.Repeat(indentUnit, depth)+content, i)
+			indent := strings.Repeat(indentUnit, depth)
+			from := chars.Len16(normalized[:pos])
+			keep(indent+content, i, func(at int) int { return beforeTabs(line, from+max(at-len(indent), 0)) })
 		} else if boxOnly(normalized) {
 			continue
 		} else if strings.ContainsAny(normalized, allBoxChars) {
 			// A name that happens to contain a box character, such as "Section ─ A.txt", is
 			// a root item.
-			keep(line, i)
+			keep(line, i, nil)
 		} else if chars.SpaceRun(normalized, 0) > 0 {
-			return "", nil, failAt(i+1,
+			return "", nil, nil, failAt(input, i,
 				"Unexpected indentation without box-drawing characters. In box-drawing format, use ├── or └── prefixes for indented nodes.")
 		} else {
-			keep(line, i)
+			keep(line, i, nil)
 		}
 	}
-	return strings.Join(out, "\n"), lineMap, nil
+	return strings.Join(out, "\n"), lineMap, columns, nil
 }

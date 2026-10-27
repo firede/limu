@@ -81,6 +81,21 @@ type view struct {
 	titleH      float64
 	attributesH float64
 	fontSize    float64
+	// mono says the members are set in the monospace face.
+	mono bool
+}
+
+// memberFace is the face a member is set in: italic where it is abstract, and monospace where
+// mono says, as Pele's memberLine measures it.
+func memberFace(classifier string, mono bool) text.Face {
+	var face text.Face
+	if classifier == "*" {
+		face = text.Italic
+	}
+	if mono {
+		face |= text.Mono
+	}
+	return face
 }
 
 // An end is where an edge meets the side of a class: Pele's End.
@@ -153,19 +168,21 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		}
 	}
 
-	// memberLine is a member as it is drawn, at a size, as Pele's memberLine gives it.
-	memberLine := func(m *Member, size float64) line {
+	monospaced := o.Monospace&layout.Members != 0
+	// memberLine is a member as it is drawn, at a size, and in the monospace face where mono
+	// says, as Pele's memberLine gives it.
+	memberLine := func(m *Member, size float64, mono bool) line {
 		t := chars.Trim(text.DecodeEntities(m.DisplayText()))
-		var face text.Face
-		if m.Classifier == "*" {
-			face = text.Italic
-		}
+		face := memberFace(m.Classifier, mono)
 		return line{text: t, width: measure.Width(t, size, face), classifier: m.Classifier}
 	}
 	// classView measures a class as it is drawn: its name, its annotations and its members,
 	// and the box they fit in, as the classView of Pele's draw does.
 	classView := func(node *graphNode, cls *Class) view {
-		author := classStyle(db, cls)
+		author, family := classStyle(db, cls)
+		// A font family the author gives the class keeps its members out of the monospace
+		// face.
+		mono := monospaced && !family
 		fontSize := size
 		if author.FontSize > 0 {
 			fontSize = author.FontSize
@@ -190,10 +207,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 		}
 		var attributes, methods []line
 		for _, m := range cls.Members {
-			attributes = append(attributes, memberLine(m, memberSize))
+			attributes = append(attributes, memberLine(m, memberSize, mono))
 		}
 		for _, m := range cls.Methods {
-			methods = append(methods, memberLine(m, memberSize))
+			methods = append(methods, memberLine(m, memberSize, mono))
 		}
 		inner := label.Width
 		for _, a := range annotations {
@@ -223,7 +240,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 			node: node, author: author, label: label,
 			w: max(inner+2*padX, minWidth), h: titleH + attributesH + section(len(methods)),
 			annotations: annotations, attributes: attributes, methods: methods,
-			titleH: titleH, attributesH: attributesH, fontSize: fontSize,
+			titleH: titleH, attributesH: attributesH, fontSize: fontSize, mono: mono,
 		}
 	}
 
@@ -810,8 +827,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned, tight bool) *
 
 // classStyle is what the author set for a class: the declarations of the classDefs of its
 // classes, and then its own. Pele's classStyle keeps the last declaration of each property
-// that has an effect and resolves those, which comes to the same.
-func classStyle(db *DB, cls *Class) css.Author {
+// that has an effect and resolves those, which comes to the same. It also reports whether
+// they set a font family, which keeps the class's members out of the monospace face.
+func classStyle(db *DB, cls *Class) (author css.Author, family bool) {
 	var decls []string
 	for _, name := range strings.Split(cls.CSSClasses, " ") {
 		if def := db.styleClasses[name]; def != nil {
@@ -820,7 +838,8 @@ func classStyle(db *DB, cls *Class) css.Author {
 			}
 		}
 	}
-	return css.Declarations(append(decls, cls.Styles...))
+	decls = append(decls, cls.Styles...)
+	return css.Declarations(decls), css.FontFamilyDeclared(decls)
 }
 
 // classItems draws a class centered on x, y, as Pele's classSvg does: the box, with its
@@ -879,11 +898,7 @@ func classItems(v *view, cls *Class, x, y, tiny, tinyHeight float64, o *layout.O
 	lines := func(list []line, role scene.Role, from float64) {
 		middle := from + sectionPad + lineHeight/2
 		for _, ln := range list {
-			var face text.Face
-			if ln.classifier == "*" {
-				face = text.Italic
-			}
-			l := common.LineOf(ln.text, ln.width, memberSize, lineHeight, face)
+			l := common.LineOf(ln.text, ln.width, memberSize, lineHeight, memberFace(ln.classifier, v.mono))
 			m := scene.Item{
 				Kind: scene.Text, Role: role, ID: cls.ID, Label: l,
 				At: scene.Point{X: x + (left + padX), Y: y + middle}, Align: scene.Start,

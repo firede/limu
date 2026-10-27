@@ -49,6 +49,16 @@ const WRITTEN = [
   ),
 ];
 
+// Attributes set in the monospace face, and entities whose own font family keeps theirs out of
+// it, from Pele's tests of the monospace option, tests/render/er.test.ts.
+const MONO = [
+  'erDiagram\n  CAR {\n    string registrationNumber PK "The plate number, as issued by the registration office of the country"\n    int wheels FK, UK\n  }',
+  'erDiagram\n  A {\n    string `a  b`\n    string `<code>a  b</code>`\n    Map~string,int~ m PK, FK\n    string? opt "**bold** and _it_"\n  }',
+  'erDiagram\n  A {\n    string name PK\n  }\n  B {\n    string name PK\n  }\n  style A color:black,font-family:serif',
+  'erDiagram\n  A {\n    string name PK\n  }\n  B {\n    string name PK\n  }\n  classDef serif color:black,font-family:serif\n  class A serif',
+  'erDiagram\n  A {\n    int id PK\n    string name\n  }\n  B {\n    int id\n  }\n  style A font-weight:bold,font-size:20px\n  style B font-style:italic,font-family:url(x)\n  A ||--o{ B : has',
+];
+
 // The fragments mutations splice in, for text that parses and still draws something odd.
 const FRAGMENTS = [
   ...PARSE_FRAGMENTS,
@@ -163,7 +173,9 @@ export function readSvg(svg, num) {
           for (const m of s.slice(cells).matchAll(/<text class="pele-er-(type|name|keys|comment)"[^>]*>/g)) {
             const at = cells + m.index;
             const t = textAt(s.slice(at, s.indexOf('</text>', at)), cx, cy) ?? 't none';
-            out.push(`${m[1]} ${n(attr(m[0], 'font-size') ?? size)} ${t}`);
+            // A cell all in the monospace face names the family on its text.
+            const mono = attr(m[0], 'font-family') !== undefined ? ' mono' : '';
+            out.push(`${m[1]}${mono} ${n(attr(m[0], 'font-size') ?? size)} ${t}`);
           }
         }
         break;
@@ -189,11 +201,13 @@ export default async function ({ src, cases, write, random }) {
   });
 
   const out = [];
-  const draw = (source, maxWidth) => {
+  // mono sets the attributes in the monospace face, as Pele's monospace option does where it
+  // lists them.
+  const draw = (source, maxWidth, mono) => {
     let r;
     globalThis.limuExactNumbers = true;
     try {
-      r = render(source, { measurer: metricsMeasurer, maxWidth, outputLimit: Infinity });
+      r = render(source, { measurer: metricsMeasurer, maxWidth, outputLimit: Infinity, monospace: mono ? ['attributes'] : undefined });
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
       return false;
@@ -201,7 +215,7 @@ export default async function ({ src, cases, write, random }) {
       globalThis.limuExactNumbers = false;
     }
     if (r.type !== 'er') return false;
-    out.push({ src: source, maxWidth, lines: readSvg(r.svg, num) });
+    out.push({ src: source, maxWidth, ...(mono ? { mono } : {}), lines: readSvg(r.svg, num) });
     return true;
   };
   let drawn = 0;
@@ -216,5 +230,12 @@ export default async function ({ src, cases, write, random }) {
     const s = next();
     if (!lone(s) && s.length <= 3000) each(s);
   }
+  // Attributes set in the monospace face, with the cases of Pele's tests of it, and the first
+  // of the diagrams above again.
+  for (const s of MONO) {
+    draw(s, undefined, true);
+    draw(s, 360, true);
+  }
+  corpus.slice(0, 300).forEach((s, i) => draw(s, i % 3 === 0 ? 360 : undefined, true));
   write('diagram/er/testdata/pele/render.json', { cases: out });
 }
