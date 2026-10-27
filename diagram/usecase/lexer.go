@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -155,8 +156,10 @@ func keywordAt(s string, i, c int) int {
 
 // lineColumn is the line and column of byte offset, as Pele's lineColumn counts them: a
 // carriage return and a line feed after it end one line, and the column is in UTF-16 code
-// units.
+// units. Where s is the text the parser reads, they are those of the text as written
+// (common.Written).
 func lineColumn(s string, offset int) (line, column int) {
+	s, offset = common.Written(s, offset)
 	line = 1
 	lineStart := 0
 	for i := 0; i < offset; i++ {
@@ -173,8 +176,12 @@ func lineColumn(s string, offset int) (line, column int) {
 	return line, chars.Len16(s[lineStart:offset]) + 1
 }
 
-// unit is byte offset i of s in UTF-16 code units, as Pele's offsets count.
-func unit(s string, i int) int { return chars.Len16(s[:i]) }
+// unit is byte offset i of s in UTF-16 code units, as Pele's offsets count. Where s is the
+// text the parser reads, it is the offset in the text as written, Pele's written(s, i)[1].
+func unit(s string, i int) int {
+	s, i = common.Written(s, i)
+	return chars.Len16(s[:i])
+}
 
 // locationText is where the bytes from start to end are, as Pele's locationText writes it.
 func locationText(s string, start, end int) string {
@@ -212,7 +219,7 @@ func startsToken(s string, i int) bool {
 // to end, the characters its lexer skipped before one did, as Pele's lexError words it.
 func lexError(s string, start, end int) *diagram.Error {
 	line, column := lineColumn(s, start)
-	offset, length := unit(s, start), chars.Len16(s[start:end])
+	offset, length := unit(s, start), unit(s, end)-unit(s, start)
 	return &diagram.Error{
 		Code: diagram.Syntax,
 		Message: "Error lexing usecase diagram: unexpected character: ->" + s[start:start+1] + "<- at offset: " +
