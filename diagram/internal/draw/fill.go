@@ -2,6 +2,7 @@ package draw
 
 import (
 	"math"
+	"slices"
 
 	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/jsmath"
@@ -221,9 +222,11 @@ func Casing(role scene.Role, path *scene.Path, ends [2]scene.Marker, line []stri
 		width = 2.5
 	}
 	it := &scene.Item{
-		Kind:  scene.Mark,
-		Role:  role,
-		Parts: []scene.Part{{Path: path, Paint: scene.StrokeOnly}},
+		Kind: scene.Mark,
+		Role: role,
+		// A copy of the path, since snapping moves a path that items share as the first of
+		// them that holds it does, and the edge's own points snap one by one.
+		Parts: []scene.Part{{Path: &scene.Path{Ops: path.Ops, Args: slices.Clone(path.Args)}, Paint: scene.StrokeOnly}},
 		Style: style.Style{
 			Fill: style.Bg, Stroke: style.Bg, StrokeWidth: style.N(width + caseWidth),
 			Cap: style.CapRound, Join: style.JoinRound,

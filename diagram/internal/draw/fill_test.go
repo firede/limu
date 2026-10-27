@@ -56,3 +56,11 @@ func TestCasingOfNone(t *testing.T) {
 		t.Errorf("width %v", it.Style.StrokeWidth)
 	}
 }
+
+// A casing doesn't share its edge's path, which snapping would then move as the casing's.
+func TestCasingOwnsItsPath(t *testing.T) {
+	path := new(scene.Path).MoveTo(0, 0).LineTo(10, 0)
+	if it := Casing("x", path, [2]scene.Marker{}, nil, false); it.Parts[0].Path == path {
+		t.Error("the casing shares the edge's path")
+	}
+}
