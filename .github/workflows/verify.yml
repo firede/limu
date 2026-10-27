@@ -39,9 +39,10 @@ jobs:
       GOAMD64: ${{ matrix.goamd64 }}
     steps:
       - uses: actions/checkout@v5
+      # limumygo asks for a newer Go than limu does, as MyGo does.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: limumygo/go.mod
           cache-dependency-path: limumygo/go.sum
       # MyGo sets and measures text with Pango on Linux, which the limumygo tests need.
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends libpangocairo-1.0-0
