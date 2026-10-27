@@ -138,6 +138,41 @@ func partPaint(it *scene.Item, part *scene.Part) string {
 	return fill + " " + stroke
 }
 
+// inkNames are the colors Pele's ink picks, by the theme's paints the default look settles them
+// as.
+var inkNames = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)", style.Bg: "var(--pele-fg-on-dark,#fff)"}
+
+// inked is the item's style as the default look settles it, and that style without the
+// colors picked on a fill: the text on its own fill and the stroke and text on a ground. The
+// diagram's own text and stroke are taken as a paint neither picks, so that a color picked
+// differs from what the style would be without it even where it is the same as the default.
+func inked(it *scene.Item) (got, plain style.Style) {
+	var look style.Look
+	own := it.Style
+	own.Text, own.Stroke = style.SurfaceAlt, style.SurfaceAlt
+	bare := own
+	bare.OnFill, bare.Ground = false, style.Paint{}
+	return look.Cascade(string(it.Role), own, it.Author), look.Cascade(string(it.Role), bare, it.Author)
+}
+
+// textPaint is the fill the oracle reads of an item's text: the color ink picks where the
+// look picks one, and the diagram's own otherwise.
+func textPaint(it *scene.Item) string {
+	if got, plain := inked(it); got.Text != plain.Text {
+		return inkNames[got.Text]
+	}
+	return paintName(it.Style.Text)
+}
+
+// strokeInk is the stroke the oracle reads of an edge's group, the color ink picks on the
+// fill it lies in, or "" where it lies in none.
+func strokeInk(it *scene.Item) string {
+	if got, plain := inked(it); got.Stroke != plain.Stroke {
+		return inkNames[got.Stroke]
+	}
+	return ""
+}
+
 // labelLine is the line the oracle writes of a label drawn about at: the point, the label's
 // size, the fill of its text, and its spans.
 func labelLine(it *scene.Item, l *text.Label, at scene.Point) string {
@@ -153,11 +188,12 @@ func labelLine(it *scene.Item, l *text.Label, at scene.Point) string {
 		}
 		lines = append(lines, strings.Join(spans, " "))
 	}
-	return "t " + pt(at.X, at.Y) + " " + pt(l.Width, l.Height) + " " + paintName(it.Style.Text) + " | " + strings.Join(lines, " | ")
+	return "t " + pt(at.X, at.Y) + " " + pt(l.Width, l.Height) + " " + textPaint(it) + " | " + strings.Join(lines, " | ")
 }
 
-// marker is the outline Pele's marker draws, every number in full, as the oracle reads it.
-func marker(m scene.Marker) string {
+// marker is the outline Pele's marker draws, every number in full, as the oracle reads it,
+// filled and stroked as given where it is filled.
+func marker(m scene.Marker, fill, stroke string) string {
 	const arrow = scene.MarkerSize
 	x, y, dx, dy := m.At.X, m.At.Y, m.DX, m.DY
 	nx, ny := -dy, dx
@@ -166,9 +202,9 @@ func marker(m scene.Marker) string {
 		bx, by := x-float64(dx*arrow), y-float64(dy*arrow)
 		half := float64(arrow * 0.42)
 		return "M " + pt(x, y) + " L " + pt(bx+float64(nx*half), by+float64(ny*half)) +
-			" L " + pt(bx-float64(nx*half), by-float64(ny*half)) + " Z var(--_l) none"
+			" L " + pt(bx-float64(nx*half), by-float64(ny*half)) + " Z " + fill + " " + stroke
 	case "arrow_circle":
-		return "o " + pt(x-float64(dx*4), y-float64(dy*4)) + " 3.5 var(--_l) none"
+		return "o " + pt(x-float64(dx*4), y-float64(dy*4)) + " 3.5 " + fill + " " + stroke
 	case "arrow_cross":
 		cx, cy := x-float64(dx*4), y-float64(dy*4)
 		const a = 3.5
@@ -342,12 +378,54 @@ func sceneLines(sc *scene.Scene, want func(int) string) []string {
 			if w, ok := it.Style.StrokeWidth.Get(); ok {
 				width = n(w)
 			}
-			lines = append(lines, fmt.Sprintf("edge %s %s %s", id, dash, width))
+			over := strokeInk(it)
+			color := over
+			if over == "" {
+				over, color = "-", "var(--_l)"
+			}
+			lines = append(lines, fmt.Sprintf("edge %s %s %s %s", id, dash, width, over))
 			lines = append(lines, "path "+pathLine(it.Parts[0].Path, arcs(hint())))
 			lines = append(lines, "pen "+pelesvg.CapJoin(it))
 			for _, m := range it.Ends {
-				if s := marker(m); s != "" {
+				if s := marker(m, color, "none"); s != "" {
 					lines = append(lines, "m "+s)
+				}
+			}
+		case RoleCasing:
+			// A casing is written as the oracle reads Pele's: its width where it is not the
+			// casings' 5, its path, and the markers of its edge, drawn in the background.
+			width := "-"
+			if w := it.Style.StrokeWidth.Or(1); w != 5 {
+				width = n(w)
+			}
+			if _, ok := it.Style.Opacity.Get(); ok || it.Style.StrokeOpacity != (style.Num{}) {
+				width += " opacity"
+			}
+			lines = append(lines, "casing "+width+" -")
+			lines = append(lines, "path "+pathLine(it.Parts[0].Path, arcs(hint())))
+			var edge *scene.Item
+			for k := i + 1; k < len(sc.Items) && edge == nil; k++ {
+				if sc.Items[k].Role == RoleEdge && sc.Items[k].ID == it.ID {
+					edge = &sc.Items[k]
+				}
+			}
+			if edge == nil {
+				lines = append(lines, "casing of no edge")
+				break
+			}
+			var outline []scene.Part
+			for _, m := range edge.Ends {
+				outline = append(outline, m.Outline()...)
+				if s := marker(m, "var(--_bg)", "var(--_bg)"); s != "" {
+					lines = append(lines, "cm "+s)
+				}
+			}
+			if len(outline) != len(it.Parts)-1 {
+				lines = append(lines, "casing's markers differ")
+			}
+			for k := range outline {
+				if k+1 < len(it.Parts) && pelesvg.D(outline[k].Path) != pelesvg.D(it.Parts[k+1].Path) {
+					lines = append(lines, "casing's markers differ")
 				}
 			}
 		case RoleEdgeLabel:

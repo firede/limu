@@ -37,6 +37,9 @@ const (
 	RoleBlock     scene.Role = "block.block"
 	RoleEdge      scene.Role = "block.edge"
 	RoleEdgeLabel scene.Role = "block.edge-label"
+	// RoleCasing is a casing under an edge that crosses the border of a fill an author sets,
+	// drawn in the background so that the edge stands out on the fill.
+	RoleCasing scene.Role = "block.casing"
 )
 
 // shapes are the shapes Pele draws the types of block with, Pele's SHAPES; any other is a
@@ -88,6 +91,9 @@ type view struct {
 	shape  string
 	label  text.Label
 	author css.Author
+	// decls are the declarations of the block's classes and styles, which say whether it
+	// sets a fill, and whether that fill picks the color of its labels.
+	decls  []string
 	mask   int
 	dx, dy float64
 	// bw and bh are the size as drawn, which for a fixed shape is smaller than its cell.
@@ -646,7 +652,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 	// authorOf reads the declarations of a block's classes and styles, as Pele's styleOf
 	// does: a style list is split on commas only, so one entry can still hold several
 	// declarations.
-	authorOf := func(b *Block) css.Author {
+	authorOf := func(b *Block) []string {
 		var decls []string
 		add := func(styles []string) {
 			for _, s := range styles {
@@ -663,13 +669,15 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 			}
 		}
 		add(b.Styles)
-		return css.Declarations(decls)
+		return decls
 	}
 
 	newView := func(b *Block, index int) *view {
 		v := &view{block: b, index: index, kind: kindLeaf}
 		if b.Type != "space" {
-			v.author = authorOf(b)
+			decls := authorOf(b)
+			v.author = css.Declarations(decls)
+			v.decls = decls
 		}
 		var face text.Face
 		if v.author.Bold {
@@ -1036,7 +1044,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		FontSize: size,
 	}
 
-	var heading, clusters, nodes, edges, labels []scene.Item
+	var heading, clusters, casings, nodes, edges, labels []scene.Item
+	// fills are the composites whose authors paint them a fill, which edges inside them are
+	// drawn on, as Pele's fills.
+	var fills []draw.Fill
 	if !title.Empty() {
 		heading = append(heading, scene.Item{
 			Kind: scene.Text, Role: RoleTitle, Label: &title,
@@ -1052,11 +1063,18 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		if v.kind == kindComposite {
 			top := v.y - v.h/2
 			box := scene.Rect{X: v.x - v.w/2, Y: top, W: v.w, H: v.h}
+			if css.Paints(v.decls) {
+				fills = append(fills, draw.Fill{Box: [4]float64{v.x - v.w/2, top, v.x + v.w/2, top + v.h}, Decls: v.decls})
+			}
 			it := scene.Item{
 				Kind: scene.Group, Role: RoleComposite, ID: b.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted, OnFill: inks(v.decls)},
 				Author: v.author.Style,
+			}
+			// A composite is drawn at half its opacity, unless its author sets a fill.
+			if !css.FillDeclared(v.decls) {
+				it.Style.FillOpacity = style.N(0.5)
 			}
 			if !v.label.Empty() {
 				it.Label = &v.label
@@ -1068,7 +1086,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		it := scene.Item{
 			Kind: scene.Node, Role: RoleBlock, Shape: scene.Shape(v.shape), ID: b.ID, Class: classes,
 			Box:    scene.Rect{X: v.x - v.bw/2, Y: v.y - v.bh/2, W: v.bw, H: v.bh},
-			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
+			Style:  style.Style{Fill: style.Surface, Stroke: style.Border, OnFill: inks(v.decls)},
 			Author: v.author.Style,
 			At:     scene.Point{X: v.x + v.dx, Y: v.y + v.dy},
 		}
@@ -1108,11 +1126,22 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		if edge.Pattern == "dotted" {
 			own.Dash = style.Dashes(3, 4)
 		}
+		// An edge inside one fill is drawn in the color of its labels, and one that crosses the
+		// border of a fill is laid on a casing, as Pele's overFills finds.
+		edgeEnds := path.Ends(start, end)
+		ground, cased := draw.OnFills(path.Path, []float64{path.SX, path.SY, path.EX, path.EY}, fills, nil)
+		if cased {
+			if c := draw.Casing(RoleCasing, path.Path, edgeEnds, style.Style{}, edge.Thickness == "thick"); c != nil {
+				c.ID = edge.ID
+				casings = append(casings, *c)
+			}
+		}
+		own.Ground = ground
 		it := scene.Item{
 			Kind: scene.Edge, Role: RoleEdge, ID: edge.ID,
 			Box:   path.Path.Bounds(),
 			Parts: []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
-			Ends:  path.Ends(start, end),
+			Ends:  edgeEnds,
 			Style: own,
 		}
 		for k := 0; k+1 < len(r.points); k += 2 {
@@ -1138,9 +1167,15 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		}
 	}
 
-	sc.Items = make([]scene.Item, 0, len(heading)+len(clusters)+len(edges)+len(nodes)+len(labels))
-	for _, layer := range [][]scene.Item{heading, clusters, edges, nodes, labels} {
+	sc.Items = make([]scene.Item, 0, len(heading)+len(clusters)+len(casings)+len(edges)+len(nodes)+len(labels))
+	for _, layer := range [][]scene.Item{heading, clusters, casings, edges, nodes, labels} {
 		sc.Items = append(sc.Items, layer...)
 	}
 	return sc, nil
+}
+
+// inks reports whether Pele's ink picks the color of a label on a block's own fill: a fill it
+// picks a color on, and no color for the text, read or not.
+func inks(decls []string) bool {
+	return css.Inks(decls) && !css.Sets(decls, "color")
 }
