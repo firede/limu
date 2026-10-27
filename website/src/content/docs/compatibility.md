@@ -3,7 +3,7 @@ title: "Compatibility"
 description: "Supported diagram types, and how limu differs from Pele and Mermaid."
 ---
 
-limu parses Mermaid text the way [Pele](https://pele.run) 1.9.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
+limu parses Mermaid text the way [Pele](https://pele.run) 1.12.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
 
 ## Diagram types
 
