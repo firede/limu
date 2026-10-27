@@ -195,6 +195,27 @@ export default async function ({ src, pele, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, FRAGMENTS, random(42));
   for (let tries = 0; drawn < 4000 && tries < 40000; tries++) each(next());
+  // Labels on parallel edges that cover each other, stacked along their line, with the gap
+  // between the blocks widened where they do not fit: between rows and between columns, in a
+  // container, between round blocks whose stretched container gives some of the gap back
+  // over several rounds, and where widening leaves the labels covering each other. Each is
+  // drawn in hosts wide enough for the wider gap, too narrow for it, and so narrow that the
+  // layout is tight and widens no column.
+  for (const source of [
+    'block\n  a["Left"] b["Right"]\n  a -- "12 production<br>conforming" --> b\n  b -- "12 production<br>deviation" --> a',
+    'block\n  a["Left"] b["Right"] c\n  a -- "12 production<br>conforming" --> b\n  b -- "12 production<br>deviation" --> a\n  b -- "other<br>label" --> c\n  c -- "more<br>labels" --> b',
+    'block\n  columns 1\n  a["A"]\n  b["B"]\n  a -- "144 production conforming" --> b\n  b -- "144 production deviation" --> a\n  a -- "third" --> b',
+    'block\n  columns 2\n  block:g\n    columns 1\n    a\n    b\n  end\n  c\n  a -- "one label<br>two" --> b\n  b -- "three<br>four" --> a\n  a -- "five<br>six" --> b',
+    'block\n  columns 2\n  block:g["Group"]\n    a\n  end\n  b\n  a -- "one label<br>two" --> b\n  b -- "three<br>four" --> a',
+    'block\n  columns 1\n  block:g\n    a\n  end\n  b\n  a -- "one label" --> b\n  b -- "three" --> a\n  a -- "five" --> b',
+    'block\n  columns 3\n  block:g\n    columns 1\n    a\n    b\n  end\n  block:h\n    columns 1\n    c\n    d\n    e\n    f\n  end\n  x\n  a -- "one" --> b\n  b -- "two" --> a\n  a -- "three" --> b\n  a -- "four" --> b',
+    'block\n  columns 1\n  block:g\n    a(("A")) b(("B"))\n  end\n  w["a very very very wide block here, wider still"]\n  a -- "one label<br>two" --> b\n  b -- "three label<br>four" --> a',
+    'block\n  columns 1\n  block:g\n    a(("A")) b(("B")) c(("C"))\n  end\n  w["a very very very wide block here, wider still and still wider"]\n  a -- "one label<br>two" --> c\n  c -- "three label<br>four" --> a',
+  ]) {
+    if (seen.has(source)) continue;
+    seen.add(source);
+    for (const maxWidth of [undefined, 300, 150]) draw(source, maxWidth);
+  }
   // A case whose blocks run to thousands, as space:9999 makes them, is left out: the fixture
   // would hold every one of them.
   const cases = out.filter((c) => JSON.stringify(c).length <= 40000);
