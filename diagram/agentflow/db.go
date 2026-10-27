@@ -3,6 +3,7 @@ package agentflow
 import (
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
@@ -170,8 +171,10 @@ type options struct {
 	// Direction is the direction InheritDir gives where the diagram has none.
 	Direction string
 	// LineOffset is the number of lines of front matter before the text the parser sees,
-	// added to every line reported.
+	// added to every line reported where Source is not set.
 	LineOffset int
+	// Source is the text the parser reads, where errors in metadata are located.
+	Source string
 	// Log, if set, is told of each diagnostic as it is recorded.
 	Log func(severity, message string)
 }
@@ -554,9 +557,9 @@ func (d *DB) metadata(id, source string, loc *loc) (yaml.Value, error) {
 			}
 		}
 		if !ok {
-			at, line, column := "", 0, 0
+			at := ""
+			line, column := d.errorAt(loc)
 			if loc != nil {
-				line, column = loc.FirstLine+d.LineOffset, loc.FirstColumn+1
 				at = " (" + strconv.Itoa(line) + ":" + strconv.Itoa(column) + ")"
 			}
 			return nil, syntaxAt(`Metadata of "`+id+`" is not valid YAML. `+err.Error()+at, line, column)
@@ -568,13 +571,44 @@ func (d *DB) metadata(id, source string, loc *loc) (yaml.Value, error) {
 	return stripPrototypeKeys(parsed), nil
 }
 
+// errorAt is the line and column of an error at loc, as Pele's errorAt gives them: located in
+// Source as common.Locate locates it, so they are those of the text as its author wrote it.
+// Without Source, the line counts the lines of front matter before the text.
+func (d *DB) errorAt(loc *loc) (line, column int) {
+	if loc == nil {
+		return 0, 0
+	}
+	source := d.options.Source
+	if source == "" {
+		return loc.FirstLine + d.LineOffset, loc.FirstColumn + 1
+	}
+	// The start of the line, where indexOf's -1 for a line past the last starts over at 0.
+	start := 0
+	for k := 1; k < loc.FirstLine; k++ {
+		if nl := strings.IndexByte(source[start:], '\n'); nl >= 0 {
+			start += nl + 1
+		} else {
+			start = 0
+		}
+	}
+	// The column is counted in code units.
+	at := start
+	for n := loc.FirstColumn; n > 0 && at < len(source); n-- {
+		r, size := utf8.DecodeRuneInString(source[at:])
+		if r > 0xffff {
+			n--
+		}
+		at += size
+	}
+	l := common.Locate(source, at)
+	return l.Line, l.Column
+}
+
 // shapeError is the error of a metadata block's unknown shape, at the place of the block, as
 // Pele's shapeError makes it.
 func (d *DB) shapeError(message string, loc *loc) *diagram.Error {
 	e := &diagram.Error{Code: diagram.Semantic, Message: message, Type: "agentflow"}
-	if loc != nil {
-		e.Line, e.Column = loc.FirstLine+d.LineOffset, loc.FirstColumn+1
-	}
+	e.Line, e.Column = d.errorAt(loc)
 	return e
 }
 
@@ -819,7 +853,7 @@ func (d *DB) addSingleLink(start, end string, info *linkInfo, id string, hasID b
 	}
 
 	if max := d.options.MaxEdges; max >= 0 && len(d.Edges) >= max {
-		return agentError("Edge limit exceeded. "+strconv.Itoa(len(d.Edges))+" edges found, but the limit is "+strconv.Itoa(max)+".", diagram.Limit)
+		return agentError("Edge limit exceeded. The limit is "+strconv.Itoa(max)+".", diagram.Limit)
 	}
 	d.Edges = append(d.Edges, edge)
 	d.pairCount[pair] = existing + 1

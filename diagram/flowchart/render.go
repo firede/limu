@@ -220,6 +220,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			}
 		}
 	}
+	graphs.InheritCrossedDirections(cnodes, edgeEnds(graph.Edges, index))
 
 	rootDir := graphs.Direction(db.Direction)
 	if down {
@@ -455,7 +456,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		if hasClass(classes, "internal-link") && n.Label != "" && !o.NoLinks {
 			// The label is a note's name, but it ends up a link, so it is checked as an address.
 			name := text.DecodeEntities(n.Label)
-			if _, ok := url.LinkURL(url.SanitizeURL(name), true, o.LinkSchemes); ok {
+			if url.InternalLink(name, !o.NoLinks, o.LinkSchemes) {
 				it.Link = name
 			}
 		}
@@ -571,4 +572,20 @@ func hasClass(classes []string, name string) bool {
 		}
 	}
 	return false
+}
+
+// edgeEnds gives the nodes each edge runs between, -1 for an end that is no node, as the
+// edges Pele's draw passes to inheritCrossedDirections.
+func edgeEnds(edges []*GraphEdge, index map[string]int) [][2]int {
+	ends := make([][2]int, len(edges))
+	for k, edge := range edges {
+		ends[k] = [2]int{-1, -1}
+		if i, ok := index[edge.Start]; ok {
+			ends[k][0] = i
+		}
+		if i, ok := index[edge.End]; ok {
+			ends[k][1] = i
+		}
+	}
+	return ends
 }

@@ -18,7 +18,7 @@ func Parse(source string, config diagram.Config, title string, lineOffset int, l
 	flow, _ := config["flowchart"].(diagram.Config)
 	inherit, _ := flow["inheritDir"].(bool)
 	dir, _ := config["direction"].(string)
-	db := newDB(options{InheritDir: inherit, Direction: dir, LineOffset: lineOffset, MaxEdges: limits.MaxEdges})
+	db := newDB(options{InheritDir: inherit, Direction: dir, LineOffset: lineOffset, Source: source, MaxEdges: limits.MaxEdges})
 	if title != "" {
 		db.Title = title
 	}

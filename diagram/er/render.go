@@ -606,7 +606,7 @@ func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.
 			name = n.Label
 		}
 		display := text.DecodeEntities(name)
-		if _, ok := url.LinkURL(url.SanitizeURL(display), true, o.LinkSchemes); ok {
+		if url.InternalLink(display, !o.NoLinks, o.LinkSchemes) {
 			it.Link = display
 		}
 	}

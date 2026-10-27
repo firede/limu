@@ -189,7 +189,8 @@ export default async function ({ pele, src, cases, write, random }) {
     draw(s, undefined, { limit: Infinity });
     draw(s, 360, { limit: Infinity });
   }
-  for (const template of TEMPLATES) for (const p of payloads(pele)) each(template(p));
+  // A payload with half a pair of surrogates can't be carried to Go as it is.
+  for (const template of TEMPLATES) for (const p of payloads(pele)) if (p.isWellFormed()) each(template(p));
   const flowcharts = cases('flowchart').extracted.map(toSwimlane).filter(isSwimlane);
   flowcharts.forEach(each);
   const corpus = [...docs, ...own, ...flowcharts];

@@ -17,6 +17,10 @@ func TestSanitizeMatchesPele(t *testing.T) {
 			Link      *string `json:"link"`
 			Image     *string `json:"image"`
 			Mail      *string `json:"mail"`
+			// Internal and InternalMail are what internalLink says of the input as a note's
+			// name, with the schemes of Link and of Mail.
+			Internal     bool `json:"internal"`
+			InternalMail bool `json:"internalMail"`
 		} `json:"url"`
 	}
 	if err := fixture.Load("testdata/pele/url.json", &p); err != nil {
@@ -48,6 +52,14 @@ func TestSanitizeMatchesPele(t *testing.T) {
 		if got != c.Sanitized || safe != c.Safe || !same(link, c.Link) || !same(image, c.Image) || !same(mail, c.Mail) {
 			t.Errorf("%q\n got %q, safe %q, link %q, image %q, mail %q\nPele %q, safe %q, link %q, image %q, mail %q", c.Input,
 				got, safe, show(link), show(image), show(mail), c.Sanitized, c.Safe, show(c.Link), show(c.Image), show(c.Mail))
+			if failed++; failed > 20 {
+				t.Fatal("too many failures")
+			}
+		}
+		internal := InternalLink(c.Input, true, nil)
+		internalMail := InternalLink(c.Input, true, []string{"mailto", "obsidian"})
+		if internal != c.Internal || internalMail != c.InternalMail {
+			t.Errorf("%q as a note's name: internal %v, with mail %v; Pele %v, %v", c.Input, internal, internalMail, c.Internal, c.InternalMail)
 			if failed++; failed > 20 {
 				t.Fatal("too many failures")
 			}
