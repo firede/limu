@@ -155,6 +155,25 @@ func strokeName(p style.Paint) string {
 
 var textPaints = map[style.Paint]string{style.Fg: "var(--_fg)", style.Muted: "var(--_m)", style.Bg: "var(--_bg)"}
 
+// inkNames are the colors Pele's ink picks, by the theme's paints the default look settles
+// them as.
+var inkNames = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)", style.Bg: "var(--pele-fg-on-dark,#fff)"}
+
+// textPaint is the fill the oracle reads of an item's text: the color the default look picks
+// on a fill, where it picks one, and the diagram's own otherwise. The diagram's own is taken
+// as a paint the look never picks, to tell a color picked from it.
+func textPaint(it *scene.Item) string {
+	var look style.Look
+	own := it.Style
+	own.Text = style.SurfaceAlt
+	bare := own
+	bare.OnFill, bare.Ground = false, style.Paint{}
+	if got := look.Cascade(string(it.Role), own, it.Author); got.Text != look.Cascade(string(it.Role), bare, it.Author).Text {
+		return inkNames[got.Text]
+	}
+	return textPaints[it.Style.Text]
+}
+
 var anchors = [...]string{scene.Middle: "middle", scene.Start: "start", scene.End: "end"}
 
 // written is text as Pele's esc writes it, without the control characters XML does not
@@ -190,7 +209,7 @@ func sceneLines(sc *scene.Scene) []string {
 			size = num(l.Size)
 		}
 		for _, line := range l.Lines {
-			at := prefix + "t " + pt(it.At.X, y) + " " + size + " " + anchors[it.Align] + " " + textPaints[it.Style.Text] + " " +
+			at := prefix + "t " + pt(it.At.X, y) + " " + size + " " + anchors[it.Align] + " " + textPaint(it) + " " +
 				weight + " " + author(textView, it.Author) + " "
 			if len(line) == 0 {
 				lines = append(lines, at+" ")
