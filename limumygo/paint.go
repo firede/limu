@@ -164,7 +164,7 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 		case scene.Solid:
 			fill = Color(s.Line, s.Opacity)
 		case scene.Hollow:
-			fill = Color(s.Bg, s.Opacity)
+			fill = Color(s.Hollow, s.Opacity)
 		case scene.Shade:
 			stroke = ui.Color{}
 			fill = Color(shade(s.Bg, it.Author.Fill.Set()), s.Opacity)
@@ -261,7 +261,7 @@ func (p *Painter) Ends(it *scene.Item, s style.Resolved) {
 			case scene.StrokeOnly:
 				p.stroke(path, line, pn)
 			case scene.Hollow:
-				p.fill(path, Color(s.Bg, s.Opacity))
+				p.fill(path, Color(s.Hollow, s.Opacity))
 				p.stroke(path, line, pn)
 			}
 		}

@@ -187,3 +187,23 @@ func TestInkOnFill(t *testing.T) {
 		t.Errorf("dark theme on navy: %v", got)
 	}
 }
+
+func TestGround(t *testing.T) {
+	var look Look
+	th := Default()
+	navy := Of(Hex("#000080"))
+	own := Style{Stroke: Line, Ground: navy}
+	r := look.Resolve("x", own, Style{})
+	if r.Stroke != th.Bg || r.Marker != th.Bg || r.Hollow != Hex("#000080") || r.Bg != th.Bg {
+		t.Errorf("on navy: %+v", r)
+	}
+	if r := look.Resolve("x", own, Style{Stroke: Of(Hex("#f00"))}); r.Stroke != Hex("#f00") {
+		t.Errorf("an author's stroke: %v", r.Stroke)
+	}
+	if r := look.Resolve("x", Style{Stroke: Line}, Style{}); r.Stroke != th.Line || r.Hollow != th.Bg {
+		t.Errorf("no ground: %+v", r)
+	}
+	if !Inks(Style{Fill: navy}) || Inks(Style{Fill: navy, FillOpacity: N(0.4)}) || Inks(Style{}) {
+		t.Error("Inks")
+	}
+}

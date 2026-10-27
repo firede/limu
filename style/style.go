@@ -222,6 +222,13 @@ type Style struct {
 	// Pele's ink picks a color for a label on a fill a style sets. A diagram sets it on the
 	// parts whose labels Pele draws so.
 	OnFill bool
+	// Ground is the fill under the part where it lies inside a fill its author sets on
+	// another part, as an edge inside a group with a fill of its own. Unless an override or
+	// the part's author sets a stroke, the part is stroked in the theme's Fg or Bg, whichever
+	// stands out more against the ground, as Pele draws an edge inside one fill in the color
+	// of that fill's labels, and what it paints Hollow is filled with the ground, as Pele's
+	// hollowOn fills a marker. A diagram sets it only on a fill ink can pick a color on.
+	Ground Paint
 }
 
 // Over is s laid over base: what s sets, and what base sets where s does not.
@@ -266,6 +273,9 @@ func (s Style) Over(base Style) Style {
 		s.HaloWidth = base.HaloWidth
 	}
 	s.OnFill = s.OnFill || base.OnFill
+	if !s.Ground.Set() {
+		s.Ground = base.Ground
+	}
 	return s
 }
 
@@ -291,9 +301,15 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 		over = l.Overrides[role]
 	}
 	s := author.Over(over.Over(own))
-	if set := author.Over(over); s.OnFill && !set.Text.Set() {
+	set := author.Over(over)
+	if s.OnFill && !set.Text.Set() {
 		if text, ok := ink(th, set); ok {
 			s.Text = text
+		}
+	}
+	if s.Ground.Visible() && !set.Stroke.Set() {
+		if stroke, ok := ink(th, Style{Fill: s.Ground}); ok {
+			s.Stroke = stroke
 		}
 	}
 	if !s.StrokeWidth.set {
@@ -325,6 +341,14 @@ func ink(th *Theme, set Style) (Paint, bool) {
 		return Fg, true
 	}
 	return Bg, true
+}
+
+// Inks reports whether a fill an author sets is one ink picks a text color on: a color drawn
+// at no less than half its opacity, as Pele's ink knows one. A diagram asks it to know whether
+// an edge inside the fill takes that color, or a casing, as Pele's edgeInk does.
+func Inks(author Style) bool {
+	_, ok := ink(defaultTheme, author)
+	return ok
 }
 
 // luminance is a color's relative luminance, as WCAG 2 defines it and Pele's ink computes
@@ -363,7 +387,8 @@ type Resolved struct {
 	// with, as Pele fills them in the color of the line alone.
 	Marker      Color
 	Line        Color // the theme's color of lines, for parts painted solid
-	Bg          Color // the theme's background, for parts painted hollow
+	Bg          Color // the theme's background, for parts painted shade
+	Hollow      Color // the theme's background, or the ground, for parts painted hollow
 	StrokeWidth float64
 	Radius      float64
 	Dash        []float64 // none for a solid line
@@ -385,6 +410,10 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 		s.Join = JoinMiter
 	}
 	stroke := s.Stroke.Color(th)
+	hollow := th.Bg
+	if s.Ground.Visible() {
+		hollow = s.Ground.Color(th)
+	}
 	return Resolved{
 		Fill:        at(s.Fill.Color(th), s.FillOpacity),
 		Stroke:      at(stroke, s.StrokeOpacity),
@@ -392,6 +421,7 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 		Marker:      stroke,
 		Line:        th.Line,
 		Bg:          th.Bg,
+		Hollow:      hollow,
 		StrokeWidth: s.StrokeWidth.v,
 		Radius:      s.Radius.v,
 		Dash:        s.Dash.v,

@@ -323,7 +323,7 @@ func (w *Writer) Parts(it *scene.Item, st style.Style) {
 		case scene.Solid:
 			fill, fillOpacity = style.Line, style.Num{}
 		case scene.Hollow:
-			fill, fillOpacity = style.Bg, style.Num{}
+			fill, fillOpacity = hollow(st), style.Num{}
 		case scene.Shade:
 			fill, stroke, fillOpacity = shade(it), style.None, style.Num{}
 		}
@@ -334,6 +334,15 @@ func (w *Writer) Parts(it *scene.Item, st style.Style) {
 		}
 		b.WriteString("/>")
 	}
+}
+
+// hollow is the fill of a part painted Hollow: the theme's background, or the ground the
+// style gives, as Pele's hollowOn fills a marker on a fill.
+func hollow(st style.Style) style.Paint {
+	if st.Ground.Visible() {
+		return st.Ground
+	}
+	return style.Bg
 }
 
 // shade is the fill of an item's parts painted Shade: the theme's background, or, when the
@@ -371,7 +380,7 @@ func (w *Writer) Ends(it *scene.Item, st style.Style) {
 			case scene.StrokeOnly:
 				fill = style.None
 			case scene.Hollow:
-				fill = style.Bg
+				fill = hollow(st)
 			}
 			// Filled in the stroke's color alone, and stroked at the stroke's opacity.
 			w.PaintAttr("fill", fill)
