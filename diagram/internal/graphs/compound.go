@@ -508,6 +508,38 @@ func routeCrossings(nodes []CNode, edges []CEdge, style routeStyle) int {
 	return total
 }
 
+// InheritCrossedDirections gives each group that an edge crosses its parent's direction, as
+// Pele's inheritCrossedDirections does, to match Mermaid. An edge crosses the groups that hold
+// one of its ends and not the other. ends holds the nodes each edge runs between, -1 for an
+// end that is no node.
+func InheritCrossedDirections(nodes []CNode, ends [][2]int) {
+	ancestors := func(i int) map[int]bool {
+		set := map[int]bool{}
+		for p := nodes[i].Parent; p >= 0 && !set[p]; p = nodes[p].Parent {
+			set[p] = true
+		}
+		return set
+	}
+	for _, e := range ends {
+		src, dst := e[0], e[1]
+		if src < 0 || dst < 0 || src == dst {
+			continue
+		}
+		a := ancestors(src)
+		b := ancestors(dst)
+		for g := range a {
+			if !b[g] {
+				nodes[g].Dir = ""
+			}
+		}
+		for g := range b {
+			if !a[g] {
+				nodes[g].Dir = ""
+			}
+		}
+	}
+}
+
 // Shift moves a laid out graph by ox, oy, as Pele's shiftLayout does.
 func Shift(nodes []CNode, edges []CEdge, ox, oy float64) {
 	for i := range nodes {
