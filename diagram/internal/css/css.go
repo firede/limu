@@ -121,8 +121,8 @@ func LineDeclared(decls []string) bool {
 // ShapeCSS is the style Pele's resolveStyle writes on a shape of declarations, as it writes
 // it into an attribute: each property of a shape that is kept, with the last value given it,
 // in the order the properties first came, "fill:red;stroke:blue;", with & and " written as
-// entities and the control characters XML does not allow dropped; "" for none. (A value with
-// < or > is dropped before, as unsafe.) A diagram that decides by what the attribute holds,
+// entities; "" for none. (A value with < or >, or with a character XML does not allow, is
+// dropped before, as unsafe.) A diagram that decides by what the attribute holds,
 // as a treemap does whether a class fills a section, reads it here.
 func ShapeCSS(decls []string) string {
 	var props, values []string
@@ -157,7 +157,6 @@ func ShapeCSS(decls []string) string {
 				b.WriteString("&amp;")
 			case r == '"':
 				b.WriteString("&quot;")
-			case r <= 0x08 || r == 0x0b || r == 0x0c || r >= 0x0e && r <= 0x1f || r == 0x7f:
 			default:
 				b.WriteRune(r)
 			}
@@ -276,10 +275,18 @@ func dashes(value string) style.Dash {
 
 // unsafe matches Pele's RE_UNSAFE, /url\s*\(|expression\s*\(|javascript:|[<>{};\\]|@import|image-set|\/\*/i:
 // what in a value could load or run something. The i flag, without u, folds the case of
-// ASCII letters only, and \s is JavaScript's white space.
+// ASCII letters only, and \s is JavaScript's white space. It also matches what Pele's
+// RE_INVALID_XML does, a character XML does not allow, which esc would drop and so could
+// make a value unsafe once written. (A lone surrogate, which it matches too, a Go string does
+// not hold.)
 func unsafe(value string) bool {
 	if strings.ContainsAny(value, "<>{};\\") {
 		return true
+	}
+	for _, r := range value {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
+			return true
+		}
 	}
 	v := lowerASCII(value)
 	for _, bad := range []string{"javascript:", "@import", "image-set", "/*"} {

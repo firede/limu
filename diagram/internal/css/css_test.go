@@ -100,7 +100,8 @@ func TestDeclarationsReadAsJavaScript(t *testing.T) {
 		"fill:RED":             red,
 		"fill:blac\u212a":      {}, // a Kelvin sign is no k to CSS
 		"fill:rgb (255,0,0)":   {},
-		"fill:rgb(255\n0\f0)":  red,
+		"fill:rgb(255\n0\t0)":  red,
+		"fill:rgb(255\n0\f0)":  {}, // a form feed is no character XML allows
 		"fill:NONE":            style.None,
 	} {
 		if got := Declarations([]string{decl}).Style.Fill; got != want {
@@ -168,8 +169,8 @@ func TestShapeCSS(t *testing.T) {
 		{[]string{"color:red", "font-size:20px"}, ""},
 		{[]string{" FILL :red !important", "stroke:blue", "fill:green", "x:y", ":z", "rx"}, "fill:green;stroke:blue;"},
 		{[]string{`stroke:a"b&c`, "fill:url(x)", `stroke-width:\1`}, "stroke:a&quot;b&amp;c;"},
-		// A control character is kept and then dropped as it is written.
-		{[]string{"opacity:0.5", "stroke-linecap:round", "stroke-dasharray:1\x7f2", "rx:\x01"}, "opacity:0.5;stroke-linecap:round;stroke-dasharray:12;rx:;"},
+		// A value with a character XML does not allow is dropped, as Pele drops it.
+		{[]string{"opacity:0.5", "stroke-linecap:round", "stroke-dasharray:1\x7f2", "rx:\x01"}, "opacity:0.5;stroke-linecap:round;"},
 	} {
 		if got := ShapeCSS(c.decls); got != c.want {
 			t.Errorf("ShapeCSS(%q) = %q, want %q", c.decls, got, c.want)

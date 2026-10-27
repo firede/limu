@@ -2,7 +2,6 @@ package sankey
 
 import (
 	"math"
-	"strings"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
@@ -89,14 +88,6 @@ func fillStyle(color any) (style.Style, bool) {
 	if css.ShapeCSS([]string{"fill:" + s}) == "" {
 		return style.Style{}, false
 	}
-	// Pele writes the style without the control characters XML does not allow, and that is
-	// what a browser reads.
-	s = strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
-			return -1
-		}
-		return r
-	}, s)
 	return css.Declarations([]string{"fill:" + s}).Style, true
 }
 
@@ -139,8 +130,10 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth, natural 
 	chartHeight := numberOption(conf, "height", 400, 1, 10000)
 	nodeWidth := min(numberOption(conf, "nodeWidth", 10, 1, 200), chartWidth)
 	showValues := conf["showValues"] != false
-	prefix := textOption(conf, "prefix")
-	suffix := textOption(conf, "suffix")
+	// The affixes are decoded once, here, as Pele's draw decodes them, and not again where
+	// they are written.
+	prefix := text.DecodeEntities(textOption(conf, "prefix"))
+	suffix := text.DecodeEntities(textOption(conf, "suffix"))
 	outlined := conf["labelStyle"] == "outlined"
 	align := alignment("justify")
 	switch a := conf["nodeAlignment"]; a {
@@ -393,7 +386,7 @@ func draw(m *Model, conf diagram.Config, o *layout.Options, chartWidth, natural 
 			Style:  style.Style{Fill: style.Series(end), FillOpacity: style.N(linkOpacity)},
 			Author: author,
 			Tooltip: text.DecodeEntities(from) + " → " + text.DecodeEntities(to) + ": " +
-				text.DecodeEntities(prefix) + chars.NumberString(rounded(link.value)) + text.DecodeEntities(suffix),
+				prefix + chars.NumberString(rounded(link.value)) + suffix,
 		})
 	}
 

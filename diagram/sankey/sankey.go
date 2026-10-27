@@ -69,7 +69,7 @@ func (m *Model) addLink(source, target int, value float64) {
 func Parse(source, title string) (*Model, error) {
 	m := newModel()
 	m.Title = title
-	if err := parseSankey(prepareTextForParsing(source), m); err != nil {
+	if err := parseSankey(prepareTextForParsing(source, nil), m, source); err != nil {
 		return nil, err
 	}
 	return m, nil
