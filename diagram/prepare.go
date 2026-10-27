@@ -81,22 +81,35 @@ func (p *Prepared) Source(keepComments bool) string {
 // as its author wrote it, as the function Pele's inSource makes does: the text with its line
 // breaks normalized and the line feed Source adds, and the byte in it. It reads the text
 // again, recording how it was rewritten, only when the function is first called, since that
-// is only to report an error.
+// is only to report an error. Where reading the text again does not give what Source gives, as
+// for a Prepared that Prepare did not make or whose fields were changed since, it finds each
+// byte where it is in the text Source gives.
 func (p *Prepared) InSource(keepComments bool) func(at int) (source string, offset int) {
 	var steps [][]edit.Edit
 	var source string
-	read := false
+	read, same := false, false
 	return func(at int) (string, int) {
 		if !read {
 			read = true
-			pre, _ := preprocess(p.source, &steps)
-			text := pre.WithComments
-			if !keepComments {
-				text = cleanupComments(text, &steps)
+			pre, err := preprocess(p.source, &steps)
+			if err == nil {
+				text := pre.WithComments
+				if !keepComments {
+					text = cleanupComments(text, &steps)
+				}
+				given := p.Source(keepComments)
+				same = p.source != "" && encodeEntities(text, &steps)+"\n" == given
+				// Match the line feed Source adds.
+				source = normalizeLineBreaks(p.source) + "\n"
+				if !same {
+					source = given
+				}
+			} else {
+				source = p.Source(keepComments)
 			}
-			encodeEntities(text, &steps)
-			// Match the line feed Source adds.
-			source = normalizeLineBreaks(p.source) + "\n"
+		}
+		if !same {
+			return source, at
 		}
 		return source, edit.InputOffset(steps, at)
 	}

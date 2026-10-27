@@ -50,7 +50,9 @@ var origins sync.Map // textID → *origin
 // parseSource does: the errors parse locates in that text report where they are in the text
 // its author wrote (locatingIn), and its errors are tagged with diagram.TagError (tagErrors).
 func ParsePrepared[T any](p *diagram.Prepared, keepComments bool, parse func(src string) (T, error)) (T, error) {
-	src := p.Source(keepComments)
+	// A copy of its own, since a text is known by where it is held, and Source may give one
+	// that is held elsewhere too, as "\n" for an empty text is.
+	src := strings.Clone(p.Source(keepComments))
 	id := idOf(src)
 	origins.Store(id, &origin{find: p.InSource(keepComments)})
 	defer origins.Delete(id)
