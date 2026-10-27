@@ -126,3 +126,5 @@ flowchart LR
 limu reads `fill`, `stroke`, `color`, the opacities, `stroke-width`, `stroke-dasharray`, `stroke-linecap`, `stroke-linejoin`, `rx` and `ry`. It also reads the font's weight, style and size, which change the size of text and so go to layout. It ignores other properties, and any value that could reach outside the diagram.
 
 The author's styles sit above your overrides. Their colors are fixed and don't change with the theme.
+
+When the author fills a part and sets no color for its text, the text is drawn in the theme's foreground or background, whichever stands out more against the fill, as Pele does. The same goes for edges and labels that lie inside a group the author fills, such as a subgraph, a block or a sequence diagram's box. An edge that crosses the border of such a fill is drawn over a casing in the background's color, so it stays visible where it runs over the fill.

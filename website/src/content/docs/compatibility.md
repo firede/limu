@@ -63,7 +63,7 @@ Pele renders SVG in a browser, while limu lays out a scene for a backend to draw
 | `type`, `mermaidType` | `Diagram.Type()`, `Diagram.MermaidType()` |
 | `PeleError` and its codes | `diagram.Error` and its codes |
 | `limit`, `maxEdges`, `config` | `diagram.Options` |
-| `measurer`, `fontSize`, `maxWidth`, `autoDirection`, `directionBreakpoint`, `padding`, `now` | `layout.Options`, where `KeepDirection` is the opposite of `autoDirection` |
+| `measurer`, `fontSize`, `maxWidth`, `autoDirection`, `directionBreakpoint`, `padding`, `monospace`, `now` | `layout.Options`, where `KeepDirection` is the opposite of `autoDirection` |
 | `links`, `images`, `linkSchemes`, `imageSchemes` | `layout.Options` and the svg package's `Options` |
 | `fontFamily`, `fontFamilyMono` | The svg package's `FontFamily` and `MonoFamily` |
 | `icons` | `layout.Options.Icons`, plus the svg package's `IconMarkup` or limumygo's `DrawIcon` |

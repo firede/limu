@@ -18,7 +18,8 @@ text ──parse──▶ model ──layout──▶ scene.Scene ──backend�
 Anything that changes where things are belongs to layout, and changing it lays the diagram
 out again. That covers the measurer and its fonts, the text size, the width the host has
 and whether a diagram may turn to fit it, the padding around a diagram, a grid to snap to,
-how edges are routed, and the present and time zone of a gantt chart. `Padding` is nil for
+how edges are routed, which parts of diagrams are set in the monospace face
+(`Options.Monospace`, Pele's `monospace`), and the present and time zone of a gantt chart. `Padding` is nil for
 Pele's 8 and may be set to 0, and `Options.Pad` reads it. Everything else is style, which
 is settled only when a scene is drawn, so changing it only redraws.
 
@@ -228,6 +229,22 @@ passes them on to the browser. The svg package writes them where they're set. li
 passes them, with SVG's initial miter limit of 4 and the style's dashes, to MyGo, which
 strokes them as SVG does.
 
+A fill the author sets can be dark, and text and lines drawn in the theme's colors would be
+lost on it. Pele 1.12 picks a color for what lies on such a fill, the theme's foreground or
+background, whichever stands out more against it, and limu keeps that choice in style, since
+it changes no position. A diagram says only what lies on a fill, and the style picks the
+color when the scene is drawn. `OnFill` marks a part whose text is set on its own fill.
+`Ground` is the fill under a part that lies inside another part's fill, as an edge inside a
+group, and its stroke and text take the color picked on it. What such a part paints
+`Hollow`, as an open marker, is filled with the ground, which `Resolved.Hollow` gives.
+`TextGround` is the fill under a part's text alone. A color the author or an override sets
+always wins. A diagram sets a ground only on a fill Pele's `ink` picks a color on, an opaque
+enough fill whose opacities can be read, and `css.Inks` decides that from the author's
+declarations as Pele reads them. An edge that crosses the border of a fill gets a casing
+instead, an item drawn under it in the background's color and four units wider, as Pele's
+`edgeCasing` draws one, so that the edge stands out where it runs over the fill.
+`draw.FillUnder` finds which fill holds an edge, and `draw.Casing` makes the casing.
+
 limumygo draws what the svg package writes, but not in every way as a browser draws SVG.
 
 - MyGo has no group to draw at an opacity, so an item's opacity is applied to each color
@@ -299,6 +316,9 @@ as Pele keeps it under `src/layout`, `src/svg` and `src/diagrams/common`.
   variable `graph`, which would hide the package.
 - `draw` has the geometry of shapes and edges, Pele's `svg/shapes.ts`, `svg/edges.ts` and
   `svg/cluster.ts`.
+- `edit` records the edits preprocessing makes to a diagram's text, as Pele's `Edit` does,
+  so that an error is placed where it is in the text as written, not in the text the
+  parser read.
 - `css` reads what the author sets with `classDef` and `style` lines, as Pele's
   `resolveStyle` does. It belongs to the diagrams rather than to `style`, because the
   weight, slant and size of text the author sets are inputs to layout.
@@ -308,7 +328,8 @@ as Pele keeps it under `src/layout`, `src/svg` and `src/diagrams/common`.
   host can draw and the glyphs drawn for them, the lexer and reader of the Langium grammars
   with their shared tokens and `AccDescr`, the scanning helpers of the hand-written Jison
   lexers such as `WordAt`, the indented outlines of kanban boards and mindmaps, and the
-  errors of a diagram's text.
+  errors of a diagram's text. `ParsePrepared` runs a diagram's parser and places its
+  errors in the text as written, as Pele's `locatingIn` does, through `edit`.
 
 `layout.Options.Routing` reaches the diagrams on the layered layout, which are flowcharts
 and swimlane, agent flow, state, class, entity relationship, requirement and use case
