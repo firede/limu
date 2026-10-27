@@ -20,14 +20,15 @@ import { readLabel } from '../lib/limu.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './block.mjs';
 
 // The last opacity an element's style attribute gives a property, as a browser takes it over
-// the element's attribute: a number, or a percentage, clamped to [0, 1].
+// the element's attribute: a number as CSS writes one, with digits after a point it has, or a
+// percentage, clamped to [0, 1].
 function styleOpacity(tag, prop) {
   let v;
   for (const decl of (attr(tag, 'style') ?? '').split(';')) {
     const at = decl.indexOf(':');
     if (at < 0 || decl.slice(0, at).trim().toLowerCase() !== prop) continue;
     const raw = decl.slice(at + 1).trim();
-    const m = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(%?)$/i.exec(raw);
+    const m = /^([+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?)(%?)$/i.exec(raw);
     if (m) v = Math.max(0, Math.min(1, Number(m[1]) / (m[2] ? 100 : 1)));
   }
   return v;

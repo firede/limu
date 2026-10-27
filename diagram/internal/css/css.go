@@ -247,12 +247,11 @@ func paint(value string) style.Paint {
 
 // opacity reads an opacity, as 0.5 or 50%, kept from 0 to 1, or unset for one it cannot read.
 func opacity(value string) style.Num {
-	pct := strings.HasSuffix(value, "%")
-	f, err := strconv.ParseFloat(strings.TrimSuffix(value, "%"), 64)
-	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+	f, unit, ok := cssNumber(value)
+	if !ok || unit != "" && unit != "%" || math.IsInf(f, 0) {
 		return style.Num{}
 	}
-	if pct {
+	if unit == "%" {
 		f /= 100
 	}
 	return style.N(max(0, min(1, f)))
@@ -275,10 +274,15 @@ func fontPixels(value string) (float64, bool) {
 	return f, err == nil
 }
 
-// length reads a number of pixels, with or without px.
+// length reads a number of pixels, with or without px, as a browser reads a CSS number: not
+// inf, NaN or a hexadecimal float, which Go's ParseFloat reads too.
 func length(value string) (float64, bool) {
-	f, err := strconv.ParseFloat(strings.TrimSuffix(cssTrim(value), "px"), 64)
-	return f, err == nil
+	v := cssTrim(value)
+	if len(v) >= 2 && chars.EqualFoldASCII(v[len(v)-2:], "px") {
+		v = v[:len(v)-2]
+	}
+	f, unit, ok := cssNumber(v)
+	return f, ok && unit == "" && !math.IsInf(f, 0)
 }
 
 // cssTrim is s without the white space of CSS about it: spaces, tabs, line feeds, carriage

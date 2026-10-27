@@ -264,3 +264,21 @@ func TestInksText(t *testing.T) {
 		}
 	}
 }
+
+// Widths and opacities are numbers as CSS writes them, which Go's ParseFloat reads more of.
+func TestCSSNumbers(t *testing.T) {
+	for value, want := range map[string]float64{
+		"1e1": 10, "+3": 3, "3PX": 3, " 2px ": 2,
+		"inf": -1, "NaN": -1, "0x10": -1, "1.": -1, "1e400": -1, "2em": -1,
+	} {
+		got := Declarations([]string{"stroke-width:" + value}).Style.StrokeWidth.Or(-1)
+		if got != want {
+			t.Errorf("stroke-width:%s gives %v, not %v", value, got, want)
+		}
+	}
+	for value, want := range map[string]float64{"0.5": 0.5, "50%": 0.5, "2": 1, "0.": -1, "inf": -1, "5deg": -1} {
+		if got := Declarations([]string{"opacity:" + value}).Style.Opacity.Or(-1); got != want {
+			t.Errorf("opacity:%s gives %v, not %v", value, got, want)
+		}
+	}
+}
