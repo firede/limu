@@ -89,3 +89,20 @@ func TestInternalLink(t *testing.T) {
 		}
 	}
 }
+
+// decodeURIComponent decodes U+FFFD written in percent escapes, and throws on a surrogate or an
+// overlong sequence.
+func TestDecodeReplacementCharacter(t *testing.T) {
+	for in, want := range map[string]string{
+		"a%EF%BF%BDb": "a�b",
+		"a%ED%A0%80b": "a%ED%A0%80b",
+		"a%C0%80b":    "a%C0%80b",
+	} {
+		if got := decode(in); got != want {
+			t.Errorf("decode(%q) = %q, not %q", in, got, want)
+		}
+	}
+	if got := SanitizeURL("javascript%3Aalert(1)%EF%BF%BD"); got != blank {
+		t.Errorf("SanitizeURL of an escaped javascript: URL = %q", got)
+	}
+}

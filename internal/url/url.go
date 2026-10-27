@@ -60,8 +60,10 @@ func decode(uri string) string {
 			seq = append(seq, c)
 			k += 2
 		}
+		// DecodeRune gives RuneError and a size of 1 for a sequence that isn't UTF-8, such as an
+		// overlong one or a surrogate, and a size of 3 for U+FFFD itself, which decodes.
 		r, size := utf8.DecodeRune(seq)
-		if r == utf8.RuneError || size != len(seq) {
+		if r == utf8.RuneError && size == 1 || size != len(seq) {
 			return uri
 		}
 		b.Write(seq)
