@@ -6,7 +6,8 @@
 // A lane has the role swimlane.lane (RoleLane). Everything else is drawn by the flowchart's
 // layout and keeps the flowchart's roles: flowchart.node, flowchart.edge,
 // flowchart.edge-label, flowchart.cluster and flowchart.cluster-title for a subgraph inside
-// a lane, and flowchart.title. A host that styles flowcharts styles a swimlane diagram's
+// a lane, flowchart.casing under an edge that crosses a lane's or a subgraph's fill its
+// author sets, and flowchart.title. A host that styles flowcharts styles a swimlane diagram's
 // nodes and edges the same way.
 package swimlane
 
@@ -54,6 +55,7 @@ var variant = flowchart.Variant{
 		return graphs.Lanes(nodes, edges, dir, opt, pad)
 	},
 	DrawGroup: drawLane,
+	FilledBox: laneBand,
 }
 
 // prepare puts the nodes outside every lane in one unnamed lane, as Mermaid does, and drops
@@ -90,7 +92,7 @@ func prepare(g *flowchart.Graph) {
 // drawLane draws a lane, as Pele's drawLane does: an outline the length of the diagram, with
 // its title in a band at the start. Where the lanes run across, the band is at their left
 // and the title is turned to read upwards.
-func drawLane(c *graphs.CNode, label *text.Label, author css.Author, classes []string, id string, dir graphs.Dir) scene.Item {
+func drawLane(c *graphs.CNode, label *text.Label, author css.Author, decls []string, classes []string, id string, dir graphs.Dir) scene.Item {
 	left := c.X - c.W/2
 	top := c.Y - c.H/2
 	sideways := dir == graphs.LR || dir == graphs.RL
@@ -103,8 +105,10 @@ func drawLane(c *graphs.CNode, label *text.Label, author css.Author, classes []s
 	}
 	it := scene.Item{
 		Kind: scene.Group, Role: RoleLane, ID: id, Class: classes, Box: outline,
-		Parts:  []scene.Part{{Box: outline, Paint: scene.StrokeOnly}, {Box: band}},
-		Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted},
+		Parts: []scene.Part{{Box: outline, Paint: scene.StrokeOnly}, {Box: band}},
+		// The title lies on the band, and takes the color that stands out on a fill its author
+		// sets.
+		Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted, OnFill: css.InksText(decls, decls)},
 		Author: author.Style,
 	}
 	if !label.Empty() {
@@ -114,4 +118,15 @@ func drawLane(c *graphs.CNode, label *text.Label, author css.Author, classes []s
 		}
 	}
 	return it
+}
+
+// laneBand is the band of a lane that takes the fill its author sets, as left, top, right and
+// bottom, as Pele's laneBand gives it.
+func laneBand(c *graphs.CNode, dir graphs.Dir) [4]float64 {
+	left := c.X - c.W/2
+	top := c.Y - c.H/2
+	if dir == graphs.LR || dir == graphs.RL {
+		return [4]float64{left, top, left + c.PadTop, top + c.H}
+	}
+	return [4]float64{left, top, left + c.W, top + c.PadTop}
 }

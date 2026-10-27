@@ -38,9 +38,14 @@ type Variant struct {
 	// laid out tightly to fit the host's width.
 	Layout func(nodes []graphs.CNode, edges []graphs.CEdge, dir graphs.Dir, opt graphs.LayeredOptions, tight bool) graphs.CompoundResult
 	// DrawGroup, if set, draws a top-level group in place of a cluster: c is the group as it
-	// was laid out, label its title, author what its author set for it, and dir the
-	// direction the diagram was laid out in.
-	DrawGroup func(c *graphs.CNode, label *text.Label, author css.Author, classes []string, id string, dir graphs.Dir) scene.Item
+	// was laid out, label its title, author what its author set for it, decls the
+	// declarations that is read from, and dir the direction the diagram was laid out in.
+	DrawGroup func(c *graphs.CNode, label *text.Label, author css.Author, decls []string, classes []string, id string, dir graphs.Dir) scene.Item
+	// FilledBox, if set, is the part of a group DrawGroup draws that takes the fill its author
+	// sets, as left, top, right and bottom, as Pele's filledBox gives it. Edges are cased or
+	// drawn in the fill's label color by it; without it, a fill of such a group is not looked
+	// at.
+	FilledBox func(c *graphs.CNode, dir graphs.Dir) [4]float64
 }
 
 // Layout lays out a parsed flowchart as a scene, as Pele's renderFlowchart draws it: across
@@ -93,6 +98,8 @@ type view struct {
 	shape  string
 	w, h   float64
 	dy     float64
+	// decls are what its author declares, which Pele reads in its style.
+	decls []string
 }
 
 // lay lays the flowchart out once, as Pele's draw does, with the variant v if it is not nil.
@@ -209,6 +216,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			v = view{node: node, author: author, label: label, shape: shape, w: w, h: h, dy: dy}
 			c = graphs.NewCNode(w, h, -1)
 		}
+		v.decls = decls
 		c.Seq = float64(len(views))
 		views = append(views, v)
 		cnodes = append(cnodes, c)
@@ -354,7 +362,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		}
 	}
 
-	var titles, clusters, struck, nodes, edges, labels []scene.Item
+	var titles, clusters, casings, struck, nodes, edges, labels []scene.Item
+	// The groups whose authors set them a fill, which the edges are checked against.
+	var fills []draw.Fill
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
 			Kind: scene.Text, Role: RoleTitle, Label: &title,
@@ -368,12 +378,18 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		x, y := c.X, c.Y
 		classes, tags := common.Clickable(common.ClassNames(common.TrimDefault(n.CSSClasses)))
 		if c.IsGroup && variant != nil && variant.DrawGroup != nil && c.Parent < 0 {
-			lane := variant.DrawGroup(c, &v.label, v.author, classes, n.ID, rootDir)
+			if css.Paints(v.decls) && variant.FilledBox != nil {
+				fills = append(fills, draw.Fill{Box: variant.FilledBox(c, rootDir), Decls: v.decls})
+			}
+			lane := variant.DrawGroup(c, &v.label, v.author, v.decls, classes, n.ID, rootDir)
 			lane.Tags = tags
 			clusters = append(clusters, lane)
 			continue
 		}
 		if c.IsGroup {
+			if css.Paints(v.decls) {
+				fills = append(fills, draw.Fill{Box: [4]float64{x - c.W/2, y - c.H/2, x + c.W/2, y + c.H/2}, Decls: v.decls})
+			}
 			titleX := draw.ClusterTitleX(node(i), v.label.Width, crossings, gpad)
 			titleY := y - c.H/2 + 8 + v.label.Height/2
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
@@ -382,6 +398,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
 				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
 				Author: v.author.Style,
+			}
+			// A fill the author sets is drawn at full opacity, as Pele's setsFill leaves out the
+			// group's own fill-opacity.
+			if css.Sets(v.decls, "fill") {
+				cluster.Style.FillOpacity = style.Num{}
 			}
 			label := &v.label
 			if !label.Empty() {
@@ -398,7 +419,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 						Author: style.Style{Text: v.author.Style.Text},
 					})
 				} else {
+					// The title lies on the group's fill, and takes a color that stands out on a
+					// fill its author sets; one struck over the edges sits on a halo instead.
 					cluster.Label, cluster.At = label, at
+					cluster.Style.OnFill = css.InksText(v.decls, v.decls)
 				}
 			}
 			clusters = append(clusters, cluster)
@@ -452,6 +476,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			it.Picture = &scene.Picture{Icon: n.Icon, Box: scene.Rect{X: x - glyph/2, Y: y + top + (box-glyph)/2, W: glyph, H: glyph}}
 		default:
 			it.Parts = draw.Outline(v.shape, x, y, w, h)
+			// The label lies on the shape's fill, unless the shape is drawn bare.
+			it.Style.OnFill = draw.ShapeFilled(v.shape) && css.InksText(v.decls, v.decls)
 		}
 		if hasClass(classes, "internal-link") && n.Label != "" && !o.NoLinks {
 			// The label is a note's name, but it ends up a link, so it is checked as an address.
@@ -483,8 +509,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		edge := drawn[i]
 		label := &edgeLabels[i]
 		var author css.Author
+		var line []string
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
-			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
+			line = append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...)
+			author = css.Declarations(line)
 			// What styles an edge's line styles its markers, and fills nothing.
 			author.Style.Fill = style.Paint{}
 		}
@@ -538,6 +566,15 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 				// A self-loop, which the layout gives no route: the corners its curve is drawn about.
 				it.Route = it.Parts[0].Path.Corners()
 			}
+			// An edge inside one fill its author sets is drawn in that fill's label color, and
+			// one that crosses the border of a fill is cased, as Pele's overFills decides.
+			ground, cased := draw.OnFills(path.Path, []float64{path.SX, path.SY, path.EX, path.EY}, fills, line)
+			it.Style.Ground = ground
+			if cased {
+				if casing := draw.Casing(RoleCasing, path.Path, it.Ends, author.Style, edge.Thickness == "thick"); casing != nil {
+					casings = append(casings, *casing)
+				}
+			}
 			edges = append(edges, it)
 		}
 		if label.Width > 0 {
@@ -553,8 +590,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 		}
 	}
 
-	sc.Items = make([]scene.Item, 0, len(titles)+len(clusters)+len(edges)+len(struck)+len(labels)+len(nodes))
-	for _, layer := range [][]scene.Item{titles, clusters, edges, struck, labels, nodes} {
+	sc.Items = make([]scene.Item, 0, len(titles)+len(clusters)+len(casings)+len(edges)+len(struck)+len(labels)+len(nodes))
+	for _, layer := range [][]scene.Item{titles, clusters, casings, edges, struck, labels, nodes} {
 		sc.Items = append(sc.Items, layer...)
 	}
 	return sc

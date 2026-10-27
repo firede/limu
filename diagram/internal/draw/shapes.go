@@ -45,6 +45,9 @@ type shapeDef struct {
 	// the middle.
 	span    func(w, h float64, sideways bool) float64
 	noLabel bool
+	// bare is set on a shape drawn with no fill, whose label a fill its author sets does not
+	// lie on, as Pele's bare marks it.
+	bare bool
 }
 
 func flat(w, h float64, sideways bool) float64 {
@@ -293,6 +296,7 @@ var shapes = map[string]*shapeDef{
 	// Pele draws a text shape as a box with neither fill nor stroke, which shows nothing;
 	// here it has no pieces.
 	"text": {
+		bare: true,
 		span: flat,
 		size: func(tw, th float64) Size { return Size{tw + 8, th + 8, 0} },
 		draw: func(*drawing, float64, float64) {},
@@ -509,9 +513,9 @@ var shapes = map[string]*shapeDef{
 		},
 	},
 	// Pele draws the box of a brace with neither fill nor stroke; here it has no piece.
-	"brace":   {size: padded(12, 0, 0), draw: func(d *drawing, w, h float64) { d.brace(-w/2+12, h, -1) }},
-	"brace-r": {size: padded(12, 0, 0), draw: func(d *drawing, w, h float64) { d.brace(w/2-12, h, 1) }},
-	"braces": {size: padded(24, 0, 0), draw: func(d *drawing, w, h float64) {
+	"brace":   {bare: true, size: padded(12, 0, 0), draw: func(d *drawing, w, h float64) { d.brace(-w/2+12, h, -1) }},
+	"brace-r": {bare: true, size: padded(12, 0, 0), draw: func(d *drawing, w, h float64) { d.brace(w/2-12, h, 1) }},
+	"braces": {bare: true, size: padded(24, 0, 0), draw: func(d *drawing, w, h float64) {
 		d.brace(-w/2+12, h, -1)
 		d.brace(w/2-12, h, 1)
 	}},
@@ -665,6 +669,16 @@ func ShapeSpan(shape string, w, h float64, sideways bool) float64 {
 func ShapeHasLabel(shape string) bool {
 	s, ok := shapes[shape]
 	return !ok || !s.noLabel
+}
+
+// ShapeFilled reports whether a shape is drawn with a fill its label lies on, as Pele's
+// shapeFilled does: every shape but those drawn bare, and rect for a name it does not know.
+func ShapeFilled(shape string) bool {
+	s, ok := shapes[shape]
+	if !ok {
+		s = fallback
+	}
+	return !s.bare
 }
 
 // A Node is a box laid out, as much of Pele's CNode as the drawing needs: its center, its
