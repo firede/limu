@@ -20,8 +20,8 @@ type Node struct {
 }
 
 // Link is a band of flow from one node to another, Pele's SankeyLink, with its nodes by
-// their place in Model.Nodes. Value is what parseFloat reads of the third field: NaN where it
-// holds no number.
+// their place in Model.Nodes. Value is what parseFloat reads of the third field, which is
+// always finite, as a row whose value is not is an error.
 type Link struct {
 	Source, Target int
 	Value          float64
@@ -64,8 +64,9 @@ func (m *Model) addLink(source, target int, value float64) {
 
 // Parse parses a sankey diagram's text, as the parse of Pele's sankey diagram does: source is
 // what diagram.Prepared.Source gives, and title the title its front matter gives, "" for
-// none. The text is prepared as Mermaid's prepareTextForParsing prepares it before it is
-// parsed. An error is a *diagram.Error.
+// none. The text is prepared as Pele's prepareTextForParsing prepares it before it is
+// parsed, and an error is placed in the text before it was prepared. An error is a
+// *diagram.Error.
 func Parse(source, title string) (*Model, error) {
 	m := newModel()
 	m.Title = title
