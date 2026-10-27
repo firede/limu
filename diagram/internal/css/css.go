@@ -411,6 +411,14 @@ func Paints(decls []string) bool {
 	return alpha*scale > 0
 }
 
+// InksText reports whether Pele's ink picks a color for text, given the declarations of the
+// shape it lies on and of the text: where the shape's fill is one Inks is true of, and the
+// text's declarations set no color, read or not, as Pele's pick tests the text's style with
+// /[";]fill:/. The style alone can't tell, since a color it can't read is unset there.
+func InksText(shape, text []string) bool {
+	return Inks(shape) && !Sets(text, "color")
+}
+
 // Inks reports whether declarations give a shape a fill that Pele's ink picks a text color on:
 // a color it reads, drawn at no less than half its opacity, with opacities it reads. The color
 // it picks is the style's to settle (style.Style.OnFill and Ground).

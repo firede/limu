@@ -1069,7 +1069,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 			it := scene.Item{
 				Kind: scene.Group, Role: RoleComposite, ID: b.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted, OnFill: inks(v.decls)},
+				Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted, OnFill: css.InksText(v.decls, v.decls)},
 				Author: v.author.Style,
 			}
 			// A composite is drawn at half its opacity, unless its author sets a fill.
@@ -1086,7 +1086,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		it := scene.Item{
 			Kind: scene.Node, Role: RoleBlock, Shape: scene.Shape(v.shape), ID: b.ID, Class: classes,
 			Box:    scene.Rect{X: v.x - v.bw/2, Y: v.y - v.bh/2, W: v.bw, H: v.bh},
-			Style:  style.Style{Fill: style.Surface, Stroke: style.Border, OnFill: inks(v.decls)},
+			Style:  style.Style{Fill: style.Surface, Stroke: style.Border, OnFill: css.InksText(v.decls, v.decls)},
 			Author: v.author.Style,
 			At:     scene.Point{X: v.x + v.dx, Y: v.y + v.dy},
 		}
@@ -1172,10 +1172,4 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		sc.Items = append(sc.Items, layer...)
 	}
 	return sc, nil
-}
-
-// inks reports whether Pele's ink picks the color of a label on a block's own fill: a fill it
-// picks a color on, and no color for the text, read or not.
-func inks(decls []string) bool {
-	return css.Inks(decls) && !css.Sets(decls, "color")
 }

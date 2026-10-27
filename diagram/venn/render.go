@@ -370,10 +370,14 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 			continue
 		}
 		id := strings.Join(r.sets, "|")
-		// The text takes the color that stands out on the fill under it, as Pele's ink picks.
-		var ground style.Paint
-		if fill := under(r); css.Inks(fill) {
-			ground = shapeStyle(fill).Fill
+		// The text takes the color that stands out on the fill under it, as Pele's ink picks,
+		// unless its own style sets a color.
+		fill := under(r)
+		ground := func(text []string) style.Paint {
+			if !css.InksText(fill, text) {
+				return style.Paint{}
+			}
+			return shapeStyle(fill).Fill
 		}
 		x := float64(r.spot.x*scale) + ox
 		y := float64(r.spot.y*scale) + oy - total/2
@@ -383,12 +387,12 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 				it := scene.Item{
 					Kind: scene.Text, Role: RoleLabel, ID: id, Label: &l.label,
 					At:     scene.Point{X: x, Y: y + l.label.Height/2},
-					Style:  style.Style{Text: style.Fg, Ground: ground},
+					Style:  style.Style{Text: style.Fg, Ground: ground(r.decls)},
 					Author: textStyle(r.decls),
 				}
 				if l.isText {
 					it.Role, it.ID = RoleText, l.id
-					it.Style.Text = style.Muted
+					it.Style.Text, it.Style.Ground = style.Muted, ground(declsOf(l.id))
 					it.Author = textStyle(declsOf(l.id))
 				}
 				sc.Items = append(sc.Items, it)

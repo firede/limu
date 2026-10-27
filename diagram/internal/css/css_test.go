@@ -244,3 +244,23 @@ func TestInksAndPaints(t *testing.T) {
 		}
 	}
 }
+
+func TestInksText(t *testing.T) {
+	navy := []string{"fill:#000080"}
+	for _, c := range []struct {
+		shape, text []string
+		want        bool
+	}{
+		{navy, nil, true},
+		{navy, []string{"color:#fff"}, false},
+		// A color Pele can't read still keeps ink from picking one.
+		{navy, []string{"color:#f"}, false},
+		// One it drops does not.
+		{navy, []string{"color:url(x)"}, true},
+		{[]string{"fill:none"}, nil, false},
+	} {
+		if got := InksText(c.shape, c.text); got != c.want {
+			t.Errorf("InksText(%q, %q) = %v", c.shape, c.text, got)
+		}
+	}
+}

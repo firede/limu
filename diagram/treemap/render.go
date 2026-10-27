@@ -143,7 +143,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		// Text on a fill the author sets is drawn in the color that stands out on it, as
 		// Pele's ink picks it: a name on its box's own fill, and a value, an item of its own,
 		// on the box's fill as its ground.
-		onFill := css.Inks(node.CSS) && !css.Sets(node.CSS, "color")
+		onFill := css.InksText(node.CSS, node.CSS)
 		var ground style.Paint
 		if onFill {
 			ground = author.Style.Fill
