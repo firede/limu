@@ -451,7 +451,8 @@ func (l *lexer) reverse(c int) bool {
 }
 
 // title records a title statement, with or without the legacy colon, up to the end of its
-// line, as the title of Pele's tokenize does, and reports whether there was one.
+// line, as the title of Pele's tokenize does, and reports whether there was one. A bare title,
+// with only spaces after it on its line, is skipped as no title.
 func (l *lexer) title() bool {
 	if !l.ci(l.p, "title") {
 		return false
@@ -461,7 +462,16 @@ func (l *lexer) title() bool {
 	if legacy {
 		q++
 	}
-	if !chars.IsSpace(l.code(q)) || q+1 >= l.n || !l.has(q+1, cLine) {
+	e := q
+	for e < l.n && l.code(e) != 10 && chars.IsSpace(l.code(e)) {
+		e++
+	}
+	if e == l.n || l.code(e) == 10 {
+		l.p = e
+		return true
+	}
+	sep := l.code(q)
+	if !chars.IsSpace(sep) || sep == 13 || !l.has(q+1, cLine) {
 		return false
 	}
 	typ := tTitle
@@ -566,10 +576,6 @@ func (l *lexer) initial() {
 		return
 	}
 	if c == 35 || c == 37 && l.code(p+1) != 123 {
-		l.p = l.eol(p)
-		return
-	}
-	if c != 125 && l.code(p+1) == 37 && l.code(p+2) == 37 {
 		l.p = l.eol(p)
 		return
 	}
