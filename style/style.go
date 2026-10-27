@@ -208,10 +208,13 @@ type Style struct {
 	StrokeOpacity Num
 	StrokeWidth   Num
 	Radius        Num // of the corners of a box that takes the theme's
-	Dash          Dash
-	Cap           Cap  // of the ends of lines and of their dashes
-	Join          Join // of the corners of lines and outlines
-	Opacity       Num  // of the whole part
+	// MaxRadius caps the theme's radius where no level sets one, as a treemap's small boxes
+	// are rounded by min(var(--_r), cap) in Pele.
+	MaxRadius Num
+	Dash      Dash
+	Cap       Cap  // of the ends of lines and of their dashes
+	Join      Join // of the corners of lines and outlines
+	Opacity   Num  // of the whole part
 	// Halo is drawn about the letters of the part's text, HaloWidth wide, so that lines
 	// under the text stop short of it: the title of a group an edge runs through.
 	Halo      Paint
@@ -260,6 +263,9 @@ func (s Style) Over(base Style) Style {
 	}
 	if !s.Radius.set {
 		s.Radius = base.Radius
+	}
+	if !s.MaxRadius.set {
+		s.MaxRadius = base.MaxRadius
 	}
 	if !s.Dash.set {
 		s.Dash = base.Dash
@@ -317,26 +323,28 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 			s.Text = text
 		}
 	}
+	// A diagram sets a ground only on a fill ink picks a color on, as it reads the author's
+	// declarations, so the color is picked whatever its alpha, which holds less than they do.
 	if s.Ground.Visible() {
-		if on, ok := ink(th, Style{Fill: s.Ground}); ok {
-			if !set.Stroke.Set() {
-				s.Stroke = on
-			}
-			if !set.Text.Set() {
-				s.Text = on
-			}
+		on := pick(th, s.Ground.Color(th))
+		if !set.Stroke.Set() {
+			s.Stroke = on
+		}
+		if !set.Text.Set() {
+			s.Text = on
 		}
 	}
 	if s.TextGround.Visible() && !set.Text.Set() {
-		if on, ok := ink(th, Style{Fill: s.TextGround}); ok {
-			s.Text = on
-		}
+		s.Text = pick(th, s.TextGround.Color(th))
 	}
 	if !s.StrokeWidth.set {
 		s.StrokeWidth = N(th.StrokeWidth)
 	}
 	if !s.Radius.set {
 		s.Radius = N(th.Radius)
+		if s.MaxRadius.set {
+			s.Radius = N(min(th.Radius, s.MaxRadius.v))
+		}
 	}
 	if !s.Text.Set() {
 		s.Text = Fg
@@ -377,10 +385,15 @@ func ink(th *Theme, set Style) (Paint, bool) {
 	if float64(fill.A)/255*set.FillOpacity.Or(1)*set.Opacity.Or(1) < 0.5 {
 		return Paint{}, false
 	}
+	return pick(th, fill), true
+}
+
+// pick is the theme's Fg or Bg, whichever contrasts more with a color.
+func pick(th *Theme, fill Color) Paint {
 	if contrast(fill, th.Fg) > contrast(fill, th.Bg) {
-		return Fg, true
+		return Fg
 	}
-	return Bg, true
+	return Bg
 }
 
 // luminance is a color's relative luminance, as WCAG 2 defines it and Pele's ink computes

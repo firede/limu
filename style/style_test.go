@@ -204,3 +204,25 @@ func TestGround(t *testing.T) {
 		t.Errorf("no ground: %+v", r)
 	}
 }
+
+// MaxRadius caps the theme's radius and no radius a level sets.
+func TestMaxRadius(t *testing.T) {
+	own := Style{MaxRadius: N(2)}
+	for _, c := range []struct {
+		theme, over, want float64
+	}{
+		{4, -1, 2},
+		{0, -1, 0},
+		{4, 6, 6},
+	} {
+		th := Default()
+		th.Radius = c.theme
+		look := &Look{Theme: th}
+		if c.over >= 0 {
+			look.Overrides = Overrides{"x": {Radius: N(c.over)}}
+		}
+		if got := look.Cascade("x", own, Style{}).Radius.Or(-1); got != c.want {
+			t.Errorf("theme %v, override %v: radius %v", c.theme, c.over, got)
+		}
+	}
+}

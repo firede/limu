@@ -191,10 +191,11 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			Parts:  []scene.Part{{Box: rect, Rounded: true}},
 			Author: author.Style,
 		}
-		// The corners of a small box are rounded by a quarter of its shorter side at most,
-		// which is less than the theme's 4.
+		// The corners of a small box are rounded by the theme's radius and a quarter of its
+		// shorter side at most, as Pele's corners caps them where the cap is under its default
+		// radius of 4.
 		if limit := min(b.w, b.h) / 4; limit < 4 {
-			it.Style.Radius = style.N(limit)
+			it.Style.MaxRadius = style.N(limit)
 		}
 
 		if node.Section {

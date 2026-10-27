@@ -244,7 +244,7 @@ func sceneLines(sc *scene.Scene) []string {
 			// Pele writes the theme's radius alone as rx:var(--_r), and the radius of a small
 			// box, capped, otherwise.
 			rounded := "-"
-			if _, capped := it.Style.Radius.Get(); it.Parts[0].Rounded && !capped {
+			if _, capped := it.Style.MaxRadius.Get(); it.Parts[0].Rounded && !capped {
 				rounded = "r"
 			}
 			lines = append(lines, fmt.Sprintf("%s %s [%s] %s,%s %s %s %s %s %s", kind, pelesvg.ID(it.ID), strings.Join(it.Class, " "),
