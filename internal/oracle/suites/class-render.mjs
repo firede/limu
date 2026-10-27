@@ -74,6 +74,18 @@ function wide(rnd) {
   return lines.join('\n');
 }
 
+// Members set in the monospace face, and classes whose own font family keeps theirs out of it,
+// from Pele's tests of the monospace option, tests/render/class.test.ts.
+const MONO = [
+  'classDiagram\nclass A {\n  +title: string\n}',
+  'classDiagram\nclass A {\n  +title: string\n  +draw()*\n  +count$ int\n  +a  b  c\n}\nA --> B',
+  'classDiagram\nclass A {\n  +title: string\n}\nclass B {\n  +title: string\n}\nstyle A color:black,font-family:serif',
+  'classDiagram\nclass A {\n  +title: string\n}\nclass B {\n  +title: string\n}\nclassDef serif color:black,font-family:serif\nclass A:::serif',
+  'classDiagram\nclass A {\n  +title: string\n}\nclass B {\n  +title: string\n}\nclassDef big font-size:20px,font-weight:bold\nclass A:::big\nstyle B font-family:url(x)',
+  'classDiagram\nclass A {\n  +title: string\n}\nstyle A color:"x"font-family:y',
+  'classDiagram\nclass A {\n  +title: string\n}\nstyle A font-family: ',
+];
+
 // The ways a diagram is laid out besides its own: a title, and Pele's options for classes.
 const HEADS = [
   '---\ntitle: Class diagram\n---\n',
@@ -201,7 +213,9 @@ export function readSvg(svg, num, redraw) {
       } else if (cls.startsWith('pele-member')) {
         const parts = cls.split(' ');
         const flag = parts[2] === 'pele-static' ? ' static' : parts[2] === 'pele-abstract' ? ' abstract' : '';
-        lines.push(`member ${parts[1].slice(5)}${flag} ${at(inner)} ${content(inner.slice(whole.length))}`);
+        // Members set in the monospace face are in a group that names its family.
+        const mono = open.some((e) => e.name === 'g' && attr(e.tag, 'class') === 'pele-members' && attr(e.tag, 'font-family') !== undefined);
+        lines.push(`member ${parts[1].slice(5)}${flag}${mono ? ' mono' : ''} ${at(inner)} ${content(inner.slice(whole.length))}`);
       } else if (k && !(k.kind === 'struck' && k.seen)) {
         lines.push(`t ${at(inner)}`);
         k.seen = true;
@@ -280,11 +294,13 @@ export default async function ({ src, cases, write, random }) {
 
   const redraw = (type, x, y, dx, dy) => classMarker(type, x, y, dx, dy, 'var(--_l)');
   const out = [];
-  const draw = (source, maxWidth) => {
+  // mono sets the members in the monospace face, as Pele's monospace option does where it
+  // lists them.
+  const draw = (source, maxWidth, mono) => {
     let r;
     globalThis.limuExactNumbers = true;
     try {
-      r = render(source, { measurer: metricsMeasurer, maxWidth, outputLimit: Infinity });
+      r = render(source, { measurer: metricsMeasurer, maxWidth, outputLimit: Infinity, monospace: mono ? ['members'] : undefined });
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
       return false;
@@ -292,7 +308,7 @@ export default async function ({ src, cases, write, random }) {
       globalThis.limuExactNumbers = false;
     }
     if (r.type !== 'class') return false;
-    out.push({ src: source, maxWidth, lines: readSvg(r.svg, num, redraw) });
+    out.push({ src: source, maxWidth, ...(mono ? { mono } : {}), lines: readSvg(r.svg, num, redraw) });
     return true;
   };
   let drawn = 0;
@@ -320,6 +336,13 @@ export default async function ({ src, cases, write, random }) {
       draw(s, i % 2 === 0 ? 520 : 200);
     }
   }
+  // Members set in the monospace face, with the cases of Pele's tests of it, and the first of
+  // the diagrams above again.
+  for (const s of MONO) {
+    draw(s, undefined, true);
+    draw(s, 360, true);
+  }
+  classes.slice(0, 300).forEach((s, i) => draw(s, i % 3 === 0 ? 360 : undefined, true));
   // The test reads a line with a tag among its classes with the tag moved last, so the lines
   // that name one are kept in full.
   write('diagram/class/testdata/pele/render.json', { cases: out }, { keep: (line) => line.includes('clickable') });

@@ -21,6 +21,9 @@ type peleRender struct {
 	Cases []struct {
 		Src      string  `json:"src"`
 		MaxWidth float64 `json:"maxWidth"`
+		// Mono says the members are set in the monospace face, as Pele's monospace option
+		// lists them.
+		Mono bool `json:"mono"`
 		fixture.Drawing
 	} `json:"cases"`
 }
@@ -46,10 +49,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
+		o := &layout.Options{MaxWidth: c.MaxWidth}
+		if c.Mono {
+			o.Monospace = layout.Members
+		}
+		got := sceneLines(Layout(db, pre.Config, o))
 		if msg := f.Diff(k, &c.Drawing, got, pelesvg.TagsLast("clickable")); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), %s", c.Src, c.MaxWidth, msg)
+				t.Errorf("Layout(%q, max %v, mono %v), %s", c.Src, c.MaxWidth, c.Mono, msg)
 			}
 		}
 	}
@@ -182,6 +189,9 @@ func sceneLines(sc *scene.Scene) []string {
 				kind += " static"
 			} else if it.Label.Lines[0][0].Face&text.Italic != 0 {
 				kind += " abstract"
+			}
+			if it.Label.Lines[0][0].Face&text.Mono != 0 {
+				kind += " mono"
 			}
 			lines = append(lines, "member "+kind+" "+textAt(it.Label, it.At.X, it.At.Y)+" "+peleText(spans(it.Label)))
 		case RoleNote:
