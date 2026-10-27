@@ -344,6 +344,26 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 	return s
 }
 
+// Shade is what a part painted scene.Shade is filled with, before the opacity a backend lays
+// it at over a fill the author sets: the theme's Bg, or, on a fill an override or the author
+// sets that ink picks a color on, the other of Fg and Bg, the one that stands out less on the
+// fill, as Pele 1.12 keeps an entity's stripes light on a light fill and dark on a dark one.
+// It reports whether it was picked on a fill.
+func (l *Look) Shade(role string, author Style) (Paint, bool) {
+	var over Style
+	if l != nil {
+		over = l.Overrides[role]
+	}
+	on, ok := ink(l.ThemeOrDefault(), author.Over(over))
+	switch {
+	case !ok:
+		return Bg, false
+	case on == Fg:
+		return Bg, true
+	}
+	return Fg, true
+}
+
 // ink is the theme's Fg or Bg, whichever contrasts more with the fill a style sets, as Pele's
 // ink picks ON_LIGHT or ON_DARK: with Pele's colors, Fg where the fill's luminance is above
 // that at which the two contrast with it equally, and Bg at or below it. It reports false
@@ -399,7 +419,8 @@ type Resolved struct {
 	// with, as Pele fills them in the color of the line alone.
 	Marker      Color
 	Line        Color // the theme's color of lines, for parts painted solid
-	Bg          Color // the theme's background, for parts painted shade
+	Bg          Color // the theme's background
+	Shade       Color // for parts painted shade, as Look.Shade picks it
 	Hollow      Color // the theme's background, or the ground, for parts painted hollow
 	StrokeWidth float64
 	Radius      float64
@@ -426,6 +447,7 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 	if s.Ground.Visible() {
 		hollow = s.Ground.Color(th)
 	}
+	shade, _ := l.Shade(role, author)
 	return Resolved{
 		Fill:        at(s.Fill.Color(th), s.FillOpacity),
 		Stroke:      at(stroke, s.StrokeOpacity),
@@ -433,6 +455,7 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 		Marker:      stroke,
 		Line:        th.Line,
 		Bg:          th.Bg,
+		Shade:       shade.Color(th),
 		Hollow:      hollow,
 		StrokeWidth: s.StrokeWidth.v,
 		Radius:      s.Radius.v,

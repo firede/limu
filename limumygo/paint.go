@@ -167,7 +167,7 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 			fill = Color(s.Hollow, s.Opacity)
 		case scene.Shade:
 			stroke = ui.Color{}
-			fill = Color(shade(s.Bg, it.Author.Fill.Set()), s.Opacity)
+			fill = Color(shade(s.Shade, it.Author.Fill.Set()), s.Opacity)
 		case scene.Dot:
 			stroke = ui.Color{}
 			fill = Color(s.Marker, s.Opacity)
@@ -189,9 +189,10 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 	}
 }
 
-// shade is the color of a part painted Shade: the background, or, when its item's author
-// set a fill, the background at 60% opacity over the parts below, as the svg package writes
-// it and Pele draws an entity's stripes.
+// shade is the color of a part painted Shade: the color style.Look.Shade picks, the
+// background or, on a fill ink picks a color on, the other of the two it picks from, and when
+// its item's author set a fill, that color at 60% opacity over the parts below, as the svg
+// package writes it and Pele draws an entity's stripes.
 func shade(bg style.Color, author bool) style.Color {
 	if author {
 		bg.A = uint8(float64(bg.A)*0.6 + 0.5)
