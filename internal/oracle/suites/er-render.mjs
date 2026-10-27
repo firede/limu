@@ -59,6 +59,20 @@ const MONO = [
   'erDiagram\n  A {\n    int id PK\n    string name\n  }\n  B {\n    int id\n  }\n  style A font-weight:bold,font-size:20px\n  style B font-style:italic,font-family:url(x)\n  A ||--o{ B : has',
 ];
 
+// Fills an author sets on subgraphs and entities, light and dark: their titles, names and
+// cells written in the color that stands out on them, the stripes of a table kept light on a
+// light fill and dark on a dark one, relationships inside a subgraph's fill drawn in the color
+// of its labels with their open markers filled with it, and those that cross its border, or
+// lie in a fill no color is picked on, laid on casings.
+const FILLS = [
+  'erDiagram\nsubgraph S\nA {\n  int id PK "the key"\n  string name\n  string more\n}\nA |o--o{ B : x\nB ||--|| B : self\nend\nC }|..|{ A : y\nstyle S fill:#123',
+  'erDiagram\ndirection LR\nsubgraph S\nA ||--o{ B : x\nend\nB ||--o{ C : y\nstyle S fill:lightyellow\nstyle A fill:#202020\nstyle B fill:navy,color:#ff0',
+  'erDiagram\nsubgraph S\nA |o--o| B : x\nend\nstyle S fill:#00000040',
+  'erDiagram\nsubgraph S\nA ||--o{ B : x\nend\nstyle S fill:#000,fill-opacity:0.3',
+  'erDiagram\nsubgraph S\nA ||--o{ B : x\nend\nstyle S fill:#000,color:notacolor',
+  'erDiagram\nA {\n  int id PK\n  string name "c"\n  string more\n}\nB {\n  int id PK\n  string name\n}\nC {\n  int id\n}\nstyle A fill:#000\nstyle B fill:#fffbe6\nclassDef d fill:#0b2a5b,color:#0f0\nclass C d',
+];
+
 // The fragments mutations splice in, for text that parses and still draws something odd.
 const FRAGMENTS = [
   ...PARSE_FRAGMENTS,
@@ -114,6 +128,24 @@ export function readSvg(svg, num) {
     return m ? `t ${from(cx, m[1])},${from(cy, m[2])}` : undefined;
   };
   const path = (d, cx = '0', cy = '0') => lines(d).replace(/([^MLCQZ ,]+),([^MLCQZ ,]+)/g, (_, x, y) => `${from(cx, x)},${from(cy, y)}`);
+  // The color ink picks for a text on a fill, which Pele writes on the text: " ink=" and the
+  // color, and nothing where it picks none. s starts at the text, or holds it first.
+  const ink = (s) => {
+    const fill = attr(tag(s, 'text') ?? '', 'fill');
+    return fill?.startsWith('var(--pele-fg-on-') ? ' ink=' + fill : '';
+  };
+  // The casings Pele draws after the subgraphs, before the relationships: each path and ring
+  // in them, and whether it is filled.
+  const casings = [];
+  const cased = svg.indexOf('<g class="pele-casings"');
+  if (cased >= 0) {
+    const group = svg.slice(cased, svg.indexOf('<g class="pele-edges"', cased));
+    for (const m of group.matchAll(/<(path|circle) [^>]*>/g)) {
+      const filled = attr(m[0], 'fill') === 'var(--_bg)' ? ' bg' : '';
+      if (m[1] === 'circle') casings.push(`casing o ${n(attr(m[0], 'cx'))},${n(attr(m[0], 'cy'))} ${n(attr(m[0], 'r'))}${filled}`);
+      else casings.push(`casing ${path(attr(m[0], 'd'))}${filled}`);
+    }
+  }
 
   const out = [];
   const head = tag(svg, 'svg');
@@ -131,19 +163,28 @@ export function readSvg(svg, num) {
     const classes = attr(open, 'class').split(' ');
     switch (kind) {
       case 'cluster': {
-        out.push(`cluster ${id} [${classes.slice(1).join(' ')}] ${box(tag(s, 'rect'))} ${pen(tag(s, 'rect'), [open])}`);
+        // Drawn at half its opacity unless its author sets a fill.
+        const opacity = attr(tag(s, 'rect'), 'fill-opacity') ? '' : ' opaque';
+        out.push(`cluster ${id} [${classes.slice(1).join(' ')}] ${box(tag(s, 'rect'))} ${pen(tag(s, 'rect'), [open])}${opacity}`);
         const t = textAt(s);
-        if (t) out.push(t);
+        if (t) out.push(t + ink(s.slice(s.indexOf('<text'))));
         break;
       }
       case 'edge': {
+        out.push(...casings.splice(0));
         const line = tag(s, 'path');
         const dashed = line.includes(' stroke-dasharray="4 3"') ? ' dashed' : '';
-        out.push(`edge ${id} ${classes[1].slice('pele-er-'.length)}${dashed} ${path(attr(line, 'd'))} ${pen(line, [open, edges])}`);
+        // A relationship inside a fill is stroked in the color ink picks on it.
+        const over = attr(open, 'stroke');
+        out.push(`edge ${id} ${classes[1].slice('pele-er-'.length)}${dashed} ${path(attr(line, 'd'))} ${pen(line, [open, edges])}${over ? ' ink=' + over : ''}`);
         for (const m of s.matchAll(/<(path|circle) class="pele-marker"[^>]*>/g)) {
           const p = pen(m[0], [open, edges]);
-          if (m[1] === 'circle') out.push(`m o ${n(attr(m[0], 'cx'))},${n(attr(m[0], 'cy'))} ${n(attr(m[0], 'r'))} ${p}`);
-          else out.push(`m ${path(attr(m[0], 'd'))}${attr(m[0], 'fill') === 'var(--_bg)' ? ' bg' : ''} ${p}`);
+          // An open marker is filled with the background, or with the fill it lies in. Every
+          // ring is open, and is written " on" only.
+          const fill = attr(m[0], 'fill');
+          const hollow = fill === 'var(--_bg)' ? ' bg' : fill !== undefined ? ' on' : '';
+          if (m[1] === 'circle') out.push(`m o ${n(attr(m[0], 'cx'))},${n(attr(m[0], 'cy'))} ${n(attr(m[0], 'r'))}${hollow === ' on' ? hollow : ''} ${p}`);
+          else out.push(`m ${path(attr(m[0], 'd'))}${hollow} ${p}`);
         }
         break;
       }
@@ -158,14 +199,17 @@ export function readSvg(svg, num) {
         const stripes = s.indexOf('<g class="pele-er-stripes"');
         if (stripes >= 0) {
           const group = s.slice(stripes, s.indexOf('</g>', stripes));
-          for (const r of tags(group, 'rect')) out.push(`stripe ${box(r, cx, cy)}${/rx/.test(r) ? ' rounded' : ''}`);
+          // Stripes on a fill ink picks a color on are in the other color it picks from.
+          const shade = attr(tag(group, 'g'), 'fill');
+          const tone = shade === 'var(--_bg)' ? '' : ' shade=' + shade;
+          for (const r of tags(group, 'rect')) out.push(`stripe ${box(r, cx, cy)}${/rx/.test(r) ? ' rounded' : ''}${tone}`);
           out.push(`divider ${path(attr(tag(s, 'path class="pele-er-divider"'), 'd'), cx, cy)}`);
           out.push(`outline ${box(rects.at(-1), cx, cy)} ${pen(rects.at(-1), [open])}`);
         }
         const a = /<a [^>]*\shref="([^"]*)"/.exec(s);
         if (a) out.push(`link ${unescape(a[1])}`);
         const name = s.indexOf('<text class="pele-label"');
-        if (name >= 0) out.push(textAt(s.slice(name), cx, cy));
+        if (name >= 0) out.push(textAt(s.slice(name), cx, cy) + ink(s.slice(name)));
         const cells = s.indexOf('<g class="pele-er-attributes"');
         if (cells >= 0) {
           const size = attr(tag(s, 'g class="pele-er-attributes"'), 'font-size');
@@ -175,7 +219,7 @@ export function readSvg(svg, num) {
             const t = textAt(s.slice(at, s.indexOf('</text>', at)), cx, cy) ?? 't none';
             // A cell all in the monospace face names the family on its text.
             const mono = attr(m[0], 'font-family') !== undefined ? ' mono' : '';
-            out.push(`${m[1]}${mono} ${n(attr(m[0], 'font-size') ?? size)} ${t}`);
+            out.push(`${m[1]}${mono} ${n(attr(m[0], 'font-size') ?? size)} ${t}${ink(m[0])}`);
           }
         }
         break;
@@ -237,5 +281,6 @@ export default async function ({ src, cases, write, random }) {
     draw(s, 360, true);
   }
   corpus.slice(0, 300).forEach((s, i) => draw(s, i % 3 === 0 ? 360 : undefined, true));
+  for (const s of FILLS) draw(s);
   write('diagram/er/testdata/pele/render.json', { cases: out });
 }

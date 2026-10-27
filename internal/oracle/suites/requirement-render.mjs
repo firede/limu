@@ -10,11 +10,14 @@ const box = (s) => `${attr(s, 'x')},${attr(s, 'y')},${attr(s, 'width')},${attr(s
 
 // A text element as one line: its class, its font's size, weight and slant and its anchor,
 // then each run of it: where it is placed, if it is, its own emphasis and its text.
+// A text on a fill its author sets is written in the color ink picks on it, which the line
+// ends with, after " ink=".
 function textLine(open, spans) {
   const head = `text ${attr(open, 'class') ?? '-'} fs=${attr(open, 'font-size') ?? '-'} w=${attr(open, 'font-weight') ?? '-'} i=${
     attr(open, 'font-style') === 'italic' ? 1 : 0
   } a=${attr(open, 'text-anchor')}`;
-  return head + spans.map((s) => ' ' + s).join('');
+  const fill = attr(open, 'fill');
+  return head + spans.map((s) => ' ' + s).join('') + (fill?.startsWith('var(--pele-fg-on-') ? ' ink=' + fill : '');
 }
 
 const span = (open, text) => {
@@ -129,6 +132,13 @@ const STROKES = [
     'style f stroke:#333,stroke-linejoin:inherit,stroke-linecap:flat',
 ];
 
+// Boxes on fills their authors set, light and dark, whose texts are written in the color that
+// stands out on them, and fills and colors of text on which Pele picks none.
+const FILLS = [
+  'requirementDiagram\nrequirement r {\nid: 1\ntext: the text\nrisk: high\n}\nelement e {\ntype: x\ndocref: d\n}\nelement f {\n}\ne - satisfies -> r\nstyle r fill:#123\nstyle e fill:lightyellow\nstyle f fill:navy',
+  'requirementDiagram\nrequirement r {\nid: 1\n}\nelement e {\ntype: x\n}\nelement f {\ntype: y\n}\nelement g {\ntype: z\n}\nstyle r fill:#000,color:#ff0\nstyle e fill:#000,color:notacolor\nstyle f fill:#000,fill-opacity:0.3\nclassDef d fill:#202020\nclass g d',
+];
+
 export default async function ({ src, cases, write, random }) {
   const { render, PeleError } = await src('index.ts');
   const { preprocess } = await src('preprocess.ts');
@@ -174,5 +184,6 @@ export default async function ({ src, cases, write, random }) {
     const s = next();
     if (s.length <= 3000 && !lone(s)) each(s);
   }
+  FILLS.forEach(each);
   write('diagram/requirement/testdata/pele/render.json', { cases: out });
 }

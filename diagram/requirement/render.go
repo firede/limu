@@ -56,6 +56,9 @@ type view struct {
 	keyWidth   float64
 	headHeight float64
 	w, h       float64
+	// inks says that Pele's inkFill picks the color of the box's texts on the fill its author
+	// gives it.
+	inks bool
 }
 
 // restyle adds bold or italic to a whole label after its markdown is read, since emphasis
@@ -248,7 +251,8 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 		c := graphs.NewCNode(w, headHeight+bodyHeight, -1)
 		c.Seq = float64(len(views))
 		views = append(views, view{node: node, author: author, kind: kind, name: name, rows: rows,
-			keyWidth: keyWidth, headHeight: headHeight, w: w, h: headHeight + bodyHeight})
+			keyWidth: keyWidth, headHeight: headHeight, w: w, h: headHeight + bodyHeight,
+			inks: css.InksText(node.CSSStyles, node.CSSStyles)})
 		cnodes = append(cnodes, c)
 	}
 
@@ -336,10 +340,17 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			Parts:  []scene.Part{{Box: box, Rounded: true}},
 			Label:  &v.name,
 			At:     scene.Point{X: x, Y: y + (top + padY + v.kind.Height + v.name.Height/2)},
-			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
+			Style:  style.Style{Fill: style.Surface, Stroke: style.Border, OnFill: v.inks},
 			Author: v.author.Style,
 		}
-		texts := []scene.Item{textItem(RoleKind, &v.kind, scene.Middle, x, y+(top+padY+v.kind.Height/2), style.Muted, v.author)}
+		// The texts are set on the box's fill, in the color that stands out on a fill the author
+		// gives it, as Pele's inkFill picks it: the name on the box's own fill, and the rest on
+		// the fill under them.
+		var ground style.Paint
+		if v.inks {
+			ground = v.author.Style.Fill
+		}
+		texts := []scene.Item{textItem(RoleKind, &v.kind, scene.Middle, x, y+(top+padY+v.kind.Height/2), style.Muted, v.author, ground)}
 		if len(v.rows) > 0 {
 			divider := top + v.headHeight
 			it.Parts = append(it.Parts, scene.Part{
@@ -350,8 +361,8 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 			for k := range v.rows {
 				r := &v.rows[k]
 				texts = append(texts,
-					textItem(RoleField, &r.key, scene.Start, x+(left+padX), y+(at+r.key.Height/2), style.Muted, v.author),
-					textItem(RoleValue, &r.value, scene.Start, x+(left+padX+v.keyWidth+columnGap), y+(at+r.value.Height/2), style.Fg, v.author))
+					textItem(RoleField, &r.key, scene.Start, x+(left+padX), y+(at+r.key.Height/2), style.Muted, v.author, ground),
+					textItem(RoleValue, &r.value, scene.Start, x+(left+padX+v.keyWidth+columnGap), y+(at+r.value.Height/2), style.Fg, v.author, ground))
 				at += r.height + rowGap
 			}
 		}
@@ -451,15 +462,16 @@ func lay(db *DB, o *layout.Options, down bool) *scene.Scene {
 }
 
 // textItem is a text of a box beside its name: its kind, or a field's name or value, drawn
-// about x, y in the color own and the color of text its author gave the box.
-func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, own style.Paint, author css.Author) scene.Item {
+// about x, y in the color own and the color of text its author gave the box, or in the color
+// that stands out on ground, the fill under it, where it is given.
+func textItem(role scene.Role, l *text.Label, align scene.Align, x, y float64, own style.Paint, author css.Author, ground style.Paint) scene.Item {
 	box := scene.Rect{X: x - l.Width/2, Y: y - l.Height/2, W: l.Width, H: l.Height}
 	if align == scene.Start {
 		box.X = x
 	}
 	return scene.Item{
 		Kind: scene.Text, Role: role, Box: box, Label: l, At: scene.Point{X: x, Y: y}, Align: align,
-		Style:  style.Style{Text: own},
+		Style:  style.Style{Text: own, TextGround: ground},
 		Author: style.Style{Text: author.Style.Text},
 	}
 }
