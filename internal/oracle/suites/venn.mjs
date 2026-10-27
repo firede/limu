@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { enc, peleError } from '../lib/value.mjs';
 import { arrayIn, docs, fileLiterals, lone, testFiles, picker } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // Pele's fragments and seeds, tests/venn/oracle.test.ts, and fragments for the pipeline and
 // for what Pele draws.
@@ -246,6 +247,7 @@ function dumpModel(m) {
 
 // Each case's tokens, with where each starts in UTF-16 code units, and its model or error.
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -295,7 +297,7 @@ export default async function ({ src, pele, write, random }) {
       return { ...out, ...caught(e) };
     }
     if (out.type !== 'venn') return out;
-    const piped = parsed(() => venn.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
+    const piped = parsed(() => located(source, false, () => venn.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title)));
     // Most text comes out of the pipeline as it went in, and parses the same.
     if (JSON.stringify(piped) === JSON.stringify(out.direct)) return { ...out, same: true };
     return { ...out, ...piped };

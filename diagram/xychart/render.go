@@ -186,12 +186,12 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 			bars++
 		}
 	}
-	lo, hi := m.YAxis.Min, m.YAxis.Max
-	exact := m.HasSetYAxis && !math.IsInf(lo, 0) && !math.IsNaN(lo) && !math.IsInf(hi, 0) && !math.IsNaN(hi) && lo != hi
-	if exact {
-		lo, _ = finite(lo)
-		hi, _ = finite(hi)
-	} else {
+	// The bounds as written are compared once they are clamped, so that two beyond the limit
+	// on the same side are one.
+	lo, okLo := finite(m.YAxis.Min)
+	hi, okHi := finite(m.YAxis.Max)
+	exact := m.HasSetYAxis && okLo && okHi && lo != hi
+	if !exact {
 		lo, hi = math.Inf(1), math.Inf(-1)
 		for _, plot := range plots {
 			for _, d := range plot.Data {

@@ -69,7 +69,8 @@ func TestLayoutMatchesPele(t *testing.T) {
 			fail("Layout(%q) in %s: no error, Pele %v", c.Src, c.Zone, c.Error)
 			continue
 		case c.Error != nil:
-			got := dumpError(err)
+			// Entity codes are written back as written, as limu's Render does.
+			got := dumpError(diagram.TagError(pre.Detected, err))
 			if got["code"] != c.Error["code"] || got["message"] != c.Error["message"] {
 				fail("Layout(%q) in %s: %v, Pele %v", c.Src, c.Zone, err, c.Error)
 			}
@@ -164,7 +165,7 @@ func quote(s string) string {
 // dropControls drops the control characters Pele's esc drops.
 func dropControls(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

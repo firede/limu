@@ -21,6 +21,9 @@ type peleRender struct {
 	Cases []struct {
 		Src      string  `json:"src"`
 		MaxWidth float64 `json:"maxWidth"`
+		// Mono says the members are set in the monospace face, as Pele's monospace option
+		// lists them.
+		Mono bool `json:"mono"`
 		fixture.Drawing
 	} `json:"cases"`
 }
@@ -46,10 +49,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
+		o := &layout.Options{MaxWidth: c.MaxWidth}
+		if c.Mono {
+			o.Monospace = layout.Members
+		}
+		got := sceneLines(Layout(db, pre.Config, o))
 		if msg := f.Diff(k, &c.Drawing, got, pelesvg.TagsLast("clickable")); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), %s", c.Src, c.MaxWidth, msg)
+				t.Errorf("Layout(%q, max %v, mono %v), %s", c.Src, c.MaxWidth, c.Mono, msg)
 			}
 		}
 	}
@@ -168,14 +175,14 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			held = []string{}
 			if len(it.Label.Lines) > 0 {
-				held = append(held, "t "+textAt(it.Label, it.At.X, it.At.Y))
+				held = append(held, "t "+textAt(it.Label, it.At.X, it.At.Y)+ink(it))
 				held = append(held, icons...)
 				icons = icons[:0]
 			}
 		case RoleDivider:
 			// Written with its class.
 		case RoleAnnotation:
-			lines = append(lines, "annotation "+peleText(spans(it.Label))+" "+textAt(it.Label, it.At.X, it.At.Y))
+			lines = append(lines, "annotation "+peleText(spans(it.Label))+" "+textAt(it.Label, it.At.X, it.At.Y)+ink(it))
 		case RoleAttribute, RoleMethod:
 			kind := strings.TrimPrefix(string(it.Role), "class.")
 			if len(it.Parts) > 0 {
@@ -183,7 +190,10 @@ func sceneLines(sc *scene.Scene) []string {
 			} else if it.Label.Lines[0][0].Face&text.Italic != 0 {
 				kind += " abstract"
 			}
-			lines = append(lines, "member "+kind+" "+textAt(it.Label, it.At.X, it.At.Y)+" "+peleText(spans(it.Label)))
+			if it.Label.Lines[0][0].Face&text.Mono != 0 {
+				kind += " mono"
+			}
+			lines = append(lines, "member "+kind+" "+textAt(it.Label, it.At.X, it.At.Y)+" "+peleText(spans(it.Label))+ink(it))
 		case RoleNote:
 			lines = append(lines, "note "+id, "path "+pelesvg.D(it.Parts[0].Path)+" "+pen(it, ""), "fold "+pelesvg.D(it.Parts[1].Path)+" "+pen(it, ""))
 			label(it.Label, it.At.X, it.At.Y)
@@ -195,6 +205,26 @@ func sceneLines(sc *scene.Scene) []string {
 		}
 	}
 	return append(lines, held...)
+}
+
+// inkNames are the colors Pele's ink picks, by the theme's paints the default look settles
+// them as.
+var inkNames = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)", style.Bg: "var(--pele-fg-on-dark,#fff)"}
+
+// ink is what the oracle writes of the color ink picks for an item's text on a fill: " ink="
+// and the color, where the default look picks one, and nothing elsewhere. The diagram's own
+// text is taken as a paint ink never picks, so that a color picked shows even where it is the
+// same as the diagram's.
+func ink(it *scene.Item) string {
+	var look style.Look
+	own := it.Style
+	own.Text = style.SurfaceAlt
+	bare := own
+	bare.OnFill, bare.Ground, bare.TextGround = false, style.Paint{}, style.Paint{}
+	if got, plain := look.Cascade(string(it.Role), own, it.Author), look.Cascade(string(it.Role), bare, it.Author); got.Text != plain.Text {
+		return " ink=" + inkNames[got.Text]
+	}
+	return ""
 }
 
 // spans is the text of a label of one line.
@@ -209,7 +239,7 @@ func spans(l *text.Label) string {
 // peleText is text as Pele writes it into its SVG, characters XML does not allow dropped.
 func peleText(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

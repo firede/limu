@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 	"github.com/firede/limu/internal/fixture"
 )
 
@@ -177,9 +178,13 @@ func compare(t *testing.T, what, src string, got, want any) bool {
 
 // check parses text as Pele's parse does, with config and title, and compares with Pele's
 // result.
-func check(t *testing.T, what, text string, config diagram.Config, title string, want peleResult) bool {
+func check(t *testing.T, what, text string, config diagram.Config, title string, want peleResult, pre *diagram.Prepared) bool {
 	t.Helper()
 	ast, err := parseGit(text)
+	if pre != nil {
+		// Parse as ParsePrepared does, so that errors are located in the text as written.
+		ast, err = common.ParsePrepared(pre, false, parseGit)
+	}
 	if err != nil {
 		if want.Error == nil || want.AST != nil {
 			t.Errorf("%s(%q): %v, Pele had none", what, text, err)
@@ -220,7 +225,7 @@ func TestParseMatchesPele(t *testing.T) {
 	}
 	failed := 0
 	for _, c := range p.Cases {
-		ok := check(t, "Parse", c.Src, diagram.Config{}, "", c.Direct)
+		ok := check(t, "Parse", c.Src, diagram.Config{}, "", c.Direct, nil)
 		if ok {
 			pre, err := diagram.Prepare(c.Src, diagram.Options{})
 			var typ diagram.Type
@@ -242,7 +247,7 @@ func TestParseMatchesPele(t *testing.T) {
 				t.Errorf("type of %q: %q, Pele %v", c.Src, typ, c.Type)
 				ok = false
 			case typ == diagram.GitGraph:
-				ok = check(t, "ParsePrepared", pre.Source(false), pre.Config, pre.Title, c.peleResult)
+				ok = check(t, "ParsePrepared", pre.Source(false), pre.Config, pre.Title, c.peleResult, pre)
 			}
 		}
 		if !ok {

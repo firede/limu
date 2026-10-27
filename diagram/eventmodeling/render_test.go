@@ -114,7 +114,7 @@ var classes = map[scene.Role]string{
 // clean is text as Pele's esc writes it, the control characters XML does not allow dropped.
 func clean(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

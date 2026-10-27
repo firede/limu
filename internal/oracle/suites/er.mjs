@@ -5,6 +5,7 @@
 import { peleError } from '../lib/value.mjs';
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // Pele's fragments, tests/er/oracle.test.ts.
 export const FRAGMENTS = [
@@ -204,6 +205,7 @@ function dumpGraph(graph) {
 }
 
 export default async function ({ src, cases, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -238,7 +240,7 @@ export default async function ({ src, cases, write, random }) {
     }
     if (type !== 'er') return { type, direct: direct(source) };
     try {
-      const db = er.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title, pre.lineOffset, {});
+      const db = located(source, false, () => er.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title, pre.lineOffset, {}));
       return { type, db: dumpDb(db), graph: dumpGraph(buildErGraph(db)) };
     } catch (e) {
       return { type, ...caught(e) };

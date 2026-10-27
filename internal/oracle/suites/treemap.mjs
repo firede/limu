@@ -6,6 +6,7 @@
 import { enc, peleError } from '../lib/value.mjs';
 import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The fragments of Pele's tests/treemap/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -284,6 +285,7 @@ const dumpNode = (n) => ({
 });
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -336,7 +338,7 @@ export default async function ({ src, pele, write, random }) {
     }
     if (out.type !== 'treemap') return out;
     try {
-      const m = treemap.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title);
+      const m = located(source, false, () => treemap.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
       out.model = {
         title: opt(m.title),
         accTitle: opt(m.accTitle),

@@ -10,6 +10,7 @@
 import { enc, peleError } from '../lib/value.mjs';
 import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 export const ZONES = ['UTC', 'America/New_York', 'Europe/London', 'Asia/Kolkata'];
 
@@ -304,6 +305,7 @@ function dates(rnd, mod) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -346,7 +348,7 @@ export default async function ({ src, pele, write, random }) {
       return { ...out, ...caught(e) };
     }
     if (out.type !== 'gantt') return out;
-    const piped = parsed(() => gantt.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title), now);
+    const piped = parsed(() => located(source, false, () => gantt.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title)), now);
     if (JSON.stringify(piped) === JSON.stringify(out.direct)) return { ...out, same: true };
     return { ...out, ...piped };
   };

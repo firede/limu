@@ -4,6 +4,7 @@ import "github.com/firede/limu/scene"
 
 // The roles of the items of a state diagram.
 const (
+	RoleCasing      scene.Role = "state.casing" // under a transition that crosses a fill its author sets
 	RoleChoice      scene.Role = "state.choice"
 	RoleComposite   scene.Role = "state.composite"
 	RoleDescription scene.Role = "state.description"

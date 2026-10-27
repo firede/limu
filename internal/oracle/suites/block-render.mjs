@@ -1,6 +1,8 @@
 // Block diagrams drawn end to end: what Pele's render draws, read back out of its SVG as one
 // line per thing drawn, in the order drawn, and the errors of the diagrams it refuses to draw.
-// limu's test writes the same lines from its scene.
+// limu's test writes the same lines from its scene. An edge says the color its group strokes it
+// in where it lies inside a fill, and the casings under edges that cross the border of one are
+// read as they are drawn, before the edges.
 //
 // A scene has no groups to move what is in them, so it holds where everything is on the page,
 // where Pele writes the inside of a block about the block's middle. Pele's SVG is drawn here
@@ -18,14 +20,15 @@ import { readLabel } from '../lib/limu.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './block.mjs';
 
 // The last opacity an element's style attribute gives a property, as a browser takes it over
-// the element's attribute: a number, or a percentage, clamped to [0, 1].
+// the element's attribute: a number as CSS writes one, with digits after a point it has, or a
+// percentage, clamped to [0, 1].
 function styleOpacity(tag, prop) {
   let v;
   for (const decl of (attr(tag, 'style') ?? '').split(';')) {
     const at = decl.indexOf(':');
     if (at < 0 || decl.slice(0, at).trim().toLowerCase() !== prop) continue;
     const raw = decl.slice(at + 1).trim();
-    const m = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(%?)$/i.exec(raw);
+    const m = /^([+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?)(%?)$/i.exec(raw);
     if (m) v = Math.max(0, Math.min(1, Number(m[1]) / (m[2] ? 100 : 1)));
   }
   return v;
@@ -76,7 +79,7 @@ function label(s, dx, dy) {
   return `t ${dx === undefined ? pt(l.x, l.y) : pt(dx + l.x, dy + l.y)} ${pt(l.width, l.height)} ${attr(text, 'fill') ?? '-'} | ${spans}`;
 }
 
-const GROUP = /<g class="pele-(cluster|edge|edge-label|node)[ "]/g;
+const GROUP = /<g class="pele-(cluster|casings|edge|edge-label|node)[ "]/g;
 const SHAPE = /<(rect|circle|ellipse|path|polygon)\b[^>]*>/g;
 
 // The lines of a block diagram's SVG, drawn with its numbers in full.
@@ -130,13 +133,38 @@ export function readSvg(svg) {
       }
       case 'edge': {
         const p = /<path d="[^"]*"[^>]*>/.exec(s)[0];
-        lines.push(`edge ${id} ${attr(p, 'stroke-dasharray') ?? '-'} ${attr(p, 'stroke-width') ?? '-'}`);
+        lines.push(`edge ${id} ${attr(p, 'stroke-dasharray') ?? '-'} ${attr(p, 'stroke-width') ?? '-'} ${attr(open, 'stroke') ?? '-'}`);
         lines.push(`path ${path(attr(p, 'd'))}`);
         lines.push(`pen ${capJoin([edgesOpen, open, p])}`);
         for (const m of s.matchAll(/<(path|circle) class="pele-marker"[^>]*>/g)) {
           const e = m[0];
           const shape = m[1] === 'path' ? path(attr(e, 'd')) : `o ${pt(attr(e, 'cx'), attr(e, 'cy'))} ${n(attr(e, 'r'))}`;
           lines.push(`m ${shape} ${attr(e, 'fill') ?? '-'} ${attr(e, 'stroke') ?? '-'}`);
+        }
+        break;
+      }
+      case 'casings': {
+        // Each casing is the path of its edge, in a group of its own where its width or
+        // opacities differ from the casings', and then its markers. An edge's path has one
+        // figure and no fill, where a cross, the one marker drawn without a fill, has two.
+        let width = '-';
+        let style = '-';
+        for (const m of s.slice(open.length + 1).matchAll(/<(g|path|circle)\b([^>]*)>|<\/g>/g)) {
+          const [e, tag] = m;
+          if (tag === undefined) {
+            width = '-';
+            style = '-';
+          } else if (tag === 'g') {
+            width = attr(e, 'stroke-width') ?? '-';
+            style = attr(e, 'style') ?? '-';
+          } else if (tag === 'circle') {
+            lines.push(`cm o ${pt(attr(e, 'cx'), attr(e, 'cy'))} ${n(attr(e, 'r'))} ${attr(e, 'fill') ?? '-'} ${attr(e, 'stroke') ?? '-'}`);
+          } else if (attr(e, 'fill') === undefined && attr(e, 'd').split('M').length === 2) {
+            lines.push(`casing ${width} ${style}`);
+            lines.push(`path ${path(attr(e, 'd'))}`);
+          } else {
+            lines.push(`cm ${path(attr(e, 'd'))} ${attr(e, 'fill') ?? '-'} ${attr(e, 'stroke') ?? '-'}`);
+          }
         }
         break;
       }
@@ -195,6 +223,48 @@ export default async function ({ src, pele, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, FRAGMENTS, random(42));
   for (let tries = 0; drawn < 4000 && tries < 40000; tries++) each(next());
+  // Labels on parallel edges that cover each other, stacked along their line, with the gap
+  // between the blocks widened where they do not fit: between rows and between columns, in a
+  // container, between round blocks whose stretched container gives some of the gap back
+  // over several rounds, and where widening leaves the labels covering each other. Each is
+  // drawn in hosts wide enough for the wider gap, too narrow for it, and so narrow that the
+  // layout is tight and widens no column.
+  for (const source of [
+    'block\n  a["Left"] b["Right"]\n  a -- "12 production<br>conforming" --> b\n  b -- "12 production<br>deviation" --> a',
+    'block\n  a["Left"] b["Right"] c\n  a -- "12 production<br>conforming" --> b\n  b -- "12 production<br>deviation" --> a\n  b -- "other<br>label" --> c\n  c -- "more<br>labels" --> b',
+    'block\n  columns 1\n  a["A"]\n  b["B"]\n  a -- "144 production conforming" --> b\n  b -- "144 production deviation" --> a\n  a -- "third" --> b',
+    'block\n  columns 2\n  block:g\n    columns 1\n    a\n    b\n  end\n  c\n  a -- "one label<br>two" --> b\n  b -- "three<br>four" --> a\n  a -- "five<br>six" --> b',
+    'block\n  columns 2\n  block:g["Group"]\n    a\n  end\n  b\n  a -- "one label<br>two" --> b\n  b -- "three<br>four" --> a',
+    'block\n  columns 1\n  block:g\n    a\n  end\n  b\n  a -- "one label" --> b\n  b -- "three" --> a\n  a -- "five" --> b',
+    'block\n  columns 3\n  block:g\n    columns 1\n    a\n    b\n  end\n  block:h\n    columns 1\n    c\n    d\n    e\n    f\n  end\n  x\n  a -- "one" --> b\n  b -- "two" --> a\n  a -- "three" --> b\n  a -- "four" --> b',
+    'block\n  columns 1\n  block:g\n    a(("A")) b(("B"))\n  end\n  w["a very very very wide block here, wider still"]\n  a -- "one label<br>two" --> b\n  b -- "three label<br>four" --> a',
+    'block\n  columns 1\n  block:g\n    a(("A")) b(("B")) c(("C"))\n  end\n  w["a very very very wide block here, wider still and still wider"]\n  a -- "one label<br>two" --> c\n  c -- "three label<br>four" --> a',
+  ]) {
+    if (seen.has(source)) continue;
+    seen.add(source);
+    for (const maxWidth of [undefined, 300, 150]) draw(source, maxWidth);
+  }
+  // Fills an author sets: on composites, at full opacity, with labels in the color that
+  // stands out on them; edges inside one fill drawn in that color, and edges that cross the
+  // border of one laid on casings, with each kind of marker, thick, dotted and looping; and
+  // fills too faint, or too transparent, for a color to be picked on them.
+  for (const source of [
+    'block\n  block:g["Dark"]\n    a b\n  end\n  c\n  a --> b\n  a --> c\n  style g fill:#1f3a5f',
+    'block\n  block:g["Light"]\n    a b\n  end\n  c\n  a --x b\n  b --o c\n  b --x c\n  a ==> c\n  c -.-> a\n  style g fill:#fee',
+    'block\n  columns 1\n  block:g\n    a\n    b\n  end\n  c\n  a == "label" ==> b\n  b --> c\n  a --> a\n  c --> c\n  classDef dark fill:navy,color:#ccc\n  class g dark',
+    'block\n  block:outer\n    block:inner\n      a b\n    end\n    c\n  end\n  d\n  a --> b\n  a --> c\n  c --> d\n  b x--> d\n  style outer fill:#333\n  style inner fill:yellow',
+    'block\n  block:g\n    a b\n  end\n  c\n  a --> b\n  a --o c\n  style g fill:#000,fill-opacity:0.3',
+    'block\n  block:g\n    a b\n  end\n  c\n  a --> b\n  b --> c\n  style g fill:rgba(0,0,0,0.6),opacity:0.5',
+    'block\n  block:g\n    a b\n  end\n  c\n  a --> b\n  b --> c\n  style g fill:none',
+    'block\n  block:g\n    a b\n  end\n  c\n  a --> b\n  b --> c\n  style g fill:transparent,stroke:red',
+    'block\n  block:g\n    a b\n  end\n  c\n  a --> b\n  b --> c\n  style g fill:hsl(200 80% 30%)',
+    'block\n  a["Dark"] b["Light"] c["Own"] d<["Go"]>(right)\n  style a fill:#123\n  style b fill:lightyellow\n  style c fill:#123,color:#f80\n  style d fill:darkred',
+  ]) {
+    if (seen.has(source)) continue;
+    seen.add(source);
+    draw(source);
+    draw(source, 150);
+  }
   // A case whose blocks run to thousands, as space:9999 makes them, is left out: the fixture
   // would hold every one of them.
   const cases = out.filter((c) => JSON.stringify(c).length <= 40000);

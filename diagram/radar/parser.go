@@ -142,6 +142,37 @@ func (l *lexer) matchAccDescr(src string, at int) int {
 	return common.AccDescrToken.Match(src, at)
 }
 
+// nameRest reports whether Pele's RE_NAME_REST, /[-\w]*\w/y, matches at byte at: whether the
+// run of word characters and dashes there holds a word character, which the pattern
+// backtracks to end on.
+func nameRest(src string, at int) bool {
+	for k := at; k < len(src) && (isWord(src[k]) || src[k] == '-'); k++ {
+		if src[k] != '-' {
+			return true
+		}
+	}
+	return false
+}
+
+// optionValue matches one of words, the values of an option, as Pele's optionValue does: a
+// value gives way to a longer name, as `circles` is, except right after its option, as in
+// `graticule polygonaxis`.
+func optionValue(option int, words ...string) func(src string, at, previous int) int {
+	return func(src string, at, previous int) int {
+		end := -1
+		for _, w := range words {
+			if strings.HasPrefix(src[at:], w) {
+				end = at + len(w)
+				break
+			}
+		}
+		if end < 0 || previous == option || !nameRest(src, end) {
+			return end
+		}
+		return -1
+	}
+}
+
 // word is Pele's word: the text, which an ID that goes on past it takes over.
 func word(text string) common.TokenType {
 	return common.TokenType{Name: text, Literal: text, Longer: []int{tID}}
@@ -172,25 +203,11 @@ func radarTokens(l *lexer) []common.TokenType {
 		mark("]"),
 		mark("{"),
 		mark("}"),
-		{Name: "GRATICULE", Match: func(src string, at int) int {
-			for _, w := range [...]string{"circle", "polygon"} {
-				if strings.HasPrefix(src[at:], w) {
-					return at + len(w)
-				}
-			}
-			return -1
-		}},
-		{Name: "BOOLEAN", Match: func(src string, at int) int {
-			for _, w := range [...]string{"true", "false"} {
-				if strings.HasPrefix(src[at:], w) {
-					return at + len(w)
-				}
-			}
-			return -1
-		}},
+		{Name: "GRATICULE", MatchAfter: optionValue(tGraticule, "circle", "polygon")},
+		{Name: "BOOLEAN", MatchAfter: optionValue(tShowLegend, "true", "false")},
 		accDescr,
 		common.AccTitleToken,
-		common.TitleToken,
+		common.TitleBefore(nameRest),
 		{Name: "NUMBER", Match: l.matchNumber},
 		common.StringToken,
 		{Name: "ID", Match: matchID},

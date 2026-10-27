@@ -4,7 +4,10 @@
 // drawn, with its flows, shapes and palette slots. Layout lays the graph out as a scene.
 package agentflow
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // Parse parses an agent flow's text, as the parse of Pele's agentflow diagram does, and
 // builds the graph it draws, which records the diagnostics of its shapes and flows: source is
@@ -15,7 +18,7 @@ func Parse(source string, config diagram.Config, title string, lineOffset int, l
 	flow, _ := config["flowchart"].(diagram.Config)
 	inherit, _ := flow["inheritDir"].(bool)
 	dir, _ := config["direction"].(string)
-	db := newDB(options{InheritDir: inherit, Direction: dir, LineOffset: lineOffset, MaxEdges: limits.MaxEdges})
+	db := newDB(options{InheritDir: inherit, Direction: dir, LineOffset: lineOffset, Source: source, MaxEdges: limits.MaxEdges})
 	if title != "" {
 		db.Title = title
 	}
@@ -29,7 +32,9 @@ func Parse(source string, config diagram.Config, title string, lineOffset int, l
 // ParsePrepared parses a prepared agent flow.
 // It reads the source with its comments, as Pele's agentflow diagram has keepComments.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(true), p.Config, p.Title, p.LineOffset, p.Limits)
+	return common.ParsePrepared(p, true, func(src string) (*DB, error) {
+		return Parse(src, p.Config, p.Title, p.LineOffset, p.Limits)
+	})
 }
 
 // defaultCurve is the curve the flowchart's config gives edges, as Pele's agentGraph reads it:

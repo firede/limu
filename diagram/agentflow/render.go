@@ -46,7 +46,8 @@ var flowEnd = map[graphs.Dir]int{graphs.TB: 2, graphs.RL: 3, graphs.BT: 0, graph
 // "agentflow.collapsed" for a collapsed flow, with "agentflow.collapsed-rule" and
 // "agentflow.collapsed-dots" for the dashed rule and the dots drawn under its label; an edge
 // by its kind, "agentflow.sequence", "agentflow.reference" (a dotted edge) or
-// "agentflow.failure" (one that ends in a cross); and "agentflow.edge-label".
+// "agentflow.failure" (one that ends in a cross); "agentflow.casing" under an edge that
+// crosses a flow's fill its author sets; and "agentflow.edge-label".
 func Layout(db *DB, config diagram.Config, o *layout.Options) *scene.Scene {
 	if o == nil {
 		o = &layout.Options{}
@@ -71,6 +72,7 @@ func numberOption(config diagram.Config, key string, fallback float64) float64 {
 type view struct {
 	node   *graphNode
 	author css.Author
+	decls  []string
 	label  text.Label
 	shape  string
 	w, h   float64
@@ -185,7 +187,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			v = view{node: node, author: author, label: label, shape: shape, w: s.W, h: s.H, dy: s.DY}
 			c = graphs.NewCNode(s.W, s.H, -1)
 		}
-		v.filled = css.FillDeclared(decls)
+		v.decls, v.filled = decls, css.FillDeclared(decls)
 		c.Seq = float64(len(views))
 		views = append(views, v)
 		cnodes = append(cnodes, c)
@@ -197,6 +199,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			}
 		}
 	}
+	graphs.InheritCrossedDirections(cnodes, edgeEnds(graph.Edges, index))
 
 	rootDir := graphs.Direction(db.Direction)
 	if down {
@@ -429,7 +432,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		}
 	}
 
-	var titles, clusters, nodes, edges, labels []scene.Item
+	var titles, clusters, nodes, casings, edges, labels []scene.Item
+	var fills []draw.Fill
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
 			Kind: scene.Text, Role: RoleTitle, Label: &title,
@@ -445,8 +449,13 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		if c.IsGroup {
 			titleX := draw.ClusterTitleX(node(i), v.label.Width, crossings, groupPad)
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
+			if css.Paints(v.decls) {
+				fills = append(fills, draw.Fill{Box: [4]float64{x - c.W/2, y - c.H/2, x + c.W/2, y + c.H/2}, Decls: v.decls})
+			}
 			own := tint(slot(n), 0.06, v.filled)
-			own.Text = style.Muted
+			// The title lies on the flow's fill, and takes the color that stands out on a fill
+			// its author sets, as Pele's inkFill gives it.
+			own.Text, own.OnFill = style.Muted, css.InksText(v.decls, v.decls)
 			cluster := scene.Item{
 				Kind: scene.Group, Role: RoleFlow, ID: n.ID, Class: classes, Tags: tags, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
@@ -508,10 +517,12 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			it.Parts = draw.Outline(v.shape, x, y, w, h)
 			it.Style = tint(s, 0.14, v.filled)
 		}
+		// The label lies on the node's fill, unless its shape is drawn bare.
+		it.Style.OnFill = (v.shape == collapsed || draw.ShapeFilled(v.shape)) && css.InksText(v.decls, v.decls)
 		if hasClass(classes, "internal-link") && n.Label != "" && !o.NoLinks {
 			// The label is a note's name, but it ends up a link, so it is checked as an address.
 			name := text.DecodeEntities(n.Label)
-			if _, ok := url.LinkURL(url.SanitizeURL(name), true, o.LinkSchemes); ok {
+			if url.InternalLink(name, !o.NoLinks, o.LinkSchemes) {
 				it.Link = name
 			}
 		}
@@ -528,8 +539,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 	// have, is the route the edge was laid out along.
 	put := func(edge *graphEdge, label *text.Label, path draw.EdgePath, route []float64, x, y float64) {
 		var author css.Author
+		var line []string
 		if len(edge.Style) > 0 || len(edge.CSSCompiledStyles) > 0 {
-			author = css.Declarations(append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...))
+			line = append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...)
+			author = css.Declarations(line)
 			// What styles an edge's line styles its marker, and fills nothing.
 			author.Style.Fill = style.Paint{}
 		}
@@ -552,6 +565,16 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			Ends:   path.Ends("", scene.MarkerType(edge.ArrowTypeEnd)),
 			Style:  own,
 			Author: author.Style,
+		}
+		// An edge inside one fill an author sets takes the color that stands out on it, and
+		// one that crosses the border of one is laid on a casing, as Pele's overFills and
+		// edgeCasing draw them.
+		ground, cased := draw.OnFills(path.Path, []float64{path.EX, path.EY}, fills, line)
+		it.Style.Ground = ground
+		if cased {
+			if casing := draw.Casing(RoleCasing, path.Path, it.Ends, line, false); casing != nil {
+				casings = append(casings, *casing)
+			}
 		}
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
@@ -606,8 +629,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		put(holds[i].edge, &holds[i].label, heldPaths[i], heldDrawn[i], heldLabels[2*i], heldLabels[2*i+1])
 	}
 
-	sc.Items = make([]scene.Item, 0, len(titles)+len(clusters)+len(edges)+len(labels)+len(nodes))
-	for _, layer := range [][]scene.Item{titles, clusters, edges, labels, nodes} {
+	sc.Items = make([]scene.Item, 0, len(titles)+len(clusters)+len(casings)+len(edges)+len(labels)+len(nodes))
+	for _, layer := range [][]scene.Item{titles, clusters, casings, edges, labels, nodes} {
 		sc.Items = append(sc.Items, layer...)
 	}
 	return sc
@@ -634,4 +657,20 @@ func hasClass(classes []string, name string) bool {
 		}
 	}
 	return false
+}
+
+// edgeEnds gives the nodes each edge runs between, -1 for an end that is no node, as the
+// edges Pele's draw passes to inheritCrossedDirections.
+func edgeEnds(edges []*graphEdge, index map[string]int) [][2]int {
+	ends := make([][2]int, len(edges))
+	for k, edge := range edges {
+		ends[k] = [2]int{-1, -1}
+		if i, ok := index[edge.Start]; ok {
+			ends[k][0] = i
+		}
+		if i, ok := index[edge.End]; ok {
+			ends[k][1] = i
+		}
+	}
+	return ends
 }

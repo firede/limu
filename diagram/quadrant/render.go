@@ -158,6 +158,10 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	taken := []float64{left + tileW, top, left + w - tileW, top + h, left, top + tileH, left + w, top + h - tileH}
 	isClear := func(from int, x0, y0, x1, y1 float64) bool {
 		for k := from; k < len(taken); k += 4 {
+			// An empty quadrant label blocks no point label.
+			if taken[k] >= taken[k+2] || taken[k+1] >= taken[k+3] {
+				continue
+			}
 			if x0 < taken[k+2] && x1 > taken[k] && y0 < taken[k+3] && y1 > taken[k+1] {
 				return false
 			}

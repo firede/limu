@@ -3,7 +3,7 @@ title: "Compatibility"
 description: "Supported diagram types, and how limu differs from Pele and Mermaid."
 ---
 
-limu parses Mermaid text the way [Pele](https://pele.run) 1.9.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
+limu parses Mermaid text the way [Pele](https://pele.run) 1.12.0 does and produces the same layout, number for number. Where limu differs from Mermaid, it's almost always because Pele does.
 
 ## Diagram types
 
@@ -63,7 +63,7 @@ Pele renders SVG in a browser, while limu lays out a scene for a backend to draw
 | `type`, `mermaidType` | `Diagram.Type()`, `Diagram.MermaidType()` |
 | `PeleError` and its codes | `diagram.Error` and its codes |
 | `limit`, `maxEdges`, `config` | `diagram.Options` |
-| `measurer`, `fontSize`, `maxWidth`, `autoDirection`, `directionBreakpoint`, `padding`, `now` | `layout.Options`, where `KeepDirection` is the opposite of `autoDirection` |
+| `measurer`, `fontSize`, `maxWidth`, `autoDirection`, `directionBreakpoint`, `padding`, `monospace`, `now` | `layout.Options`, where `KeepDirection` is the opposite of `autoDirection` |
 | `links`, `images`, `linkSchemes`, `imageSchemes` | `layout.Options` and the svg package's `Options` |
 | `fontFamily`, `fontFamilyMono` | The svg package's `FontFamily` and `MonoFamily` |
 | `icons` | `layout.Options.Icons`, plus the svg package's `IconMarkup` or limumygo's `DrawIcon` |
@@ -107,7 +107,7 @@ Diagrams that can get narrower do so to fit `layout.Options.MaxWidth`. A wide fl
 
 ### Subgraphs
 
-A flowchart subgraph keeps its own `direction`, even when it links to nodes outside it.
+As in Mermaid, a flowchart subgraph that an edge crosses, from a node inside it to one outside, takes its parent's direction. Its own `direction` applies only when no edge crosses its border.
 
 ### Limits
 

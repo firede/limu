@@ -48,10 +48,15 @@ func option(config diagram.Config, key string, fallback, lo, hi float64) float64
 }
 
 // relativeRadius is how far from the center a value is drawn, clipped to the range from lo
-// to hi, as Pele's relativeRadius gives it.
+// to hi, as Pele's relativeRadius gives it. It is scaled before it is divided, unless the
+// product overflows, where it is divided first.
 func relativeRadius(value, lo, hi, radius float64) float64 {
 	clipped := min(max(value, lo), hi)
-	return (radius * (clipped - lo)) / (hi - lo)
+	scaled := radius * (clipped - lo)
+	if math.IsInf(scaled, 0) || math.IsNaN(scaled) {
+		return radius * ((clipped - lo) / (hi - lo))
+	}
+	return scaled / (hi - lo)
 }
 
 // closedRoundCurve is a closed Catmull-Rom spline through the points, as cubic Bézier

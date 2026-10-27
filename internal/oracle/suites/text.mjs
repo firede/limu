@@ -9,7 +9,7 @@ const BITS = [
   'fa:fa-car', 'fab:fa-github', 'fa:fa-missing', 'é', 'é', '😀', '𠀀', 'Ω', '\t',
 ];
 
-// What Pele 1.9.0 reads besides: the tags that set faces and those dropped, text shaped like a
+// What Pele 1.12.0 reads besides: the tags that set faces and those dropped, text shaped like a
 // tag that stays text, and the break hints, a zero-width space and a soft hyphen.
 const MORE = [
   '<sub>', '</sub>', '<sup>', '</sup>', '<SUP>', '<code>', '</code>', '<kbd>', '</kbd>', '<tt>', '<var>', '</var>',

@@ -125,6 +125,16 @@ func (l *lexer) color(at, parts int) int {
 	return i
 }
 
+// afterLineFeed reports whether only spaces and tabs stand between a line feed and byte at,
+// as Pele's afterLineFeed does.
+func (l *lexer) afterLineFeed(at int) bool {
+	k := at - 1
+	for l.unit(k) == 32 || l.unit(k) == 9 {
+		k--
+	}
+	return l.unit(k) == 10
+}
+
 func (l *lexer) lineEnd(from int) int {
 	if end := strings.IndexByte(l.src[from:], '\n'); end >= 0 {
 		return from + end
@@ -147,16 +157,18 @@ func (l *lexer) next() int {
 			l.ended = true
 			return tEOF
 		}
-		c, size := chars.UnitAt(src, i)
-		// A comment runs to the end of the line. It also takes the character before it along,
-		// whatever that is: a line break, or the last letter of a word. After a character above
-		// the Basic Multilingual Plane, JavaScript reads its low surrogate, which is no %.
-		next1, next2 := -1, -1
-		if size < 4 {
-			next1, next2 = l.unit(i+size), l.unit(i+size+1)
+		c := l.unit(i)
+		if c == 37 && l.unit(i+1) == 37 && l.unit(i+2) != 123 {
+			l.at = l.lineEnd(i + 2)
+			continue
 		}
-		if c == 37 && next1 == 37 && next2 != 123 || c != 125 && next1 == 37 && next2 == 37 {
-			l.at = l.lineEnd(min(i+size+1, n))
+		if l.lineStart && l.word(i, "title") && l.afterLineFeed(i) && chars.Trim(src[i+5:l.lineEnd(i+5)]) == "" {
+			// A bare title is skipped as a comment is, so that it does not end indented text.
+			j := l.lineEnd(i + 5)
+			for l.unit(j) == 10 || l.unit(j) == 13 {
+				j++
+			}
+			l.at = j
 			continue
 		}
 		if l.lineStart {
@@ -188,7 +200,7 @@ func (l *lexer) next() int {
 			l.lineStart = true
 			return l.token(tNewline, i)
 		}
-		if c == 37 && next1 == 37 {
+		if c == 37 && l.unit(i+1) == 37 {
 			l.at = l.lineEnd(i)
 			continue
 		}
@@ -202,8 +214,9 @@ func (l *lexer) next() int {
 		}
 
 		if (c|32) >= 97 && (c|32) <= 122 || c == 95 {
+			// The text of a title is on its line: a line break after the word is no space.
 			if l.word(i, "title") {
-				if s, ssize := chars.UnitAt(src, i+5); chars.IsSpace(s) {
+				if s, ssize := chars.UnitAt(src, i+5); chars.IsSpace(s) && s != 10 && s != 13 {
 					from := i + 5 + ssize
 					end := from
 					for end < n {
@@ -219,7 +232,8 @@ func (l *lexer) next() int {
 				}
 			}
 			for _, k := range keywords {
-				if l.keyword(i, k.word) {
+				// A hyphen continues a name, as in `set-theory`.
+				if l.keyword(i, k.word) && l.unit(i+len(k.word)) != 45 {
 					return l.token(k.typ, i+len(k.word))
 				}
 			}

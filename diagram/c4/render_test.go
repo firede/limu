@@ -133,6 +133,45 @@ func paintName(p style.Paint) string {
 	return "?"
 }
 
+// inkNames are the colors Pele's ink picks, by the theme's paints the default look settles
+// them as.
+var inkNames = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)", style.Bg: "var(--pele-fg-on-dark,#fff)"}
+
+// inked is the item's style as the default look settles it, and that style without the
+// colors picked on a fill: the text on its own fill or on the fill under it, and the stroke
+// on a ground. The diagram's own text and stroke are taken as a paint neither picks, so that
+// a color picked differs from what the style would be without it even where it is the same
+// as the default.
+func inked(it *scene.Item) (got, plain style.Style) {
+	var look style.Look
+	own := it.Style
+	own.Text, own.Stroke = style.SurfaceAlt, style.SurfaceAlt
+	bare := own
+	bare.OnFill, bare.Ground, bare.TextGround = false, style.Paint{}, style.Paint{}
+	return look.Cascade(string(it.Role), own, it.Author), look.Cascade(string(it.Role), bare, it.Author)
+}
+
+// textPaint is the fill Pele writes on an item's text: the color ink picks where the look
+// picks one, the diagram's own otherwise, and "-" for the theme's text color.
+func textPaint(it *scene.Item) string {
+	if got, plain := inked(it); got.Text != plain.Text {
+		return inkNames[got.Text]
+	}
+	if it.Style.Text == style.Fg {
+		return "-"
+	}
+	return paintName(it.Style.Text)
+}
+
+// strokePaint is the stroke Pele writes on an item: the color ink picks where the look picks
+// one, and the diagram's own otherwise.
+func strokePaint(it *scene.Item) string {
+	if got, plain := inked(it); got.Stroke != plain.Stroke {
+		return inkNames[got.Stroke]
+	}
+	return paintName(it.Style.Stroke)
+}
+
 func dash(st style.Style) string {
 	if !st.Dash.Set() || len(st.Dash.Pattern()) == 0 {
 		return "-"
@@ -184,10 +223,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			text = append(text, strings.Join(spans, "+"))
 		}
-		fill := paintName(it.Style.Text)
-		if it.Style.Text == style.Fg {
-			fill = "-"
-		}
+		fill := textPaint(it)
 		lines = append(lines, fmt.Sprintf("%s %s %s %s | %s %s%s css=%s", kind, pt(it.At.X, it.At.Y), pt(l.Width, l.Height),
 			num(l.Size), strings.Join(text, " | "), extra, fill, colors(it.Author.Text, style.Paint{})))
 	}
@@ -224,8 +260,18 @@ func sceneLines(sc *scene.Scene) []string {
 				label(next, "")
 				i++
 			}
+		case RoleCasing:
+			// Pele's casing is a path and the outlines of the relation's markers, outside any
+			// group the oracle names.
+			for _, part := range it.Parts {
+				if part.Path == nil {
+					lines = append(lines, "rect outside")
+				} else {
+					lines = append(lines, "path outside")
+				}
+			}
 		case RoleRel:
-			lines = append(lines, fmt.Sprintf("edge %s %s %s %s css=%s", id, paintName(it.Style.Fill), paintName(it.Style.Stroke),
+			lines = append(lines, fmt.Sprintf("edge %s %s %s %s css=%s", id, paintName(it.Style.Fill), strokePaint(it),
 				capJoin(it), colors(style.Paint{}, it.Author.Stroke)))
 			var path []string
 			it.Parts[0].Path.Each(func(op scene.Op, a []float64) {

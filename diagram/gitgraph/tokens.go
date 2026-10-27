@@ -63,6 +63,19 @@ var referenceToken = common.TokenType{Name: "REFERENCE", Match: func(s string, p
 	return e
 }}
 
+// referenceRest reports whether /[-./\w]*[-\w]/ matches at byte p, which is where the run of
+// word characters, dashes, dots and slashes there holds a word character or a dash. It is the
+// rest of a name that titleBefore gives way to in Pele's GIT_TOKENS, so that `titles` is a
+// name.
+func referenceRest(s string, p int) bool {
+	for i := p; i < len(s) && (chars.IsWord(int(s[i])) || s[i] == '-' || s[i] == '.' || s[i] == '/'); i++ {
+		if s[i] != '.' && s[i] != '/' {
+			return true
+		}
+	}
+	return false
+}
+
 // word is Pele's word: a keyword that is the start of a longer name is part of that name, so
 // `commits` is a branch.
 func word(name string) common.TokenType {
@@ -120,7 +133,7 @@ var gitTokens = []common.TokenType{
 	{Name: ":", Literal: ":"},
 	accDescrToken,
 	common.AccTitleToken,
-	common.TitleToken,
+	common.TitleBefore(referenceRest),
 	common.IntToken,
 	common.StringToken,
 	common.NewlineToken,

@@ -27,9 +27,10 @@ jobs:
         working-directory: website
     steps:
       - uses: actions/checkout@v5
+      # limumygo asks for a newer Go than limu does, as MyGo does.
       - uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version-file: limumygo/go.mod
           cache-dependency-path: limumygo/go.sum
       - uses: pnpm/action-setup@v4
         with:

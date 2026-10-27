@@ -4,6 +4,7 @@
 import { peleError } from '../lib/value.mjs';
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The fragments of Pele's tests/state/oracle.test.ts, and more of what Pele reads beyond the
 // grammar.
@@ -291,6 +292,7 @@ export function stateCorpus(cases, detect, preprocess) {
 }
 
 export default async function ({ src, cases, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -333,7 +335,7 @@ export default async function ({ src, cases, write, random }) {
     if (type !== 'state') return { type, direct: direct(source) };
     const text = encodeEntities(pre.text) + '\n';
     try {
-      const db = state.parse(text, pre.config, pre.title, pre.lineOffset, {});
+      const db = located(source, false, () => state.parse(text, pre.config, pre.title, pre.lineOffset, {}));
       return { type, ...tokens(text), db: dumpDb(db) };
     } catch (e) {
       return { type, ...tokens(text), ...caught(e) };

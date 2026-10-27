@@ -47,7 +47,7 @@ var irTokens = append(append([]common.TokenType{
 	literal("("),
 	literal(","),
 	literal(")"),
-	titleToken,
+	title(wordOrDash),
 	accTitleToken,
 	accDescrToken,
 	identifier("RR_ID"),

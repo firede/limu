@@ -73,3 +73,40 @@ export function stroke(prop, chain, inherited = KEYWORDS[prop][0]) {
 // The cap and the join a stroke is drawn with, as stroke settles them from chain, with a space
 // between, or sep.
 export const capJoin = (chain, sep = ' ') => `${stroke('stroke-linecap', chain)}${sep}${stroke('stroke-linejoin', chain)}`;
+
+// The casings Pele draws under edges that cross a fill a style sets, read from the SVG from
+// their group on, a line for each: its width, its path, and its markers, p for an arrow's
+// point, o for a circle and x for a cross. A casing wrapped in a group of its own has the
+// width the group gives, or calc where the group's style gives it, and the others the 5 of the
+// group of all of them. A diagram that moves its paths when it reads them gives how in move.
+export function readCasings(s, move = (d) => d) {
+  const lines = [];
+  let current;
+  let width = '5';
+  let depth = 0;
+  for (const m of s.slice(s.indexOf('>') + 1).matchAll(/<(\/?)(g|path|circle)\b([^>]*)>/g)) {
+    const [, close, name, rest] = m;
+    if (name === 'g') {
+      if (close) {
+        if (--depth < 0) break;
+        width = '5';
+      } else {
+        depth++;
+        width = attr(rest, 'stroke-width') ?? (/stroke-width:/.test(attr(rest, 'style') ?? '') ? 'calc' : '5');
+      }
+      continue;
+    }
+    if (name === 'circle') {
+      current.push('o');
+      continue;
+    }
+    const d = attr(rest, 'd');
+    if (attr(rest, 'fill') !== undefined) current.push('p');
+    else if ((d.match(/M/g) ?? []).length > 1) current.push('x');
+    else {
+      current = [`casing ${width} ${move(d)}`];
+      lines.push(current);
+    }
+  }
+  return lines.map((c) => (c.length > 1 ? `${c[0]} ${c.slice(1).join('')}` : c[0]));
+}

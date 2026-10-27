@@ -8,6 +8,7 @@
 package wardley
 
 import (
+	"github.com/firede/limu/diagram/internal/common"
 	"strings"
 
 	"github.com/firede/limu/diagram"
@@ -295,5 +296,7 @@ func Parse(source string, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared Wardley map.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }

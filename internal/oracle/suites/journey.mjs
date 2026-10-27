@@ -5,6 +5,7 @@
 import { enc, peleError } from '../lib/value.mjs';
 import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The fragments of Pele's tests/journey/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -186,6 +187,7 @@ function dumpModel(m) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -228,7 +230,7 @@ export default async function ({ src, pele, write, random }) {
     }
     if (out.type !== 'journey') return out;
     const text = encodeEntities(pre.text) + '\n';
-    const piped = parsed(text, () => journey.parse(text, pre.config, pre.title));
+    const piped = parsed(text, () => located(source, false, () => journey.parse(text, pre.config, pre.title)));
     // Most text comes out of the pipeline as it went in, and parses the same.
     if (JSON.stringify(piped) === JSON.stringify(out.direct)) return { ...out, same: true };
     return { ...out, ...piped };

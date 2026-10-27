@@ -25,7 +25,7 @@ func TestWorstCases(t *testing.T) {
 	itoa := strconv.Itoa
 	prepare := func(src string) func() error {
 		return func() error {
-			prepareTextForParsing(src)
+			prepareTextForParsing(src, nil)
 			return nil
 		}
 	}

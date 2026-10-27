@@ -123,7 +123,8 @@ export function readSvg(svg, glyphs) {
         const end = body.indexOf('</text>', m.index);
         const y = attr(whole, 'y');
         if (!y.startsWith('m')) throw new Error(`a text not moved: ${whole}`);
-        const style = (attr(whole, 'font-weight') ? 1 : 0) | (attr(whole, 'font-style') === 'italic' ? 2 : 0);
+        const style =
+          (attr(whole, 'font-weight') ? 1 : 0) | (attr(whole, 'font-style') === 'italic' ? 2 : 0) | (attr(whole, 'font-family') ? 4 : 0);
         lines.push(`label ${look('start', whole)} ${pt(attr(whole, 'x'), y.slice(1))} | ${style}:${unescape(body.slice(m.index + whole.length, end))}`);
         break;
       }
@@ -156,11 +157,14 @@ export default async function ({ pele, src, write, random }) {
   const out = [];
   const host = (name) => (ICONS.includes(name) ? '<path d="M0,0"/>' : undefined);
   let tight = 0;
-  const draw = (source, maxWidth, fontSize, icons) => {
+  // mono sets the names in the monospace face, as Pele's monospace option does where it lists
+  // files.
+  const draw = (source, maxWidth, fontSize, icons, mono) => {
     let r;
     globalThis.limuExactNumbers = true;
     try {
-      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, icons: icons ? host : undefined, outputLimit: Infinity });
+      const monospace = mono ? ['files'] : undefined;
+      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, icons: icons ? host : undefined, monospace, outputLimit: Infinity });
     } catch (e) {
       if (!(e instanceof PeleError)) throw e;
       return false;
@@ -171,7 +175,7 @@ export default async function ({ pele, src, write, random }) {
     const lines = readSvg(r.svg, GLYPHS);
     // A name laid out tightly is written by leftLabelSvg, a loose one in a text of its own.
     if (r.svg.includes('anchor="start"')) tight++;
-    out.push({ src: source, maxWidth, fontSize, icons: icons || undefined, lines });
+    out.push({ src: source, maxWidth, fontSize, icons: icons || undefined, mono: mono || undefined, lines });
     return true;
   };
   const NARROW = [320, 240, 200, 160, 120, 100, 80, 60, 40, 400, 280, 500];
@@ -195,6 +199,12 @@ export default async function ({ pele, src, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, FRAGMENTS, random(82));
   while (drawn < 2500) each(next());
+  // Names set in the monospace face, with the case of Pele's test of it, and the first of the
+  // trees above again, in hosts wide and narrow.
+  const mono = 'treeView-beta\n    src/\n        App.tsx ## main\n';
+  draw(mono, undefined, undefined, false, true);
+  draw(mono, 90, undefined, false, true);
+  usable.slice(0, 300).forEach((s, i) => draw(s, i % 2 === 0 ? NARROW[(i / 2) % NARROW.length] : undefined, i % 5 === 0 ? 13 : undefined, i % 3 === 0, true));
   console.log(`treeview-render: ${out.length} drawings, ${tight} laid out tightly`);
   write('diagram/treeview/testdata/pele/render.json', { cases: out });
 }

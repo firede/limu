@@ -468,7 +468,7 @@ func (d *DB) addSingleLink(start, end string, info *linkInfo, id string) error {
 	}
 
 	if max := d.options.MaxEdges; max >= 0 && len(d.Edges) >= max {
-		return flowError("Edge limit exceeded. "+strconv.Itoa(len(d.Edges))+" edges found, but the limit is "+strconv.Itoa(max)+".", diagram.Limit)
+		return flowError("Edge limit exceeded. The limit is "+strconv.Itoa(max)+".", diagram.Limit)
 	}
 	d.Edges = append(d.Edges, edge)
 	d.pairCount[start+"\x00"+end]++

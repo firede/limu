@@ -59,7 +59,8 @@ func TestLayoutMatchesPele(t *testing.T) {
 		var got []string
 		sc, err := Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize})
 		if err != nil {
-			e := err.(*diagram.Error)
+			// Entity codes are written back as written, as limu's Render does.
+			e := diagram.TagError(pre.Detected, err).(*diagram.Error)
 			got = []string{"error " + string(e.Code) + " " + e.Message}
 			refused++
 		} else {
@@ -258,7 +259,7 @@ func sceneLines(sc *scene.Scene) []string {
 // xmlText is text as Pele's esc writes it, without the control characters XML does not allow.
 func xmlText(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

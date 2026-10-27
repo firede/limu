@@ -25,7 +25,10 @@ type cell struct {
 	// Where the cell is placed: its place in the grid, then its center and size.
 	col, row, cols float64
 	heights        []float64
-	x, y, w, h     float64
+	// rowGaps and colGaps are extra room after each row or column of a container, which
+	// edge labels that do not fit between its blocks take.
+	rowGaps, colGaps []float64
+	x, y, w, h       float64
 }
 
 // maxSpan is the most columns a block may span, Pele's MAX_SPAN.
@@ -98,7 +101,7 @@ func measure(box *cell, gap, inset float64) error {
 			tallest = child.nh
 		}
 	}
-	height := float64(float64(len(heights)-1) * gap)
+	height := float64(float64(len(heights)-1)*gap) + total(box.rowGaps)
 	for row := range heights {
 		if heights[row] < 0 {
 			heights[row] = tallest
@@ -107,7 +110,7 @@ func measure(box *cell, gap, inset float64) error {
 	}
 	box.cols = cols
 	box.heights = heights
-	box.nw = max(box.nw, float64(cols*cw)+float64((cols-1)*gap)+2*inset)
+	box.nw = max(box.nw, float64(cols*cw)+float64((cols-1)*gap)+total(box.colGaps)+2*inset)
 	box.nh = height + 2*inset + box.head
 	return nil
 }
@@ -115,10 +118,19 @@ func measure(box *cell, gap, inset float64) error {
 // arrange gives each child of a container its cell, sharing out any room the container has
 // beyond what it needs, as Pele's arrange does.
 func arrange(box *cell, gap, inset float64) {
-	cols, heights := box.cols, box.heights
+	cols, heights, rowGaps, colGaps := box.cols, box.heights, box.rowGaps, box.colGaps
 	rows := float64(len(heights))
-	cw := (box.w - 2*inset - float64((cols-1)*gap)) / cols
-	room := box.h - 2*inset - box.head - float64((rows-1)*gap)
+	cw := (box.w - 2*inset - float64((cols-1)*gap) - total(colGaps)) / cols
+	room := box.h - 2*inset - box.head - float64((rows-1)*gap) - total(rowGaps)
+	// offsets are the gaps before each column.
+	var offsets []float64
+	if len(colGaps) > 0 {
+		sum := 0.0
+		for col := 0; float64(col) < cols; col++ {
+			offsets = append(offsets, sum)
+			sum += at(colGaps, col)
+		}
+	}
 	needed := 0.0
 	for _, height := range heights {
 		needed += height
@@ -134,13 +146,31 @@ func arrange(box *cell, gap, inset float64) {
 	row := 0
 	for _, child := range box.children {
 		for ; float64(row) < child.row; row++ {
-			top += float64(heights[row]*scale) + share + gap
+			top += float64(heights[row]*scale) + share + gap + at(rowGaps, row)
 		}
-		child.w = float64(cw*child.span) + float64(gap*(child.span-1))
+		before := at(offsets, int(child.col))
+		child.w = float64(cw*child.span) + float64(gap*(child.span-1)) + at(offsets, int(child.col+child.span-1)) - before
 		child.h = float64(heights[row]*scale) + share
-		child.x = left + float64(child.col*(cw+gap)) + child.w/2
+		child.x = left + float64(child.col*(cw+gap)) + before + child.w/2
 		child.y = top + child.h/2
 	}
+}
+
+// total is the sum of gaps, as Pele's total takes it.
+func total(gaps []float64) float64 {
+	sum := 0.0
+	for _, gap := range gaps {
+		sum += gap
+	}
+	return sum
+}
+
+// at is gaps[i], or 0 past their end, as JavaScript's gaps[i] ?? 0 reads a sparse array.
+func at(gaps []float64, i int) float64 {
+	if i < 0 || i >= len(gaps) {
+		return 0
+	}
+	return gaps[i]
 }
 
 // layoutCells lays out a tree of cells in place, as Pele's layout does, and gives the size of

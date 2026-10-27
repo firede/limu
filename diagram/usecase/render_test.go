@@ -122,6 +122,26 @@ func paintName(p style.Paint) string {
 	return "?"
 }
 
+// inkNames are the colors Pele's ink picks, by the theme's paints the default look settles
+// them as.
+var inkNames = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)", style.Bg: "var(--pele-fg-on-dark,#fff)"}
+
+// textPaint is the fill Pele writes on an item's text: the color ink picks where the default
+// look picks one, on the item's own fill or on the fill under its text, and the diagram's own
+// otherwise. The diagram's own text is taken as a paint ink never picks, so that a color
+// picked shows even where it is the same as the diagram's.
+func textPaint(it *scene.Item) string {
+	var look style.Look
+	own := it.Style
+	own.Text = style.SurfaceAlt
+	bare := own
+	bare.OnFill, bare.Ground, bare.TextGround = false, style.Paint{}, style.Paint{}
+	if got, plain := look.Cascade(string(it.Role), own, it.Author), look.Cascade(string(it.Role), bare, it.Author); got.Text != plain.Text {
+		return inkNames[got.Text]
+	}
+	return paintName(it.Style.Text)
+}
+
 // partPaint is how a part of an item is painted, as the oracle reads Pele's fill and stroke,
 // and when it has a stroke, its ends, and its joins where it has corners.
 func partPaint(it *scene.Item, part *scene.Part, corners bool) string {
@@ -209,7 +229,7 @@ func sceneLines(sc *scene.Scene) []string {
 	// the item that holds it gives its text. Pele centers every text of a use case diagram.
 	textAt := func(owner *scene.Item, l *text.Label, cx, cy float64) string {
 		shift := float64(l.Size * 0.35)
-		s := "t " + pt(cx, cy-l.Height/2+l.LineHeight/2+shift) + " " + paintName(owner.Style.Text)
+		s := "t " + pt(cx, cy-l.Height/2+l.LineHeight/2+shift) + " " + textPaint(owner)
 		if owner.Align != scene.Middle {
 			s += " not centered"
 		}
@@ -286,6 +306,31 @@ func sceneLines(sc *scene.Scene) []string {
 				shape(it, &it.Parts[k])
 			}
 			label(it, it.Label, it.At.X, it.At.Y)
+		case RoleCasing:
+			// Pele's casings follow its boundaries, and the oracle reads them with the last:
+			// the path, in the casings' paint, and the outlines of the relation's markers,
+			// filled and stroked in the background, as a group with round ends and corners
+			// draws them, but for a cross, which is stroked alone.
+			for _, s := range subpaths(it.Parts[0].Path) {
+				lines = append(lines, "path "+s+" - -")
+			}
+			for _, part := range it.Parts[1:] {
+				for _, s := range subpaths(part.Path) {
+					if part.Paint == scene.StrokeOnly {
+						lines = append(lines, "path "+s+" - -")
+						continue
+					}
+					ellipse := strings.HasPrefix(s, "ellipse")
+					if !ellipse {
+						s = "path " + s
+					}
+					s += " var(--_bg) var(--_bg) cap=round"
+					if !ellipse {
+						s += " join=round"
+					}
+					lines = append(lines, s)
+				}
+			}
 		case RoleRelation, RoleNoteLink:
 			dash := "-"
 			if it.Style.Dash.Set() {
@@ -298,7 +343,12 @@ func sceneLines(sc *scene.Scene) []string {
 			if (it.Role == RoleNoteLink) != (it.Shape == "note") {
 				lines = append(lines, "role "+string(it.Role)+" of a line of shape "+string(it.Shape))
 			}
-			lines = append(lines, fmt.Sprintf("edge %s %s [%s] %s", id, it.Shape, classes(it), dash))
+			ink := ""
+			if s := (*style.Look)(nil).Cascade(string(it.Role), it.Style, it.Author); s.Stroke != it.Author.Over(it.Style).Stroke {
+				// The color ink picks on the fill the edge lies in.
+				ink = " ink=" + inkNames[s.Stroke]
+			}
+			lines = append(lines, fmt.Sprintf("edge %s %s [%s] %s%s", id, it.Shape, classes(it), dash, ink))
 			for _, s := range subpaths(it.Parts[0].Path) {
 				lines = append(lines, "path "+s+ends(it, 0, true))
 			}
@@ -361,7 +411,7 @@ func sceneLines(sc *scene.Scene) []string {
 // dropped.
 func peleID(id string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

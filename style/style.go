@@ -1,5 +1,7 @@
 package style
 
+import "math"
+
 // A Paint is what a part is filled, stroked or written with: a color of the theme, a color
 // of its own, or nothing. The zero Paint is unset, and takes what is under it.
 type Paint struct {
@@ -206,14 +208,37 @@ type Style struct {
 	StrokeOpacity Num
 	StrokeWidth   Num
 	Radius        Num // of the corners of a box that takes the theme's
-	Dash          Dash
-	Cap           Cap  // of the ends of lines and of their dashes
-	Join          Join // of the corners of lines and outlines
-	Opacity       Num  // of the whole part
+	// MaxRadius caps the theme's radius where no level sets one, as a treemap's small boxes
+	// are rounded by min(var(--_r), cap) in Pele.
+	MaxRadius Num
+	Dash      Dash
+	Cap       Cap  // of the ends of lines and of their dashes
+	Join      Join // of the corners of lines and outlines
+	Opacity   Num  // of the whole part
 	// Halo is drawn about the letters of the part's text, HaloWidth wide, so that lines
 	// under the text stop short of it: the title of a group an edge runs through.
 	Halo      Paint
 	HaloWidth Num
+	// OnFill says that the part's text is set on its fill. Where an override or the part's
+	// author sets a fill over the diagram's own, and neither sets a color for the text, the
+	// text is drawn in the theme's Fg or Bg, whichever stands out more against that fill, as
+	// Pele's ink picks a color for a label on a fill a style sets. A diagram sets it on the
+	// parts whose labels Pele draws so.
+	OnFill bool
+	// Ground is the fill under the part where it lies inside a fill its author sets on
+	// another part, as an edge inside a group with a fill of its own. Unless an override or
+	// the part's author sets them, the part's stroke and text are drawn in the theme's Fg or
+	// Bg, whichever stands out more against the ground, as Pele draws an edge or a label
+	// inside one fill in the color of that fill's labels, and what it paints Hollow is filled
+	// with the ground, as Pele's hollowOn fills a marker. A diagram sets it only on a fill ink
+	// can pick a color on.
+	Ground Paint
+	// TextGround is the fill under the part's text alone, where the text lies inside a fill
+	// its author sets on another part and the rest of the part keeps its own colors, as the
+	// name under a sequence diagram's figure in a box. Unless an override or the part's
+	// author sets one, the text is drawn in the theme's Fg or Bg, whichever stands out more
+	// against it. A diagram sets it only on a fill ink can pick a color on.
+	TextGround Paint
 }
 
 // Over is s laid over base: what s sets, and what base sets where s does not.
@@ -239,6 +264,9 @@ func (s Style) Over(base Style) Style {
 	if !s.Radius.set {
 		s.Radius = base.Radius
 	}
+	if !s.MaxRadius.set {
+		s.MaxRadius = base.MaxRadius
+	}
 	if !s.Dash.set {
 		s.Dash = base.Dash
 	}
@@ -256,6 +284,13 @@ func (s Style) Over(base Style) Style {
 	}
 	if !s.HaloWidth.set {
 		s.HaloWidth = base.HaloWidth
+	}
+	s.OnFill = s.OnFill || base.OnFill
+	if !s.Ground.Set() {
+		s.Ground = base.Ground
+	}
+	if !s.TextGround.Set() {
+		s.TextGround = base.TextGround
 	}
 	return s
 }
@@ -282,16 +317,99 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 		over = l.Overrides[role]
 	}
 	s := author.Over(over.Over(own))
+	set := author.Over(over)
+	if s.OnFill && !set.Text.Set() {
+		if text, ok := ink(th, set); ok {
+			s.Text = text
+		}
+	}
+	// A diagram sets a ground only on a fill ink picks a color on, as it reads the author's
+	// declarations, so the color is picked whatever its alpha, which holds less than they do.
+	if s.Ground.Visible() {
+		on := pick(th, s.Ground.Color(th))
+		if !set.Stroke.Set() {
+			s.Stroke = on
+		}
+		if !set.Text.Set() {
+			s.Text = on
+		}
+	}
+	if s.TextGround.Visible() && !set.Text.Set() {
+		s.Text = pick(th, s.TextGround.Color(th))
+	}
 	if !s.StrokeWidth.set {
 		s.StrokeWidth = N(th.StrokeWidth)
 	}
 	if !s.Radius.set {
 		s.Radius = N(th.Radius)
+		if s.MaxRadius.set {
+			s.Radius = N(min(th.Radius, s.MaxRadius.v))
+		}
 	}
 	if !s.Text.Set() {
 		s.Text = Fg
 	}
 	return s
+}
+
+// Shade is what a part painted scene.Shade is filled with, before the opacity a backend lays
+// it at over a fill the author sets: the theme's Bg, or, on a fill the author sets that ink
+// picks a color on, the other of Fg and Bg, the one that stands out less on the fill, as Pele
+// 1.12 keeps an entity's stripes light on a light fill and dark on a dark one. It reports
+// whether it was picked on a fill. A fill an override sets leaves the shade the theme's Bg,
+// since the backend lays a shade at an opacity only over a fill the author sets.
+func (l *Look) Shade(author Style) (Paint, bool) {
+	on, ok := ink(l.ThemeOrDefault(), author)
+	switch {
+	case !ok:
+		return Bg, false
+	case on == Fg:
+		return Bg, true
+	}
+	return Fg, true
+}
+
+// ink is the theme's Fg or Bg, whichever contrasts more with the fill a style sets, as Pele's
+// ink picks ON_LIGHT or ON_DARK: with Pele's colors, Fg where the fill's luminance is above
+// that at which the two contrast with it equally, and Bg at or below it. It reports false
+// where the style sets no fill, or one drawn at less than half its opacity, since what is
+// under the fill would then decide.
+func ink(th *Theme, set Style) (Paint, bool) {
+	if !set.Fill.Visible() {
+		return Paint{}, false
+	}
+	fill := set.Fill.Color(th)
+	if float64(fill.A)/255*set.FillOpacity.Or(1)*set.Opacity.Or(1) < 0.5 {
+		return Paint{}, false
+	}
+	return pick(th, fill), true
+}
+
+// pick is the theme's Fg or Bg, whichever contrasts more with a color.
+func pick(th *Theme, fill Color) Paint {
+	if contrast(fill, th.Fg) > contrast(fill, th.Bg) {
+		return Fg
+	}
+	return Bg
+}
+
+// luminance is a color's relative luminance, as WCAG 2 defines it and Pele's ink computes
+// it.
+func luminance(c Color) float64 {
+	lin := func(v uint8) float64 {
+		x := float64(v) / 255
+		if x <= 0.04045 {
+			return x / 12.92
+		}
+		return math.Pow((x+0.055)/1.055, 2.4)
+	}
+	return 0.2126*lin(c.R) + 0.7152*lin(c.G) + 0.0722*lin(c.B)
+}
+
+// contrast is the contrast ratio of two colors, as WCAG 2 defines it.
+func contrast(a, b Color) float64 {
+	la, lb := luminance(a), luminance(b)
+	return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 }
 
 // ThemeOrDefault is the look's theme, or Default when it has none. The default is shared:
@@ -311,7 +429,9 @@ type Resolved struct {
 	// with, as Pele fills them in the color of the line alone.
 	Marker      Color
 	Line        Color // the theme's color of lines, for parts painted solid
-	Bg          Color // the theme's background, for parts painted hollow
+	Bg          Color // the theme's background
+	Shade       Color // for parts painted shade, as Look.Shade picks it
+	Hollow      Color // the theme's background, or the ground, for parts painted hollow
 	StrokeWidth float64
 	Radius      float64
 	Dash        []float64 // none for a solid line
@@ -333,6 +453,11 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 		s.Join = JoinMiter
 	}
 	stroke := s.Stroke.Color(th)
+	hollow := th.Bg
+	if s.Ground.Visible() {
+		hollow = s.Ground.Color(th)
+	}
+	shade, _ := l.Shade(author)
 	return Resolved{
 		Fill:        at(s.Fill.Color(th), s.FillOpacity),
 		Stroke:      at(stroke, s.StrokeOpacity),
@@ -340,6 +465,8 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 		Marker:      stroke,
 		Line:        th.Line,
 		Bg:          th.Bg,
+		Shade:       shade.Color(th),
+		Hollow:      hollow,
 		StrokeWidth: s.StrokeWidth.v,
 		Radius:      s.Radius.v,
 		Dash:        s.Dash.v,

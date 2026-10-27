@@ -14,7 +14,7 @@ const FRAGMENTS = [
   '\ndirection LR\n', '\ndirection TB\n', ' & ', ':::cls', '\nclassDef cls fill:#f96\n', '\nstyle A stroke:#f00\n',
   '\nstyle S fill:#00f\n', '\nlinkStyle 0 stroke:#0f0\n', '\nclick A "https://x.y/z" "tip"\n', '@{ shape: circle }',
   '@{ shape: diam }', '@{ icon: "fa:user", form: circle, label: "U" }', 'e1@{ curve: linear }', '中文', '😀', '\nA --> A\n',
-  '\nS --> A\n', '\nA --> S\n', ' LR', ' TD', ' BT', ' RL',
+  '\nS --> A\n', '\nA --> S\n', ' LR', ' TD', ' BT', ' RL', '\nstyle S fill:navy\n', '\nstyle T fill:#BBDEFB\n',
 ];
 
 // Sources written as Pele's swimlane tests write them, and more.
@@ -51,6 +51,11 @@ function written() {
     'swimlane-beta TD\n  subgraph A\n    a1 --> a2 --> a3 --> a4\n  end\n  subgraph B\n    b1 --> b2\n  end\n  subgraph C\n    c1\n  end\n  a4 -- back --> a1\n  a1 --> c1\n  c1 -- long way --> a4\n  b2 --> a1\n  a3 ---> b1',
     'swimlane-beta TD\n  subgraph A\n    a1 -->|yes| a2\n    a1 -->|no| a3\n    a1 --> a1\n    a2 -- loop --> a2\n  end\n  subgraph B\n    b1@{ shape: circle } --> b2@{ icon: "fa:user", form: circle, label: "U" }\n  end\n  a2 --> b1\n  b2 -.-> a3\n  a3 ==> b2',
     'swimlane-beta RL\n  subgraph L["`**bold** lane`"]\n    a["`a *markdown* label`"]\n  end\n  subgraph M:::hot\n    b\n  end\n  classDef hot fill:#f96,stroke:#333,stroke-width:4px\n  a --> b',
+    // Fills a style sets, as Pele's swimlane tests draw them.
+    'swimlane-beta LR\n  subgraph L[Light]\n    a\n  end\n  subgraph D[Dark]\n    b\n  end\n  subgraph P[Plain]\n    c\n  end\n  style L fill:#BBDEFB\n  style D fill:#1f3a5f',
+    'swimlane-beta TB\nsubgraph S["one<br/>two<br/>three<br/>four<br/>five<br/>six<br/>seven<br/>eight"]\n  A\nend\nS --> S\nstyle S fill:black',
+    'swimlane-beta LR\nsubgraph S["one<br/>two<br/>three<br/>four<br/>five<br/>six"]\n  A --> B\nend\nsubgraph T\n  C\nend\nS --> S\nS --> T\nT --> S\nstyle S fill:#BBDEFB\nstyle T fill:navy',
+    'swimlane-beta TD\n  subgraph L\n    subgraph G [Group]\n      a --> b\n    end\n    c\n  end\n  subgraph M\n    d\n  end\n  a --> c\n  b --> d\n  style G fill:#BBDEFB\n  style M fill:#000\n  style a fill:navy',
     'swimlane-beta TD\n  subgraph L1\n    subgraph G1 [Group one]\n      subgraph G2 [Group two]\n        a --> b\n      end\n      c\n    end\n    d\n  end\n  subgraph L2\n    subgraph G3\n    end\n    e\n  end\n  a --> e\n  G1 --> d\n  e --> G3',
   );
   // Smaller cases of Pele's stress tests.
@@ -189,7 +194,8 @@ export default async function ({ pele, src, cases, write, random }) {
     draw(s, undefined, { limit: Infinity });
     draw(s, 360, { limit: Infinity });
   }
-  for (const template of TEMPLATES) for (const p of payloads(pele)) each(template(p));
+  // A payload with half a pair of surrogates can't be carried to Go as it is.
+  for (const template of TEMPLATES) for (const p of payloads(pele)) if (p.isWellFormed()) each(template(p));
   const flowcharts = cases('flowchart').extracted.map(toSwimlane).filter(isSwimlane);
   flowcharts.forEach(each);
   const corpus = [...docs, ...own, ...flowcharts];

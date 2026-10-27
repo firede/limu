@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { peleError } from '../lib/value.mjs';
 import { fileLiterals, testFiles, docs, arrayIn, lone, picker } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // Pele's fragments, tests/mindmap/oracle.test.ts, and more for decorations, config and what
 // is drawn.
@@ -222,6 +223,7 @@ function dumpModel(m) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -260,7 +262,7 @@ export default async function ({ src, pele, write, random }) {
       return { ...out, ...caught(e) };
     }
     if (out.type !== 'mindmap') return out;
-    const piped = parsed(() => mindmap.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
+    const piped = parsed(() => located(source, false, () => mindmap.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title)));
     if (JSON.stringify(piped) === JSON.stringify(out.direct)) return { ...out, same: true };
     return { ...out, ...piped };
   };

@@ -3,6 +3,7 @@ package sequence
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,6 +29,9 @@ type peleRender struct {
 		Src      string  `json:"src"`
 		MaxWidth float64 `json:"maxWidth"`
 		FontSize float64 `json:"fontSize"`
+		// Monospace is Pele's monospace option, the parts of diagrams set in the monospace
+		// font.
+		Monospace []string `json:"monospace"`
 		fixture.Drawing
 	} `json:"cases"`
 }
@@ -53,10 +57,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}
+		if slices.Contains(c.Monospace, "messages") {
+			o.Monospace = layout.Messages
+		}
+		got := sceneLines(Layout(db, pre.Config, o))
 		if msg := f.Diff(k, &c.Drawing, got, authorFill); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
+				t.Errorf("Layout(%q, max %v, size %v, monospace %q), %s", c.Src, c.MaxWidth, c.FontSize, c.Monospace, msg)
 			}
 		}
 	}
@@ -85,16 +93,47 @@ func paintName(p style.Paint) string {
 	return "?"
 }
 
+// inkNames are the colors Pele's ink picks for text or lines on a fill, by the theme's paint
+// limu's look picks in their place under the default theme.
+var inkNames = map[style.Paint]string{
+	style.Fg: "var(--pele-fg-on-light,#1f1f1f)",
+	style.Bg: "var(--pele-fg-on-dark,#fff)",
+}
+
+// probe is a paint no part of a sequence diagram is drawn in. A part's own text or stroke is
+// set to it to see whether the look puts a color in its place.
+var probe = style.Of(style.RGB(1, 2, 3))
+
+// inked is the names of the text and the stroke the default look draws an item in, as the
+// backends cascade its style: those it picks to stand out on a fill under the item, or under
+// its text, by the name Pele's ink writes, and its own otherwise.
+func inked(it *scene.Item) (txt, stroke string) {
+	own := it.Style
+	own.Text, own.Stroke = probe, probe
+	s := (*style.Look)(nil).Cascade(string(it.Role), own, it.Author)
+	txt, stroke = paintName(it.Style.Text), paintName(it.Style.Stroke)
+	if s.Text != probe {
+		txt = inkNames[s.Text]
+	}
+	if s.Stroke != probe {
+		stroke = inkNames[s.Stroke]
+	}
+	return txt, stroke
+}
+
 // partPaint is how a part of an item is painted, as the oracle reads Pele's fill and stroke,
 // with the width of the stroke where it is not the theme's, its ends and corners, and whether
 // the author set a fill.
 func partPaint(it *scene.Item, paint scene.Painting) string {
-	fill, stroke := paintName(pelesvg.OwnFill(it)), paintName(it.Style.Stroke)
+	_, stroke := inked(it)
+	fill := paintName(pelesvg.OwnFill(it))
 	switch paint {
 	case scene.StrokeOnly:
 		fill = "none"
 	case scene.FillOnly:
 		stroke = "none"
+	case scene.Dot:
+		fill, stroke = stroke, "none"
 	}
 	s := fill + " " + stroke
 	if w, ok := it.Style.StrokeWidth.Get(); ok {
@@ -129,7 +168,7 @@ func authorFill(line string) string {
 
 // markerPaint is how a part of a marker is painted, in the color of its edge's line.
 func markerPaint(it *scene.Item, paint scene.Painting, join style.Join) string {
-	line := paintName(it.Style.Stroke)
+	_, line := inked(it)
 	if paint == scene.FillOnly {
 		return line + " none"
 	}
@@ -159,7 +198,7 @@ func ends(s style.Style, stroke string, join style.Join) string {
 // clean drops what XML does not allow, as Pele's esc does.
 func clean(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r
@@ -205,7 +244,8 @@ func sceneLines(sc *scene.Scene) []string {
 		if it.Role == RoleFrameKind || it.Role == RoleNumber {
 			y = it.At.Y + shift
 		}
-		lines = append(lines, "text "+pt(it.At.X, y)+" "+paintName(it.Style.Text)+" "+content(l))
+		txt, _ := inked(it)
+		lines = append(lines, "text "+pt(it.At.X, y)+" "+txt+" "+content(l))
 	}
 	// The subpaths of a path, with the curves an arc was drawn with written as the arc, by
 	// where it ends.

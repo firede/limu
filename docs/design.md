@@ -18,7 +18,8 @@ text ──parse──▶ model ──layout──▶ scene.Scene ──backend�
 Anything that changes where things are belongs to layout, and changing it lays the diagram
 out again. That covers the measurer and its fonts, the text size, the width the host has
 and whether a diagram may turn to fit it, the padding around a diagram, a grid to snap to,
-how edges are routed, and the present and time zone of a gantt chart. `Padding` is nil for
+how edges are routed, which parts of diagrams are set in the monospace face
+(`Options.Monospace`, Pele's `monospace`), and the present and time zone of a gantt chart. `Padding` is nil for
 Pele's 8 and may be set to 0, and `Options.Pad` reads it. Everything else is style, which
 is settled only when a scene is drawn, so changing it only redraws.
 
@@ -91,8 +92,9 @@ when a theme changes them.
 | `StrokeOnly` | none | the style's stroke | an edge, the lid of a cylinder |
 | `FillOnly` | the style's fill | none | the body of a datastore |
 | `Solid` | the theme's line | the style's stroke | the dot of a final state, the bar of a fork |
-| `Hollow` | the theme's background | the style's stroke | the ring of a final state, which hides what is under it |
-| `Shade` | the theme's background, or that background at 60% opacity over the parts below when the author set a fill | none | a stripe of an entity's table |
+| `Hollow` | the theme's background, or the style's ground | the style's stroke | the ring of a final state, which hides what is under it, and an open marker |
+| `Shade` | the theme's background, or on a fill the author set that ink picks a color on, the one of foreground and background that stands out less (`Look.Shade`). It's laid at 60% opacity over the parts below when the author set a fill | none | a stripe of an entity's table |
+| `Dot` | the color of the item's stroke | none | the dot of a central connection on a sequence diagram's message |
 
 Paths have four kinds of step (move, line, quadratic curve and cubic curve) and can close.
 MyGo's paths have no arcs, so an arc becomes cubic curves as it's added, one for each
@@ -121,7 +123,10 @@ A swimlane diagram's items keep a flowchart's roles, so an override for `flowcha
 reaches them too, and its lanes are `swimlane.lane`. Flowcharts and state, class, use case
 and agent flow diagrams name an edge's label `*.edge-label`. Class and entity relationship
 diagrams draw the dividers of a box as items of their own, `class.divider` and
-`er.divider`, which take only the stroke color the author set.
+`er.divider`, which take only the stroke color the author set. Where an edge crosses the
+border of a fill the author set, a diagram draws a casing under it as a `Mark` of its own,
+`*.casing`, in flowcharts and swimlane, state, agent flow, block, C4, use case and entity
+relationship diagrams.
 
 The other diagrams draw these items.
 
@@ -225,8 +230,24 @@ edges of mindmaps, journeys, timelines, wardley, ishikawa and event modeling dia
 a cynefin diagram's transitions, end flat, since Pele draws them with no cap. limu reads an
 author's `stroke-linecap` and `stroke-linejoin` in `style` and `classDef` lines, as Pele
 passes them on to the browser. The svg package writes them where they're set. limumygo
-strokes with MyGo's round ends and corners when both are round, and otherwise fills the
-outline SVG would stroke.
+passes them, with SVG's initial miter limit of 4 and the style's dashes, to MyGo, which
+strokes them as SVG does.
+
+A fill the author sets can be dark, and text and lines drawn in the theme's colors would be
+lost on it. Pele 1.12 picks a color for what lies on such a fill, the theme's foreground or
+background, whichever stands out more against it, and limu keeps that choice in style, since
+it changes no position. A diagram says only what lies on a fill, and the style picks the
+color when the scene is drawn. `OnFill` marks a part whose text is set on its own fill.
+`Ground` is the fill under a part that lies inside another part's fill, as an edge inside a
+group, and its stroke and text take the color picked on it. What such a part paints
+`Hollow`, as an open marker, is filled with the ground, which `Resolved.Hollow` gives.
+`TextGround` is the fill under a part's text alone. A color the author or an override sets
+always wins. A diagram sets a ground only on a fill Pele's `ink` picks a color on, an opaque
+enough fill whose opacities can be read, and `css.Inks` decides that from the author's
+declarations as Pele reads them. An edge that crosses the border of a fill gets a casing
+instead, an item drawn under it in the background's color and four units wider, as Pele's
+`edgeCasing` draws one, so that the edge stands out where it runs over the fill.
+`draw.FillUnder` finds which fill holds an edge, and `draw.Casing` makes the casing.
 
 limumygo draws what the svg package writes, but not in every way as a browser draws SVG.
 
@@ -299,6 +320,9 @@ as Pele keeps it under `src/layout`, `src/svg` and `src/diagrams/common`.
   variable `graph`, which would hide the package.
 - `draw` has the geometry of shapes and edges, Pele's `svg/shapes.ts`, `svg/edges.ts` and
   `svg/cluster.ts`.
+- `edit` records the edits preprocessing makes to a diagram's text, as Pele's `Edit` does,
+  so that an error is placed where it is in the text as written, not in the text the
+  parser read.
 - `css` reads what the author sets with `classDef` and `style` lines, as Pele's
   `resolveStyle` does. It belongs to the diagrams rather than to `style`, because the
   weight, slant and size of text the author sets are inputs to layout.
@@ -308,7 +332,8 @@ as Pele keeps it under `src/layout`, `src/svg` and `src/diagrams/common`.
   host can draw and the glyphs drawn for them, the lexer and reader of the Langium grammars
   with their shared tokens and `AccDescr`, the scanning helpers of the hand-written Jison
   lexers such as `WordAt`, the indented outlines of kanban boards and mindmaps, and the
-  errors of a diagram's text.
+  errors of a diagram's text. `ParsePrepared` runs a diagram's parser and places its
+  errors in the text as written, as Pele's `locatingIn` does, through `edit`.
 
 `layout.Options.Routing` reaches the diagrams on the layered layout, which are flowcharts
 and swimlane, agent flow, state, class, entity relationship, requirement and use case
@@ -329,7 +354,12 @@ A few differences from Pele are on purpose, or known and left alone.
   whole. With a measurer that kerns, the gap between them isn't quite Pele's.
 - A link's host outside ASCII is lowercased and written in Punycode without the whole of
   UTS #46 (`internal/url`). Its other mappings, such as those of ligatures and combining
-  marks, aren't made, so a few such hosts come out differently from Node's.
+  marks, aren't made, so a few such hosts come out differently from Node's. Since Pele 1.12
+  hands a link with its percent escapes to the URL parser, such a host can be written in
+  escapes too, as `https:%E2%80%8Bx.y`, whose zero-width space Node drops and limu doesn't.
+- Pele picks the color of text on a fill from its own two colors, and limu from the theme's
+  foreground and background. With the default theme they're the same, and with another
+  theme a fill near the middle may take the other one.
 
 ## Testing
 
@@ -398,7 +428,7 @@ Pele draws with lines and curves. A circle, an ellipse, a box with corners of it
 path with an arc are drawn by a `scene.Path` in cubic curves that only come close, so they
 are compared as figures, within a tolerance.
 
-The port follows Pele 1.9.0, commit `e7f092a`. Each fixture records the version and commit
+The port follows Pele 1.12.0, commit `8aff183`. Each fixture records the version and commit
 it was written from, and the architecture and Node version that wrote it. The tests read
 fixtures with `fixture.Load`, which fails on a fixture written from another version or
 commit of Pele, or on one with an empty list at its top level, as a suite that found no

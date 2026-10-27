@@ -27,6 +27,9 @@ type peleRender struct {
 		MaxWidth float64 `json:"maxWidth"`
 		FontSize float64 `json:"fontSize"`
 		Icons    bool    `json:"icons"`
+		// Mono says the names are set in the monospace face, as Pele's monospace option lists
+		// files.
+		Mono bool `json:"mono"`
 		fixture.Drawing
 	} `json:"cases"`
 }
@@ -60,15 +63,18 @@ func TestLayoutMatchesPele(t *testing.T) {
 		if c.Icons {
 			o.Icons = icons
 		}
+		if c.Mono {
+			o.Monospace = layout.Files
+		}
 		sc := Layout(m, pre.Config, o)
-		if c.MaxWidth > 0 && sc.Width < Layout(m, pre.Config, &layout.Options{FontSize: c.FontSize, Icons: o.Icons}).Width {
+		if c.MaxWidth > 0 && sc.Width < Layout(m, pre.Config, &layout.Options{FontSize: c.FontSize, Icons: o.Icons, Monospace: o.Monospace}).Width {
 			tight++
 		}
 		got := sceneLines(t, sc)
 		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v, icons %v), %s", c.Src, c.MaxWidth, c.FontSize, c.Icons,
-					msg)
+				t.Errorf("Layout(%q, max %v, size %v, icons %v, mono %v), %s", c.Src, c.MaxWidth, c.FontSize, c.Icons,
+					c.Mono, msg)
 			}
 		}
 	}
@@ -101,7 +107,7 @@ func paintName(p style.Paint) string {
 // clean is text as Pele's esc writes it, the control characters XML does not allow dropped.
 func clean(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

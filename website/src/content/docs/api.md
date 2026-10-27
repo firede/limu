@@ -91,6 +91,7 @@ Text over a limit gives an error with code `diagram.Limit`. A negative limit tur
 | `Padding` | 8 | Sets the space around the diagram. It's a pointer so you can set 0 with `new(0.0)`. |
 | `Snap` | none | Rounds positions to multiples of this value, for backends that draw on whole pixels. |
 | `Routing` | `layout.Auto` | Sets how edges run in ranked layouts. `Auto` follows the text, and `layout.Orthogonal` and `layout.Straight` override it. |
+| `Monospace` | none | Sets which parts are set in the monospace face. `layout.Members` covers the members of class diagrams, `layout.Attributes` the types, names and keys of the attributes of entity relationship diagrams, `layout.Files` the entries of tree views, and `layout.Messages` the messages of sequence diagrams. A part whose author gives it a font keeps it. |
 | `Now` | `time.Now()` | Sets the current time for gantt charts, which marks today and starts tasks that have no start date. |
 | `Location` | `time.Local` | Sets the time zone gantt charts read and write dates in. |
 

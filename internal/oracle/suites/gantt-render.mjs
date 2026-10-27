@@ -10,6 +10,7 @@ import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
 import { unescape, attr, stroke } from '../lib/svg.mjs';
 import { FRAGMENTS, NOWS, ZONES, corpus, statementDiagrams } from './gantt.mjs';
+import { locator } from '../lib/located.mjs';
 
 // How a shape is painted: its fill, with its opacity, and its stroke.
 const paint = (s) => {
@@ -185,6 +186,7 @@ function drawableDiagrams(rnd) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { render, PeleError } = await src('index.ts');
   const { metricsMeasurer } = await src('text/measurer.ts');
   const { num } = await src('svg/builder.ts');
@@ -194,7 +196,7 @@ export default async function ({ src, pele, write, random }) {
   const parses = (source) => {
     try {
       const pre = preprocess(source);
-      gantt.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title);
+      located(source, false, () => gantt.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
       return true;
     } catch {
       return false;

@@ -28,6 +28,10 @@ type TokenType struct {
 	// it is but the whole type does not match, no closer is in the rest of the text, and the
 	// type is not tried again.
 	Opener func(src string, at int) bool
+	// MatchAfter matches in place of Match, for a type whose match depends on the token
+	// before it, as Pele's match does when it reads its third argument: previous is the kind
+	// of the last token that is not hidden, or -1 at the start.
+	MatchAfter func(src string, at, previous int) int
 	// First is every ASCII character a match can start with, or "" when that is not known.
 	// A type with a First is tried only at those characters and at characters outside ASCII.
 	First  string
@@ -87,6 +91,13 @@ func Tokenize(src string, table *Table, typ diagram.Type) (*Tokens, error) {
 				scanners[k] = t.Scanner()
 			}
 			return scanners[k](src, p)
+		}
+		if t.MatchAfter != nil {
+			previous := -1
+			if len(out.Kinds) > 0 {
+				previous = out.Kinds[len(out.Kinds)-1]
+			}
+			return t.MatchAfter(src, p, previous)
 		}
 		if t.Literal != "" {
 			if strings.HasPrefix(src[p:], t.Literal) {
@@ -255,6 +266,20 @@ var AccTitleToken = TokenType{Name: "ACC_TITLE", First: "\t a", Match: func(s st
 // TitleToken is Pele's TITLE, /[\t ]*title(?:[\t ][^\n\r]*?(?=%%)|[\t ][^\n\r]*|)/y: the word
 // alone matches too, so `title1` starts with a title.
 var TitleToken = TokenType{Name: "TITLE", First: "\t t", Match: func(s string, at int) int {
+	return matchTitle(s, at, nil)
+}}
+
+// TitleBefore is Pele's titleBefore(rest), TITLE with its last alternative made `(?!rest)`:
+// the word alone matches only where rest does not match after it, so that `title` does not
+// split a longer name. rest reports whether its pattern matches at a byte.
+func TitleBefore(rest func(s string, at int) bool) TokenType {
+	return TokenType{Name: "TITLE", First: "\t t", Match: func(s string, at int) int {
+		return matchTitle(s, at, rest)
+	}}
+}
+
+// matchTitle matches TITLE at byte at, or Pele's titleBefore(rest) when rest is not nil.
+func matchTitle(s string, at int, rest func(s string, at int) bool) int {
 	i := blanks(s, at)
 	if !strings.HasPrefix(s[i:], "title") {
 		return -1
@@ -263,8 +288,11 @@ var TitleToken = TokenType{Name: "TITLE", First: "\t t", Match: func(s string, a
 	if i < len(s) && (s[i] == ' ' || s[i] == '\t') {
 		return lineRest(s, i+1)
 	}
+	if rest != nil && rest(s, i) {
+		return -1
+	}
 	return i
-}}
+}
 
 // StringToken is Pele's STRING, /"([^"\\]|\\.)*"|'([^'\\]|\\.)*'/y. Each character has one
 // way to be taken, so the first quote that ends it is its end; a backslash before a line
@@ -607,11 +635,24 @@ func (r *Reader) Expect(kind int) string {
 	return r.Take()
 }
 
-// Fail panics with a syntax error at the token: what was expected, and what was found.
+// Fail panics with a syntax error at the token: what was expected, and what was found. At
+// the end of the text, the error is put after the last token, before the line breaks and
+// hidden comments that end the text, as Pele's fail puts it.
 func (r *Reader) Fail(expected string) {
 	found := "end of input"
 	if r.Kind() != -1 {
 		found = "`" + r.Text(r.I) + "`"
 	}
-	panic(SyntaxError(r.Diagram, r.Tokens.Src, r.Tokens.Starts[r.I], "Expecting "+expected+" but found "+found+".", false))
+	t := r.Tokens
+	at := t.Starts[r.I]
+	if r.Kind() == -1 {
+		k := r.I
+		for k > 0 && chars.Trim(t.Src[t.Starts[k-1]:t.Ends[k-1]]) == "" {
+			k--
+		}
+		if k > 0 {
+			at = t.Ends[k-1]
+		}
+	}
+	panic(SyntaxError(r.Diagram, t.Src, at, "Expecting "+expected+" but found "+found+".", false))
 }

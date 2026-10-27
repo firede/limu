@@ -4,9 +4,9 @@
 //
 // It draws what the svg package writes, as MyGo draws it: the parts of each item, filled
 // and stroked, the markers at the ends of edges, and labels, in the style the look settles
-// for each. Lines end and turn their corners as the style's Cap and Join say, as SVG's
-// stroke-linecap and stroke-linejoin do: MyGo strokes paths only with round ends and
-// corners, so a line with others is drawn by filling its outline.
+// for each. Lines end, turn their corners and are dashed as the style's Cap, Join and Dash
+// say, as SVG's stroke-linecap, stroke-linejoin and stroke-dasharray do, with SVG's initial
+// stroke-miterlimit: MyGo strokes paths with all of these.
 //
 // An item's opacity is laid on each color it is drawn in, where SVG draws the item as a
 // group at that opacity: MyGo's painter has no group of its own to draw at an opacity. Where
@@ -164,10 +164,13 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 		case scene.Solid:
 			fill = Color(s.Line, s.Opacity)
 		case scene.Hollow:
-			fill = Color(s.Bg, s.Opacity)
+			fill = Color(s.Hollow, s.Opacity)
 		case scene.Shade:
 			stroke = ui.Color{}
-			fill = Color(shade(s.Bg, it.Author.Fill.Set()), s.Opacity)
+			fill = Color(shade(s.Shade, it.Author.Fill.Set()), s.Opacity)
+		case scene.Dot:
+			stroke = ui.Color{}
+			fill = Color(s.Marker, s.Opacity)
 		}
 		if part.Path == nil {
 			radius := 0.0
@@ -186,9 +189,10 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 	}
 }
 
-// shade is the color of a part painted Shade: the background, or, when its item's author
-// set a fill, the background at 60% opacity over the parts below, as the svg package writes
-// it and Pele draws an entity's stripes.
+// shade is the color of a part painted Shade: the color style.Look.Shade picks, the
+// background or, on a fill ink picks a color on, the other of the two it picks from, and when
+// its item's author set a fill, that color at 60% opacity over the parts below, as the svg
+// package writes it and Pele draws an entity's stripes.
 func shade(bg style.Color, author bool) style.Color {
 	if author {
 		bg.A = uint8(float64(bg.A)*0.6 + 0.5)
@@ -261,7 +265,7 @@ func (p *Painter) Ends(it *scene.Item, s style.Resolved) {
 			case scene.StrokeOnly:
 				p.stroke(path, line, pn)
 			case scene.Hollow:
-				p.fill(path, Color(s.Bg, s.Opacity))
+				p.fill(path, Color(s.Hollow, s.Opacity))
 				p.stroke(path, line, pn)
 			}
 		}
@@ -288,183 +292,25 @@ func (p *Painter) across(b scene.Rect, w float32) float32 {
 
 func (p *Painter) fill(sp *scene.Path, c ui.Color) { p.FillPath(p.Path(sp), c) }
 
-// stroke strokes a path of the scene with a pen. MyGo strokes it when its ends and corners
-// are round, which are all MyGo draws; with others, its outline is filled. The filling of
-// outlines, and the cutting of dashed lines into dashes, work around MyGo, and go once
-// ui.Painter.StrokePath takes caps, joins, a miter limit and dashes, as egoist/mygo#530
-// asks.
+// stroke strokes a path of the scene with a pen, which MyGo strokes as SVG does. An opaque
+// line longer than piece device pixels is stroked in pieces (strokeLines).
 func (p *Painter) stroke(sp *scene.Path, c ui.Color, pn pen) {
 	if c.A == 0 || !(pn.width > 0) {
 		return
 	}
-	if pn.cap != style.CapRound || pn.join != style.JoinRound {
-		lines := sp.Flatten(p.tolerance())
-		if len(pn.dash) > 0 {
-			lines = scene.Dash(lines, pn.dash, 0)
-		}
-		p.strokeOutline(lines, c, pn)
-		return
-	}
 	w := p.Len(pn.width)
-	if len(pn.dash) == 0 && (c.A < 255 || p.across(sp.Bounds(), w) <= piece) {
-		p.StrokePath(p.Path(sp), w, c)
+	dash := p.dashes(pn)
+	// Translucent pieces would show darker where they overlap: a translucent line is
+	// stroked whole.
+	if c.A < 255 || p.across(sp.Bounds(), w) <= piece {
+		p.StrokePath(p.with(p.Path(sp), pn, dash, 0), w, c)
 		return
 	}
-	lines := sp.Flatten(p.tolerance())
-	if len(pn.dash) > 0 {
-		lines = scene.Dash(lines, pn.dash, 0)
-	}
-	// Translucent pieces would show darker where their caps overlap: a translucent line's
-	// dashes are stroked as one path.
-	limit := float32(math.MaxFloat32)
-	if c.A == 255 {
-		limit = max(piece/p.Scale()-w-2, 8)
-	}
-	p.strokeLines(lines, w, c, limit)
-}
-
-// strokeLines strokes polylines of the scene w DIPs wide, in pieces no more than limit DIPs
-// across, and only those that show. With round joins and caps, a closed polyline is drawn as
-// an open one back to its start.
-func (p *Painter) strokeLines(lines []scene.Polyline, w float32, c ui.Color, limit float32) {
-	view := p.Visible()
-	var path ui.Path
-	var x0, y0, x1, y1 float32 // the piece's bounds
-	empty := true
-	flush := func() {
-		if !empty && overlaps(ui.Rect{X: x0 - w, Y: y0 - w, W: x1 - x0 + 2*w, H: y1 - y0 + 2*w}, view) {
-			p.StrokePath(&path, w, c)
-		}
-		path.Reset()
-		empty = true
-	}
-	for _, l := range lines {
-		pts := l.Points
-		if l.Closed {
-			pts = append(pts[:len(pts):len(pts)], pts[0])
-		}
-		var last [2]float32
-		for i, pt := range pts {
-			x, y := p.Point(pt)
-			if i > 0 {
-				// A line longer than a piece is cut.
-				n := int(math.Ceil(float64(max(abs(x-last[0]), abs(y-last[1])) / (limit / 2))))
-				for j := 1; j <= n; j++ {
-					k := float32(j) / float32(n)
-					sx, sy := last[0]+(x-last[0])*k, last[1]+(y-last[1])*k
-					if !empty && max(x1, sx)-min(x0, sx) <= limit && max(y1, sy)-min(y0, sy) <= limit {
-						path.LineTo(sx, sy)
-						x0, y0, x1, y1 = min(x0, sx), min(y0, sy), max(x1, sx), max(y1, sy)
-					} else {
-						px, py := last[0]+(x-last[0])*float32(j-1)/float32(n), last[1]+(y-last[1])*float32(j-1)/float32(n)
-						flush()
-						path.MoveTo(px, py).LineTo(sx, sy)
-						x0, y0, x1, y1 = min(px, sx), min(py, sy), max(px, sx), max(py, sy)
-						empty = false
-					}
-				}
-			} else if !empty && max(x1, x)-min(x0, x) <= limit && max(y1, y)-min(y0, y) <= limit {
-				path.MoveTo(x, y)
-				x0, y0, x1, y1 = min(x0, x), min(y0, y), max(x1, x), max(y1, y)
-			} else {
-				flush()
-				path.MoveTo(x, y)
-				x0, y0, x1, y1 = x, y, x, y
-				empty = false
-			}
-			last = [2]float32{x, y}
-		}
-	}
-	flush()
-}
-
-// fillTiles fills polygons of the scene, where the painter shows, a tile of tile device
-// pixels at a time: each polygon is clipped to the tile, which keeps how many times it winds
-// about each point inside it, and so what a fill with the non-zero rule covers. The tiles'
-// sides are on the edges of device pixels, so that where two meet neither covers a part of
-// a pixel the other covers too, and no seam shows.
-func (p *Painter) fillTiles(polys []scene.Polyline, c ui.Color, tile int) {
-	var dips [][][2]float32
-	x0, y0 := float32(math.Inf(1)), float32(math.Inf(1))
-	x1, y1 := float32(math.Inf(-1)), float32(math.Inf(-1))
-	for _, l := range polys {
-		var poly [][2]float32
-		for _, pt := range l.Points {
-			x, y := p.Point(pt)
-			poly = append(poly, [2]float32{x, y})
-			x0, y0, x1, y1 = min(x0, x), min(y0, y), max(x1, x), max(y1, y)
-		}
-		dips = append(dips, poly)
-	}
-	// Only what shows, and a pixel about it.
-	v := p.Visible()
-	x0, y0 = max(x0, v.X-1), max(y0, v.Y-1)
-	x1, y1 = min(x1, v.X+v.W+1), min(y1, v.Y+v.H+1)
-	s := p.Scale()
-	// The tiles, in device pixels, from the pixel the first is in.
-	px0, py0 := int(math.Floor(float64(x0*s))), int(math.Floor(float64(y0*s)))
-	var path ui.Path
-	for ty := py0; float32(ty) < y1*s; ty += tile {
-		for tx := px0; float32(tx) < x1*s; tx += tile {
-			r := ui.Rect{X: float32(tx) / s, Y: float32(ty) / s, W: float32(tile) / s, H: float32(tile) / s}
-			path.Reset()
-			for _, poly := range dips {
-				clipped := clipPolygon(poly, r)
-				for i, pt := range clipped {
-					if i == 0 {
-						path.MoveTo(pt[0], pt[1])
-					} else {
-						path.LineTo(pt[0], pt[1])
-					}
-				}
-				if len(clipped) > 0 {
-					path.Close()
-				}
-			}
-			p.FillPath(&path, c)
-		}
-	}
-}
-
-// clipPolygon is a polygon clipped to a box, as Sutherland and Hodgman do it, for
-// fillTiles.
-func clipPolygon(poly [][2]float32, r ui.Rect) [][2]float32 {
-	edges := [4]struct {
-		axis int
-		at   float32
-		keep float32 // 1 keeps what is above at, -1 what is below
-	}{{0, r.X, 1}, {0, r.X + r.W, -1}, {1, r.Y, 1}, {1, r.Y + r.H, -1}}
-	for _, e := range edges {
-		if len(poly) == 0 {
-			break
-		}
-		in := func(pt [2]float32) bool { return (pt[e.axis]-e.at)*e.keep >= 0 }
-		var out [][2]float32
-		prev := poly[len(poly)-1]
-		for _, pt := range poly {
-			if in(pt) != in(prev) {
-				k := (e.at - prev[e.axis]) / (pt[e.axis] - prev[e.axis])
-				out = append(out, [2]float32{prev[0] + (pt[0]-prev[0])*k, prev[1] + (pt[1]-prev[1])*k})
-			}
-			if in(pt) {
-				out = append(out, pt)
-			}
-			prev = pt
-		}
-		poly = out
-	}
-	return poly
+	p.strokeLines(sp.Flatten(p.tolerance()), c, pn, dash)
 }
 
 func overlaps(a, b ui.Rect) bool {
 	return a.X < b.X+b.W && a.Y < b.Y+b.H && a.X+a.W > b.X && a.Y+a.H > b.Y
-}
-
-func abs(v float32) float32 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
 
 // Label draws an item's label as the svg package writes it, about the item's At: each line

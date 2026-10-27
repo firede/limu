@@ -7,7 +7,10 @@
 // units, as Pele's are.
 package sankey
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // Node is a node of a diagram, Pele's SankeyNode: its id as written, with the entities of the
 // text encoded as Pele's preprocessing leaves them, and its place in Model.Nodes.
@@ -17,8 +20,8 @@ type Node struct {
 }
 
 // Link is a band of flow from one node to another, Pele's SankeyLink, with its nodes by
-// their place in Model.Nodes. Value is what parseFloat reads of the third field: NaN where it
-// holds no number.
+// their place in Model.Nodes. Value is what parseFloat reads of the third field, which is
+// always finite, as a row whose value is not is an error.
 type Link struct {
 	Source, Target int
 	Value          float64
@@ -61,12 +64,13 @@ func (m *Model) addLink(source, target int, value float64) {
 
 // Parse parses a sankey diagram's text, as the parse of Pele's sankey diagram does: source is
 // what diagram.Prepared.Source gives, and title the title its front matter gives, "" for
-// none. The text is prepared as Mermaid's prepareTextForParsing prepares it before it is
-// parsed. An error is a *diagram.Error.
+// none. The text is prepared as Pele's prepareTextForParsing prepares it before it is
+// parsed, and an error is placed in the text before it was prepared. An error is a
+// *diagram.Error.
 func Parse(source, title string) (*Model, error) {
 	m := newModel()
 	m.Title = title
-	if err := parseSankey(prepareTextForParsing(source), m); err != nil {
+	if err := parseSankey(prepareTextForParsing(source, nil), m, source); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -74,5 +78,7 @@ func Parse(source, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared sankey diagram.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }

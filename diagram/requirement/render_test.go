@@ -61,6 +61,26 @@ func TestLayoutMatchesPele(t *testing.T) {
 	}
 }
 
+// inkNames are the colors Pele's ink picks, by the theme's paints the default look settles
+// them as.
+var inkNames = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)", style.Bg: "var(--pele-fg-on-dark,#fff)"}
+
+// ink is what the oracle writes of the color ink picks for an item's text on a fill: " ink="
+// and the color, where the default look picks one, and nothing elsewhere. The diagram's own
+// text is taken as a paint ink never picks, so that a color picked shows even where it is the
+// same as the diagram's.
+func ink(it *scene.Item) string {
+	var look style.Look
+	own := it.Style
+	own.Text = style.SurfaceAlt
+	bare := own
+	bare.OnFill, bare.Ground, bare.TextGround = false, style.Paint{}, style.Paint{}
+	if got, plain := look.Cascade(string(it.Role), own, it.Author), look.Cascade(string(it.Role), bare, it.Author); got.Text != plain.Text {
+		return " ink=" + inkNames[got.Text]
+	}
+	return ""
+}
+
 // sceneLines writes a scene as the oracle reads Pele's SVG.
 func sceneLines(sc *scene.Scene) []string {
 	num := pelesvg.Num
@@ -78,7 +98,7 @@ func sceneLines(sc *scene.Scene) []string {
 	// text writes an item's label, drawn about x, y, as the oracle reads Pele's text element.
 	text := func(it *scene.Item, class, size, weight string, x, y float64) {
 		if s := textLine(it.Label, it.Align, class, size, weight, x, y); s != "" {
-			lines = append(lines, s)
+			lines = append(lines, s+ink(it))
 		}
 	}
 	labels := false
@@ -312,7 +332,7 @@ func sharedFace(l *text.Label) text.Face {
 // dropControls drops the characters XML does not allow, as Pele's esc does.
 func dropControls(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

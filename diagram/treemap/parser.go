@@ -38,7 +38,9 @@ const (
 var treemapTokens = []common.TokenType{
 	common.AccDescrToken,
 	common.AccTitleToken,
-	common.TitleToken,
+	// Pele's titleBefore(String.raw`\w`): the word alone is no title where a word character
+	// follows, so that a class name such as title_2 is read whole.
+	common.TitleBefore(func(s string, at int) bool { return at < len(s) && chars.IsWord(int(s[at])) }),
 	{Name: "TREEMAP_KEYWORD", First: "t", Match: matchKeyword},
 	{Name: "CLASS_DEF", First: "c", Match: func(s string, at int) int {
 		end, _, _, _ := matchClassDef(s, at)

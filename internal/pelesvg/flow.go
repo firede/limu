@@ -60,6 +60,60 @@ func OwnFill(it *scene.Item) style.Paint {
 	return it.Style.Fill.Alpha(it.Style.FillOpacity.Or(1))
 }
 
+// The colors Pele's ink gives what lies on a fill a style sets, by the theme's paint that
+// stands for each: ON_LIGHT is the theme's Fg, and ON_DARK its Bg.
+var inks = map[style.Paint]string{
+	style.Fg: "var(--pele-fg-on-light,#1f1f1f)",
+	style.Bg: "var(--pele-fg-on-dark,#fff)",
+}
+
+// TextInk is the color Pele's ink writes for an item's text, where the item's style picks one
+// that stands out on a fill (OnFill, Ground or TextGround), as Look.Cascade settles it; "" where
+// it picks none.
+func TextInk(it *scene.Item) string {
+	var look *style.Look
+	own := it.Style
+	// A paint no item's text has, to tell a color picked from the one the item gives.
+	own.Text = style.Critical
+	return inks[look.Cascade(string(it.Role), own, it.Author).Text]
+}
+
+// StrokeInk is the color Pele's ink writes for an item's stroke, where the ground it lies on
+// picks one, as Look.Cascade settles it; "" where it picks none.
+func StrokeInk(it *scene.Item) string {
+	var look *style.Look
+	own := it.Style
+	own.Stroke = style.Critical
+	return inks[look.Cascade(string(it.Role), own, it.Author).Stroke]
+}
+
+// CasingLine is a casing as the render oracles read the casings Pele draws under edges that
+// cross a fill a style sets: its width, its path, and the markers it cases, p for an arrow's
+// point, o for a circle and x for a cross.
+func CasingLine(it *scene.Item) string {
+	line := "casing " + Num(it.Style.StrokeWidth.Or(1)) + " " + D(it.Parts[0].Path)
+	marks := ""
+	for _, part := range it.Parts[1:] {
+		curved, closed := false, false
+		part.Path.Each(func(op scene.Op, _ []float64) {
+			curved = curved || op == scene.CubeTo
+			closed = closed || op == scene.Close
+		})
+		switch {
+		case curved:
+			marks += "o"
+		case closed:
+			marks += "p"
+		default:
+			marks += "x"
+		}
+	}
+	if marks != "" {
+		line += " " + marks
+	}
+	return line
+}
+
 // FlowLines writes the scene of a flowchart or a swimlane diagram as the render oracle reads
 // Pele's SVG of one: a line for each thing drawn, in the order drawn, with numbers as Pele's
 // SVG writes them.
@@ -80,6 +134,14 @@ func FlowLines(sc *scene.Scene) []string {
 			lines = append(lines, textAt(l, cx, cy))
 		}
 	}
+	// ink writes the color an item's label takes on a fill a style sets, if it takes one.
+	ink := func(it *scene.Item) {
+		if it.Label != nil && len(it.Label.Lines) > 0 {
+			if s := TextInk(it); s != "" {
+				lines = append(lines, "ink "+s)
+			}
+		}
+	}
 	for i := range sc.Items {
 		it := &sc.Items[i]
 		id := ID(it.ID)
@@ -91,13 +153,20 @@ func FlowLines(sc *scene.Scene) []string {
 			}
 		case "flowchart.cluster":
 			lines = append(lines, fmt.Sprintf("cluster %s [%s] %s", id, classes, box(it.Box, 0, 0)))
+			if _, ok := it.Style.FillOpacity.Get(); !ok {
+				lines = append(lines, "opaque")
+			}
 			label(it.Label, it.At.X, it.At.Y)
+			ink(it)
 		case "swimlane.lane":
 			lines = append(lines, fmt.Sprintf("lane %s [%s] %s band %s", id, classes, box(it.Parts[0].Box, 0, 0), box(it.Parts[1].Box, 0, 0)))
 			label(it.Label, it.At.X, it.At.Y)
 			if it.Label != nil && len(it.Label.Lines) > 0 && it.Rotate != 0 {
 				lines = append(lines, "rotate "+num(it.Rotate)+" "+num(it.At.X)+" "+num(it.At.Y))
 			}
+			ink(it)
+		case "flowchart.casing":
+			lines = append(lines, CasingLine(it))
 		case "flowchart.edge":
 			flags := ""
 			if w, ok := it.Style.StrokeWidth.Get(); ok && w == 2.5 {
@@ -108,6 +177,9 @@ func FlowLines(sc *scene.Scene) []string {
 			}
 			lines = append(lines, fmt.Sprintf("edge %s [%s]%s %s", id, classes, flags, D(it.Parts[0].Path)))
 			lines = append(lines, "stroke "+CapJoin(it))
+			if s := StrokeInk(it); s != "" {
+				lines = append(lines, "ink "+s)
+			}
 			for _, m := range it.Ends {
 				if s := Marker(m); s != "" {
 					lines = append(lines, "m "+s)
@@ -132,6 +204,7 @@ func FlowLines(sc *scene.Scene) []string {
 				lines = append(lines, "link "+it.Link)
 			}
 			label(it.Label, it.At.X-cx, it.At.Y-cy)
+			ink(it)
 		default:
 			lines = append(lines, "unknown role "+string(it.Role))
 		}
@@ -143,7 +216,7 @@ func FlowLines(sc *scene.Scene) []string {
 // dropped.
 func ID(id string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

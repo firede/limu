@@ -11,6 +11,7 @@ package diagram
 import (
 	"strconv"
 
+	"github.com/firede/limu/diagram/internal/edit"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -60,6 +61,9 @@ type Prepared struct {
 	// LineOffset is the number of lines of front matter before the text.
 	LineOffset int
 	Limits     Limits
+
+	// source is the text Prepare was given, with what is not UTF-8 replaced.
+	source string
 }
 
 // Source is the text a diagram's parser reads, as Pele's parseSource hands it over: Text, or
@@ -70,7 +74,45 @@ func (p *Prepared) Source(keepComments bool) string {
 	if keepComments {
 		text = p.WithComments
 	}
-	return encodeEntities(text) + "\n"
+	return encodeEntities(text, nil) + "\n"
+}
+
+// InSource gives a function that finds a byte of the text Source gives in the diagram's text
+// as its author wrote it, as the function Pele's inSource makes does: the text with its line
+// breaks normalized and the line feed Source adds, and the byte in it. It reads the text
+// again, recording how it was rewritten, only when the function is first called, since that
+// is only to report an error. Where reading the text again does not give what Source gives, as
+// for a Prepared that Prepare did not make or whose fields were changed since, it finds each
+// byte where it is in the text Source gives.
+func (p *Prepared) InSource(keepComments bool) func(at int) (source string, offset int) {
+	var steps [][]edit.Edit
+	var source string
+	read, same := false, false
+	return func(at int) (string, int) {
+		if !read {
+			read = true
+			pre, err := preprocess(p.source, &steps)
+			if err == nil {
+				text := pre.WithComments
+				if !keepComments {
+					text = cleanupComments(text, &steps)
+				}
+				given := p.Source(keepComments)
+				same = p.source != "" && encodeEntities(text, &steps)+"\n" == given
+				// Match the line feed Source adds.
+				source = normalizeLineBreaks(p.source) + "\n"
+				if !same {
+					source = given
+				}
+			} else {
+				source = p.Source(keepComments)
+			}
+		}
+		if !same {
+			return source, at
+		}
+		return source, edit.InputOffset(steps, at)
+	}
 }
 
 // Prepare reads a diagram's front matter, directives and type, as Pele's parseSource does
@@ -90,7 +132,7 @@ func Prepare(source string, opt Options) (*Prepared, error) {
 	if limit > 0 && chars.Len16(source) > limit {
 		return nil, newError("Diagram source is longer than the limit of "+strconv.Itoa(limit)+" characters.", Limit, "")
 	}
-	pre, err := preprocess(source)
+	pre, err := preprocess(source, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +163,7 @@ func Prepare(source string, opt Options) (*Prepared, error) {
 		HasTitle:     pre.HasTitle,
 		LineOffset:   pre.LineOffset,
 		Limits:       Limits{MaxEdges: maxEdges},
+		source:       source,
 	}, nil
 }
 
@@ -133,7 +176,9 @@ func Unsupported(found Detected) *Error {
 }
 
 // TagError gives err, if it is an *Error, the diagram's type where it has none, as Pele's
-// tagErrors does for the errors of a diagram's parser and of its layout. It is err.
+// tagErrors does for the errors of a diagram's parser and of its layout, and writes the
+// entity codes in its message and snippet as the text has them, not as the parser read them.
+// It is err.
 func TagError(found Detected, err error) error {
 	if e, ok := err.(*Error); ok {
 		if e.Type == "" {
@@ -142,6 +187,8 @@ func TagError(found Detected, err error) error {
 		if e.MermaidType == "" {
 			e.MermaidType = found.MermaidType
 		}
+		e.Message = edit.WrittenCodes(e.Message)
+		e.Snippet = edit.WrittenCodes(e.Snippet)
 	}
 	return err
 }

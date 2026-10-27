@@ -6,6 +6,7 @@
 import { enc, peleError } from '../lib/value.mjs';
 import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The fragments of Pele's tests/eventmodeling/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -230,6 +231,7 @@ export const STRESS = [
 ];
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -293,7 +295,7 @@ export default async function ({ src, pele, write, random }) {
     }
     if (out.type !== 'eventmodeling') return out;
     try {
-      const m = eventmodeling.parse(encodeEntities(pre.withComments) + '\n', pre.config, pre.title);
+      const m = located(source, true, () => eventmodeling.parse(encodeEntities(pre.withComments) + '\n', pre.config, pre.title));
       out.model = {
         title: opt(m.title),
         accTitle: opt(m.accTitle),

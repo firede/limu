@@ -44,9 +44,12 @@ const (
 
 // The roles of the parts of an ER diagram.
 const (
-	RoleTitle             scene.Role = "er.title"
-	RoleCluster           scene.Role = "er.cluster"
-	RoleRelationship      scene.Role = "er.relationship"
+	RoleTitle        scene.Role = "er.title"
+	RoleCluster      scene.Role = "er.cluster"
+	RoleRelationship scene.Role = "er.relationship"
+	// RoleCasing is a casing under a relationship that crosses the border of a fill an
+	// author sets, drawn in the background so that the relationship stands out on the fill.
+	RoleCasing            scene.Role = "er.casing"
 	RoleRelationshipLabel scene.Role = "er.relationship-label"
 	RoleEntity            scene.Role = "er.entity"
 	RoleDivider           scene.Role = "er.divider"
@@ -92,10 +95,13 @@ type row struct {
 type view struct {
 	node   *graphNode
 	author css.Author
-	label  text.Label
-	w, h   float64
-	headH  float64
-	rows   []row
+	// decls are the declarations of the entity's classes and styles, which say whether it
+	// sets a fill, and whether that fill picks the color of its texts.
+	decls []string
+	label text.Label
+	w, h  float64
+	headH float64
+	rows  []row
 	// cols are the left edge of each column, from the left edge of the box.
 	cols             []float64
 	rowSize, keySize float64
@@ -212,6 +218,12 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if author.Italic {
 			face |= text.Italic
 		}
+		// The type, name and keys of an attribute are set in the monospace face where the
+		// options list attributes, unless the author gives the entity a font family.
+		mono := face
+		if o.Monospace&layout.Attributes != 0 && !css.FontFamilyDeclared(decls) {
+			mono |= text.Mono
+		}
 		nameSize, rowSize, keySize := size, smallSize, jsmath.Round(float64(size*0.75))
 		if author.FontSize > 0 {
 			nameSize, rowSize, keySize = author.FontSize, author.FontSize, author.FontSize
@@ -230,7 +242,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		// Loops leave by a side the layout keeps free of other edges: the right when ranks
 		// run down, the bottom when they run across.
 		below := len(own) > 0 && !node.IsGroup && horizontal(i)
-		v := view{node: node, author: author, label: label, rowSize: rowSize, keySize: keySize, below: below}
+		v := view{node: node, author: author, decls: decls, label: label, rowSize: rowSize, keySize: keySize, below: below}
 		reach, bands := 0.0, 0.0
 		for _, lp := range own {
 			if below {
@@ -275,9 +287,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				var widths [4]float64
 				for _, a := range node.Attributes {
 					cells := [4]text.Label{
-						labelOf(cellText(a.Type), true, rowSize, noWrap, face),
-						labelOf(cellText(a.Name), true, rowSize, noWrap, face),
-						labelOf(strings.Join(a.Keys, ", "), false, keySize, noWrap, face),
+						labelOf(cellText(a.Type), true, rowSize, noWrap, mono),
+						labelOf(cellText(a.Name), true, rowSize, noWrap, mono),
+						labelOf(strings.Join(a.Keys, ", "), false, keySize, noWrap, mono),
 						labelOf(cellText(a.Comment), true, rowSize, commentWrap, face),
 					}
 					h := rowLine
@@ -411,7 +423,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		}
 	}
 
-	var titles, clusters, nodes, edges, labels []scene.Item
+	var titles, clusters, casings, nodes, edges, labels []scene.Item
+	// fills are the subgraphs whose authors paint them a fill, which relationships inside them
+	// are drawn on, as Pele's fills.
+	var fills []draw.Fill
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
 			Kind: scene.Text, Role: RoleTitle, Label: &title,
@@ -427,11 +442,21 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			v.w, v.h = c.W, c.H
 			box := scene.Rect{X: c.X - c.W/2, Y: c.Y - c.H/2, W: c.W, H: c.H}
 			titleX := draw.ClusterTitleX(node(i), v.label.Width, crossings, groupPad)
+			if css.Paints(v.decls) {
+				fills = append(fills, draw.Fill{Box: [4]float64{box.X, box.Y, box.X + c.W, box.Y + c.H}, Decls: v.decls})
+			}
+			// The title is set on the subgraph's fill, in the color that stands out on a fill
+			// the author gives it, as Pele's inkFill picks it.
 			cluster := scene.Item{
 				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted, OnFill: css.InksText(v.decls, v.decls)},
 				Author: v.author.Style,
+			}
+			// A subgraph is drawn at half its opacity, unless its author sets a fill, as
+			// Pele's setsFill tests.
+			if !css.FillDeclared(v.decls) {
+				cluster.Style.FillOpacity = style.N(0.5)
 			}
 			if !v.label.Empty() {
 				cluster.Label = &v.label
@@ -555,6 +580,17 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			// A self-loop, which the layout gives no route: the corners its curve is drawn about.
 			route = path.Corners()
 		}
+		// A relationship inside one fill is drawn in the color of its labels, with its open
+		// markers filled with the fill, and one that crosses the border of a fill is laid on a
+		// casing, as Pele's fillUnder and edgeInk find.
+		ground, cased := draw.OnFills(path, nil, fills, nil)
+		own.Ground = ground
+		if cased {
+			if c := draw.Casing(RoleCasing, path, ends, nil, false); c != nil {
+				c.ID = edge.ID
+				casings = append(casings, *c)
+			}
+		}
 		edges = append(edges, scene.Item{
 			Kind: scene.Edge, Role: RoleRelationship, ID: edge.ID,
 			Box:   path.Bounds(),
@@ -575,8 +611,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		}
 	}
 
-	sc.Items = make([]scene.Item, 0, len(titles)+len(clusters)+len(edges)+len(labels)+len(nodes))
-	for _, layer := range [][]scene.Item{titles, clusters, edges, labels, nodes} {
+	sc.Items = make([]scene.Item, 0, len(titles)+len(clusters)+len(casings)+len(edges)+len(labels)+len(nodes))
+	for _, layer := range [][]scene.Item{titles, clusters, casings, edges, labels, nodes} {
 		sc.Items = append(sc.Items, layer...)
 	}
 	return sc
@@ -595,9 +631,17 @@ func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.
 		Kind: scene.Node, Role: RoleEntity, Shape: "rounded", ID: n.Label, Class: classes,
 		Box:    box,
 		Parts:  []scene.Part{{Box: box, Rounded: true}},
-		Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
+		Style:  style.Style{Fill: style.Surface, Stroke: style.Border, OnFill: css.InksText(v.decls, v.decls)},
 		Author: v.author.Style,
 		Label:  &v.label, At: scene.Point{X: x, Y: y},
+	}
+	// The texts are set on the entity's fill, in the color that stands out on a fill the author
+	// gives it, as Pele's inkFill picks it: the name on the box's own fill, and the cells on
+	// the fill under them. The stripes under every other row are shaded as style.Look.Shade
+	// picks on that fill.
+	var ground style.Paint
+	if it.Style.OnFill {
+		ground = v.author.Style.Fill
 	}
 	if hasClass(classes, "internal-link") && !v.label.Empty() && !o.NoLinks {
 		// The name ends up in an href, so it gets the same check as a URL.
@@ -606,7 +650,7 @@ func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.
 			name = n.Label
 		}
 		display := text.DecodeEntities(name)
-		if _, ok := url.LinkURL(url.SanitizeURL(display), true, o.LinkSchemes); ok {
+		if url.InternalLink(display, !o.NoLinks, o.LinkSchemes) {
 			it.Link = display
 		}
 	}
@@ -638,9 +682,9 @@ func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.
 			if l.Empty() {
 				continue
 			}
-			own := style.Style{Text: style.Muted}
+			own := style.Style{Text: style.Muted, TextGround: ground}
 			if k == 1 {
-				own = style.Style{}
+				own = style.Style{TextGround: ground}
 			}
 			// The label is centered on At down, and its first line's baseline is where Pele
 			// writes it.

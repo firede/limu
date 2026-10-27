@@ -4,6 +4,7 @@ import (
 	"math"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
@@ -79,29 +80,24 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	})
 }
 
-// hardWrap splits text into lines of at most columns code units, keeping its own line
-// breaks, as Pele's hardWrap does. Where Pele's cut falls between the two halves of a
-// character past the Basic Multilingual Plane, the character stays whole on the line before.
+// hardWrap splits text into lines of at most columns characters, keeping its own line breaks,
+// as Pele's hardWrap does. A line of no more than columns code units, or of no more than
+// columns code points, stays whole. A longer one is cut every columns code points, so that no
+// character past the Basic Multilingual Plane is split.
 func hardWrap(s string, columns int) []string {
 	var out []string
 	for _, line := range strings.Split(text.DecodeEntities(s), "\n") {
-		if chars.Len16(line) <= columns {
+		if chars.Len16(line) <= columns || utf8.RuneCountInString(line) <= columns {
 			out = append(out, line)
 			continue
 		}
-		from, units, cut := 0, 0, columns
-		for i, r := range line {
-			if units >= cut {
+		from, n := 0, 0
+		for i := range line {
+			if n > 0 && n%columns == 0 {
 				out = append(out, line[from:i])
 				from = i
-				for cut <= units {
-					cut += columns
-				}
 			}
-			units++
-			if r > 0xffff {
-				units++
-			}
+			n++
 		}
 		out = append(out, line[from:])
 	}

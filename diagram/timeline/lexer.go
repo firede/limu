@@ -75,10 +75,21 @@ func tokenize(src string) *common.JisonTokens {
 				continue
 			}
 		}
-		// `\s` after a keyword also takes a line break, so `title` alone on a line takes the
-		// next line as its text.
 		if common.KeywordAt(src, p, "title") {
-			if s, size := chars.UnitAt(src, p+5); chars.IsSpace(s) && p+5+size < n && src[p+5+size] != 10 {
+			// Unlike Mermaid, a bare title is skipped, as no title.
+			e := p + 5
+			for {
+				c, size := chars.UnitAt(src, e)
+				if c == '\n' || !chars.IsSpace(c) {
+					break
+				}
+				e += size
+			}
+			if e == n || src[e] == '\n' {
+				p = e
+				continue
+			}
+			if s, size := chars.UnitAt(src, p+5); s != '\r' && chars.IsSpace(s) {
 				emit(tTitle, common.LineEnd(src, p+5+size))
 				continue
 			}

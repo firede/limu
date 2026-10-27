@@ -56,6 +56,18 @@ func idMatch(s string, at int) int {
 	return end
 }
 
+// idRest reports whether /[-\w]*\w/ matches at byte at, which is where the run of word
+// characters and dashes there holds a word character. It is the rest of an ID that
+// titleBefore gives way to in Pele's ARCHITECTURE_TOKENS, so that `titles` is an ID.
+func idRest(s string, at int) bool {
+	for i := at; i < len(s) && (s[i] == '-' || isWord(s[i])); i++ {
+		if s[i] != '-' {
+			return true
+		}
+	}
+	return false
+}
+
 // word is Pele's word: the text, which an identifier that goes on longer takes over.
 func word(text string) common.TokenType {
 	return common.TokenType{Name: text, Literal: text, Longer: []int{tID}}
@@ -155,7 +167,7 @@ var archTokens = []common.TokenType{
 	}},
 	common.AccDescrToken,
 	common.AccTitleToken,
-	common.TitleToken,
+	common.TitleBefore(idRest),
 	common.StringToken,
 	{Name: "ID", Match: idMatch},
 	common.NewlineToken,

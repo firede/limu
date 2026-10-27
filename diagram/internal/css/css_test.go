@@ -7,6 +7,28 @@ import (
 	"github.com/firede/limu/style"
 )
 
+func TestFontFamilyDeclared(t *testing.T) {
+	for _, c := range []struct {
+		decls []string
+		want  bool
+	}{
+		{[]string{"font-family:Courier"}, true},
+		{[]string{"color:red", "Font-Family: Arial !important"}, true},
+		{[]string{"font-family: "}, false},
+		{[]string{"font-family:url(x)"}, false},
+		{[]string{"font-family:a\x01"}, false},
+		{[]string{"fill:#eee", "stroke:#333", "font-size:12px"}, false},
+		// An entity Pele writes for a quote or an ampersand ends in the semicolon it tests for.
+		{[]string{`color:"x"font-family:y`}, true},
+		{[]string{"color:a&font-family:b"}, true},
+		{[]string{"color:font-family:b"}, false},
+	} {
+		if got := FontFamilyDeclared(c.decls); got != c.want {
+			t.Errorf("%q: %v, want %v", c.decls, got, c.want)
+		}
+	}
+}
+
 func TestDeclarations(t *testing.T) {
 	a := Declarations([]string{
 		"fill:#f9f", "stroke:#333", "stroke-width:4px", "color: red !IMPORTANT",
@@ -100,7 +122,8 @@ func TestDeclarationsReadAsJavaScript(t *testing.T) {
 		"fill:RED":             red,
 		"fill:blac\u212a":      {}, // a Kelvin sign is no k to CSS
 		"fill:rgb (255,0,0)":   {},
-		"fill:rgb(255\n0\f0)":  red,
+		"fill:rgb(255\n0\r0)":  red,
+		"fill:rgb(255\n0\f0)":  {}, // a form feed is no character XML allows
 		"fill:NONE":            style.None,
 	} {
 		if got := Declarations([]string{decl}).Style.Fill; got != want {
@@ -168,11 +191,94 @@ func TestShapeCSS(t *testing.T) {
 		{[]string{"color:red", "font-size:20px"}, ""},
 		{[]string{" FILL :red !important", "stroke:blue", "fill:green", "x:y", ":z", "rx"}, "fill:green;stroke:blue;"},
 		{[]string{`stroke:a"b&c`, "fill:url(x)", `stroke-width:\1`}, "stroke:a&quot;b&amp;c;"},
-		// A control character is kept and then dropped as it is written.
-		{[]string{"opacity:0.5", "stroke-linecap:round", "stroke-dasharray:1\x7f2", "rx:\x01"}, "opacity:0.5;stroke-linecap:round;stroke-dasharray:12;rx:;"},
+		// A value with a character XML does not allow is dropped.
+		{[]string{"opacity:0.5", "stroke-linecap:round", "stroke-dasharray:1\x7f2", "rx:\x01", "ry:\ufffe"}, "opacity:0.5;stroke-linecap:round;"},
 	} {
 		if got := ShapeCSS(c.decls); got != c.want {
 			t.Errorf("ShapeCSS(%q) = %q, want %q", c.decls, got, c.want)
+		}
+	}
+}
+
+func TestInksAndPaints(t *testing.T) {
+	for _, c := range []struct {
+		decls        []string
+		inks, paints bool
+	}{
+		{nil, false, false},
+		{[]string{"fill:#000080"}, true, true},
+		{[]string{"fill:none"}, false, false},
+		{[]string{"fill:transparent"}, false, false},
+		{[]string{"fill:var(--x)"}, false, true},
+		{[]string{"fill:#000", "fill-opacity:0.4"}, false, true},
+		{[]string{"fill:#000", "fill-opacity:abc"}, false, true},
+		{[]string{"fill:#000", "fill-opacity:50%"}, true, true},
+		{[]string{"fill:#000", "opacity:0.7", "fill-opacity:0.7"}, false, true},
+		{[]string{"fill:#000", "opacity:0"}, false, false},
+		{[]string{"fill:#000", "opacity:1e999"}, true, true},
+		{[]string{"fill:#000", "opacity:1deg"}, false, true},
+		{[]string{"fill:rgba(0,0,0,0.4)"}, false, true},
+		// Colors as Pele's color reads them: an empty argument, a mix of numbers and
+		// percentages, or none in the comma syntax is no color it reads, and an alpha is
+		// taken as it is written, not as a byte.
+		{[]string{"fill:rgb(10,20,,30)"}, false, true},
+		{[]string{"fill:rgb(10%,20,30)"}, false, true},
+		{[]string{"fill:rgb(none,0,0)"}, false, true},
+		{[]string{"fill:rgb(none 0 0)"}, true, true},
+		{[]string{"fill:rgb(0 0 0 / 0.499)"}, false, true},
+		{[]string{"fill:rgb(0 0 0 / 0.5 / 1)"}, false, true},
+		{[]string{"fill:hsl(200,80,30)"}, false, true},
+		{[]string{"fill:hsl(200deg 80% 30%)"}, true, true},
+		{[]string{"fill:hsl(1turn,80%,30%)"}, true, true},
+		{[]string{"fill:hsl(1e999,80%,30%)"}, false, true},
+		{[]string{"fill:#0000"}, false, false},
+		{[]string{"fill:#00000080"}, true, true},
+		{[]string{"fill:DarkSlateGrey"}, true, true},
+		{[]string{"fill:red#"}, false, true},
+	} {
+		if got := Inks(c.decls); got != c.inks {
+			t.Errorf("Inks(%q) = %v", c.decls, got)
+		}
+		if got := Paints(c.decls); got != c.paints {
+			t.Errorf("Paints(%q) = %v", c.decls, got)
+		}
+	}
+}
+
+func TestInksText(t *testing.T) {
+	navy := []string{"fill:#000080"}
+	for _, c := range []struct {
+		shape, text []string
+		want        bool
+	}{
+		{navy, nil, true},
+		{navy, []string{"color:#fff"}, false},
+		// A color Pele can't read still keeps ink from picking one.
+		{navy, []string{"color:#f"}, false},
+		// One it drops does not.
+		{navy, []string{"color:url(x)"}, true},
+		{[]string{"fill:none"}, nil, false},
+	} {
+		if got := InksText(c.shape, c.text); got != c.want {
+			t.Errorf("InksText(%q, %q) = %v", c.shape, c.text, got)
+		}
+	}
+}
+
+// Widths and opacities are numbers as CSS writes them, which Go's ParseFloat reads more of.
+func TestCSSNumbers(t *testing.T) {
+	for value, want := range map[string]float64{
+		"1e1": 10, "+3": 3, "3PX": 3, " 2px ": 2,
+		"inf": -1, "NaN": -1, "0x10": -1, "1.": -1, "1e400": -1, "2em": -1,
+	} {
+		got := Declarations([]string{"stroke-width:" + value}).Style.StrokeWidth.Or(-1)
+		if got != want {
+			t.Errorf("stroke-width:%s gives %v, not %v", value, got, want)
+		}
+	}
+	for value, want := range map[string]float64{"0.5": 0.5, "50%": 0.5, "2": 1, "0.": -1, "inf": -1, "5deg": -1} {
+		if got := Declarations([]string{"opacity:" + value}).Style.Opacity.Or(-1); got != want {
+			t.Errorf("opacity:%s gives %v, not %v", value, got, want)
 		}
 	}
 }

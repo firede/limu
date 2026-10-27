@@ -153,3 +153,95 @@ func TestOver(t *testing.T) {
 		t.Errorf("none over anything is none: %v", p)
 	}
 }
+
+func TestInkOnFill(t *testing.T) {
+	look := Look{Overrides: Overrides{"x.lit": {Fill: Of(Hex("#ffd700"))}}}
+	th := Default()
+	own := Style{Text: Muted, OnFill: true}
+	for _, c := range []struct {
+		name        string
+		role        string
+		own, author Style
+		text        Color
+	}{
+		{"no fill set", "x", own, Style{}, th.Muted},
+		{"a dark fill", "x", own, Style{Fill: Of(Hex("#000080"))}, th.Bg},
+		{"a light fill", "x", own, Style{Fill: Of(Hex("#ffe4e1"))}, th.Fg},
+		// #7d7d7d is just darker than where #1f1f1f and #fff contrast with it equally, #7f7f7f
+		// just lighter.
+		{"just dark", "x", own, Style{Fill: Of(Hex("#7d7d7d"))}, th.Bg},
+		{"just light", "x", own, Style{Fill: Of(Hex("#7f7f7f"))}, th.Fg},
+		{"a text color set", "x", own, Style{Fill: Of(Hex("#000")), Text: Of(Hex("#f00"))}, Hex("#f00")},
+		{"a faint fill", "x", own, Style{Fill: Of(Hex("#000")), FillOpacity: N(0.7), Opacity: N(0.7)}, th.Muted},
+		{"a translucent color", "x", own, Style{Fill: Of(Color{0, 0, 0, 100})}, th.Muted},
+		{"not on its fill", "x", Style{Text: Muted}, Style{Fill: Of(Hex("#000"))}, th.Muted},
+		{"an override's fill", "x.lit", own, Style{}, th.Fg},
+	} {
+		if got := look.Resolve(c.role, c.own, c.author).Text; got != c.text {
+			t.Errorf("%s: text %v, want %v", c.name, got, c.text)
+		}
+	}
+	// In a dark theme, the light Fg is the one that stands out on a dark fill.
+	dark := Look{Theme: KohuDark()}
+	if got := dark.Resolve("x", own, Style{Fill: Of(Hex("#000080"))}).Text; got != KohuDark().Fg {
+		t.Errorf("dark theme on navy: %v", got)
+	}
+}
+
+func TestGround(t *testing.T) {
+	var look Look
+	th := Default()
+	navy := Of(Hex("#000080"))
+	own := Style{Stroke: Line, Ground: navy}
+	r := look.Resolve("x", own, Style{})
+	if r.Stroke != th.Bg || r.Marker != th.Bg || r.Text != th.Bg || r.Hollow != Hex("#000080") || r.Bg != th.Bg {
+		t.Errorf("on navy: %+v", r)
+	}
+	if r := look.Resolve("x", own, Style{Stroke: Of(Hex("#f00"))}); r.Stroke != Hex("#f00") {
+		t.Errorf("an author's stroke: %v", r.Stroke)
+	}
+	if r := look.Resolve("x", Style{Stroke: Line}, Style{}); r.Stroke != th.Line || r.Hollow != th.Bg {
+		t.Errorf("no ground: %+v", r)
+	}
+}
+
+// MaxRadius caps the theme's radius and no radius a level sets.
+func TestMaxRadius(t *testing.T) {
+	own := Style{MaxRadius: N(2)}
+	for _, c := range []struct {
+		theme, over, want float64
+	}{
+		{4, -1, 2},
+		{0, -1, 0},
+		{4, 6, 6},
+	} {
+		th := Default()
+		th.Radius = c.theme
+		look := &Look{Theme: th}
+		if c.over >= 0 {
+			look.Overrides = Overrides{"x": {Radius: N(c.over)}}
+		}
+		if got := look.Cascade("x", own, Style{}).Radius.Or(-1); got != c.want {
+			t.Errorf("theme %v, override %v: radius %v", c.theme, c.over, got)
+		}
+	}
+}
+
+// A shade is picked on a fill the author sets, and stays the background under one an
+// override sets, which a backend lays no shade at an opacity over.
+func TestShadeOnAuthorFill(t *testing.T) {
+	navy := Of(Hex("#000080"))
+	look := &Look{Overrides: Overrides{"er.entity": {Fill: navy}}}
+	if p, ok := look.Shade(Style{}); p != Bg || ok {
+		t.Errorf("under an override's fill: %v %v", p, ok)
+	}
+	if p, ok := look.Shade(Style{Fill: navy}); p != Fg || !ok {
+		t.Errorf("on an author's navy: %v %v", p, ok)
+	}
+	if p, ok := look.Shade(Style{Fill: Of(Hex("#ffff00"))}); p != Bg || !ok {
+		t.Errorf("on an author's yellow: %v %v", p, ok)
+	}
+	if r := look.Resolve("er.entity", Style{}, Style{}); r.Shade != look.ThemeOrDefault().Bg {
+		t.Errorf("resolved under an override's fill: %v", r.Shade)
+	}
+}

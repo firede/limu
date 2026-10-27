@@ -4,7 +4,10 @@
 // relationships that are drawn, and Layout, which lays them out as a scene.
 package er
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // Parse parses an ER diagram's text, as the parse of Pele's er diagram does: source is what
 // diagram.Prepared.Source gives, and title the title its front matter gives, "" for none. An
@@ -23,5 +26,7 @@ func Parse(source, title string) (*DB, error) {
 // ParsePrepared parses a prepared ER diagram: Parse of the source and title that Pele's
 // parseSource hands the parse of its er diagram.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*DB, error) {
+		return Parse(src, p.Title)
+	})
 }

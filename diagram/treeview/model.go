@@ -7,6 +7,9 @@ package treeview
 
 import (
 	"strings"
+	"unicode/utf8"
+
+	"github.com/firede/limu/diagram/internal/common"
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/internal/chars"
@@ -94,31 +97,70 @@ func populate(tree *ast, d *db) {
 }
 
 // readTreeView reads the text to a syntax tree, as Pele's readTreeView does, taking a tree
-// drawn with box-drawing characters too. Its errors name the lines of the text as given.
+// drawn with box-drawing characters too. Its errors name the places of the text as given, and
+// of the text as written where source is the text a diagram's parser reads (common.Locate).
 func readTreeView(source string) (*ast, error) {
-	text, lineMap, err := preprocessBoxDrawing(source)
+	text, lineMap, columns, err := preprocessBoxDrawing(source)
 	if err != nil {
 		return nil, err
+	}
+	// Pele asks whether the text is the source by its value. limu finds the text as written
+	// by where the source is held (common.Written), so the source itself is read when the
+	// text is the same.
+	if text == source {
+		text = source
 	}
 	tree, err := parseTreeView(text)
 	if err == nil {
 		return tree, nil
 	}
+	// The parser already located errors in unchanged text.
 	e, ok := err.(*diagram.Error)
-	if len(lineMap) == 0 || !ok {
+	if !ok || text == source || e.Line < 1 || e.Line > len(lineMap) {
 		return nil, err
 	}
-	message := e.Message
-	if head := strings.IndexByte(message, '\n'); head == -1 {
-		message = remapErrorLines(message, lineMap)
-	} else {
-		message = remapErrorLines(message[:head], lineMap) + message[head:]
+	line := lineMap[e.Line-1]
+	start := lineStart(source, line)
+	at := 0
+	if e.Column > 0 {
+		if column := columns[e.Line-1]; column != nil {
+			at = column(e.Column - 1)
+		} else {
+			at = unitOffset(source[start:], e.Column-1)
+		}
 	}
-	line := e.Line
-	if line >= 1 && line <= len(lineMap) {
-		line = lineMap[line-1]
+	written := common.Locate(source, start+at)
+	head := strings.IndexByte(e.Message, '\n')
+	if head == -1 {
+		head = len(e.Message)
 	}
-	return nil, &diagram.Error{Code: e.Code, Message: message, Type: e.Type, Line: line, Column: e.Column, Snippet: e.Snippet}
+	rest := e.Message[head:]
+	if e.Snippet != "" {
+		rest = strings.Replace(rest, e.Snippet, written.Snippet, 1)
+	}
+	message := remapErrorLines(e.Message[:head], map[int]int{e.Line: written.Line}) + rest
+	column, snippet := 0, ""
+	if e.Column > 0 {
+		column = written.Column
+	}
+	if e.Snippet != "" {
+		snippet = written.Snippet
+	}
+	return nil, &diagram.Error{Code: e.Code, Message: message, Type: e.Type, Line: written.Line, Column: column, Snippet: snippet}
+}
+
+// unitOffset is the byte of s at which code unit n of it is, or the end of s.
+func unitOffset(s string, n int) int {
+	i := 0
+	for units := 0; i < len(s) && units < n; {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		units++
+		if r > 0xffff {
+			units++
+		}
+		i += size
+	}
+	return i
 }
 
 // buildTreeView makes the model of a tree, as Pele's buildTreeView does.
@@ -151,5 +193,7 @@ func Parse(source, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared tree view.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }

@@ -323,9 +323,11 @@ func (w *Writer) Parts(it *scene.Item, st style.Style) {
 		case scene.Solid:
 			fill, fillOpacity = style.Line, style.Num{}
 		case scene.Hollow:
-			fill, fillOpacity = style.Bg, style.Num{}
+			fill, fillOpacity = hollow(st), style.Num{}
 		case scene.Shade:
-			fill, stroke, fillOpacity = shade(it), style.None, style.Num{}
+			fill, stroke, fillOpacity = w.shade(it), style.None, style.Num{}
+		case scene.Dot:
+			fill, stroke, fillOpacity = st.Stroke, style.None, style.Num{}
 		}
 		w.paintAttr("fill", fill, fillOpacity)
 		w.paintAttr("stroke", stroke, st.StrokeOpacity)
@@ -336,15 +338,26 @@ func (w *Writer) Parts(it *scene.Item, st style.Style) {
 	}
 }
 
-// shade is the fill of an item's parts painted Shade: the theme's background, or, when the
-// item's author set a fill, the background at 60% over it, as Pele draws an entity's
-// stripes at an opacity of 0.6 when its style sets a fill. The parts below show through,
-// in SVG and in the limumygo package alike.
-func shade(it *scene.Item) style.Paint {
-	if it.Author.Fill.Set() {
-		return style.Bg.Alpha(0.6)
+// hollow is the fill of a part painted Hollow: the theme's background, or the ground the
+// style gives, as Pele's hollowOn fills a marker on a fill.
+func hollow(st style.Style) style.Paint {
+	if st.Ground.Visible() {
+		return st.Ground
 	}
 	return style.Bg
+}
+
+// shade is the fill of an item's parts painted Shade: the paint the look's Shade picks, the
+// theme's background or, on a fill ink picks a color on, the other of the two it picks from,
+// and when the item's author set a fill, that paint at 60% over it, as Pele draws an entity's
+// stripes at an opacity of 0.6 when its style sets a fill. The parts below show through,
+// in SVG and in the limumygo package alike.
+func (w *Writer) shade(it *scene.Item) style.Paint {
+	p, _ := w.o.Look.Shade(it.Author)
+	if it.Author.Fill.Set() {
+		return p.Alpha(0.6)
+	}
+	return p
 }
 
 // Ends writes the markers at the ends of an edge, in the color of its stroke, each part as
@@ -371,7 +384,7 @@ func (w *Writer) Ends(it *scene.Item, st style.Style) {
 			case scene.StrokeOnly:
 				fill = style.None
 			case scene.Hollow:
-				fill = style.Bg
+				fill = hollow(st)
 			}
 			// Filled in the stroke's color alone, and stroked at the stroke's opacity.
 			w.PaintAttr("fill", fill)

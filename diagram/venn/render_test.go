@@ -298,7 +298,7 @@ func pathLine(p *scene.Path) string {
 // written is text as Pele's esc writes it, without the control characters XML does not allow.
 func written(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r
@@ -306,6 +306,20 @@ func written(s string) string {
 }
 
 var textPaints = map[style.Paint]string{style.Fg: "var(--_fg)", style.Muted: "var(--_m)"}
+
+// inkPaints are the colors Pele's ink writes, by the paints the style picks for them in the
+// default theme.
+var inkPaints = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)", style.Bg: "var(--pele-fg-on-dark,#fff)"}
+
+// textPaint is the fill Pele writes on a text: the color ink picks on the ground under it,
+// unless its author sets one, and otherwise its own.
+func textPaint(it *scene.Item) string {
+	if it.Style.Ground.Set() && !it.Author.Text.Set() {
+		var look style.Look
+		return inkPaints[look.Cascade(string(it.Role), it.Style, it.Author).Text]
+	}
+	return textPaints[it.Style.Text]
+}
 
 // sceneLines writes a scene as the oracle reads Pele's SVG.
 func sceneLines(sc *scene.Scene) []string {
@@ -365,7 +379,7 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			content = append(content, s)
 		}
-		lines = append(lines, kind+" "+id+" t "+pt(it.At.X, y)+" "+textPaints[it.Style.Text]+" "+num(l.Size)+" "+weight+" "+italic+
+		lines = append(lines, kind+" "+id+" t "+pt(it.At.X, y)+" "+textPaint(it)+" "+num(l.Size)+" "+weight+" "+italic+
 			" "+author(it.Author)+" | "+strings.Join(content, " | "))
 	}
 	for i := range sc.Items {

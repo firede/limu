@@ -3,6 +3,7 @@ package diagram
 import (
 	"strings"
 
+	"github.com/firede/limu/diagram/internal/edit"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/yaml"
 )
@@ -31,24 +32,39 @@ type preprocessed struct {
 var unsafeKeys = map[string]bool{"__proto__": true, "constructor": true, "prototype": true}
 
 // cleanupComments takes out the lines that are comments, `%%` and not `%%{`, and the white
-// space the text starts with, as Pele's cleanupComments does.
-func cleanupComments(text string) string {
+// space the text starts with, as Pele's cleanupComments does. It adds what it takes out to
+// steps, unless steps is nil.
+func cleanupComments(text string, steps *[][]edit.Edit) string {
 	if strings.Contains(text, "%%") {
-		text = dropComments(text)
+		text = dropComments(text, steps)
 	}
-	return chars.TrimStart(text)
+	trimmed := chars.TrimStart(text)
+	edit.Push(steps, []edit.Edit{{From: 0, To: len(text) - len(trimmed)}})
+	return trimmed
+}
+
+// normalizeLineBreaks writes each CRLF and each lone CR as a line feed, as Pele's
+// normalizeLineBreaks does.
+func normalizeLineBreaks(text string) string {
+	if strings.Contains(text, "\r") {
+		text = strings.ReplaceAll(text, "\r\n", "\n")
+		text = strings.ReplaceAll(text, "\r", "\n")
+	}
+	return text
 }
 
 // dropComments is text.replace(/^\s*%%(?!{)[^\n]+\n?/gm, ""): at the start of a line, white
 // space over any number of lines, %% not followed by {, at least one character up to the line
-// feed, and the line feed.
-func dropComments(text string) string {
+// feed, and the line feed. It adds what it takes out to steps, unless steps is nil.
+func dropComments(text string, steps *[][]edit.Edit) string {
 	var b strings.Builder
+	var edits []edit.Edit
 	last := 0
 	for i := 0; i < len(text); {
 		if i == 0 || chars.IsLineEnd(chars.UnitBefore(text, i)) {
 			if end := commentAt(text, i); end > 0 {
 				b.WriteString(text[last:i])
+				edits = append(edits, edit.Edit{From: i, To: end})
 				last = end
 				i = end
 				continue
@@ -57,6 +73,7 @@ func dropComments(text string) string {
 		_, size := chars.UnitAt(text, i)
 		i += size
 	}
+	edit.Push(steps, edits)
 	if last == 0 {
 		return text
 	}
@@ -310,7 +327,9 @@ func directiveAt(s string, i int) (end int, typ, body string, ok bool) {
 	return j, typ, body, true
 }
 
-func directives(text string, config Config) string {
+// directives reads the directives of text into config, as Pele's directives does, and gives
+// text without them. It adds what it takes out to steps, unless steps is nil.
+func directives(text string, config Config, steps *[][]edit.Edit) string {
 	if !strings.Contains(text, "%%{") {
 		return text
 	}
@@ -331,6 +350,7 @@ func directives(text string, config Config) string {
 		i = end - 1
 	}
 	var b strings.Builder
+	var edits []edit.Edit
 	last := 0
 	for i := 0; i < len(text); i++ {
 		end, _, _, ok := directiveAt(text, i)
@@ -338,9 +358,11 @@ func directives(text string, config Config) string {
 			continue
 		}
 		b.WriteString(text[last:i])
+		edits = append(edits, edit.Edit{From: i, To: end})
 		last = end
 		i = end - 1
 	}
+	edit.Push(steps, edits)
 	if last == 0 {
 		return text
 	}
@@ -409,13 +431,10 @@ func singleQuoted(attrs string) string {
 }
 
 // preprocess reads a diagram's front matter and directives and takes out its comment lines,
-// as Pele's preprocess does.
-func preprocess(source string) (preprocessed, error) {
-	text := source
-	if strings.Contains(text, "\r") {
-		text = strings.ReplaceAll(text, "\r\n", "\n")
-		text = strings.ReplaceAll(text, "\r", "\n")
-	}
+// as Pele's preprocess does. It adds to steps, unless steps is nil, what it takes out of the
+// source on the way to WithComments, once its line breaks are normalized.
+func preprocess(source string, steps *[][]edit.Edit) (preprocessed, error) {
+	text := normalizeLineBreaks(source)
 	// A tag needs a closing bracket, so nothing after the last one can match.
 	if strings.Contains(text, "<") {
 		if lastClose := strings.LastIndexByte(text, '>'); lastClose > 0 {
@@ -457,19 +476,23 @@ func preprocess(source string) (preprocessed, error) {
 			}
 			pre.LineOffset = strings.Count(text[:min(front.length, len(text))], "\n")
 			text = text[front.length:]
+			edit.Push(steps, []edit.Edit{{From: 0, To: front.length}})
 		}
 	}
 
-	text = directives(text, pre.Config)
-	pre.Text = cleanupComments(text)
+	text = directives(text, pre.Config, steps)
+	pre.Text = cleanupComments(text, nil)
 	pre.WithComments = text
 	return pre, nil
 }
 
 // dropColorSemicolons does what Mermaid's `text.replace(/keyword.*:\S*#.*;/g, drop the last
 // character)` does, as Pele's does: on a line where the keyword is followed by a colon, a
-// color-like `#`, and later a semicolon, the last semicolon goes.
-func dropColorSemicolons(text, keyword string) string {
+// color-like `#`, and later a semicolon, the last semicolon goes. It adds what it takes out
+// to steps, unless steps is nil.
+func dropColorSemicolons(text, keyword string, steps *[][]edit.Edit) string {
+	var edits []edit.Edit
+	defer func() { edit.Push(steps, edits) }()
 	from := strings.Index(text, keyword)
 	if from == -1 {
 		return text
@@ -504,6 +527,7 @@ func dropColorSemicolons(text, keyword string) string {
 		}
 		if hash != -1 {
 			if semi := strings.LastIndexByte(text[:lineEnd], ';'); semi > hash {
+				edits = append(edits, edit.Edit{From: semi, To: semi + 1})
 				out.WriteString(text[last:semi])
 				last = semi + 1
 			}
@@ -521,12 +545,15 @@ func dropColorSemicolons(text, keyword string) string {
 }
 
 // encodeEntities hides `#name;` entity codes behind placeholder characters so `#` and `;`
-// survive parsing, as Mermaid does and Pele's encodeEntities does.
-func encodeEntities(text string) string {
+// survive parsing, as Mermaid does and Pele's encodeEntities does. It adds what it replaces
+// to steps, unless steps is nil.
+func encodeEntities(text string, steps *[][]edit.Edit) string {
 	if !strings.Contains(text, "#") {
 		return text
 	}
-	text = dropColorSemicolons(dropColorSemicolons(text, "style"), "classDef")
+	text = dropColorSemicolons(dropColorSemicolons(text, "style", steps), "classDef", steps)
+	var edits []edit.Edit
+	defer func() { edit.Push(steps, edits) }()
 	var b strings.Builder
 	last := 0
 	for i := 0; i < len(text); i++ {
@@ -542,12 +569,12 @@ func encodeEntities(text string) string {
 		}
 		inner := text[i+1 : j]
 		b.WriteString(text[last:i])
+		code := "ﬂ°" + inner + "¶ß"
 		if strings.Trim(inner, "0123456789") == "" {
-			b.WriteString("ﬂ°°")
-		} else {
-			b.WriteString("ﬂ°")
+			code = "ﬂ°°" + inner + "¶ß"
 		}
-		b.WriteString(inner + "¶ß")
+		b.WriteString(code)
+		edits = append(edits, edit.Edit{From: i, To: j + 1, Text: code})
 		last = j + 1
 		i = j
 	}

@@ -10,6 +10,7 @@ package venn
 
 import (
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 )
 
 // Subset is a set (one id) or an overlap of sets (two or more ids, sorted), with its relative
@@ -66,5 +67,7 @@ func Parse(source, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared venn diagram.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }

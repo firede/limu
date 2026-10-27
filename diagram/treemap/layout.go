@@ -15,15 +15,28 @@ type box struct {
 	// picks its color.
 	series int
 	// value is a leaf's own value, or the sum of the leaves under a section.
-	value      float64
-	children   []*box
+	value    float64
+	children []*box
+	// headed says whether a section keeps room for its header, and header is that room. A
+	// section too small for one gives its whole box to its children.
+	headed     bool
+	header     float64
 	x, y, w, h float64
 }
 
 // insets are Pele's Insets: the gap between boxes, and the room a section keeps for its
-// header and about its children on the other three sides.
+// header, or for a short one when the full one leaves its children too little, and about its
+// children on the other three sides.
 type insets struct {
-	gap, header, side float64
+	gap, header, short, side float64
+}
+
+// clamp is v within low and high, as Pele's clamp gives it: low where v is not at least low.
+func clamp(v, low, high float64) float64 {
+	if v >= low {
+		return min(v, high)
+	}
+	return low
 }
 
 // newBox is Pele's box: a leaf's value counts when it is a positive number.
@@ -74,12 +87,18 @@ func squarify(boxes []*box, total, x, y, w, h, gap float64) {
 				bx, by = x+offset, y
 				across, down = length, thickness
 			}
-			x0 := jsmath.Round(bx + gap/2)
-			y0 := jsmath.Round(by + gap/2)
-			b.x = x0
-			b.y = y0
-			b.w = jsmath.Round(bx+across-gap/2) - x0
-			b.h = jsmath.Round(by+down-gap/2) - y0
+			// The gap is left out where it would leave the box no size.
+			gx, gy := 0.0, 0.0
+			if jsmath.Round(bx+across-gap/2) > jsmath.Round(bx+gap/2) {
+				gx = gap / 2
+			}
+			if jsmath.Round(by+down-gap/2) > jsmath.Round(by+gap/2) {
+				gy = gap / 2
+			}
+			b.x = jsmath.Round(bx + gx)
+			b.y = jsmath.Round(by + gy)
+			b.w = jsmath.Round(bx+across-gx) - b.x
+			b.h = jsmath.Round(by+down-gy) - b.y
 			offset += length
 			rest -= b.value
 		}
@@ -94,8 +113,9 @@ func squarify(boxes []*box, total, x, y, w, h, gap float64) {
 	}
 }
 
-// layoutTreemap gives every box with a size, parents before their children, as Pele's
-// layoutTreemap does.
+// layoutTreemap gives the boxes of positive value, those with no size among them, parents
+// before their children, as Pele's layoutTreemap does. A box is kept within the room its
+// parent has for it.
 func layoutTreemap(roots []*Node, width, height float64, in insets) []*box {
 	var all []*box
 	top := make([]*box, len(roots))
@@ -117,12 +137,9 @@ func layoutTreemap(roots []*Node, width, height float64, in insets) []*box {
 		}
 	}
 
-	gap, header, side := in.gap, in.header, in.side
+	gap, header, short, side := in.gap, in.header, in.short, in.side
 	var placed []*box
 	place := func(children []*box, x, y, w, h float64) {
-		if w <= 0 || h <= 0 {
-			return
-		}
 		var shown []*box
 		for _, b := range children {
 			if b.value > 0 {
@@ -139,19 +156,39 @@ func layoutTreemap(roots []*Node, width, height float64, in insets) []*box {
 		if len(shown) == 0 || math.IsInf(total, 0) || math.IsNaN(total) {
 			return
 		}
-		squarify(shown, total, x-gap/2, y-gap/2, w+gap, h+gap, gap)
+		w = max(0, w)
+		h = max(0, h)
+		if w > 0 && h > 0 {
+			squarify(shown, total, x-gap/2, y-gap/2, w+gap, h+gap, gap)
+		}
 		for _, b := range shown {
-			if b.w > 0 && b.h > 0 {
-				placed = append(placed, b)
-			}
+			x0 := clamp(b.x, x, x+w)
+			y0 := clamp(b.y, y, y+h)
+			b.w = clamp(b.x+b.w, x0, x+w) - x0
+			b.h = clamp(b.y+b.h, y0, y+h) - y0
+			b.x = x0
+			b.y = y0
+			placed = append(placed, b)
 		}
 	}
 
 	place(top, 0, 0, width, height)
 	for i := 0; i < len(placed); i++ {
 		b := placed[i]
-		if len(b.children) > 0 {
-			place(b.children, b.x+side, b.y+header, b.w-float64(2*side), b.h-header-side)
+		if len(b.children) == 0 {
+			continue
+		}
+		top := short
+		if b.h-header-side >= 12 {
+			top = header
+		}
+		b.headed = b.w > max(24, float64(2*side)) && b.h-top-side >= 8
+		if b.headed {
+			b.header = top
+			place(b.children, b.x+side, b.y+top, b.w-float64(2*side), b.h-top-side)
+		} else {
+			b.header = 0
+			place(b.children, b.x, b.y, b.w, b.h)
 		}
 	}
 	return placed

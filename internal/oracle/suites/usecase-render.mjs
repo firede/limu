@@ -210,6 +210,25 @@ const classesAfter = (cls, n) =>
 
 const GROUP = /<g class="pele-(cluster|edge|edge-label|node)[ "]/g;
 
+// Fills an author sets, and what lies on them: the texts of a boundary and of nodes on fills
+// light and dark, relations inside a boundary's fill, which take the color of its labels, and
+// relations that cross its border, or lie in a fill no color is picked on, which are laid on
+// casings. Pele's casings follow its boundaries, and are read with the last of them.
+const FILLS = [
+  'usecase-beta\nactor A\nsystemBoundary S["Shop"]\n  U(Buy) <<UC>>\n  V(Pay)\n  W[Refund]\nend\nA --> U\nU --> V\nV ..> : extend W\nU ..> : include W\nU --o V\nU --x W\nU --> U\nstyle S fill:#123',
+  'usecase-beta\ndirection LR\nsystemBoundary P["Pkg"]@{ type: package }\n  U\n  V\n  W\nend\nX --o U\nW x-- X\nU e1@--> V\nV e2@--> W\nstyle P fill:lightyellow\nstyle e1 stroke:#f00,stroke-width:3px,opacity:0.5\nstyle e2 stroke-width:2px,stroke-opacity:0.4',
+  'usecase-beta\nsystemBoundary S\n  U\n  V\nend\nX --> U\nU --> V\nU e1@--> X\nstyle S fill:#12345678\nstyle e1 stroke:none',
+  'usecase-beta\nsystemBoundary S\n  U\n  V\nend\nU --> V\nX --> V\nstyle S fill:#123,color:#ff0',
+  'usecase-beta\nsystemBoundary S\n  U\n  V\nend\nU --> V\nX --> V\nstyle S fill:#123,color:notacolor',
+  'usecase-beta\nsystemBoundary S\n  U\nend\nsystemBoundary T\n  V\nend\nU --> V\nU ..> : extend V\nclassDef dark fill:navy\nclass S,T dark',
+  'usecase-beta\nsystemBoundary S\n  U\n  V\nend\nU --> V\nstyle S fill:transparent',
+  'usecase-beta\nsystemBoundary S\n  U\n  V\nend\nU --> V\nstyle S fill:rgb(0 0 0 / 40%)',
+  'usecase-beta\nsystemBoundary S\n  U\n  V\nend\nU --> V\nstyle S fill:#000,fill-opacity:0.3',
+  'usecase-beta\nsystemBoundary S\n  U\n  V\nend\nU --> V\nstyle S fill:#000,opacity:calc(1)',
+  'usecase-beta\nactor A <<Person>>\nU(Use) <<UC>>\nV[Box] <<Core>>\nnote for U "A note"\njson t@{"id":1,"items":[{"sku":"A"}]}\njson q@{"a":"b"}\nA --> U\nU --> t\nstyle A fill:#000\nstyle U fill:#000\nstyle V fill:#ffd\nstyle t fill:#202020\nstyle q fill:#202020,color:#0f0',
+  'usecase-beta\nU@{ business: true }\nV\nU --> V\nclassDef c fill:hsl(240, 100%, 25%)\nclass U,V c',
+];
+
 // The lines of a use case diagram's SVG, drawn with its numbers in full; num writes a number as
 // Pele does.
 export function readSvg(svg, num) {
@@ -238,7 +257,9 @@ export function readSvg(svg, num) {
       case 'edge': {
         const type = cls.split(' ')[1].slice('pele-'.length);
         const path = /<path d="[^"]*"[^>]*>/.exec(s)[0];
-        lines.push(`edge ${id} ${type} [${classesAfter(cls, 2)}] ${attr(path, 'stroke-dasharray') ?? '-'}`);
+        // An edge inside a fill is stroked in the color ink picks on it.
+        const ink = attr(open, 'stroke');
+        lines.push(`edge ${id} ${type} [${classesAfter(cls, 2)}] ${attr(path, 'stroke-dasharray') ?? '-'}${ink ? ' ink=' + ink : ''}`);
         for (const p of page.subpaths(attr(path, 'd'))) lines.push('path ' + p + ends(path, up));
         for (const m of s.matchAll(/<(path|circle) class="pele-marker"[^>]*>/g)) {
           const stroked = attr(m[0], 'stroke') !== 'none';
@@ -307,5 +328,6 @@ export default async function ({ src, pele, write, random }) {
     const s = next();
     if (s.length <= 3000) each(s);
   }
+  FILLS.forEach(each);
   write('diagram/usecase/testdata/pele/render.json', { cases: out });
 }

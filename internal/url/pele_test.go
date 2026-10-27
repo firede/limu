@@ -17,6 +17,10 @@ func TestSanitizeMatchesPele(t *testing.T) {
 			Link      *string `json:"link"`
 			Image     *string `json:"image"`
 			Mail      *string `json:"mail"`
+			// Internal and InternalMail are what internalLink says of the input as a note's
+			// name, with the schemes of Link and of Mail.
+			Internal     bool `json:"internal"`
+			InternalMail bool `json:"internalMail"`
 		} `json:"url"`
 	}
 	if err := fixture.Load("testdata/pele/url.json", &p); err != nil {
@@ -52,6 +56,14 @@ func TestSanitizeMatchesPele(t *testing.T) {
 				t.Fatal("too many failures")
 			}
 		}
+		internal := InternalLink(c.Input, true, nil)
+		internalMail := InternalLink(c.Input, true, []string{"mailto", "obsidian"})
+		if internal != c.Internal || internalMail != c.InternalMail {
+			t.Errorf("%q as a note's name: internal %v, with mail %v; Pele %v, %v", c.Input, internal, internalMail, c.Internal, c.InternalMail)
+			if failed++; failed > 20 {
+				t.Fatal("too many failures")
+			}
+		}
 	}
 }
 
@@ -61,5 +73,36 @@ func TestLinksOff(t *testing.T) {
 	}
 	if _, ok := ImageURL("https://x", false, nil); ok {
 		t.Error("images off")
+	}
+}
+
+// The cases of Pele's tests of internalLink, tests/util/url.test.ts.
+func TestInternalLink(t *testing.T) {
+	for _, name := range []string{"Note", `Folder\note`, "Note%23heading", "👩‍💻", "Note#heading", "  Note  "} {
+		if !InternalLink(name, true, nil) {
+			t.Errorf("%q refused", name)
+		}
+	}
+	for _, name := range []string{"javascript:alert(1)", "java￾script:alert(1)", `\\nevil.example`, "\t/\\nevil.example", "/\t/evil.example"} {
+		if InternalLink(name, true, []string{"about"}) {
+			t.Errorf("%q allowed", name)
+		}
+	}
+}
+
+// decodeURIComponent decodes U+FFFD written in percent escapes, and throws on a surrogate or an
+// overlong sequence.
+func TestDecodeReplacementCharacter(t *testing.T) {
+	for in, want := range map[string]string{
+		"a%EF%BF%BDb": "a�b",
+		"a%ED%A0%80b": "a%ED%A0%80b",
+		"a%C0%80b":    "a%C0%80b",
+	} {
+		if got := decode(in); got != want {
+			t.Errorf("decode(%q) = %q, not %q", in, got, want)
+		}
+	}
+	if got := SanitizeURL("javascript%3Aalert(1)%EF%BF%BD"); got != blank {
+		t.Errorf("SanitizeURL of an escaped javascript: URL = %q", got)
 	}
 }

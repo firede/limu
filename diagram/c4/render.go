@@ -46,6 +46,7 @@ const (
 	RoleBoundaryType  scene.Role = "c4.boundary-type"
 	RoleBoundaryDescr scene.Role = "c4.boundary-descr"
 	RoleRel           scene.Role = "c4.rel"
+	RoleCasing        scene.Role = "c4.casing"
 	RoleElement       scene.Role = "c4.element"
 	RoleElementType   scene.Role = "c4.element-type"
 	RoleElementTechn  scene.Role = "c4.element-techn"
@@ -54,9 +55,9 @@ const (
 	RoleRelTechn      scene.Role = "c4.rel-techn"
 )
 
-// userStyle is the author's style of colors given by UpdateElementStyle and UpdateRelStyle,
-// as Pele's userStyle declares them.
-func userStyle(fill, stroke, color string) style.Style {
+// userDecls are the declarations of the colors given by UpdateElementStyle and
+// UpdateRelStyle, as Pele's userStyle writes them.
+func userDecls(fill, stroke, color string) []string {
 	var decls []string
 	if fill != "" {
 		decls = append(decls, "fill:"+fill)
@@ -67,10 +68,26 @@ func userStyle(fill, stroke, color string) style.Style {
 	if color != "" {
 		decls = append(decls, "color:"+color)
 	}
+	return decls
+}
+
+// userStyle is the author's style of colors given by UpdateElementStyle and UpdateRelStyle,
+// as Pele's userStyle declares them.
+func userStyle(fill, stroke, color string) style.Style {
+	decls := userDecls(fill, stroke, color)
 	if decls == nil {
 		return style.Style{}
 	}
 	return css.Declarations(decls).Style
+}
+
+// textGround is the fill under the texts of a shape or boundary whose author's declarations
+// are decls, where Pele's inkFill picks a color for them on it, and none elsewhere.
+func textGround(decls []string) style.Paint {
+	if !css.InksText(decls, decls) {
+		return style.Paint{}
+	}
+	return css.Declarations(decls).Style.Fill
 }
 
 // unhide puts back the `#name;` that entity encoding hid in an address as ﬂ°°name¶ß, as
@@ -234,6 +251,18 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 	// arrowheads. Lines, labels and boundaries are made where Pele works them out, before
 	// the group they are drawn in is moved, and moved with it at the end.
 	trim := scene.MarkerType("arrow_point").Trim()
+	// The boundaries whose author paints them a fill, as Pele gathers its fills: a relation
+	// inside one is drawn in the color that stands out on it, and one that crosses the border
+	// of one is laid on a casing.
+	var fills []draw.Fill
+	for _, gr := range order {
+		if gr == root {
+			continue
+		}
+		if decls := userDecls(gr.boundary.BgColor, "", ""); css.Paints(decls) {
+			fills = append(fills, draw.Fill{Box: [4]float64{gr.x, gr.y, gr.x + gr.w, gr.y + gr.h}, Decls: decls})
+		}
+	}
 	ls := newLanes()
 	for _, gr := range order {
 		if gr != root {
@@ -245,7 +274,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		others = nodes
 	}
 	routes := make([]*route, len(db.Rels))
-	var edges []scene.Item
+	var edges, casings []scene.Item
 	for index, rel := range db.Rels {
 		a, b := ends[index*2], ends[index*2+1]
 		startArrow := rel.Type == "birel" || rel.Type == "rel_b"
@@ -291,6 +320,17 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		}
 		if endArrow {
 			it.Ends[1] = scene.Marker{Type: "arrow_point", At: scene.Point{X: r.ex, Y: r.ey}, DX: r.edx, DY: r.edy}
+		}
+		// A relation inside one fill is drawn in the color of its labels, and one that crosses
+		// the border of a fill is laid on a casing, as Pele's overFills finds.
+		line := userDecls("", rel.LineColor, "")
+		ground, cased := draw.OnFills(r.path, []float64{r.sx, r.sy, r.ex, r.ey}, fills, line)
+		it.Style.Ground = ground
+		if cased {
+			if c := draw.Casing(RoleCasing, r.path, it.Ends, line, false); c != nil {
+				c.ID = it.ID
+				casings = append(casings, *c)
+			}
 		}
 		edges = append(edges, it)
 	}
@@ -430,6 +470,9 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		}
 		b := gr.boundary
 		author := userStyle(b.BgColor, b.BorderColor, b.FontColor)
+		// The heading is set on the boundary's fill, in the color that stands out on a fill
+		// the author gives it, as Pele's inkFill picks it.
+		ground := textGround(userDecls(b.BgColor, b.BorderColor, b.FontColor))
 		frame := scene.Rect{X: gr.x, Y: gr.y, W: gr.w, H: gr.h}
 		it := scene.Item{
 			Kind: scene.Group, Role: RoleBoundary, Shape: "rect", ID: b.Alias,
@@ -450,7 +493,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		for k, role := range [...]scene.Role{RoleBoundaryLabel, RoleBoundaryType, RoleBoundaryDescr} {
 			label := &gr.labels[k]
 			if !label.Empty() {
-				own := style.Style{Text: style.Muted}
+				own := style.Style{Text: style.Muted, TextGround: ground}
 				if k == 0 {
 					own.Text = style.Fg
 				}
@@ -485,7 +528,13 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		for _, n := range gr.nodes {
 			shape := n.shape
 			external := strings.HasPrefix(shape.Kind, "external")
+			decls := userDecls(shape.BgColor, shape.BorderColor, shape.FontColor)
 			author := userStyle(shape.BgColor, shape.BorderColor, shape.FontColor)
+			// The texts are set on the shape's fill, in the color that stands out on a fill the
+			// author gives it, as Pele's inkFill picks it: the name on the shape's own, and the
+			// rest on the fill under them.
+			inks := css.InksText(decls, decls)
+			ground := textGround(decls)
 			w, h, form := n.w, n.h, n.form
 			// The middle of the shape, which Pele draws its inside about.
 			nx := ox + (n.x + w/2)
@@ -501,7 +550,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 			case "cyl":
 				dy = cylRy(w) / 2
 			}
-			own := style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg}
+			own := style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg, OnFill: inks}
 			if external {
 				own.Fill = style.Bg
 				own.Dash = style.Dashes(4, 3)
@@ -539,12 +588,12 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 				if labels[k].Empty() {
 					continue
 				}
-				role, own := RoleElementType, style.Style{Text: style.Muted}
+				role, own := RoleElementType, style.Style{Text: style.Muted, TextGround: ground}
 				switch k {
 				case 2:
 					role = RoleElementTechn
 				case 3:
-					role, own = RoleElementDescr, style.Style{Text: style.Fg}
+					role, own = RoleElementDescr, style.Style{Text: style.Fg, TextGround: ground}
 				}
 				shapes = append(shapes, scene.Item{
 					Kind: scene.Text, Role: role, ID: shape.Alias, Label: &labels[k],
@@ -572,7 +621,7 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 			Style: style.Style{Text: style.Fg},
 		})
 	}
-	for _, layer := range [][]scene.Item{clusters, edges} {
+	for _, layer := range [][]scene.Item{clusters, casings, edges} {
 		for i := range layer {
 			layer[i].Move(ox, oy)
 		}

@@ -83,6 +83,14 @@ func sceneLines(sc *scene.Scene) []string {
 			lines = append(lines, textAt(l, cx, cy))
 		}
 	}
+	// ink writes the color an item's label takes on a fill a style sets, if it takes one.
+	ink := func(it *scene.Item) {
+		if it.Label != nil && len(it.Label.Lines) > 0 {
+			if s := pelesvg.TextInk(it); s != "" {
+				lines = append(lines, "ink "+s)
+			}
+		}
+	}
 	for i := 0; i < len(sc.Items); i++ {
 		it := &sc.Items[i]
 		id := peleID(it.ID)
@@ -96,6 +104,9 @@ func sceneLines(sc *scene.Scene) []string {
 		case "flow":
 			lines = append(lines, fmt.Sprintf("flow %s [%s] %s %s", id, classes, box(it.Box, 0, 0), slotOf(it)))
 			label(it.Label, it.At.X, it.At.Y)
+			ink(it)
+		case "casing":
+			lines = append(lines, pelesvg.CasingLine(it))
 		case "sequence", "reference", "failure":
 			flags := ""
 			if it.Style.Dash.Set() {
@@ -103,6 +114,9 @@ func sceneLines(sc *scene.Scene) []string {
 			}
 			lines = append(lines, fmt.Sprintf("edge %s [%s]%s %s", id, strings.TrimSpace("pele-edge-"+kind+" "+classes), flags, pelesvg.D(it.Parts[0].Path)))
 			lines = append(lines, "stroke "+pelesvg.CapJoin(it))
+			if s := pelesvg.StrokeInk(it); s != "" {
+				lines = append(lines, "ink "+s)
+			}
 			for _, m := range it.Ends {
 				if s := peleMarker(m); s != "" {
 					lines = append(lines, "m "+s)
@@ -143,6 +157,7 @@ func sceneLines(sc *scene.Scene) []string {
 				i += 2
 			}
 			label(it.Label, it.At.X-cx, it.At.Y-cy)
+			ink(it)
 		case "tool", "task", "decision", "input", "refdoc", "connector", "action":
 			cx, cy := it.Box.X+it.Box.W/2, it.Box.Y+it.Box.H/2
 			lines = append(lines, fmt.Sprintf("node %s %s [%s] translate(%s) %s", id, it.Shape, strings.TrimSpace("pele-kind-"+kind+" "+classes), pt(cx, cy), slotOf(it)))
@@ -154,6 +169,7 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "parts differ from the outline")
 			}
 			label(it.Label, it.At.X-cx, it.At.Y-cy)
+			ink(it)
 		default:
 			lines = append(lines, "unknown role "+string(it.Role))
 		}
@@ -234,7 +250,7 @@ func shapeLines(shape string, w, h float64) []string {
 // dropped.
 func peleID(id string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

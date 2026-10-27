@@ -10,16 +10,16 @@ import (
 	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
+	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
-	"github.com/firede/limu/text"
 )
 
 // The fixture is what Pele's render draws of treemaps, read back out of its SVG as one line
-// per thing drawn, in the order drawn, with its numbers written out in full; ./scripts/oracle.sh
-// writes it. The test writes the same lines from the scene, its numbers as JavaScript's String
+// per thing drawn, in the order drawn, with its numbers written out in full, and the tooltip
+// of each box that has one; ./scripts/oracle.sh writes it. The test writes the same lines from the scene, its numbers as JavaScript's String
 // writes them, and so compares them to the last bit.
 //
 // Where Pele writes the style an author's class gives a shape or a text, the test reads it as
@@ -129,6 +129,9 @@ var series = []string{"#4c78a8", "#f58518", "#54a24b", "#e45756", "#72b7b2", "#e
 
 // fillName is how a box is filled, as the oracle reads Pele's fill and fill-opacity.
 func fillName(p style.Paint) string {
+	if p == style.None {
+		return "none -"
+	}
 	for k, hex := range series {
 		name := fmt.Sprintf("var(--pele-series-%d,%s)", k+1, hex)
 		switch p {
@@ -152,13 +155,32 @@ func strokeName(p style.Paint) string {
 
 var textPaints = map[style.Paint]string{style.Fg: "var(--_fg)", style.Muted: "var(--_m)", style.Bg: "var(--_bg)"}
 
+// inkNames are the colors Pele's ink picks, by the theme's paints the default look settles
+// them as.
+var inkNames = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)", style.Bg: "var(--pele-fg-on-dark,#fff)"}
+
+// textPaint is the fill the oracle reads of an item's text: the color the default look picks
+// on a fill, where it picks one, and the diagram's own otherwise. The diagram's own is taken
+// as a paint the look never picks, to tell a color picked from it.
+func textPaint(it *scene.Item) string {
+	var look style.Look
+	own := it.Style
+	own.Text = style.SurfaceAlt
+	bare := own
+	bare.OnFill, bare.Ground = false, style.Paint{}
+	if got := look.Cascade(string(it.Role), own, it.Author); got.Text != look.Cascade(string(it.Role), bare, it.Author).Text {
+		return inkNames[got.Text]
+	}
+	return textPaints[it.Style.Text]
+}
+
 var anchors = [...]string{scene.Middle: "middle", scene.Start: "start", scene.End: "end"}
 
 // written is text as Pele's esc writes it, without the control characters XML does not
 // allow.
 func written(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r
@@ -187,7 +209,7 @@ func sceneLines(sc *scene.Scene) []string {
 			size = num(l.Size)
 		}
 		for _, line := range l.Lines {
-			at := prefix + "t " + pt(it.At.X, y) + " " + size + " " + anchors[it.Align] + " " + textPaints[it.Style.Text] + " " +
+			at := prefix + "t " + pt(it.At.X, y) + " " + size + " " + anchors[it.Align] + " " + textPaint(it) + " " +
 				weight + " " + author(textView, it.Author) + " "
 			if len(line) == 0 {
 				lines = append(lines, at+" ")
@@ -219,20 +241,37 @@ func sceneLines(sc *scene.Scene) []string {
 				kind = "leaf"
 			}
 			r := it.Parts[0].Box
+			// Pele writes the theme's radius alone as rx:var(--_r), and the radius of a small
+			// box, capped, otherwise.
 			rounded := "-"
-			if it.Parts[0].Rounded {
+			if _, capped := it.Style.MaxRadius.Get(); it.Parts[0].Rounded && !capped {
 				rounded = "r"
 			}
 			lines = append(lines, fmt.Sprintf("%s %s [%s] %s,%s %s %s %s %s %s", kind, pelesvg.ID(it.ID), strings.Join(it.Class, " "),
 				pt(r.X, r.Y), pt(r.W, r.H), rounded, fillName(pelesvg.OwnFill(it)), strokeName(it.Style.Stroke), pelesvg.CapJoin(it),
 				author(shapeView, it.Author)))
-			weight := "-"
-			if it.Label != nil && len(it.Label.Lines) > 0 && it.Label.Lines[0][0].Face&text.Bold != 0 {
-				weight = "var(--_hw)"
+			if it.Tooltip != "" {
+				lines = append(lines, "tip "+written(it.Tooltip))
 			}
-			label("", "", weight, it)
+			// A section's name is in the header's weight, and in the size of the group of
+			// sections unless its header is short, which Pele writes on the text; a leaf's
+			// name in its own size.
+			weight, size := "-", ""
+			if it.Role == RoleSection {
+				weight = "var(--_hw)"
+				if header := 2 * (it.At.Y - 1 - it.Box.Y); header >= 23 {
+					size = num(jsmath.Round(sc.FontSize * 0.875))
+				}
+			}
+			label("", size, weight, it)
 		case RoleValue:
-			label("", "", "-", it)
+			// A section's value, at the end of its header, is written in the size Pele gives
+			// it when no class sets one.
+			size := ""
+			if it.Align == scene.End {
+				size = num(jsmath.Round(sc.FontSize * 0.75))
+			}
+			label("", size, "-", it)
 		default:
 			lines = append(lines, "unknown role "+string(it.Role))
 		}

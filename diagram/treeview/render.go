@@ -86,6 +86,12 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 	measure := o.Measure()
 	pad := o.Pad()
 	icons := iconConfig(config)
+	// The names of the entries are set in the monospace face where the options list files, as
+	// Pele's draw sets them where its monospace option does.
+	var files text.Face
+	if o.Monospace&layout.Files != 0 {
+		files = text.Mono
+	}
 
 	s := settings(config)
 	paddingX, paddingY := s.paddingX, s.paddingY
@@ -166,6 +172,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 		if node.Type == Directory {
 			face = text.Bold
 		}
+		face |= files
 		r := &row{node: node, x: x, icon: getNodeIcon(node, icons), text: name, labelX: labelX, tight: tight}
 		var width float64
 		if tight {
@@ -274,6 +281,7 @@ func draw(m *Model, config diagram.Config, o *layout.Options, tight bool) *scene
 		if directory {
 			role, face = RoleDirectory, text.Bold
 		}
+		face |= files
 		it := scene.Item{
 			Kind: scene.Node, Role: role, ID: node.Name, Class: common.ClassNames(node.CSSClass),
 			Box:   scene.Rect{X: inset + r.x, Y: top + r.top, W: totalWidth - inset - (inset + r.x), H: r.height},
