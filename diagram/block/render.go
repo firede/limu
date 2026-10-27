@@ -2,6 +2,7 @@ package block
 
 import (
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/firede/limu/diagram"
@@ -422,6 +423,31 @@ func loopPath(v *view, k int, startTrim, endTrim float64) draw.EdgePath {
 // spots are the places along a leg a label is tried at, in turn, Pele's SPOTS.
 var spots = [...]float64{0.5, 0.3, 0.7, 0.15, 0.85}
 
+// A box is the box of a container's title, which stacked labels keep clear of, Pele's Box.
+type box struct {
+	x, y, bw, bh float64
+}
+
+// covers reports whether a label w by h centered on x, y covers a block other than s and t,
+// or a title, as Pele's covers does. obstacles is nil where the diagram is too large to
+// check, and then nothing is covered.
+func covers(x, y, w, h float64, s, t *view, obstacles []*view, titles []box) bool {
+	if obstacles == nil {
+		return false
+	}
+	for _, v := range obstacles {
+		if v != s && v != t && math.Abs(x-v.x) < (w+v.bw)/2 && math.Abs(y-v.y) < (h+v.bh)/2 {
+			return true
+		}
+	}
+	for _, v := range titles {
+		if math.Abs(x-v.x) < (w+v.bw)/2 && math.Abs(y-v.y) < (h+v.bh)/2 {
+			return true
+		}
+	}
+	return false
+}
+
 // labelSpot is the point along the leg of p from at where a label w by h covers no block
 // other than the two it joins, as Pele's labelSpot picks it.
 func labelSpot(p []float64, at int, w, h float64, s, t *view, obstacles []*view) float64 {
@@ -431,23 +457,151 @@ func labelSpot(p []float64, at int, w, h float64, s, t *view, obstacles []*view)
 	for _, spot := range spots {
 		x := p[at] + float64((p[at+2]-p[at])*spot)
 		y := p[at+1] + float64((p[at+3]-p[at+1])*spot)
-		clear := true
-		for _, v := range obstacles {
-			if v != s && v != t && math.Abs(x-v.x) < (w+v.bw)/2 && math.Abs(y-v.y) < (h+v.bh)/2 {
-				clear = false
-				break
-			}
-		}
-		if clear {
+		if !covers(x, y, w, h, s, t, obstacles, nil) {
 			return spot
 		}
 	}
 	return 0.5
 }
 
+// labelGap is the room between labels stacked along a line, Pele's LABEL_GAP.
+const labelGap = 4
+
+// stackLabels stacks the labels of the edges of stack, which join the same two blocks, along
+// the line they share where they cover each other, if they fit between its markers and cover
+// no other block or title, as Pele's stackLabels does. It gives how much longer the line
+// would have to be for them to fit, or 0.
+func stackLabels(stack []int, routes []route, legs [][]float64, s, t *view, obstacles []*view, titles []box) float64 {
+	vertical := legs[stack[0]][0] == legs[stack[0]][2]
+	lo, hi := math.Inf(-1), math.Inf(1)
+	need := float64(-labelGap)
+	// along is the length of a label along the line.
+	along := func(r *route) float64 {
+		if vertical {
+			return r.label.Height
+		}
+		return r.label.Width + 8
+	}
+	crowded := false
+	for a, i := range stack {
+		leg := legs[i]
+		if vertical {
+			if leg[0] != leg[2] {
+				return 0
+			}
+			lo = max(lo, min(leg[1], leg[3]))
+			hi = min(hi, max(leg[1], leg[3]))
+		} else {
+			if leg[1] != leg[3] {
+				return 0
+			}
+			lo = max(lo, min(leg[0], leg[2]))
+			hi = min(hi, max(leg[0], leg[2]))
+		}
+		p := &routes[i]
+		need += along(p) + labelGap
+		for _, j := range stack[:a] {
+			q := &routes[j]
+			if math.Abs(p.lx-q.lx) < (p.label.Width+q.label.Width)/2+8 && math.Abs(p.ly-q.ly) < (p.label.Height+q.label.Height)/2 {
+				crowded = true
+			}
+		}
+	}
+	if !crowded {
+		return 0
+	}
+	if room := hi - lo - 2*scene.MarkerSize; need > room {
+		return need - room
+	}
+	places := make([]float64, 0, len(stack))
+	next := (lo + hi - need) / 2
+	for _, i := range stack {
+		r := &routes[i]
+		size := along(r)
+		c := next + size/2
+		x, y := c, r.ly
+		if vertical {
+			x, y = r.lx, c
+		}
+		if covers(x, y, r.label.Width+8, r.label.Height, s, t, obstacles, titles) {
+			return 0
+		}
+		places = append(places, c)
+		next += size + labelGap
+	}
+	for k, i := range stack {
+		if vertical {
+			routes[i].ly = places[k]
+		} else {
+			routes[i].lx = places[k]
+		}
+	}
+	return 0
+}
+
+// gapsOf names the gaps of a container, its rows' or its columns'.
+type gapsOf struct {
+	box      *view
+	vertical bool
+}
+
+// widen widens the gap between s and t in the nearest container they share by short, between
+// rows where vertical is set and between columns otherwise, as Pele's widen does, and reports
+// whether there was a gap to widen. base keeps the gaps as they were when the labels were
+// measured, so that widening the same gap again does not add to what it added.
+func widen(parents []*view, s, t *view, vertical bool, short float64, base map[gapsOf][]float64) bool {
+	chain := map[*view]bool{}
+	for v := s; v != nil; v = parents[v.index] {
+		chain[v] = true
+	}
+	var tb *view
+	container := t
+	for container != nil && !chain[container] {
+		tb = container
+		container = parents[container.index]
+	}
+	if container == nil || tb == nil || container == s {
+		return false
+	}
+	sb := s
+	for parents[sb.index] != container {
+		sb = parents[sb.index]
+	}
+	var i int
+	gaps := &container.colGaps
+	if vertical {
+		if sb.row == tb.row {
+			return false
+		}
+		i = int(max(sb.row, tb.row)) - 1
+		gaps = &container.rowGaps
+	} else {
+		l, r := tb, sb
+		if sb.col < tb.col {
+			l, r = sb, tb
+		}
+		if r.col < l.col+l.span {
+			return false
+		}
+		i = int(r.col) - 1
+	}
+	key := gapsOf{container, vertical}
+	if _, ok := base[key]; !ok {
+		base[key] = slices.Clone(*gaps)
+	}
+	for len(*gaps) <= i {
+		*gaps = append(*gaps, 0)
+	}
+	(*gaps)[i] = max((*gaps)[i], at(base[key], i)+short)
+	return true
+}
+
 // Layout lays out a parsed block diagram as a scene, as Pele's renderBlock draws it: with
-// room to spare, and tightly instead when that does not fit o.MaxWidth and is narrower. An
-// error is a *diagram.Error, for a composite of no columns.
+// room to spare, and tightly instead when that does not fit o.MaxWidth and is narrower. The
+// labels of edges between the same two blocks are stacked along their line where they would
+// cover each other, and the gap between the blocks is widened where they do not fit, if that
+// leaves less of them covered and fits o.MaxWidth. An error is a *diagram.Error, for a
+// composite of no columns.
 func Layout(db *DB, config diagram.Config, o *layout.Options) (*scene.Scene, error) {
 	if o == nil {
 		o = &layout.Options{}
@@ -593,6 +747,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 	root.nw = 0
 	root.nh = 0
 	order := []*view{root}
+	// parents holds the container of each view, by its index.
+	parents := []*view{nil}
 	byID := map[string]*view{}
 	for i := 0; i < len(order); i++ {
 		parent := order[i]
@@ -602,6 +758,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		for _, child := range parent.block.Children {
 			v := newView(child, len(order))
 			parent.children = append(parent.children, &v.cell)
+			parents = append(parents, parent)
 			order = append(order, v)
 			if v.kind != kindSpace {
 				byID[child.ID] = v
@@ -609,36 +766,57 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		}
 	}
 
-	contentW, contentH, err := layoutCells(&root.cell, gap)
+	obstacles := []*view{}
+	var titles []box
+	// The layout keeps the widest a container has been, so each run starts from the widths it
+	// needs.
+	widths := make([]float64, len(order))
+	for _, v := range order {
+		widths[v.index] = v.nw
+	}
+	// place lays the blocks out in their gaps, as Pele's place does.
+	place := func() (width, height float64, err error) {
+		for _, v := range order {
+			v.nw = widths[v.index]
+		}
+		width, height, err = layoutCells(&root.cell, gap)
+		if err != nil {
+			return 0, 0, err
+		}
+		obstacles = obstacles[:0]
+		titles = titles[:0]
+		for _, v := range order {
+			switch {
+			case v.kind == kindLeaf && fixedShape(v.shape):
+				v.bw = v.nw
+				v.bh = v.nh
+			case v.kind == kindArrow:
+				v.bw = v.nw
+				if v.span > 1 {
+					v.bw = v.w
+				}
+				v.bh = v.nh
+			default:
+				v.bw = v.w
+				v.bh = v.h
+				if v.kind == kindLeaf && wideShape(v.shape) {
+					v.bh = v.nh
+				}
+			}
+			if v.kind == kindLeaf && v.shape == "cyl" {
+				v.dy = min(12, max(6, v.bw/14)) / 2
+			}
+			if v.kind == kindLeaf || v.kind == kindArrow {
+				obstacles = append(obstacles, v)
+			} else if v.head > 0 {
+				titles = append(titles, box{x: v.x, y: v.y - v.h/2 + (v.head+gap)/2 + 2, bw: v.label.Width, bh: v.label.Height})
+			}
+		}
+		return width, height, nil
+	}
+	contentW, contentH, err := place()
 	if err != nil {
 		return nil, err
-	}
-
-	var obstacles []*view
-	for _, v := range order {
-		switch {
-		case v.kind == kindLeaf && fixedShape(v.shape):
-			v.bw = v.nw
-			v.bh = v.nh
-		case v.kind == kindArrow:
-			v.bw = v.nw
-			if v.span > 1 {
-				v.bw = v.w
-			}
-			v.bh = v.nh
-		default:
-			v.bw = v.w
-			v.bh = v.h
-			if v.kind == kindLeaf && wideShape(v.shape) {
-				v.bh = v.nh
-			}
-		}
-		if v.kind == kindLeaf && v.shape == "cyl" {
-			v.dy = min(12, max(6, v.bw/14)) / 2
-		}
-		if v.kind == kindLeaf || v.kind == kindArrow {
-			obstacles = append(obstacles, v)
-		}
 	}
 
 	// Edges between the same two blocks are spread apart instead of drawn on top of each
@@ -662,16 +840,118 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		ends = append(ends, [2]*view{s, t})
 		drawn = append(drawn, edge)
 	}
-	check := obstacles
-	if len(drawn)*len(obstacles) > obstacleBudget {
-		check = nil
-	} else if check == nil {
-		check = []*view{}
+	// check is the blocks an edge is checked against, nil where there would be too many
+	// checks; place keeps obstacles up to date.
+	checking := len(drawn)*len(obstacles) <= obstacleBudget
+	check := func() []*view {
+		if checking {
+			return obstacles
+		}
+		return nil
 	}
-	seen := map[int]int{}
 	routes := make([]route, 0, len(drawn))
-	minX, minY := 0.0, 0.0
-	maxX, maxY := contentW, contentH
+	// stacks are the labelled edges between each pair of blocks joined by more than one, in
+	// the order of the first.
+	stacks := map[int][]int{}
+	var stackKeys []int
+	legs := make([][]float64, len(drawn))
+	routeAll := func() {
+		seen := map[int]int{}
+		routes = routes[:0]
+		clear(stacks)
+		stackKeys = stackKeys[:0]
+		for i := range drawn {
+			s, t := ends[i][0], ends[i][1]
+			key := keyOf(s, t)
+			total := 1
+			if n, ok := pairs[key]; ok {
+				total = n
+			}
+			k := seen[key]
+			seen[key] = k + 1
+			label := labelOf(drawn[i].Label, edgeSize, wrapWidth, 0)
+			var points []float64
+			var lx, ly float64
+			loop := 0
+			if s == t {
+				px, py, r, _, _ := loopArc(s, k+1)
+				lx = px + r + 6 + label.Width/2
+				ly = py - r/2
+				loop = k + 1
+			} else {
+				step := 14.0
+				if labelled[key] {
+					step = jsmath.Round(edgeSize*1.5) + 2
+				}
+				points = routeEdge(s, t, float64((float64(k)-float64(total-1)/2)*step), check())
+				n := len(points)
+				// The label goes on the longer leg.
+				firstLeg := math.Abs(points[2]-points[0]) + math.Abs(points[3]-points[1])
+				lastLeg := math.Abs(points[n-2]-points[n-4]) + math.Abs(points[n-1]-points[n-3])
+				at := 0
+				if n == 6 && lastLeg > firstLeg {
+					at = 2
+				}
+				spot := 0.5
+				if label.Width > 0 {
+					spot = labelSpot(points, at, label.Width+8, label.Height, s, t, check())
+				}
+				lx = points[at] + float64((points[at+2]-points[at])*spot)
+				ly = points[at+1] + float64((points[at+3]-points[at+1])*spot)
+				if label.Width > 0 && total > 1 {
+					legs[i] = slices.Clone(points[at : at+4])
+					if _, ok := stacks[key]; !ok {
+						stackKeys = append(stackKeys, key)
+					}
+					stacks[key] = append(stacks[key], i)
+				}
+			}
+			routes = append(routes, route{edge: drawn[i], points: points, loop: loop, label: label, lx: lx, ly: ly})
+		}
+	}
+
+	// settle routes the edges and stacks the labels of each pair of blocks that cover each
+	// other, as Pele's settle does. Where they do not fit and grow is set, it widens the gap
+	// between the blocks, across the rows always and across the columns unless the layout is
+	// tight, which keeps columns narrow to fit the host, and reports whether it did.
+	settle := func(grow bool) bool {
+		routeAll()
+		base := map[gapsOf][]float64{}
+		grown := false
+		for _, key := range stackKeys {
+			stack := stacks[key]
+			if len(stack) < 2 {
+				continue
+			}
+			s, t := ends[stack[0]][0], ends[stack[0]][1]
+			short := stackLabels(stack, routes, legs, s, t, check(), titles)
+			vertical := legs[stack[0]][0] == legs[stack[0]][2]
+			if grow && short > 0 && (vertical || !tight) && widen(parents, s, t, vertical, math.Ceil(short), base) {
+				grown = true
+			}
+		}
+		return grown
+	}
+	// overlap is the area of the edge labels that cover each other, as Pele's overlap sums
+	// it.
+	overlap := func() float64 {
+		area := 0.0
+		for i := range routes {
+			p := &routes[i]
+			for j := i + 1; j < len(routes); j++ {
+				q := &routes[j]
+				pw := (p.label.Width + 8) / 2
+				qw := (q.label.Width + 8) / 2
+				w := min(p.lx+pw, q.lx+qw) - max(p.lx-pw, q.lx-qw)
+				h := min(p.ly+p.label.Height/2, q.ly+q.label.Height/2) - max(p.ly-p.label.Height/2, q.ly-q.label.Height/2)
+				if p.label.Width > 0 && q.label.Width > 0 && w > 0 && h > 0 {
+					area += float64(w * h)
+				}
+			}
+		}
+		return area
+	}
+	var minX, minY, maxX, maxY float64
 	grow := func(x, y, w, h float64) {
 		if x-w/2 < minX {
 			minX = x - w/2
@@ -686,51 +966,52 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 			maxY = y + h/2
 		}
 	}
-	for i := range drawn {
-		s, t := ends[i][0], ends[i][1]
-		key := keyOf(s, t)
-		total := 1
-		if n, ok := pairs[key]; ok {
-			total = n
-		}
-		k := seen[key]
-		seen[key] = k + 1
-		label := labelOf(drawn[i].Label, edgeSize, wrapWidth, 0)
-		var points []float64
-		var lx, ly float64
-		loop := 0
-		if s == t {
-			px, py, r, _, _ := loopArc(s, k+1)
-			grow(px, py, 2*r+2, 2*r+2)
-			lx = px + r + 6 + label.Width/2
-			ly = py - r/2
-			loop = k + 1
-		} else {
-			step := 14.0
-			if labelled[key] {
-				step = jsmath.Round(edgeSize*1.5) + 2
+	// bound finds the extent of the drawing and gives its width, as Pele's bound does.
+	bound := func() float64 {
+		minX, minY = 0, 0
+		maxX, maxY = contentW, contentH
+		for i := range routes {
+			r := &routes[i]
+			if r.loop > 0 {
+				px, py, rr, _, _ := loopArc(ends[i][0], r.loop)
+				grow(px, py, 2*rr+2, 2*rr+2)
 			}
-			points = routeEdge(s, t, float64((float64(k)-float64(total-1)/2)*step), check)
-			n := len(points)
-			// The label goes on the longer leg.
-			firstLeg := math.Abs(points[2]-points[0]) + math.Abs(points[3]-points[1])
-			lastLeg := math.Abs(points[n-2]-points[n-4]) + math.Abs(points[n-1]-points[n-3])
-			at := 0
-			if n == 6 && lastLeg > firstLeg {
-				at = 2
+			if r.label.Width > 0 {
+				grow(r.lx, r.ly, r.label.Width+8, r.label.Height)
 			}
-			spot := 0.5
-			if label.Width > 0 {
-				spot = labelSpot(points, at, label.Width+8, label.Height, s, t, check)
-			}
-			lx = points[at] + float64((points[at+2]-points[at])*spot)
-			ly = points[at+1] + float64((points[at+3]-points[at+1])*spot)
 		}
-		if label.Width > 0 {
-			grow(lx, ly, label.Width+8, label.Height)
-		}
-		routes = append(routes, route{edge: drawn[i], points: points, loop: loop, label: label, lx: lx, ly: ly})
+		return maxX - minX
 	}
+	if settle(len(drawn)*len(drawn) <= obstacleBudget) {
+		before := overlap()
+		narrow := bound()
+		// A container stretched by its row gives some of a new gap back, so the gap may take
+		// a few rounds.
+		grown := true
+		for round := 0; round < 3 && grown; round++ {
+			if contentW, contentH, err = place(); err != nil {
+				return nil, err
+			}
+			grown = settle(round < 2)
+		}
+		// The drawing only grows if that leaves less of the labels covering each other, and
+		// within the host's width.
+		wide := bound()
+		room := math.Inf(1)
+		if o.MaxWidth > 0 {
+			room = o.MaxWidth
+		}
+		if overlap() > before-1 || wide > narrow && math.Ceil(wide+float64(2*pad)) > room {
+			for _, v := range order {
+				v.rowGaps, v.colGaps = nil, nil
+			}
+			if contentW, contentH, err = place(); err != nil {
+				return nil, err
+			}
+			settle(false)
+		}
+	}
+	bound()
 
 	titleRoom := 4000.0
 	if tight {
@@ -755,9 +1036,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		FontSize: size,
 	}
 
-	var titles, clusters, nodes, edges, labels []scene.Item
+	var heading, clusters, nodes, edges, labels []scene.Item
 	if !title.Empty() {
-		titles = append(titles, scene.Item{
+		heading = append(heading, scene.Item{
 			Kind: scene.Text, Role: RoleTitle, Label: &title,
 			At: scene.Point{X: sc.Width / 2, Y: pad + title.Height/2},
 		})
@@ -857,8 +1138,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		}
 	}
 
-	sc.Items = make([]scene.Item, 0, len(titles)+len(clusters)+len(edges)+len(nodes)+len(labels))
-	for _, layer := range [][]scene.Item{titles, clusters, edges, nodes, labels} {
+	sc.Items = make([]scene.Item, 0, len(heading)+len(clusters)+len(edges)+len(nodes)+len(labels))
+	for _, layer := range [][]scene.Item{heading, clusters, edges, nodes, labels} {
 		sc.Items = append(sc.Items, layer...)
 	}
 	return sc, nil
