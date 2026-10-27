@@ -152,11 +152,11 @@ func TestParseMatchesPele(t *testing.T) {
 	for _, c := range p.Cases {
 		ok := compare(t, "tokens", c.Src, dumpTokens(c.Src), c.Tokens)
 		if ok {
-			ok = compare(t, "prepared text", c.Src, prepareTextForParsing(c.Src), c.Prepared)
+			ok = compare(t, "prepared text", c.Src, prepareTextForParsing(c.Src, nil), c.Prepared)
 		}
 		if ok {
 			m := newModel()
-			err := parseSankey(c.Src, m)
+			err := parseSankey(c.Src, m, c.Src)
 			ok = check(t, "parseSankey", c.Src, m, err, c.Direct)
 		}
 		if ok {

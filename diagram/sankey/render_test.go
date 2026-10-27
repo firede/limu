@@ -59,7 +59,8 @@ func TestLayoutMatchesPele(t *testing.T) {
 		var got []string
 		sc, err := Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize})
 		if err != nil {
-			e := err.(*diagram.Error)
+			// Entity codes are written back as written, as limu's Render does.
+			e := diagram.TagError(pre.Detected, err).(*diagram.Error)
 			got = []string{"error " + string(e.Code) + " " + e.Message}
 			refused++
 		} else {

@@ -124,6 +124,35 @@ func matchRest(s string, p int, word, stop string) int {
 	return e
 }
 
+// matchBareTitle is /title[^\S\r\n]*(?=[\r\n]|$)/iy, Pele's RE_BARE_TITLE: the word alone on
+// the rest of its line, but for white space.
+func matchBareTitle(s string, p int) int {
+	if !foldAt(s, p, "title") {
+		return -1
+	}
+	e := p + len("title")
+	for {
+		c, size := chars.UnitAt(s, e)
+		if c == '\n' || c == '\r' || !chars.IsSpace(c) {
+			break
+		}
+		e += size
+	}
+	if e < len(s) && s[e] != '\n' && s[e] != '\r' {
+		return -1
+	}
+	return e
+}
+
+// matchTitle is /title[^\S\r\n][^\n]+/iy: the word, a white space character that breaks no
+// line, and the rest of the line, of which there must be some.
+func matchTitle(s string, p int) int {
+	if c := chars.Unit(s, p+len("title")); c == '\n' || c == '\r' {
+		return -1
+	}
+	return matchRest(s, p, "title", "\n")
+}
+
 // matchDays is /prefix\s+(name|…)\b/iy: the end and the index of the name. It is Pele's
 // RE_WEEKDAY and RE_WEEKEND.
 func matchDays(s string, p int, prefix string, names []string) (int, int) {
@@ -183,7 +212,7 @@ var keywordRules = map[int][]rule{
 		{bounded("topAxis"), tTopAxis},
 		{rest("tickInterval", "#\n;"), tTickInterval},
 		{rest("todayMarker", "\n;"), tTodayMarker},
-		{rest("title", "\n"), tTitle},
+		{matchTitle, tTitle},
 	},
 	'e': {{rest("excludes", "#\n;"), tExcludes}},
 	's': {{rest("section", "\n"), tSection}},
@@ -246,6 +275,12 @@ func tokenize(src string) []tok {
 			}
 			if e = matchSpaced(src, p, "click", false); e >= 0 {
 				state = sClick
+				p = e
+				return true
+			}
+		case 't':
+			// A bare title is skipped, as no title.
+			if e = matchBareTitle(src, p); e >= 0 {
 				p = e
 				return true
 			}
@@ -320,10 +355,6 @@ func tokenize(src string) []tok {
 				} else {
 					p = until('\n', p+2)
 				}
-			case c != '}' && d == '%':
-				// Any character but } followed by % starts a comment that runs to the end of
-				// the line.
-				p = until('\n', p+size+1)
 			case c == '\n':
 				e := p + 1
 				for e < n && src[e] == '\n' {

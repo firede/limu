@@ -105,7 +105,9 @@ export function hostile(pele) {
     json: (p) => JSON.stringify(p),
   });
   const out = [];
-  for (const t of templates) for (const p of payloads) out.push(t(p));
+  // A payload with a lone surrogate is left out before it is written in, as JSON in a template
+  // writes it as an escape that a Go string cannot hold either once it is read.
+  for (const t of templates) for (const p of payloads) if (!lone(p)) out.push(t(p));
   return out.filter((s) => !lone(s) && s.length <= 4000);
 }
 

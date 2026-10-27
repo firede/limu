@@ -297,12 +297,6 @@ lexing:
 			p = lineEnd(p + 2)
 			continue
 		}
-		// Mermaid's second comment rule takes any character before `%%` with it, a line
-		// break included.
-		if c != '}' && next == '%' && chars.Unit(src, p+size+1) == '%' {
-			p = lineEnd(p + size + 2)
-			continue
-		}
 		if c == '\n' || c == '\r' {
 			e := p + 1
 			for d := byteAt(e); d == '\n' || d == '\r'; d = byteAt(e) {

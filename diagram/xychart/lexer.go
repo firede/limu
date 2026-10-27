@@ -160,12 +160,6 @@ func tokenize(src string) *common.JisonTokens {
 			p = common.LineEnd(src, p+2)
 			continue
 		}
-		// Mermaid's second comment rule takes any character before `%%` with it, a line break
-		// included.
-		if c != '}' && next == '%' && chars.Unit(src, p+size+1) == '%' {
-			p = common.LineEnd(src, p+size+2)
-			continue
-		}
 		if c == '\n' || c == '\r' {
 			// Only a line break that directly follows an axis or a series ends it; one after
 			// spaces is skipped with them, and the state carries on to the next line.

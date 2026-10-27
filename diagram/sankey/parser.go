@@ -8,6 +8,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/edit"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/text"
 )
@@ -18,41 +19,92 @@ func isBlank(c int) bool {
 	return c != 10 && c != 13 && chars.IsSpace(c)
 }
 
-// prepareTextForParsing prepares a text as Mermaid's sankeyUtils does, as Pele's
-// prepareTextForParsing does: blanks are taken off both ends of the text, runs of line breaks
-// become one, so that no row is empty, and what is left is trimmed.
-func prepareTextForParsing(text string) string {
-	start, end := 0, len(text)
-	for start < end {
-		c, size := chars.UnitAt(text, start)
-		if !isBlank(c) {
-			break
-		}
-		start += size
-	}
-	for end > start {
-		c := chars.UnitBefore(text, end)
-		if !isBlank(c) {
-			break
-		}
+// trimRows takes the blanks off the start and end of each row, outside quoted fields, as
+// Pele's trimRows does, and adds an edit for each run it takes to edits. Blanks before a comma
+// at the start of a row are kept, as Mermaid reads them as an empty name.
+func trimRows(text string, edits *[]edit.Edit) string {
+	end := len(text)
+	for end > 0 && isBlank(chars.UnitBefore(text, end)) {
 		_, size := utf8.DecodeLastRuneInString(text[:end])
 		end -= size
 	}
-	s := text[start:end]
-	// .replace(/[\n\r]+/g, '\n')
-	var b strings.Builder
-	for i := 0; i < len(s); {
-		if s[i] == '\n' || s[i] == '\r' {
-			for i < len(s) && (s[i] == '\n' || s[i] == '\r') {
-				i++
+	var out strings.Builder
+	kept := 0
+	quoted := false
+	for i := 0; i < end; {
+		c, size := chars.UnitAt(text, i)
+		switch {
+		case quoted:
+			if c == '"' {
+				if chars.Unit(text, i+1) == '"' {
+					i++
+				} else {
+					quoted = false
+				}
 			}
+			i += size
+		case c == '"':
+			quoted = true
+			i++
+		case isBlank(c):
+			j := i + size
+			for {
+				d, n := chars.UnitAt(text, j)
+				if !isBlank(d) {
+					break
+				}
+				j += n
+			}
+			p, q := chars.UnitBefore(text, i), chars.Unit(text, j)
+			if i == 0 || q == 10 || q == 13 || (p == 10 || p == 13) && q != ',' {
+				out.WriteString(text[kept:i])
+				*edits = append(*edits, edit.Edit{From: i, To: j})
+				kept = j
+			}
+			i = j
+		default:
+			i += size
+		}
+	}
+	if end < len(text) {
+		*edits = append(*edits, edit.Edit{From: end, To: len(text)})
+	}
+	out.WriteString(text[kept:end])
+	return out.String()
+}
+
+// prepareTextForParsing prepares a text as Pele's prepareTextForParsing does, which is as
+// Mermaid's sankeyUtils does but that blanks are also taken off the ends of each row: runs of
+// line breaks then become one, so that no row is empty, and what is left is trimmed. Unless
+// steps is nil, the edits of each of these passes are added to it, so that an error can be
+// reported where it is in the text as written.
+func prepareTextForParsing(text string, steps *[][]edit.Edit) string {
+	var edits []edit.Edit
+	rows := trimRows(text, &edits)
+	// .replace(/[\n\r]+/g, '\n')
+	var breaks []edit.Edit
+	var b strings.Builder
+	for i := 0; i < len(rows); {
+		if rows[i] == '\n' || rows[i] == '\r' {
+			j := i
+			for j < len(rows) && (rows[j] == '\n' || rows[j] == '\r') {
+				j++
+			}
+			breaks = append(breaks, edit.Edit{From: i, To: j, Text: "\n"})
 			b.WriteByte('\n')
+			i = j
 			continue
 		}
-		b.WriteByte(s[i])
+		b.WriteByte(rows[i])
 		i++
 	}
-	return chars.Trim(b.String())
+	collapsed := b.String()
+	trimmed := chars.Trim(collapsed)
+	lead := len(collapsed) - len(chars.TrimStart(collapsed))
+	edit.Push(steps, edits)
+	edit.Push(steps, breaks)
+	edit.Push(steps, []edit.Edit{{From: 0, To: lead}, {From: lead + len(trimmed), To: len(collapsed)}})
+	return trimmed
 }
 
 // parseFloat is JavaScript's parseFloat: white space at the start is skipped, and the longest
@@ -110,8 +162,9 @@ type parseFailure struct{ err *diagram.Error }
 
 // parseSankey parses a prepared text into m, as Pele's parseSankey does: the keyword, a line
 // break, and rows of a source, a target and an amount, separated by commas, each field plain
-// or in double quotes, with a doubled quote for a quote in it.
-func parseSankey(src string, m *Model) (err error) {
+// or in double quotes, with a doubled quote for a quote in it. An error is reported in source,
+// the text as it was before prepareTextForParsing, which is src where src was not prepared.
+func parseSankey(src string, m *Model, source string) (err error) {
 	tk := tokenize(src)
 	types, texts := tk.Types, tk.Texts
 	i := 0
@@ -125,13 +178,28 @@ func parseSankey(src string, m *Model) (err error) {
 		}
 	}()
 
+	// failAt reports an error at byte at of src where it is in source, as Pele's error does.
+	failAt := func(at int, detail string) {
+		var steps [][]edit.Edit
+		if source != src {
+			prepareTextForParsing(source, &steps)
+		}
+		offset := edit.InputOffset(steps, at)
+		if at > 0 && at >= len(src) {
+			// The end of src is mapped to just after its last character, before the blanks
+			// that were trimmed after it.
+			_, size := utf8.DecodeLastRuneInString(src)
+			offset = edit.InputOffset(steps, len(src)-size) + size
+		}
+		panic(parseFailure{common.SyntaxError("sankey", source, offset, detail, false)})
+	}
 	fail := func(expected string) {
 		t := types[i]
 		got := tokenNames[t]
 		if t == tSTUCK {
 			got = tokenNames[types[i-1]]
 		}
-		panic(parseFailure{common.SyntaxError("sankey", src, tk.Starts[i], "Expecting "+expected+", got '"+got+"'", false)})
+		failAt(tk.Starts[i], "Expecting "+expected+", got '"+got+"'")
 	}
 	expect := func(typ int, also string) {
 		if types[i] != typ {
@@ -161,7 +229,7 @@ func parseSankey(src string, m *Model) (err error) {
 		raw := strings.ReplaceAll(chars.Trim(field()), `""`, `"`)
 		// Entity codes can stand for characters the lexer leaves out.
 		if invalidXML(text.DecodeEntities(raw)) {
-			panic(parseFailure{common.SyntaxError("sankey", src, start, "Invalid XML character in node name", false)})
+			failAt(start, "Invalid XML character in node name")
 		}
 		return raw
 	}
@@ -173,10 +241,14 @@ func parseSankey(src string, m *Model) (err error) {
 		expect(tCOMMA, ", 'NEWLINE', 'EOF'")
 		to := name()
 		expect(tCOMMA, ", 'NEWLINE', 'EOF'")
-		amount := field()
-		source := m.findOrCreateNode(from)
-		target := m.findOrCreateNode(to)
-		m.addLink(source, target, parseFloat(chars.Trim(amount)))
+		start := tk.Starts[i]
+		// What parseFloat reads at the start of the field is the value, as in `50%`, as
+		// Mermaid reads it, but a value that is not finite is an error.
+		value := parseFloat(field())
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			failAt(start, "Expecting a number")
+		}
+		m.addLink(m.findOrCreateNode(from), m.findOrCreateNode(to), value)
 		if types[i] != tNEWLINE {
 			break
 		}
