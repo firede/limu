@@ -123,7 +123,10 @@ A swimlane diagram's items keep a flowchart's roles, so an override for `flowcha
 reaches them too, and its lanes are `swimlane.lane`. Flowcharts and state, class, use case
 and agent flow diagrams name an edge's label `*.edge-label`. Class and entity relationship
 diagrams draw the dividers of a box as items of their own, `class.divider` and
-`er.divider`, which take only the stroke color the author set.
+`er.divider`, which take only the stroke color the author set. Where an edge crosses the
+border of a fill the author set, a diagram draws a casing under it as a `Mark` of its own,
+`*.casing`, in flowcharts and swimlane, state, agent flow, block, C4, use case and entity
+relationship diagrams.
 
 The other diagrams draw these items.
 
