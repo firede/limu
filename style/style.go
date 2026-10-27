@@ -363,14 +363,6 @@ func ink(th *Theme, set Style) (Paint, bool) {
 	return Bg, true
 }
 
-// Inks reports whether a fill an author sets is one ink picks a text color on: a color drawn
-// at no less than half its opacity, as Pele's ink knows one. A diagram asks it to know whether
-// an edge inside the fill takes that color, or a casing, as Pele's edgeInk does.
-func Inks(author Style) bool {
-	_, ok := ink(defaultTheme, author)
-	return ok
-}
-
 // luminance is a color's relative luminance, as WCAG 2 defines it and Pele's ink computes
 // it.
 func luminance(c Color) float64 {

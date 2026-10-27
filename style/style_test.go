@@ -203,7 +203,4 @@ func TestGround(t *testing.T) {
 	if r := look.Resolve("x", Style{Stroke: Line}, Style{}); r.Stroke != th.Line || r.Hollow != th.Bg {
 		t.Errorf("no ground: %+v", r)
 	}
-	if !Inks(Style{Fill: navy}) || Inks(Style{Fill: navy, FillOpacity: N(0.4)}) || Inks(Style{}) {
-		t.Error("Inks")
-	}
 }

@@ -343,3 +343,130 @@ func asciiFold(a, b string) bool {
 	}
 	return true
 }
+
+// Paints reports whether declarations paint a shape's fill, as Pele's paints reads the style
+// its resolveStyle writes: a fill that is neither none nor transparent, at an opacity above 0.
+// A color or an opacity it cannot read counts as opaque.
+func Paints(decls []string) bool {
+	fill, ok := shapeValue(decls, "fill")
+	if !ok {
+		return false
+	}
+	fill = lowerASCII(chars.Trim(fill))
+	if fill == "" || fill == "none" || fill == "transparent" {
+		return false
+	}
+	alpha := 1.0
+	if c, ok := style.ParseColor(fill); ok {
+		alpha = float64(c.A) / 255
+	}
+	scale := opacities(decls)
+	if math.IsNaN(scale) {
+		scale = 1
+	}
+	return alpha*scale > 0
+}
+
+// Inks reports whether declarations give a shape a fill that Pele's ink picks a text color on:
+// a color it reads, drawn at no less than half its opacity, with opacities it reads. The color
+// it picks is the style's to settle (style.Style.OnFill and Ground).
+func Inks(decls []string) bool {
+	fill, ok := shapeValue(decls, "fill")
+	if !ok {
+		return false
+	}
+	c, ok := style.ParseColor(fill)
+	if !ok || lowerASCII(chars.Trim(fill)) == "transparent" {
+		return false
+	}
+	// An opacity that is not a plain number may still be low, so none is picked.
+	return float64(c.A)/255*opacities(decls) >= 0.5
+}
+
+// Sets reports whether declarations give a shape's property a value resolveStyle keeps, read
+// or not, as Pele tests the style it writes for one with /[";]prop:/.
+func Sets(decls []string, prop string) bool {
+	_, ok := shapeValue(decls, prop)
+	return ok
+}
+
+// shapeValue is the value resolveStyle keeps for a property of a shape, the last one given.
+func shapeValue(decls []string, prop string) (string, bool) {
+	var value string
+	found := false
+	for _, decl := range decls {
+		p, v, ok := strings.Cut(decl, ":")
+		if !ok || p == "" || chars.ToLower(chars.Trim(p)) != prop {
+			continue
+		}
+		v = chars.Trim(replaceFold(v, "!important", ""))
+		if v == "" || unsafe(v) {
+			continue
+		}
+		value, found = v, true
+	}
+	return value, found
+}
+
+// opacities is the product of the fill opacity and the opacity resolveStyle keeps, as Pele's
+// opacity reads them, NaN where one is not a plain number.
+func opacities(decls []string) float64 {
+	product := 1.0
+	for _, prop := range []string{"fill-opacity", "opacity"} {
+		if v, ok := shapeValue(decls, prop); ok {
+			product *= amount(chars.Trim(v))
+		}
+	}
+	return product
+}
+
+// amount reads an opacity as Pele's amount does, a number or a percentage that
+// /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?(%|deg|grad|rad|turn)?$/i takes, kept from 0 to
+// 1, and NaN for anything else, an angle among them.
+func amount(raw string) float64 {
+	s := raw
+	if len(s) > 0 && (s[0] == '+' || s[0] == '-') {
+		s = s[1:]
+	}
+	digits := func(i int) int {
+		for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+			i++
+		}
+		return i
+	}
+	i := digits(0)
+	switch {
+	case i > 0:
+		if i < len(s) && s[i] == '.' {
+			if j := digits(i + 1); j > i+1 {
+				i = j
+			}
+		}
+	case i < len(s) && s[i] == '.':
+		if i = digits(1); i == 1 {
+			return math.NaN()
+		}
+	default:
+		return math.NaN()
+	}
+	if i < len(s) && (s[i] == 'e' || s[i] == 'E') {
+		j := i + 1
+		if j < len(s) && (s[j] == '+' || s[j] == '-') {
+			j++
+		}
+		if k := digits(j); k > j {
+			i = k
+		}
+	}
+	number := raw[:len(raw)-len(s)+i]
+	unit := lowerASCII(s[i:])
+	if unit != "" && unit != "%" {
+		return math.NaN()
+	}
+	// A number too large for a float64 is infinite, as parseFloat reads it.
+	f, _ := strconv.ParseFloat(number, 64)
+	if unit == "%" {
+		f /= 100
+	}
+	return max(0, min(1, f))
+}

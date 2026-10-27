@@ -2,6 +2,7 @@ package venn
 
 import (
 	"math"
+	"slices"
 	"strings"
 
 	"github.com/firede/limu/diagram"
@@ -52,6 +53,8 @@ type region struct {
 	spot   spot
 	lines  []line
 	decls  []string
+	// across is whether its text is written across other circles.
+	across bool
 }
 
 // keyOf is one key for a list of set ids, as Pele's keyOf gives one: a single id is the key,
@@ -178,10 +181,11 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 		at := findSpot(circles, inside, outside)
 		// A region that other circles cover, or all but cover, is written across them
 		// instead.
-		if at.margin < circles[smallest].r*0.2 {
+		across := len(outside) > 0 && at.margin < circles[smallest].r*0.2
+		if across {
 			at = findSpot(circles, inside, nil)
 		}
-		r := &region{sets: sets, inside: inside, spot: at, decls: decls}
+		r := &region{sets: sets, inside: inside, spot: at, decls: decls, across: across}
 		if has && raw != "" {
 			fontSize := small
 			if len(sets) == 1 {
@@ -332,6 +336,31 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 		})
 	}
 
+	var painted []*region
+	for _, r := range all {
+		if len(r.sets) > 1 && css.ShapeCSS(r.decls) != "" {
+			painted = append(painted, r)
+		}
+	}
+	// under is the fill under a region's text, as Pele's under finds it: the last overlap
+	// drawn over all of the region, or its own circle when its style sets an opacity, and none
+	// for text written across other circles.
+	under := func(r *region) []string {
+		if r.across {
+			return nil
+		}
+		var fill []string
+		if len(r.sets) == 1 && setsFillOpacity(r.decls) {
+			fill = r.decls
+		}
+		for _, other := range painted {
+			if subset(other.sets, r.sets) {
+				fill = other.decls
+			}
+		}
+		return fill
+	}
+
 	for _, r := range all {
 		total := 0.0
 		for _, l := range r.lines {
@@ -341,6 +370,11 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 			continue
 		}
 		id := strings.Join(r.sets, "|")
+		// The text takes the color that stands out on the fill under it, as Pele's ink picks.
+		var ground style.Paint
+		if fill := under(r); css.Inks(fill) {
+			ground = shapeStyle(fill).Fill
+		}
 		x := float64(r.spot.x*scale) + ox
 		y := float64(r.spot.y*scale) + oy - total/2
 		for k := range r.lines {
@@ -349,7 +383,7 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 				it := scene.Item{
 					Kind: scene.Text, Role: RoleLabel, ID: id, Label: &l.label,
 					At:     scene.Point{X: x, Y: y + l.label.Height/2},
-					Style:  style.Style{Text: style.Fg},
+					Style:  style.Style{Text: style.Fg, Ground: ground},
 					Author: textStyle(r.decls),
 				}
 				if l.isText {
@@ -377,4 +411,20 @@ func shapeStyle(decls []string) style.Style {
 func textStyle(decls []string) style.Style {
 	s := css.Declarations(decls).Style
 	return style.Style{Text: s.Text, Opacity: s.Opacity}
+}
+
+// setsFillOpacity reports whether declarations set a fill opacity that Pele's resolveStyle
+// keeps on a shape.
+func setsFillOpacity(decls []string) bool {
+	return strings.Contains(";"+css.ShapeCSS(decls), ";fill-opacity:")
+}
+
+// subset reports whether every id of some is among those of all.
+func subset(some, all []string) bool {
+	for _, id := range some {
+		if !slices.Contains(all, id) {
+			return false
+		}
+	}
+	return true
 }

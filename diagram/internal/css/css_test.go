@@ -177,3 +177,31 @@ func TestShapeCSS(t *testing.T) {
 		}
 	}
 }
+
+func TestInksAndPaints(t *testing.T) {
+	for _, c := range []struct {
+		decls        []string
+		inks, paints bool
+	}{
+		{nil, false, false},
+		{[]string{"fill:#000080"}, true, true},
+		{[]string{"fill:none"}, false, false},
+		{[]string{"fill:transparent"}, false, false},
+		{[]string{"fill:var(--x)"}, false, true},
+		{[]string{"fill:#000", "fill-opacity:0.4"}, false, true},
+		{[]string{"fill:#000", "fill-opacity:abc"}, false, true},
+		{[]string{"fill:#000", "fill-opacity:50%"}, true, true},
+		{[]string{"fill:#000", "opacity:0.7", "fill-opacity:0.7"}, false, true},
+		{[]string{"fill:#000", "opacity:0"}, false, false},
+		{[]string{"fill:#000", "opacity:1e999"}, true, true},
+		{[]string{"fill:#000", "opacity:1deg"}, false, true},
+		{[]string{"fill:rgba(0,0,0,0.4)"}, false, true},
+	} {
+		if got := Inks(c.decls); got != c.inks {
+			t.Errorf("Inks(%q) = %v", c.decls, got)
+		}
+		if got := Paints(c.decls); got != c.paints {
+			t.Errorf("Paints(%q) = %v", c.decls, got)
+		}
+	}
+}

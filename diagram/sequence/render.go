@@ -950,8 +950,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 		}
 		ground, seen := inks[fill]
 		if !seen {
-			if author := css.Declarations([]string{"fill:" + fill}).Style; style.Inks(author) {
-				ground = author.Fill
+			if decls := []string{"fill:" + fill}; css.Inks(decls) {
+				ground = css.Declarations(decls).Style.Fill
 			}
 			inks[fill] = ground
 		}

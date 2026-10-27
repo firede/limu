@@ -3,6 +3,7 @@ package draw
 import (
 	"math"
 
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
@@ -13,38 +14,29 @@ import (
 // author gives them a fill, and records it in the scene; the style then picks the color the
 // edge is drawn in on that fill, or lays a casing under it.
 
-// A Fill is a box a style fills, Pele's Fill: its left, top, right and bottom, and the style
-// its author gives it.
+// A Fill is a box a style fills, Pele's Fill: its left, top, right and bottom, and the
+// declarations its author gives it, of which css.Paints is true. A diagram gathers its fills
+// of the groups whose author paints them.
 type Fill struct {
-	Box    [4]float64
-	Author style.Style
-}
-
-// Paints reports whether an author's style paints a fill, as Pele's paints does: a fill that
-// is neither none nor transparent, at an opacity above 0.
-func Paints(author style.Style) bool {
-	f := author.Fill
-	if !f.Visible() || f.Token().Name() == "" && f.Own().A == 0 {
-		return false
-	}
-	return author.FillOpacity.Or(1)*author.Opacity.Or(1) > 0
+	Box   [4]float64
+	Decls []string
 }
 
 // OnFills is what Pele's overFills makes of an edge on fills: the ground to give the edge's
-// style where it lies inside one fill that ink picks a color on and its author, whose style
-// line is, sets it no stroke (edgeInk); and whether it needs a casing, where it crosses the
-// border of a fill or lies inside one otherwise.
-func OnFills(p *scene.Path, tips []float64, fills []Fill, line style.Style) (ground style.Paint, casing bool) {
+// style where it lies inside one fill that ink picks a color on (css.Inks), unless its
+// author's declarations, line, set it a stroke (edgeInk); and whether it needs a casing,
+// where it crosses the border of a fill or lies inside one otherwise.
+func OnFills(p *scene.Path, tips []float64, fills []Fill, line []string) (ground style.Paint, casing bool) {
 	holder, crossing := FillUnder(p, tips, fills)
 	switch {
 	case crossing:
 		return style.Paint{}, true
 	case holder < 0:
 		return style.Paint{}, false
-	case line.Stroke.Set() || !style.Inks(fills[holder].Author):
+	case css.Sets(line, "stroke") || !css.Inks(fills[holder].Decls):
 		return style.Paint{}, true
 	}
-	return fills[holder].Author.Fill, false
+	return css.Declarations(fills[holder].Decls).Style.Fill, false
 }
 
 // written is a number as Pele's num writes it into a path and reads it back: rounded to two
