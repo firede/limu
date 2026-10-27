@@ -153,3 +153,37 @@ func TestOver(t *testing.T) {
 		t.Errorf("none over anything is none: %v", p)
 	}
 }
+
+func TestInkOnFill(t *testing.T) {
+	look := Look{Overrides: Overrides{"x.lit": {Fill: Of(Hex("#ffd700"))}}}
+	th := Default()
+	own := Style{Text: Muted, OnFill: true}
+	for _, c := range []struct {
+		name        string
+		role        string
+		own, author Style
+		text        Color
+	}{
+		{"no fill set", "x", own, Style{}, th.Muted},
+		{"a dark fill", "x", own, Style{Fill: Of(Hex("#000080"))}, th.Bg},
+		{"a light fill", "x", own, Style{Fill: Of(Hex("#ffe4e1"))}, th.Fg},
+		// #7d7d7d is just darker than where #1f1f1f and #fff contrast with it equally, #7f7f7f
+		// just lighter.
+		{"just dark", "x", own, Style{Fill: Of(Hex("#7d7d7d"))}, th.Bg},
+		{"just light", "x", own, Style{Fill: Of(Hex("#7f7f7f"))}, th.Fg},
+		{"a text color set", "x", own, Style{Fill: Of(Hex("#000")), Text: Of(Hex("#f00"))}, Hex("#f00")},
+		{"a faint fill", "x", own, Style{Fill: Of(Hex("#000")), FillOpacity: N(0.7), Opacity: N(0.7)}, th.Muted},
+		{"a translucent color", "x", own, Style{Fill: Of(Color{0, 0, 0, 100})}, th.Muted},
+		{"not on its fill", "x", Style{Text: Muted}, Style{Fill: Of(Hex("#000"))}, th.Muted},
+		{"an override's fill", "x.lit", own, Style{}, th.Fg},
+	} {
+		if got := look.Resolve(c.role, c.own, c.author).Text; got != c.text {
+			t.Errorf("%s: text %v, want %v", c.name, got, c.text)
+		}
+	}
+	// In a dark theme, the light Fg is the one that stands out on a dark fill.
+	dark := Look{Theme: KohuDark()}
+	if got := dark.Resolve("x", own, Style{Fill: Of(Hex("#000080"))}).Text; got != KohuDark().Fg {
+		t.Errorf("dark theme on navy: %v", got)
+	}
+}

@@ -1,27 +1,6 @@
 package style
 
-import (
-	"math"
-	"testing"
-)
-
-// luminance is a color's relative luminance, as WCAG 2 defines it.
-func luminance(c Color) float64 {
-	lin := func(v uint8) float64 {
-		x := float64(v) / 255
-		if x <= 0.04045 {
-			return x / 12.92
-		}
-		return math.Pow((x+0.055)/1.055, 2.4)
-	}
-	return 0.2126*lin(c.R) + 0.7152*lin(c.G) + 0.0722*lin(c.B)
-}
-
-// contrast is the contrast ratio of two colors, as WCAG 2 defines it.
-func contrast(a, b Color) float64 {
-	la, lb := luminance(a), luminance(b)
-	return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
-}
+import "testing"
 
 // Kohu and KohuDark keep the contrast docs/website.md holds them to: text at 7:1 against
 // the background and surfaces, muted text, lines and the accent at 4.5:1 against the

@@ -1,5 +1,7 @@
 package style
 
+import "math"
+
 // A Paint is what a part is filled, stroked or written with: a color of the theme, a color
 // of its own, or nothing. The zero Paint is unset, and takes what is under it.
 type Paint struct {
@@ -214,6 +216,12 @@ type Style struct {
 	// under the text stop short of it: the title of a group an edge runs through.
 	Halo      Paint
 	HaloWidth Num
+	// OnFill says that the part's text is set on its fill. Where an override or the part's
+	// author sets a fill over the diagram's own, and neither sets a color for the text, the
+	// text is drawn in the theme's Fg or Bg, whichever stands out more against that fill, as
+	// Pele's ink picks a color for a label on a fill a style sets. A diagram sets it on the
+	// parts whose labels Pele draws so.
+	OnFill bool
 }
 
 // Over is s laid over base: what s sets, and what base sets where s does not.
@@ -257,6 +265,7 @@ func (s Style) Over(base Style) Style {
 	if !s.HaloWidth.set {
 		s.HaloWidth = base.HaloWidth
 	}
+	s.OnFill = s.OnFill || base.OnFill
 	return s
 }
 
@@ -282,6 +291,11 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 		over = l.Overrides[role]
 	}
 	s := author.Over(over.Over(own))
+	if set := author.Over(over); s.OnFill && !set.Text.Set() {
+		if text, ok := ink(th, set); ok {
+			s.Text = text
+		}
+	}
 	if !s.StrokeWidth.set {
 		s.StrokeWidth = N(th.StrokeWidth)
 	}
@@ -292,6 +306,44 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 		s.Text = Fg
 	}
 	return s
+}
+
+// ink is the theme's Fg or Bg, whichever contrasts more with the fill a style sets, as Pele's
+// ink picks ON_LIGHT or ON_DARK: with Pele's colors, Fg where the fill's luminance is above
+// that at which the two contrast with it equally, and Bg at or below it. It reports false
+// where the style sets no fill, or one drawn at less than half its opacity, since what is
+// under the fill would then decide.
+func ink(th *Theme, set Style) (Paint, bool) {
+	if !set.Fill.Visible() {
+		return Paint{}, false
+	}
+	fill := set.Fill.Color(th)
+	if float64(fill.A)/255*set.FillOpacity.Or(1)*set.Opacity.Or(1) < 0.5 {
+		return Paint{}, false
+	}
+	if contrast(fill, th.Fg) > contrast(fill, th.Bg) {
+		return Fg, true
+	}
+	return Bg, true
+}
+
+// luminance is a color's relative luminance, as WCAG 2 defines it and Pele's ink computes
+// it.
+func luminance(c Color) float64 {
+	lin := func(v uint8) float64 {
+		x := float64(v) / 255
+		if x <= 0.04045 {
+			return x / 12.92
+		}
+		return math.Pow((x+0.055)/1.055, 2.4)
+	}
+	return 0.2126*lin(c.R) + 0.7152*lin(c.G) + 0.0722*lin(c.B)
+}
+
+// contrast is the contrast ratio of two colors, as WCAG 2 defines it.
+func contrast(a, b Color) float64 {
+	la, lb := luminance(a), luminance(b)
+	return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 }
 
 // ThemeOrDefault is the look's theme, or Default when it has none. The default is shared:
