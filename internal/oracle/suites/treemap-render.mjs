@@ -1,5 +1,6 @@
 // Treemaps drawn end to end: what Pele's render draws, read back out of its SVG as one line
-// per thing drawn, in the order drawn. limu's test writes the same lines from its scene.
+// per thing drawn, in the order drawn, and the tooltip of each box that has one. limu's test
+// writes the same lines from its scene.
 //
 // Pele draws a treemap with no groups that move what is in them, so its numbers are where the
 // scene has them. They are drawn here written out in full, as the oracle's hooks have num()
@@ -71,6 +72,9 @@ export function readSvg(svg) {
         `${m[1]} ${unescape(m[3])} [${m[2].trim()}] ${box} ${rounded} ${attr(rect, 'fill') ?? '-'} ${attr(rect, 'fill-opacity') ?? '-'}` +
           ` ${attr(rect, 'stroke') ?? '-'} ${linecap(rect)} ${linejoin(rect)} css=${css(rect)}`
       );
+      // A box's tooltip, which names the sections with no header above it.
+      const tip = /^<title>([^<]*)<\/title>/.exec(m[4]);
+      if (tip) lines.push(`tip ${unescape(tip[1])}`);
       texts(m[4].slice(m[4].indexOf(rect) + rect.length), up, '', lines);
     }
   }
