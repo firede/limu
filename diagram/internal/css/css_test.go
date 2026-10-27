@@ -218,6 +218,23 @@ func TestInksAndPaints(t *testing.T) {
 		{[]string{"fill:#000", "opacity:1e999"}, true, true},
 		{[]string{"fill:#000", "opacity:1deg"}, false, true},
 		{[]string{"fill:rgba(0,0,0,0.4)"}, false, true},
+		// Colors as Pele's color reads them: an empty argument, a mix of numbers and
+		// percentages, or none in the comma syntax is no color it reads, and an alpha is
+		// taken as it is written, not as a byte.
+		{[]string{"fill:rgb(10,20,,30)"}, false, true},
+		{[]string{"fill:rgb(10%,20,30)"}, false, true},
+		{[]string{"fill:rgb(none,0,0)"}, false, true},
+		{[]string{"fill:rgb(none 0 0)"}, true, true},
+		{[]string{"fill:rgb(0 0 0 / 0.499)"}, false, true},
+		{[]string{"fill:rgb(0 0 0 / 0.5 / 1)"}, false, true},
+		{[]string{"fill:hsl(200,80,30)"}, false, true},
+		{[]string{"fill:hsl(200deg 80% 30%)"}, true, true},
+		{[]string{"fill:hsl(1turn,80%,30%)"}, true, true},
+		{[]string{"fill:hsl(1e999,80%,30%)"}, false, true},
+		{[]string{"fill:#0000"}, false, false},
+		{[]string{"fill:#00000080"}, true, true},
+		{[]string{"fill:DarkSlateGrey"}, true, true},
+		{[]string{"fill:red#"}, false, true},
 	} {
 		if got := Inks(c.decls); got != c.inks {
 			t.Errorf("Inks(%q) = %v", c.decls, got)

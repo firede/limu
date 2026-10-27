@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/style"
@@ -400,8 +401,8 @@ func Paints(decls []string) bool {
 		return false
 	}
 	alpha := 1.0
-	if c, ok := style.ParseColor(fill); ok {
-		alpha = float64(c.A) / 255
+	if a, ok := colorAlpha(fill); ok {
+		alpha = a
 	}
 	scale := opacities(decls)
 	if math.IsNaN(scale) {
@@ -418,12 +419,153 @@ func Inks(decls []string) bool {
 	if !ok {
 		return false
 	}
-	c, ok := style.ParseColor(fill)
-	if !ok || lowerASCII(chars.Trim(fill)) == "transparent" {
-		return false
-	}
+	alpha, ok := colorAlpha(fill)
 	// An opacity that is not a plain number may still be low, so none is picked.
-	return float64(c.A)/255*opacities(decls) >= 0.5
+	return ok && alpha*opacities(decls) >= 0.5
+}
+
+// colorAlpha is the alpha of a color as Pele's color reads it, and whether it reads it: a
+// named color but transparent, a hex color, or rgb(), rgba(), hsl() or hsla() with the
+// arguments its args takes, each a number it reads.
+func colorAlpha(raw string) (float64, bool) {
+	value := chars.ToLower(chars.Trim(raw))
+	if !strings.ContainsAny(value, "#(") {
+		_, ok := style.ParseColor(strings.Replace(value, "grey", "gray", 1))
+		return 1, ok && value != "transparent"
+	}
+	if h, ok := strings.CutPrefix(value, "#"); ok {
+		switch len(h) {
+		case 3, 4, 6, 8:
+		default:
+			return 0, false
+		}
+		for i := range len(h) {
+			if c := h[i]; !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+				return 0, false
+			}
+		}
+		if len(h) < 6 {
+			h = string([]byte{h[0], h[0], h[1], h[1], h[2], h[2]}) + strings.Repeat(h[3:], 2)
+		}
+		if len(h) < 8 {
+			return 1, true
+		}
+		n, _ := strconv.ParseUint(h[6:], 16, 8)
+		return float64(n) / 255, true
+	}
+	// /^(rgba?|hsla?)\(([^()]*)\)$/
+	open := strings.IndexByte(value, '(')
+	if open < 0 {
+		return 0, false
+	}
+	name, body := value[:open], value[open+1:]
+	if name != "rgb" && name != "rgba" && name != "hsl" && name != "hsla" ||
+		!strings.HasSuffix(body, ")") || strings.ContainsAny(body[:len(body)-1], "()") {
+		return 0, false
+	}
+	body = body[:len(body)-1]
+	hsl := strings.HasPrefix(name, "hsl")
+	list, ok := colorArgs(body, hsl)
+	if !ok {
+		return 0, false
+	}
+	alpha := 1.0
+	if len(list) == 4 {
+		alpha = amountOf(list[3], 1)
+	}
+	if hsl {
+		h := cssHue(list[0])
+		h = math.Mod(math.Mod(h, 360)+360, 360)
+		if math.IsNaN(h) || math.IsNaN(amountOf(list[1], 100)) || math.IsNaN(amountOf(list[2], 100)) {
+			return 0, false
+		}
+	} else {
+		for _, c := range list[:3] {
+			if math.IsNaN(amountOf(c, 255)) {
+				return 0, false
+			}
+		}
+	}
+	return alpha, !math.IsNaN(alpha)
+}
+
+// colorArgs splits the arguments of a color function as Pele's args does: the comma syntax
+// takes no none, rgb() channels all or none in percentages, and hsl() saturation and
+// lightness in percentages; the space syntax takes three and an alpha after a slash.
+func colorArgs(body string, hsl bool) ([]string, bool) {
+	legacy := strings.Contains(body, ",")
+	main, alpha, slashed := body, "", false
+	if !legacy {
+		parts := strings.Split(body, "/")
+		if len(parts) > 2 {
+			return nil, false
+		}
+		main = parts[0]
+		if len(parts) == 2 {
+			alpha, slashed = parts[1], true
+		}
+	}
+	var list []string
+	if legacy {
+		// /\s*,\s*/ on the trimmed arguments.
+		for _, a := range strings.Split(chars.Trim(main), ",") {
+			list = append(list, chars.Trim(a))
+		}
+		if len(list) < 3 || len(list) > 4 {
+			return nil, false
+		}
+	} else {
+		list = splitSpaces(chars.Trim(main))
+		if len(list) != 3 {
+			return nil, false
+		}
+	}
+	if slashed {
+		list = append(list, chars.Trim(alpha))
+	}
+	if !legacy {
+		for i, c := range list {
+			if c == "none" {
+				list[i] = "0"
+			}
+		}
+		return list, true
+	}
+	from, want := 0, 3
+	if hsl {
+		from, want = 1, 2
+	}
+	percent := 0
+	for _, c := range list[from:3] {
+		if strings.HasSuffix(c, "%") {
+			percent++
+		}
+	}
+	return list, percent == want || !hsl && percent == 0
+}
+
+// splitSpaces splits s on runs of white space, as JavaScript's split(/\s+/) does: an empty s
+// is one empty piece.
+func splitSpaces(s string) []string {
+	var out []string
+	start := 0
+	for i := 0; i < len(s); {
+		r, n := utf8.DecodeRuneInString(s[i:])
+		if !chars.IsSpaceRune(r) {
+			i += n
+			continue
+		}
+		out = append(out, s[start:i])
+		for i < len(s) {
+			r, n := utf8.DecodeRuneInString(s[i:])
+			if !chars.IsSpaceRune(r) {
+				break
+			}
+			i += n
+		}
+		start = i
+	}
+	return append(out, s[start:])
 }
 
 // Sets reports whether declarations give a shape's property a value resolveStyle keeps, read
@@ -463,10 +605,44 @@ func opacities(decls []string) float64 {
 	return product
 }
 
-// amount reads an opacity as Pele's amount does, a number or a percentage that
-// /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?(%|deg|grad|rad|turn)?$/i takes, kept from 0 to
-// 1, and NaN for anything else, an angle among them.
-func amount(raw string) float64 {
+// amount reads an opacity as Pele's amount does with a full of 1.
+func amount(raw string) float64 { return amountOf(raw, 1) }
+
+// amountOf reads a number of full, or a percentage, as Pele's amount does: one that
+// /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?(%|deg|grad|rad|turn)?$/i takes, kept from 0
+// to 1, and NaN for anything else, an angle among them.
+func amountOf(raw string, full float64) float64 {
+	f, unit, ok := cssNumber(raw)
+	if !ok || unit != "" && unit != "%" {
+		return math.NaN()
+	}
+	if unit == "%" {
+		f /= 100
+	} else {
+		f /= full
+	}
+	return max(0, min(1, f))
+}
+
+// cssHue reads a hue in degrees as Pele's hue does, NaN for a percentage or anything else.
+func cssHue(raw string) float64 {
+	f, unit, ok := cssNumber(raw)
+	switch {
+	case !ok || unit == "%":
+		return math.NaN()
+	case unit == "turn":
+		return f * 360
+	case unit == "rad":
+		return f * 180 / math.Pi
+	case unit == "grad":
+		return f * 0.9
+	}
+	return f
+}
+
+// cssNumber reads a number as /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?(%|deg|grad|rad|turn)?$/i
+// takes it, with parseFloat's value and the unit in lower case.
+func cssNumber(raw string) (float64, string, bool) {
 	s := raw
 	if len(s) > 0 && (s[0] == '+' || s[0] == '-') {
 		s = s[1:]
@@ -487,10 +663,10 @@ func amount(raw string) float64 {
 		}
 	case i < len(s) && s[i] == '.':
 		if i = digits(1); i == 1 {
-			return math.NaN()
+			return 0, "", false
 		}
 	default:
-		return math.NaN()
+		return 0, "", false
 	}
 	if i < len(s) && (s[i] == 'e' || s[i] == 'E') {
 		j := i + 1
@@ -503,13 +679,12 @@ func amount(raw string) float64 {
 	}
 	number := raw[:len(raw)-len(s)+i]
 	unit := lowerASCII(s[i:])
-	if unit != "" && unit != "%" {
-		return math.NaN()
+	switch unit {
+	case "", "%", "deg", "grad", "rad", "turn":
+	default:
+		return 0, "", false
 	}
 	// A number too large for a float64 is infinite, as parseFloat reads it.
 	f, _ := strconv.ParseFloat(number, 64)
-	if unit == "%" {
-		f /= 100
-	}
-	return max(0, min(1, f))
+	return f, unit, true
 }
