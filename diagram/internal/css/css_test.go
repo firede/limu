@@ -7,6 +7,28 @@ import (
 	"github.com/firede/limu/style"
 )
 
+func TestFontFamilyDeclared(t *testing.T) {
+	for _, c := range []struct {
+		decls []string
+		want  bool
+	}{
+		{[]string{"font-family:Courier"}, true},
+		{[]string{"color:red", "Font-Family: Arial !important"}, true},
+		{[]string{"font-family: "}, false},
+		{[]string{"font-family:url(x)"}, false},
+		{[]string{"font-family:a\x01"}, false},
+		{[]string{"fill:#eee", "stroke:#333", "font-size:12px"}, false},
+		// An entity Pele writes for a quote or an ampersand ends in the semicolon it tests for.
+		{[]string{`color:"x"font-family:y`}, true},
+		{[]string{"color:a&font-family:b"}, true},
+		{[]string{"color:font-family:b"}, false},
+	} {
+		if got := FontFamilyDeclared(c.decls); got != c.want {
+			t.Errorf("%q: %v, want %v", c.decls, got, c.want)
+		}
+	}
+}
+
 func TestDeclarations(t *testing.T) {
 	a := Declarations([]string{
 		"fill:#f9f", "stroke:#333", "stroke-width:4px", "color: red !IMPORTANT",
