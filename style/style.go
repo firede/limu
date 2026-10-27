@@ -353,16 +353,13 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 }
 
 // Shade is what a part painted scene.Shade is filled with, before the opacity a backend lays
-// it at over a fill the author sets: the theme's Bg, or, on a fill an override or the author
-// sets that ink picks a color on, the other of Fg and Bg, the one that stands out less on the
-// fill, as Pele 1.12 keeps an entity's stripes light on a light fill and dark on a dark one.
-// It reports whether it was picked on a fill.
-func (l *Look) Shade(role string, author Style) (Paint, bool) {
-	var over Style
-	if l != nil {
-		over = l.Overrides[role]
-	}
-	on, ok := ink(l.ThemeOrDefault(), author.Over(over))
+// it at over a fill the author sets: the theme's Bg, or, on a fill the author sets that ink
+// picks a color on, the other of Fg and Bg, the one that stands out less on the fill, as Pele
+// 1.12 keeps an entity's stripes light on a light fill and dark on a dark one. It reports
+// whether it was picked on a fill. A fill an override sets leaves the shade the theme's Bg,
+// since the backend lays a shade at an opacity only over a fill the author sets.
+func (l *Look) Shade(author Style) (Paint, bool) {
+	on, ok := ink(l.ThemeOrDefault(), author)
 	switch {
 	case !ok:
 		return Bg, false
@@ -460,7 +457,7 @@ func (l *Look) Resolve(role string, own, author Style) Resolved {
 	if s.Ground.Visible() {
 		hollow = s.Ground.Color(th)
 	}
-	shade, _ := l.Shade(role, author)
+	shade, _ := l.Shade(author)
 	return Resolved{
 		Fill:        at(s.Fill.Color(th), s.FillOpacity),
 		Stroke:      at(stroke, s.StrokeOpacity),

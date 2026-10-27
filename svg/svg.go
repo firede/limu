@@ -353,7 +353,7 @@ func hollow(st style.Style) style.Paint {
 // stripes at an opacity of 0.6 when its style sets a fill. The parts below show through,
 // in SVG and in the limumygo package alike.
 func (w *Writer) shade(it *scene.Item) style.Paint {
-	p, _ := w.o.Look.Shade(string(it.Role), it.Author)
+	p, _ := w.o.Look.Shade(it.Author)
 	if it.Author.Fill.Set() {
 		return p.Alpha(0.6)
 	}

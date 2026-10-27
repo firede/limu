@@ -93,7 +93,7 @@ when a theme changes them.
 | `FillOnly` | the style's fill | none | the body of a datastore |
 | `Solid` | the theme's line | the style's stroke | the dot of a final state, the bar of a fork |
 | `Hollow` | the theme's background, or the style's ground | the style's stroke | the ring of a final state, which hides what is under it, and an open marker |
-| `Shade` | the theme's background, or on a fill that ink picks a color on, the one of foreground and background that stands out less (`Look.Shade`). It's laid at 60% opacity over the parts below when the author set a fill | none | a stripe of an entity's table |
+| `Shade` | the theme's background, or on a fill the author set that ink picks a color on, the one of foreground and background that stands out less (`Look.Shade`). It's laid at 60% opacity over the parts below when the author set a fill | none | a stripe of an entity's table |
 | `Dot` | the color of the item's stroke | none | the dot of a central connection on a sequence diagram's message |
 
 Paths have four kinds of step (move, line, quadratic curve and cubic curve) and can close.

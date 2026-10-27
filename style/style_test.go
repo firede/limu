@@ -226,3 +226,22 @@ func TestMaxRadius(t *testing.T) {
 		}
 	}
 }
+
+// A shade is picked on a fill the author sets, and stays the background under one an
+// override sets, which a backend lays no shade at an opacity over.
+func TestShadeOnAuthorFill(t *testing.T) {
+	navy := Of(Hex("#000080"))
+	look := &Look{Overrides: Overrides{"er.entity": {Fill: navy}}}
+	if p, ok := look.Shade(Style{}); p != Bg || ok {
+		t.Errorf("under an override's fill: %v %v", p, ok)
+	}
+	if p, ok := look.Shade(Style{Fill: navy}); p != Fg || !ok {
+		t.Errorf("on an author's navy: %v %v", p, ok)
+	}
+	if p, ok := look.Shade(Style{Fill: Of(Hex("#ffff00"))}); p != Bg || !ok {
+		t.Errorf("on an author's yellow: %v %v", p, ok)
+	}
+	if r := look.Resolve("er.entity", Style{}, Style{}); r.Shade != look.ThemeOrDefault().Bg {
+		t.Errorf("resolved under an override's fill: %v", r.Shade)
+	}
+}

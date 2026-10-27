@@ -322,7 +322,7 @@ func strokeInk(it *scene.Item) string {
 // the stripes are in the background.
 func shadeName(it *scene.Item) string {
 	var look style.Look
-	if p, ok := look.Shade(string(it.Role), it.Author); ok {
+	if p, ok := look.Shade(it.Author); ok {
 		return " shade=" + inkNames[p]
 	}
 	return ""
