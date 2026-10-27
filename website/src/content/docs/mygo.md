@@ -106,7 +106,6 @@ limumygo draws the same picture as the svg package, with a few differences.
 
 - MyGo has no way to draw a group at an opacity, so limumygo applies an item's opacity to each of its colors. Where an item's parts overlap, the lower part shows through.
 - When a corner radius is too large for a box, limumygo uses the smaller of half the width and half the height. SVG uses elliptical corners instead.
-- MyGo strokes paths only with round ends and corners. Lines with other ends or corners are drawn by filling their outline.
 
 ## Fonts
 

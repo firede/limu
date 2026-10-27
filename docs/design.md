@@ -225,8 +225,8 @@ edges of mindmaps, journeys, timelines, wardley, ishikawa and event modeling dia
 a cynefin diagram's transitions, end flat, since Pele draws them with no cap. limu reads an
 author's `stroke-linecap` and `stroke-linejoin` in `style` and `classDef` lines, as Pele
 passes them on to the browser. The svg package writes them where they're set. limumygo
-strokes with MyGo's round ends and corners when both are round, and otherwise fills the
-outline SVG would stroke.
+passes them, with SVG's initial miter limit of 4 and the style's dashes, to MyGo, which
+strokes them as SVG does.
 
 limumygo draws what the svg package writes, but not in every way as a browser draws SVG.
 
