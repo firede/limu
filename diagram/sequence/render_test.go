@@ -3,6 +3,7 @@ package sequence
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,6 +29,9 @@ type peleRender struct {
 		Src      string  `json:"src"`
 		MaxWidth float64 `json:"maxWidth"`
 		FontSize float64 `json:"fontSize"`
+		// Monospace is Pele's monospace option, the parts of diagrams set in the monospace
+		// font.
+		Monospace []string `json:"monospace"`
 		fixture.Drawing
 	} `json:"cases"`
 }
@@ -53,10 +57,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}
+		if slices.Contains(c.Monospace, "messages") {
+			o.Monospace = layout.Messages
+		}
+		got := sceneLines(Layout(db, pre.Config, o))
 		if msg := f.Diff(k, &c.Drawing, got, authorFill); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
+				t.Errorf("Layout(%q, max %v, size %v, monospace %q), %s", c.Src, c.MaxWidth, c.FontSize, c.Monospace, msg)
 			}
 		}
 	}

@@ -170,11 +170,12 @@ export default async function ({ src, pele, write, random }) {
   const { num } = await src('svg/builder.ts');
 
   const out = [];
-  const draw = (source, maxWidth, fontSize) => {
+  // monospace is Pele's option, which a case records where it is given.
+  const draw = (source, maxWidth, fontSize, monospace) => {
     let r;
     globalThis.limuExactNumbers = true;
     try {
-      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, outputLimit: Infinity });
+      r = render(source, { measurer: metricsMeasurer, maxWidth, fontSize, monospace, outputLimit: Infinity });
     } catch (e) {
       if (e instanceof RangeError) return false;
       if (!(e instanceof PeleError)) throw e;
@@ -183,16 +184,18 @@ export default async function ({ src, pele, write, random }) {
       globalThis.limuExactNumbers = false;
     }
     if (r.type !== 'sequence') return false;
-    out.push({ src: source, maxWidth, fontSize, lines: readSvg(r.svg, num) });
+    out.push({ src: source, maxWidth, fontSize, monospace, lines: readSvg(r.svg, num) });
     return true;
   };
   const seen = new Set();
+  const shown = [];
   let drawn = 0;
   const each = (source) => {
     // A Go string cannot hold a surrogate with no partner.
     if (seen.has(source) || lone(source)) return;
     seen.add(source);
     if (!draw(source)) return;
+    shown.push(source);
     // Every third one again in a narrow host, which draws it tightly where it does not fit,
     // and every seventh in another size of type.
     if (drawn % 3 === 0) draw(source, 360);
@@ -208,6 +211,33 @@ export default async function ({ src, pele, write, random }) {
   while (out.length < 3200) {
     const s = next();
     if (s.length <= 3000) each(s);
+  }
+  // Pele's own cases of a host whose width leaves room to widen the gaps that wrapped
+  // messages cross, as its tests draw them, each also with its messages measured in the
+  // monospace font. Then every eighth diagram with its messages in the monospace font,
+  // loosely and in a narrow host.
+  const reported =
+    'sequenceDiagram\n  participant U as UE\n  participant M as MeNB (LTE anchor)\n  participant S as SgNB (5G, NR leg)\n' +
+    '  M->>S: SgNB Addition Request (DRB-ID, CG-ConfigInfo)\n  M->>U: RRCConnectionReconfiguration (carries the NR SCG config)\n  U->>M: RRCConnectionReconfigurationComplete';
+  const long = 'thisIsAnExtremelyLongMessageIdentifierThatShouldHaveRoomToFit';
+  const spare = [
+    [reported, 760],
+    [reported, 760.5],
+    [reported, 400],
+    [`sequenceDiagram\n  participant A\n  participant B\n  participant C\n  B->>A: ${'x'.repeat(168)}\n  C->>A: ${'x'.repeat(89)}`, 709],
+    [`sequenceDiagram\n  A->>B: ${long}`, 300.25],
+    [`sequenceDiagram\n  participant A\n  participant B\n  participant C\n  participant D\n  A->>D: ${long}`, 450],
+    [`sequenceDiagram\n  A->>+B: ${long}\n  Note right of B: note\n  B-->>-A: ok`, 400],
+    ['sequenceDiagram\n  A->>B: a message in the monospace font\n  B->>B: a message to itself\n  Note over A,B: a note', undefined],
+    ['sequenceDiagram\n  participant UE\n  participant gNB\n  participant AMF\n  gNB->>UE: RRCConnectionReconfigurationComplete\n  UE->>gNB: ok', 760],
+  ];
+  for (const [source, maxWidth] of spare) {
+    draw(source, maxWidth);
+    draw(source, maxWidth, undefined, ['messages']);
+  }
+  for (let i = 0; i < shown.length; i += 8) {
+    draw(shown[i], undefined, undefined, ['messages']);
+    draw(shown[i], 360, undefined, ['messages']);
   }
   // The test reads the fill an author gave as the style package reads it, so the lines with
   // one are kept in full.

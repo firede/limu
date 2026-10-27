@@ -299,19 +299,52 @@ func Layout(db *DB, config diagram.Config, o *layout.Options) *scene.Scene {
 	if o == nil {
 		o = &layout.Options{}
 	}
-	return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, tight) })
+	return common.Tighten(o, func(tight bool) *scene.Scene { return lay(db, config, o, tight, 0, true) })
+}
+
+// monoMeasurer measures text in the monospace face whatever face it is asked of, as the
+// messageMeasurer of Pele's draw does where monospace lists messages.
+type monoMeasurer struct{ text.Measurer }
+
+// Width is how wide the measurer it wraps measures s in the monospace face with f.
+func (m monoMeasurer) Width(s string, size float64, f text.Face) float64 {
+	return m.Measurer.Width(s, size, f|text.Mono)
+}
+
+// monoLabel is a label measured by a monoMeasurer with each of its spans in the monospace
+// face, so that it is drawn in the face it was measured in. Pele draws the labels of messages
+// in a group that sets the monospace font instead.
+func monoLabel(label text.Label) text.Label {
+	lines := make([][]text.Span, len(label.Lines))
+	for i, line := range label.Lines {
+		lines[i] = slices.Clone(line)
+		for k := range lines[i] {
+			lines[i][k].Face |= text.Mono
+		}
+	}
+	label.Lines = lines
+	return label
 }
 
 // lay lays the diagram out loosely, or tightly when tight is true, as Pele's draw does: the
 // participants in a row with their lifelines, the messages, notes and blocks down the page in
 // their order, the boxes about the participants they hold, and the participants again at the
-// foot when mirrorActors is not false.
-func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Scene {
+// foot when mirrorActors is not false. Laid out tightly in a host of a set width, it widens the
+// gaps between lifelines into the width to spare where that wraps messages into fewer lines.
+// hold is width it keeps from that spare width, and byNeed lets it share the spare width out
+// by what each gap needs rather than evenly. When what it widened comes out too wide, it lays
+// the diagram out again with other values of them.
+func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold float64, byNeed bool) *scene.Scene {
 	conf, _ := config["sequence"].(diagram.Config)
 	size := o.Size()
 	small := jsmath.Round(float64(size * 0.875))
 	tiny := jsmath.Round(float64(size * 0.75))
 	measure := o.Measure()
+	monospaced := o.Monospace&layout.Messages != 0
+	var messageMeasure text.Measurer = measure
+	if monospaced {
+		messageMeasure = monoMeasurer{measure}
+	}
 	pad := o.Pad()
 	inf := math.Inf(1)
 	mirror := conf["mirrorActors"] != false
@@ -347,21 +380,32 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	count := len(messages)
 	numbers := numberMessages(messages, conf["showSequenceNumbers"] == true)
 	// textOf lays a text out at a size, at most width wide where it wraps or the layout is tight,
-	// as the text of Pele's draw does.
-	textOf := func(raw string, fontSize float64, wrap bool, width float64, face text.Face) text.Label {
+	// measured by by, as the text of Pele's draw does.
+	textOf := func(raw string, fontSize float64, wrap bool, width float64, face text.Face, by text.Measurer) text.Label {
 		limit := inf
 		if tight || wrap {
 			limit = width
 		}
-		label := text.Layout(raw, text.Options{Measurer: measure, Size: fontSize, MaxWidth: limit, Face: face, Icons: o.Icons})
+		label := text.Layout(raw, text.Options{Measurer: by, Size: fontSize, MaxWidth: limit, Face: face, Icons: o.Icons})
 		if tight {
-			return common.BreakLabel(label, measure, max(120, width))
+			return common.BreakLabel(label, by, max(120, width))
 		}
 		return label
 	}
 	// labelOf is textOf at the wrapping width in the regular face, the defaults of the text of
 	// Pele's draw.
-	labelOf := func(raw string, fontSize float64, wrap bool) text.Label { return textOf(raw, fontSize, wrap, wrapW, 0) }
+	labelOf := func(raw string, fontSize float64, wrap bool) text.Label {
+		return textOf(raw, fontSize, wrap, wrapW, 0, measure)
+	}
+	// messageText lays the text of a message out at most width wide where it wraps, measured in
+	// the monospace face where monospace lists messages, as the messageText of Pele's draw does.
+	messageText := func(raw string, wrap bool, width float64) text.Label {
+		label := textOf(raw, small, wrap, width, 0, messageMeasure)
+		if monospaced {
+			return monoLabel(label)
+		}
+		return label
+	}
 
 	var used map[string]bool
 	if conf["hideUnusedParticipants"] == true {
@@ -447,6 +491,27 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	}
 
 	views := make([]*view, count)
+	// sized holds the text of each message as it has been wrapped to each width, so that the
+	// layouts that try out spare width measure it once.
+	sized := make([]map[float64]text.Label, count)
+	// sizedText is the text of message i wrapped to room, as the sizedText of Pele's draw gives
+	// it.
+	sizedText := func(i int, room float64) text.Label {
+		known := sized[i]
+		if known == nil {
+			if room == wrapW {
+				return views[i].label
+			}
+			known = map[float64]text.Label{wrapW: views[i].label}
+			sized[i] = known
+		}
+		label, ok := known[room]
+		if !ok {
+			label = messageText(messages[i].Text, true, room)
+			known[room] = label
+		}
+		return label
+	}
 	for i, m := range messages {
 		a, okA := colOf[m.From]
 		b, okB := colOf[m.To]
@@ -469,7 +534,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			}
 			views[i] = &view{kind: vNote, a: a, b: b, label: label, w: w}
 		} else if isLineMessage(m.Type) {
-			label := labelOf(m.Text, small, m.Wrap)
+			label := messageText(m.Text, m.Wrap, wrapW)
 			badge := badgeWidth(i)
 			if a == b {
 				need(a, a+1, selfW+8+label.Width+16+actW+badge)
@@ -575,7 +640,6 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			gaps[run.last] += run.grow
 		}
 	}
-	place()
 
 	minX, maxX := inf, math.Inf(-1)
 	// extend widens the extent across of what is drawn to hold x0 to x1, as the extend of Pele's
@@ -588,22 +652,12 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 			maxX = x1
 		}
 	}
-	for _, c := range cols {
-		extend(c.x-c.w/2, c.x+c.w/2)
-	}
-	// runEdges is the left and right of a box, as Pele's draw reckons them inline where it
-	// extends the drawing and where it draws the boxes.
-	runEdges := func(run *boxRun) (float64, float64) {
+	// boxEdges is the left and right of a box, as the boxEdges of Pele's draw gives them.
+	boxEdges := func(run *boxRun) (float64, float64) {
 		first, end := cols[run.first], cols[run.last]
 		return first.x - first.w/2 - boxPad - run.grow, end.x + end.w/2 + boxPad + run.grow
 	}
-	for _, run := range runs {
-		extend(runEdges(run))
-	}
-
-	// The extents across of every block, from what it holds.
 	frames := make([]*seqFrame, count)
-	var open []*seqFrame
 	// spanAll is the extent across of a block that holds no participant of its own, as the
 	// spanAll of Pele's draw gives it.
 	spanAll := func() (float64, float64) {
@@ -612,111 +666,231 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		}
 		return cols[0].x - framePad, cols[last].x + framePad
 	}
-	for i, m := range messages {
-		typ := m.Type
-		frameKind, isFrame := frameKinds[typ]
-		v := views[i]
-		switch {
-		case isFrame:
-			f := &seqFrame{kind: frameKind, x0: inf, x1: math.Inf(-1), dividers: []int{i}}
-			if frameKind == "rect" && m.Numbering == nil {
-				f.fill = m.Text
-			}
-			frames[i] = f
-			open = append(open, f)
-		case typ == AltElse || typ == ParAnd || typ == CriticalOption:
-			if len(open) > 0 {
+	// layoutAcross places the participants from the gaps between their lifelines and works out
+	// the extents across of what is drawn, of every block and of every note, and the text of the
+	// messages that wrap to the room between their lifelines, as the layout of Pele's draw does.
+	// It is laid out again for each share of spare width tried.
+	layoutAcross := func() {
+		place()
+		minX, maxX = inf, math.Inf(-1)
+		for _, c := range cols {
+			extend(c.x-c.w/2, c.x+c.w/2)
+		}
+		for _, run := range runs {
+			extend(boxEdges(run))
+		}
+
+		// The extents across of every block, from what it holds.
+		var open []*seqFrame
+		for i, m := range messages {
+			typ := m.Type
+			frameKind, isFrame := frameKinds[typ]
+			v := views[i]
+			switch {
+			case isFrame:
+				f := &seqFrame{kind: frameKind, x0: inf, x1: math.Inf(-1), dividers: []int{i}}
+				if frameKind == "rect" && m.Numbering == nil {
+					f.fill = m.Text
+				}
+				frames[i] = f
+				open = append(open, f)
+			case typ == AltElse || typ == ParAnd || typ == CriticalOption:
+				if len(open) > 0 {
+					f := open[len(open)-1]
+					f.dividers = append(f.dividers, i)
+				}
+			case typ == LoopEnd || typ == AltEnd || typ == OptEnd || typ == ParEnd || typ == CriticalEnd || typ == BreakEnd || typ == RectEnd:
+				if len(open) == 0 {
+					continue
+				}
 				f := open[len(open)-1]
-				f.dividers = append(f.dividers, i)
+				open = open[:len(open)-1]
+				frames[i] = f
+				if f.x0 > f.x1 {
+					f.x0, f.x1 = spanAll()
+				}
+				if f.kind != "rect" {
+					f.tabW = measure.Width(f.kind, tiny, text.Bold) + 14
+					// A block grows to the right to give its texts up to frameText of width
+					// before they wrap.
+					for k, at := range f.dividers {
+						raw := messages[at].Text
+						tab := 0.0
+						if k == 0 {
+							tab = f.tabW + 8
+						}
+						room := f.x1 - f.x0 - 16 - tab
+						var label text.Label
+						if raw != "" {
+							floor := float64(frameText)
+							if tight {
+								floor = min(frameText, wrapW)
+							}
+							label = textOf("["+raw+"]", small, true, max(room, floor), 0, measure)
+						}
+						if label.Width > room {
+							f.x1 += label.Width - room
+						}
+						if k == 0 {
+							f.title = label
+						} else {
+							f.dividerLabels = append(f.dividerLabels, label)
+						}
+					}
+				}
+				extend(f.x0, f.x1)
+				if len(open) > 0 {
+					parent := open[len(open)-1]
+					parent.x0 = min(parent.x0, f.x0-frameNest)
+					parent.x1 = max(parent.x1, f.x1+frameNest)
+				}
+			case v != nil:
+				a, b := cols[v.a], cols[v.b]
+				var x0, x1 float64
+				switch v.kind {
+				case vNote:
+					switch {
+					case m.Placement == LeftOf:
+						v.x = a.x - noteGap - v.w
+					case m.Placement == RightOf:
+						v.x = a.x + noteGap
+					case v.a == v.b:
+						v.x = a.x - v.w/2
+					default:
+						lo := min(a.x, b.x) - noteOver
+						hi := max(a.x, b.x) + noteOver
+						if tight || m.Wrap {
+							v.label = textOf(m.Text, small, true, max(wrapW, hi-lo-2*notePad), 0, measure)
+						}
+						v.w = max(hi-lo, v.label.Width+2*notePad)
+						v.x = (lo + hi - v.w) / 2
+					}
+					x0, x1 = v.x, v.x+v.w
+				case vSelf:
+					x0 = a.x
+					x1 = a.x + actW + selfW + 8 + v.label.Width + badgeWidth(i)
+				default:
+					x0, x1 = min(a.x, b.x), max(a.x, b.x)
+					if tight || m.Wrap {
+						v.label = sizedText(i, max(wrapW, x1-x0-2*msgPad-actW))
+					}
+					if b.createAt == i {
+						if b.x > a.x {
+							x1 += b.w / 2
+						} else {
+							x0 -= b.w / 2
+						}
+					}
+				}
+				extend(x0, x1)
+				if len(open) > 0 {
+					f := open[len(open)-1]
+					f.x0 = min(f.x0, x0-framePad)
+					f.x1 = max(f.x1, x1+framePad)
+				}
 			}
-		case typ == LoopEnd || typ == AltEnd || typ == OptEnd || typ == ParEnd || typ == CriticalEnd || typ == BreakEnd || typ == RectEnd:
-			if len(open) == 0 {
+		}
+	}
+	layoutAcross()
+
+	// Widen gaps only if it reduces message wrapping.
+	grown, uneven := false, false
+	if tight && o.MaxWidth > 0 {
+		spare := math.Floor(o.MaxWidth) - math.Ceil(maxX-minX+2*pad) - hold
+		stretch := make([]int32, len(cols))
+		want := make([]float64, len(gaps))
+		var wrapped []int
+		lines := 0
+		for i := 0; spare > 0 && i < len(views); i++ {
+			v := views[i]
+			if v == nil || v.kind != vLine {
 				continue
 			}
-			f := open[len(open)-1]
-			open = open[:len(open)-1]
-			frames[i] = f
-			if f.x0 > f.x1 {
-				f.x0, f.x1 = spanAll()
+			natural := messageText(messages[i].Text, false, inf)
+			if len(v.label.Lines) <= len(natural.Lines) {
+				continue
 			}
-			if f.kind != "rect" {
-				f.tabW = measure.Width(f.kind, tiny, text.Bold) + 14
-				// A block grows to the right to give its texts up to frameText of width
-				// before they wrap.
-				for k, at := range f.dividers {
-					raw := messages[at].Text
-					tab := 0.0
-					if k == 0 {
-						tab = f.tabW + 8
-					}
-					room := f.x1 - f.x0 - 16 - tab
-					var label text.Label
-					if raw != "" {
-						floor := float64(frameText)
-						if tight {
-							floor = min(frameText, wrapW)
-						}
-						label = textOf("["+raw+"]", small, true, max(room, floor), 0)
-					}
-					if label.Width > room {
-						f.x1 += label.Width - room
-					}
-					if k == 0 {
-						f.title = label
-					} else {
-						f.dividerLabels = append(f.dividerLabels, label)
+			wrapped = append(wrapped, i)
+			lines += len(v.label.Lines)
+			lo, hi := min(v.a, v.b), max(v.a, v.b)
+			stretch[lo]++
+			stretch[hi]--
+			short := (natural.Width - (cols[hi].x - cols[lo].x - 2*msgPad - actW)) / float64(hi-lo)
+			for g := lo; g < hi; g++ {
+				want[g] = max(want[g], short)
+			}
+		}
+		var active int32
+		crossed := 0.0
+		for i := range gaps {
+			active += stretch[i]
+			stretch[i] = 0
+			if active > 0 {
+				stretch[i] = 1
+			}
+			crossed += float64(stretch[i])
+		}
+		if crossed > 0 {
+			before := slices.Clone(gaps)
+			// spread widens each gap by its share and lays the diagram out again, and gives the
+			// lines of each message that wrapped, as the spread of Pele's draw does.
+			spread := func(share func(g int) float64) []int {
+				for g := range gaps {
+					gaps[g] = before[g] + share(g)
+				}
+				layoutAcross()
+				counts := make([]int, len(wrapped))
+				for k, i := range wrapped {
+					counts[k] = len(views[i].label.Lines)
+				}
+				return counts
+			}
+			// sum is the sum of counts, as the sum of Pele's draw gives it.
+			sum := func(counts []int) int {
+				total := 0
+				for _, n := range counts {
+					total += n
+				}
+				return total
+			}
+			// even is an equal share of the spare width for each gap a wrapped message
+			// crosses, as the even of Pele's draw gives it.
+			even := func(g int) float64 { return float64(stretch[g]) * spare / crossed }
+			counts := spread(even)
+			missing := 0.0
+			for _, w := range want {
+				missing += w
+			}
+			// needs is a share of the spare width by what gap g lacks, less a little to allow
+			// for rounding error, as the needs of Pele's draw gives it.
+			needs := func(g int) float64 { return want[g] * (spare - 0.01) / missing }
+			// wider reports whether some gap's share by need is wider than its even share.
+			wider := func() bool {
+				for g := range gaps {
+					if needs(g) > even(g) {
+						return true
 					}
 				}
+				return false
 			}
-			extend(f.x0, f.x1)
-			if len(open) > 0 {
-				parent := open[len(open)-1]
-				parent.x0 = min(parent.x0, f.x0-frameNest)
-				parent.x1 = max(parent.x1, f.x1+frameNest)
-			}
-		case v != nil:
-			a, b := cols[v.a], cols[v.b]
-			var x0, x1 float64
-			switch v.kind {
-			case vNote:
-				switch {
-				case m.Placement == LeftOf:
-					v.x = a.x - noteGap - v.w
-				case m.Placement == RightOf:
-					v.x = a.x + noteGap
-				case v.a == v.b:
-					v.x = a.x - v.w/2
-				default:
-					lo := min(a.x, b.x) - noteOver
-					hi := max(a.x, b.x) + noteOver
-					if tight || m.Wrap {
-						v.label = textOf(m.Text, small, true, max(wrapW, hi-lo-2*notePad), 0)
-					}
-					v.w = max(hi-lo, v.label.Width+2*notePad)
-					v.x = (lo + hi - v.w) / 2
-				}
-				x0, x1 = v.x, v.x+v.w
-			case vSelf:
-				x0 = a.x
-				x1 = a.x + actW + selfW + 8 + v.label.Width + badgeWidth(i)
-			default:
-				x0, x1 = min(a.x, b.x), max(a.x, b.x)
-				if tight || m.Wrap {
-					v.label = textOf(m.Text, small, true, max(wrapW, x1-x0-2*msgPad-actW), 0)
-				}
-				if b.createAt == i {
-					if b.x > a.x {
-						x1 += b.w / 2
-					} else {
-						x0 -= b.w / 2
+			// Reducing wrapping requires at least one gap wider than the even split.
+			if byNeed && crossed > 1 && missing > 0 && wider() {
+				first := counts
+				counts = spread(needs)
+				uneven = sum(counts) < sum(first)
+				for k, n := range counts {
+					if n > first[k] {
+						uneven = false
 					}
 				}
+				if !uneven {
+					counts = spread(even)
+				}
 			}
-			extend(x0, x1)
-			if len(open) > 0 {
-				f := open[len(open)-1]
-				f.x0 = min(f.x0, x0-framePad)
-				f.x1 = max(f.x1, x1+framePad)
+			grown = sum(counts) < lines
+			if !grown {
+				copy(gaps, before)
+				layoutAcross()
 			}
 		}
 	}
@@ -1223,7 +1397,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	}
 
 	for _, run := range runs {
-		x0, x1 := runEdges(run)
+		x0, x1 := boxEdges(run)
 		own, author := fillStyle(run.box.Fill, run.box.Fill != "transparent")
 		own.Stroke, own.Text = style.Border, style.Muted
 		box := scene.Rect{X: x0, Y: 0, W: x1 - x0, H: bottom + boxPad}
@@ -1249,7 +1423,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 	if tight {
 		titleWidth = common.TitleRoom(o)
 	}
-	title := textOf(db.Title, size, false, titleWidth, text.Bold)
+	title := textOf(db.Title, size, false, titleWidth, text.Bold, measure)
 	if minX > maxX {
 		extend(0, max(title.Width, 40))
 	}
@@ -1265,9 +1439,21 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) *scene.Sc
 		})
 	}
 
+	width := math.Ceil(maxX - minX + 2*pad)
+	// Retry with equal shares or room for activation notes and rounding.
+	if grown && width > o.MaxWidth {
+		switch {
+		case uneven:
+		case hold > 0:
+			hold = inf
+		default:
+			hold = width - math.Floor(o.MaxWidth)
+		}
+		return lay(db, config, o, tight, hold, false)
+	}
 	sc := &scene.Scene{
 		Type:     "sequence",
-		Width:    math.Ceil(maxX - minX + 2*pad),
+		Width:    width,
 		Height:   math.Ceil(bottom - minY + 2*pad),
 		FontSize: size,
 		Title:    db.AccTitle,
