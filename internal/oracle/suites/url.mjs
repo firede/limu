@@ -1,5 +1,6 @@
 // Pele's checks of the URLs diagrams link to and show: sanitizeUrl, which follows
-// @braintree/sanitize-url, safeUrl, and the schemes linkUrl and imageUrl let through.
+// @braintree/sanitize-url, safeUrl, the schemes linkUrl and imageUrl let through, and the
+// note names internalLink lets be written as links.
 import { lone } from '../lib/corpus.mjs';
 
 const WRITTEN = [
@@ -80,6 +81,13 @@ const WRITTEN = [
   '&#0104;&#x74;tp://h',
   '&#55357;&#56832;',
   '&#65601;',
+  // Half a pair of surrogates, or U+FFFE, which RE_CTRL takes out once read.
+  '&#55357;javascript:x',
+  'java&#56832;script:x',
+  '&#55357;&newline;&#56832;x',
+  '&#55357;&#55357;&#56832;',
+  'a&#65534;b&#65535;c',
+  'jav&#65534;ascript:x',
   '&#x;',
   '&#1e2;',
   '&#Infinity;',
@@ -117,6 +125,18 @@ const WRITTEN = [
   'a:',
   '&#58;',
   'http&colon;//x',
+  // Note names, which an internal link writes as they are.
+  'Note',
+  'A%26B',
+  'file=A%26B',
+  'java\tscript:x',
+  ' \u0001javascript:x',
+  '\u0001\u0002 javascript:x',
+  'ja￾va￿script:x',
+  'java\u007fscript:x',
+  'obsidian://open?file=x',
+  '%6A%61vascript:x',
+  ' javascript:x',
 ];
 
 const FRAGMENTS = [
@@ -128,7 +148,7 @@ const FRAGMENTS = [
 ];
 
 export default async function ({ src, write, random }) {
-  const { sanitizeUrl, safeUrl, linkUrl, imageUrl } = await src('util/url.ts');
+  const { sanitizeUrl, safeUrl, linkUrl, imageUrl, internalLink } = await src('util/url.ts');
   const next = random(5);
   const fuzz = [];
   while (fuzz.length < 4000) {
@@ -146,6 +166,8 @@ export default async function ({ src, write, random }) {
       link: linkUrl(sanitized, {}) ?? null,
       image: imageUrl(sanitized, {}) ?? null,
       mail: linkUrl(sanitized, { linkSchemes: ['mailto', 'obsidian'] }) ?? null,
+      internal: internalLink(input, {}),
+      internalMail: internalLink(input, { linkSchemes: ['mailto', 'obsidian'] }),
     };
   });
   write('internal/url/testdata/pele/url.json', { url });

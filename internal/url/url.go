@@ -1,6 +1,7 @@
 // Package url checks the URLs Mermaid diagrams link to and show, as Pele's src/util/url.ts
-// does: sanitizeUrl follows @braintree/sanitize-url, which Mermaid applies to click targets,
-// and LinkURL and ImageURL keep a URL only where the host allows its scheme.
+// does: SanitizeURL refuses what @braintree/sanitize-url refuses, which Mermaid applies to
+// click targets, LinkURL and ImageURL keep a URL only where the host allows its scheme, and
+// InternalLink checks the name of a note that is linked to.
 //
 // Pele's linked and relAttr, which write a link's markup around what a node draws, are left
 // to whoever writes the markup: all they decide is in LinkURL.
@@ -8,6 +9,7 @@ package url
 
 import (
 	"math"
+	"slices"
 	"strings"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -89,9 +91,11 @@ func unhex(c byte) byte {
 	return c - 'A' + 10
 }
 
-// isCtrl is /[\u0000-\u001F\u007F-\u009F\u2000-\u200D\uFEFF]/.
+// isCtrl is /[\u0000-\u001F\u007F-\u009F\u2000-\u200D\uFEFF\uD800-\uDFFF\uFFFE\uFFFF]/u, but
+// for the lone surrogates, which a Go string can't hold. Only an entity code makes one, and
+// readEntities takes it out.
 func isCtrl(r rune) bool {
-	return r <= 0x1f || r >= 0x7f && r <= 0x9f || r >= 0x2000 && r <= 0x200d || r == 0xfeff
+	return r <= 0x1f || r >= 0x7f && r <= 0x9f || r >= 0x2000 && r <= 0x200d || r == 0xfeff || r == 0xfffe || r == 0xffff
 }
 
 func hasCtrl(s string) bool { return strings.ContainsFunc(s, isCtrl) }
@@ -129,11 +133,9 @@ func entityAt(s string, i int) (end int, digits string, ok bool) {
 }
 
 // decodeEntities replaces each match of RE_HTML_ENTITIES with String.fromCharCode of its
-// digits. It works in UTF-16 code units, as two of them may make a pair of surrogates.
-func decodeEntities(s string) string {
-	if !strings.Contains(s, "&#") {
-		return s
-	}
+// digits. It gives code units, as two of them may make a pair of surrogates and one may be
+// half of a pair.
+func decodeEntities(s string) []uint16 {
 	var out []uint16
 	last := 0
 	for i := 0; i < len(s); i++ {
@@ -149,7 +151,39 @@ func decodeEntities(s string) string {
 		last = end
 		i = end - 1
 	}
-	out = append(out, utf16.Encode([]rune(s[last:]))...)
+	return append(out, utf16.Encode([]rune(s[last:]))...)
+}
+
+// readEntities makes three of a round's replacements: RE_HTML_ENTITIES, RE_HTML_CTRL_ENTITY
+// and RE_CTRL. Where there are entity codes it makes them in code units, since a code may
+// give half of a surrogate pair. Its other half may follow at once, or once a &newline; or
+// &tab; between them is gone, and otherwise RE_CTRL takes the lone half out.
+func readEntities(s string) string {
+	if !strings.Contains(s, "&#") {
+		return dropCtrl(remove(s, ctrlEntityAt))
+	}
+	u := decodeEntities(s)
+	var kept []uint16
+	for i := 0; i < len(u); i++ {
+		if end := ctrlEntityAt16(u, i); end > 0 {
+			i = end - 1
+			continue
+		}
+		kept = append(kept, u[i])
+	}
+	out := kept[:0]
+	for i := 0; i < len(kept); i++ {
+		c := kept[i]
+		switch {
+		case utf16.IsSurrogate(rune(c)):
+			if c < 0xdc00 && i+1 < len(kept) && kept[i+1] >= 0xdc00 && kept[i+1] <= 0xdfff {
+				out = append(out, c, kept[i+1])
+				i++
+			}
+		case !isCtrl(rune(c)):
+			out = append(out, c)
+		}
+	}
 	return string(utf16.Decode(out))
 }
 
@@ -189,6 +223,31 @@ func ctrlEntityAt(s string, i int) int {
 		if end < len(s) && chars.EqualFoldASCII(s[i+1:end], name) && s[end] == ';' {
 			return end + 1
 		}
+	}
+	return 0
+}
+
+// ctrlEntityAt16 is ctrlEntityAt in code units.
+func ctrlEntityAt16(u []uint16, i int) int {
+	if u[i] != '&' {
+		return 0
+	}
+next:
+	for _, name := range []string{"newline", "tab"} {
+		end := i + 1 + len(name)
+		if end >= len(u) || u[end] != ';' {
+			continue
+		}
+		for k := 0; k < len(name); k++ {
+			c := u[i+1+k]
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			if c != uint16(name[k]) {
+				continue next
+			}
+		}
+		return end + 1
 	}
 	return 0
 }
@@ -289,47 +348,57 @@ func invalidProtocol(p string) bool {
 	return false
 }
 
-// SanitizeURL follows the algorithm of @braintree/sanitize-url, as Pele's sanitizeUrl does.
+// unwrap removes the control characters, entity codes and escapes that could hide a scheme,
+// and with percent, percent escapes too, as Pele's unwrap does. It's false for a URL wrapped
+// too many times to be a real one.
+func unwrap(url string, percent bool) (string, bool) {
+	out := chars.Trim(url)
+	if percent {
+		out = decode(out)
+	}
+	for rounds := 1; ; rounds++ {
+		if rounds > 32 {
+			return "", false
+		}
+		out = dropCtrl(out)
+		out = readEntities(out)
+		out = remove(out, wsEscapeAt)
+		out = chars.Trim(out)
+		if percent {
+			out = decode(out)
+		}
+		if !hasCtrl(out) && !hasEntity(out) && !has(out, ctrlEntityAt) && !has(out, wsEscapeAt) {
+			return out, true
+		}
+	}
+}
+
+// SanitizeURL refuses what @braintree/sanitize-url refuses, the check Mermaid applies to click
+// targets, as Pele's sanitizeUrl does. Unlike it, it keeps percent escapes, so `file=A%26B`
+// still names the note `A&B`.
 func SanitizeURL(url string) string {
 	if url == "" {
 		return blank
 	}
-	decoded := decode(chars.Trim(url))
-	for rounds := 1; ; rounds++ {
-		// Each round peels one layer of encoding. A URL wrapped this many times is not a real one.
-		if rounds > 32 {
-			return blank
-		}
-		decoded = dropCtrl(decoded)
-		decoded = decodeEntities(decoded)
-		decoded = remove(decoded, ctrlEntityAt)
-		decoded = dropCtrl(decoded)
-		decoded = remove(decoded, wsEscapeAt)
-		decoded = chars.Trim(decoded)
-		decoded = decode(decoded)
-		if !hasCtrl(decoded) && !hasEntity(decoded) && !has(decoded, ctrlEntityAt) && !has(decoded, wsEscapeAt) {
-			break
-		}
-	}
-
-	if decoded == "" {
+	decoded, ok := unwrap(url, true)
+	kept, ok2 := unwrap(url, false)
+	if !ok || !ok2 || decoded == "" || kept == "" {
 		return blank
 	}
 	if decoded[0] == '.' || decoded[0] == '/' {
-		return decoded
+		return kept
 	}
 
-	trimmed := chars.TrimStart(decoded)
-	scheme, ok := schemeOf(trimmed)
+	scheme, ok := schemeOf(chars.TrimStart(decoded))
 	if !ok {
-		return decoded
+		return kept
 	}
 	protocol := chars.Trim(chars.ToLower(scheme))
 	if invalidProtocol(protocol) {
 		return blank
 	}
 
-	normalized := strings.ReplaceAll(trimmed, "\\", "/")
+	normalized := strings.ReplaceAll(chars.TrimStart(kept), "\\", "/")
 	if protocol == "mailto:" || strings.Contains(protocol, "://") {
 		return normalized
 	}
@@ -353,12 +422,12 @@ var (
 	ImageSchemes = []string{"http", "https"}
 )
 
-// allow keeps a URL that is relative or whose scheme is one of schemes. Stricter than Mermaid,
-// which lets any scheme but three through: a diagram in a shared note could otherwise open a
-// local file, a network share, or another application.
-func allow(url string, schemes []string) (string, bool) {
+// allowed reports whether a URL is relative or its scheme is one of schemes, as Pele's allowed
+// does. Stricter than Mermaid, which lets any scheme but three through: a diagram in a shared
+// note could otherwise open a local file, a network share, or another application.
+func allowed(url string, schemes []string) bool {
 	if len(url) >= 2 && (url[0] == '/' || url[0] == '\\') && (url[1] == '/' || url[1] == '\\') {
-		return "", false
+		return false
 	}
 	i := 0
 	if i < len(url) && chars.IsLetter(int(url[i])) {
@@ -367,16 +436,20 @@ func allow(url string, schemes []string) (string, bool) {
 			i++
 		}
 		if i < len(url) && url[i] == ':' {
-			name := strings.ToLower(url[:i])
-			for _, s := range schemes {
-				if s == name {
-					return url, true
-				}
-			}
-			return "", false
+			return slices.Contains(schemes, strings.ToLower(url[:i]))
 		}
 	}
-	return url, true
+	return true
+}
+
+// allow keeps a URL that allowed passes both as it is and decoded, for an app that decodes the
+// href before opening it, as Pele's allow does.
+func allow(url string, schemes []string) (string, bool) {
+	decoded, ok := unwrap(url, true)
+	if ok && allowed(url, schemes) && allowed(decoded, schemes) {
+		return url, true
+	}
+	return "", false
 }
 
 // LinkURL keeps a URL that SanitizeURL has passed when it is relative or its scheme is one the
@@ -403,4 +476,29 @@ func ImageURL(url string, images bool, schemes []string) (string, bool) {
 		schemes = ImageSchemes
 	}
 	return allow(url, schemes)
+}
+
+// InternalLink reports whether a note's name may be written as the href of an internal link,
+// as Pele's internalLink does. The href keeps the name as it is, so it must pass as a link both
+// sanitized and as a browser reads it once the SVG is written: without the characters esc
+// drops, without tabs and line breaks, and without the control characters and spaces it starts
+// with.
+func InternalLink(name string, links bool, schemes []string) bool {
+	u := SanitizeURL(name)
+	if u == blank {
+		return false
+	}
+	if _, ok := LinkURL(u, links, schemes); !ok {
+		return false
+	}
+	// RE_INVALID_XML and then /[\t\n\r]/ take out every control character below the space.
+	seen := strings.Map(func(r rune) rune {
+		if r <= 0x1f || r == 0x7f || r == 0xfffe || r == 0xffff {
+			return -1
+		}
+		return r
+	}, name)
+	seen = strings.TrimLeft(seen, " ")
+	_, ok := LinkURL(seen, links, schemes)
+	return ok
 }
