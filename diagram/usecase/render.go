@@ -48,8 +48,11 @@ const (
 // layout's box is larger when the node carries a self-relationship.
 type view struct {
 	node       *graphNode
-	kind       int
-	author     css.Author
+	kind   int
+	author css.Author
+	// decls are the declarations of the node's classes and styles, which say whether it sets
+	// a fill, and whether that fill picks the color of its texts.
+	decls      []string
 	label      text.Label
 	stereotype text.Label
 	w, h       float64
@@ -466,7 +469,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		if node.Stereotype != "" {
 			stereotype = labelOf("«"+node.Stereotype+"»", false, tiny, 200, base)
 		}
-		v := view{node: node, kind: kindBox, author: author, label: stereotype, stereotype: stereotype}
+		v := view{node: node, kind: kindBox, author: author, decls: decls, label: stereotype, stereotype: stereotype}
 		var c graphs.CNode
 		switch {
 		case node.IsGroup:
@@ -640,7 +643,10 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 	}
 	attachEnds(cedges, cnodes, views)
 
-	var titles, clusters, edges, labels, nodes []scene.Item
+	var titles, clusters, casings, edges, labels, nodes []scene.Item
+	// fills are the boundaries whose authors paint them a fill, which relations inside them
+	// are drawn on, as Pele's fills.
+	var fills []draw.Fill
 	if !title.Empty() {
 		titles = append(titles, scene.Item{
 			Kind: scene.Text, Role: RoleTitle, Label: &title,
@@ -652,13 +658,29 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		c := &cnodes[i]
 		n := v.node
 		x, y := c.X, c.Y
+		// The texts are set on the node's fill, in the color that stands out on a fill the
+		// author gives it, as Pele's inkFill picks it: its label on its own fill, and the rest
+		// on the fill under them.
+		inks := css.InksText(v.decls, v.decls)
+		var ground style.Paint
+		if inks {
+			ground = v.author.Style.Fill
+		}
 		if v.kind == kindBoundary {
 			left, top := x-c.W/2, y-c.H/2
+			if css.Paints(v.decls) {
+				fills = append(fills, draw.Fill{Box: [4]float64{left, top, left + c.W, top + c.H}, Decls: v.decls})
+			}
 			it := scene.Item{
 				Kind: scene.Group, Role: RoleSystem, Shape: "rect", ID: n.ID, Class: common.ClassNames(strings.Join(boundaryClasses[n.ID], " ")),
 				Box:    scene.Rect{X: left, Y: top, W: c.W, H: c.H},
-				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
+				Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted, OnFill: inks},
 				Author: v.author.Style,
+			}
+			// A boundary is drawn at half its opacity, unless its author sets a fill, as
+			// Pele's setsFill tests.
+			if !css.FillDeclared(v.decls) {
+				it.Style.FillOpacity = style.N(0.5)
 			}
 			if n.BoundaryType == "package" {
 				it.Shape = "package"
@@ -684,7 +706,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		it := scene.Item{
 			Kind: scene.Node, ID: n.ID, Class: common.ClassNames(strings.Join(classes[n.ID], " ")),
 			Box:    scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
-			Style:  style.Style{Fill: style.Surface, Stroke: style.Border},
+			Style:  style.Style{Fill: style.Surface, Stroke: style.Border, OnFill: inks},
 			Author: v.author.Style,
 		}
 		var stereotype *scene.Item
@@ -702,6 +724,9 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			if n.ActorType == "awesome" {
 				it.Style.Fill = style.Border
 			}
+			// An actor's texts lie under its figure, not on its fill, and keep their colors,
+			// as Pele draws them.
+			it.Style.OnFill = false
 			top := -h / 2
 			it.Parts, it.Picture = figure(v, x, y+(top+figureH/2))
 			if n.ActorType == "hollow" {
@@ -735,10 +760,11 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				cells = append(cells, scene.Item{
 					Kind: scene.Text, Role: RoleJsonKey, ID: n.ID, Label: key,
 					At:    scene.Point{X: x + (x0 + cellPad + key.Width/2), Y: y + (ry + rowH/2)},
-					Style: style.Style{Text: style.Muted},
+					Style: style.Style{Text: style.Muted, TextGround: ground},
 				})
 				cells = append(cells, leftLabel(value, x, y, x0+v.keyW+cellPad, ry+rowH/2, scene.Item{
 					Kind: scene.Text, Role: RoleJsonValue, ID: n.ID,
+					Style:  style.Style{TextGround: ground},
 					Author: style.Style{Text: v.author.Style.Text},
 				})...)
 				ry += rowH
@@ -779,7 +805,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 				stereotype = &scene.Item{
 					Kind: scene.Text, Role: RoleStereotype, ID: n.ID, Label: &v.stereotype,
 					At:    scene.Point{X: x, Y: y + (-v.label.Height / 2)},
-					Style: style.Style{Text: style.Muted},
+					Style: style.Style{Text: style.Muted, TextGround: ground},
 				}
 			}
 			it.At = scene.Point{X: x, Y: y + v.stereotype.Height/2}
@@ -879,12 +905,25 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		if edge.Internal {
 			role = RoleNoteLink
 		}
+		// A relation inside one fill is drawn in the color of its labels, with its open markers
+		// filled with the fill, and one that crosses the border of a fill is laid on a casing,
+		// as Pele's fillUnder and edgeInk find.
+		ends := path.Ends(markerType(start), markerType(end))
+		line := append(append([]string(nil), edge.CSSCompiledStyles...), edge.Style...)
+		ground, cased := draw.OnFills(path.Path, []float64{path.SX, path.SY, path.EX, path.EY}, fills, line)
+		own.Ground = ground
+		if cased {
+			if c := draw.Casing(RoleCasing, path.Path, ends, author.Style, false); c != nil {
+				c.ID = edge.ID
+				casings = append(casings, *c)
+			}
+		}
 		it := scene.Item{
 			Kind: scene.Edge, Role: role, Shape: scene.Shape(edge.RelationshipType), ID: edge.ID,
 			Class:  common.ClassNames(strings.Join(relationClasses[edge], " ")),
 			Box:    path.Path.Bounds(),
 			Parts:  []scene.Part{{Path: path.Path, Paint: scene.StrokeOnly}},
-			Ends:   path.Ends(markerType(start), markerType(end)),
+			Ends:   ends,
 			Style:  own,
 			Author: author.Style,
 		}
@@ -914,8 +953,8 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		}
 	}
 
-	sc.Items = make([]scene.Item, 0, len(titles)+len(clusters)+len(edges)+len(labels)+len(nodes))
-	for _, layer := range [][]scene.Item{titles, clusters, edges, labels, nodes} {
+	sc.Items = make([]scene.Item, 0, len(titles)+len(clusters)+len(casings)+len(edges)+len(labels)+len(nodes))
+	for _, layer := range [][]scene.Item{titles, clusters, casings, edges, labels, nodes} {
 		sc.Items = append(sc.Items, layer...)
 	}
 	return sc

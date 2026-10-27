@@ -86,6 +86,15 @@ const MONO = [
   'classDiagram\nclass A {\n  +title: string\n}\nstyle A font-family: ',
 ];
 
+// Classes on fills their authors set, light and dark, whose names, annotations and members are
+// written in the color that stands out on them, and fills and colors of text on which Pele
+// picks none.
+const FILLS = [
+  'classDiagram\nclass A {\n  <<interface>>\n  +title: string\n  +draw()*\n  +count$ int\n}\nclass B {\n  +x int\n}\nclass C\nA --> B\nstyle A fill:#123\nstyle B fill:lightyellow\nstyle C fill:navy',
+  'classDiagram\nclass A {\n  <<service>>\n  +x int\n  +run()$\n}\nclass B {\n  +y int\n}\nclassDef dark fill:#202020,stroke:#fff\nclassDef lit fill:#202020,color:#ff0\nclass A:::dark\nclass B:::lit',
+  'classDiagram\nclass A {\n  +x int\n}\nclass B {\n  +y int\n}\nclass C {\n  +z int\n}\nclass D {\n  +w int\n}\nstyle A fill:#000,fill-opacity:0.3\nstyle B fill:#00000080\nstyle C fill:#000,color:notacolor\nstyle D fill:hsl(240, 100%, 25%)',
+];
+
 // The ways a diagram is laid out besides its own: a title, and Pele's options for classes.
 const HEADS = [
   '---\ntitle: Class diagram\n---\n',
@@ -166,6 +175,14 @@ export function readSvg(svg, num, redraw) {
   const penOf = (tag) => pen(tag, open.map((e) => e.tag ?? '').reverse());
   // Where a text's lines, and the runs in them, are drawn: each x and y in it.
   const at = (s) => [...s.matchAll(/ x="([^"]*)" y="([^"]*)"/g)].map((m) => pt(m[1], m[2])).join(' ');
+  // The color ink picks for a text of a class on the fill its author gives it, which Pele
+  // writes on the text, or on the group of members the text is in: " ink=" and the color,
+  // and nothing where it picks none.
+  const ink = (tag) => {
+    let fill = attr(tag, 'fill');
+    for (const e of open) if (e.name === 'g' && attr(e.tag, 'class') === 'pele-members') fill ??= attr(e.tag, 'fill');
+    return fill?.startsWith('var(--pele-fg-on-') ? ' ink=' + fill : '';
+  };
   // The marker the hooks wrote last, which the next element drawn as a marker is.
   let written;
   const marker = () => {
@@ -209,15 +226,15 @@ export function readSvg(svg, num, redraw) {
       } else if (cls === 'pele-cardinality') {
         lines.push(`card ${content(inner.slice(whole.length))} ${at(inner)}`);
       } else if (cls === 'pele-annotation') {
-        lines.push(`annotation ${content(inner.slice(whole.length))} ${at(inner)}`);
+        lines.push(`annotation ${content(inner.slice(whole.length))} ${at(inner)}${ink(rest)}`);
       } else if (cls.startsWith('pele-member')) {
         const parts = cls.split(' ');
         const flag = parts[2] === 'pele-static' ? ' static' : parts[2] === 'pele-abstract' ? ' abstract' : '';
         // Members set in the monospace face are in a group that names its family.
         const mono = open.some((e) => e.name === 'g' && attr(e.tag, 'class') === 'pele-members' && attr(e.tag, 'font-family') !== undefined);
-        lines.push(`member ${parts[1].slice(5)}${flag}${mono ? ' mono' : ''} ${at(inner)} ${content(inner.slice(whole.length))}`);
+        lines.push(`member ${parts[1].slice(5)}${flag}${mono ? ' mono' : ''} ${at(inner)} ${content(inner.slice(whole.length))}${ink(rest)}`);
       } else if (k && !(k.kind === 'struck' && k.seen)) {
-        lines.push(`t ${at(inner)}`);
+        lines.push(`t ${at(inner)}${k.kind === 'class' ? ink(rest) : ''}`);
         k.seen = true;
       }
       continue;
@@ -343,6 +360,7 @@ export default async function ({ src, cases, write, random }) {
     draw(s, 360, true);
   }
   classes.slice(0, 300).forEach((s, i) => draw(s, i % 3 === 0 ? 360 : undefined, true));
+  for (const s of FILLS) draw(s);
   // The test reads a line with a tag among its classes with the tag moved last, so the lines
   // that name one are kept in full.
   write('diagram/class/testdata/pele/render.json', { cases: out }, { keep: (line) => line.includes('clickable') });

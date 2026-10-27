@@ -4,7 +4,10 @@ import "github.com/firede/limu/scene"
 
 // The roles of the items of a use case diagram.
 const (
-	RoleActor      scene.Role = "usecase.actor"
+	RoleActor scene.Role = "usecase.actor"
+	// RoleCasing is a casing under a relation that crosses the border of a fill an author
+	// sets, drawn in the background so that the relation stands out on the fill.
+	RoleCasing     scene.Role = "usecase.casing"
 	RoleEdgeLabel  scene.Role = "usecase.edge-label"
 	RoleJson       scene.Role = "usecase.json"
 	RoleJsonKey    scene.Role = "usecase.json-key"
