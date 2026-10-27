@@ -937,8 +937,49 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 		}
 		return lo < len(xs) && xs[lo] < x1
 	}
-	// backed is a label on a patch of the background where a lifeline runs under it, as
-	// Pele's backed draws it; ok is false where there is nothing to draw.
+	// stackOf is the blocks open where the drawing has got to, the outermost first.
+	var stackOf []*seqFrame
+	inks := map[string]style.Paint{}
+	// inkOf is the ground a fill an author gave a shaded block or a box makes for what lies
+	// inside it, read once for each fill, as the inkOf of Pele's draw reads its ink. It is
+	// unset where there is no fill or it is not one ink picks a color on, and what lies inside
+	// it then keeps the theme's colors.
+	inkOf := func(fill string) style.Paint {
+		if fill == "" {
+			return style.Paint{}
+		}
+		ground, seen := inks[fill]
+		if !seen {
+			if author := css.Declarations([]string{"fill:" + fill}).Style; style.Inks(author) {
+				ground = author.Fill
+			}
+			inks[fill] = ground
+		}
+		return ground
+	}
+	// fillUnder is the fill under what is drawn from x0 to x1 across: the innermost open
+	// shaded block's, then that of a box it lies within, as the fillUnder of Pele's draw finds
+	// it.
+	fillUnder := func(x0, x1 float64) string {
+		for k := len(stackOf) - 1; k >= 0; k-- {
+			if stackOf[k].kind == "rect" {
+				return stackOf[k].fill
+			}
+		}
+		for _, run := range runs {
+			l, r := boxEdges(run)
+			if x0 >= l && x1 <= r {
+				return run.box.Fill
+			}
+		}
+		return ""
+	}
+	// under is the ground under what is drawn from x0 to x1 across, unset where it keeps the
+	// theme's colors, as the under of Pele's draw gives its ink.
+	under := func(x0, x1 float64) style.Paint { return inkOf(fillUnder(x0, x1)) }
+	// backed is a label on a patch of the background where a lifeline runs under it, and on
+	// the ground of a fill it lies inside otherwise, as Pele's backed draws it; ok is false
+	// where there is nothing to draw.
 	backed := func(it scene.Item, label text.Label, cx, cy float64) (scene.Item, bool) {
 		if label.Width == 0 {
 			return it, false
@@ -950,6 +991,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 				Rounded: true, Paint: scene.FillOnly,
 			}}
 			it.Style.Fill, it.Style.Radius = style.Bg, style.N(3)
+		} else {
+			it.Style.Ground = under(l, l+label.Width)
 		}
 		it.Label, it.At = &label, scene.Point{X: cx, Y: cy}
 		it.Box = scene.Rect{X: l, Y: cy - label.Height/2, W: label.Width, H: label.Height}
@@ -1019,6 +1062,11 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 			Parts: parts, At: at,
 			Style: style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg},
 		}
+		// A figure's name sits on whatever is behind the figure: the fill of its box, where it
+		// is in one.
+		if isFigure(c.kind) && c.actor.Box != nil {
+			it.Style.TextGround = inkOf(c.actor.Box.Fill)
+		}
 		if cls, ok := c.actor.Properties.Get("class"); ok {
 			if s, ok := cls.(string); ok {
 				it.Class = common.ClassNames(s)
@@ -1044,7 +1092,6 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 	}
 
 	y := headBottom + 6
-	var stackOf []*seqFrame
 	for i, m := range messages {
 		typ := m.Type
 		v := views[i]
@@ -1183,7 +1230,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 			}
 			var circles []scene.Part
 			// addCircle adds a dot of a central connection, as the circle of Pele's draw draws one.
-			addCircle := func(cx, cy float64) { circles = append(circles, circle(cx, cy, centralR, scene.FillOnly)) }
+			addCircle := func(cx, cy float64) { circles = append(circles, circle(cx, cy, centralR, scene.Dot)) }
 			var number *scene.Item
 			var lineY float64
 
@@ -1199,6 +1246,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 					x1 = a.x + centralR
 				}
 				out := max(x0, x1) + selfW + bw/2
+				msg.Style.Ground = inkOf(fillUnder(a.x, out))
 				if circleFrom {
 					addCircle(a.x, top)
 				}
@@ -1247,7 +1295,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 						Kind: scene.Text, Role: RoleMessageLabel, ID: "i" + m.ID,
 						Box:   scene.Rect{X: out + 8, Y: (top+bottom)/2 - l.Height/2, W: l.Width, H: l.Height},
 						Label: &l, At: scene.Point{X: out + 8 + l.Width/2, Y: (top + bottom) / 2},
-						Style: style.Style{Text: style.Fg},
+						Style: style.Style{Text: style.Fg, Ground: under(out+8, out+8+l.Width)},
 					})
 				}
 				// A label taller than the loop reaches below it, so the next row starts under
@@ -1259,6 +1307,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 					dir = 1
 				}
 				creating := b.createAt == i
+				msg.Style.Ground = inkOf(fillUnder(min(a.x, b.x), max(a.x, b.x)))
 				low := 6.0
 				if label.Height > 0 {
 					low = label.Height + 2
@@ -1399,7 +1448,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool, hold floa
 	for _, run := range runs {
 		x0, x1 := boxEdges(run)
 		own, author := fillStyle(run.box.Fill, run.box.Fill != "transparent")
-		own.Stroke, own.Text = style.Border, style.Muted
+		// The title is set on the box's fill, in the color that stands out on a fill the author
+		// gives it, as Pele's inkOn picks it.
+		own.Stroke, own.Text, own.OnFill = style.Border, style.Muted, true
 		box := scene.Rect{X: x0, Y: 0, W: x1 - x0, H: bottom + boxPad}
 		it := scene.Item{
 			Kind: scene.Group, Role: RoleBox, Shape: "rect", ID: run.box.Name, Box: box,
