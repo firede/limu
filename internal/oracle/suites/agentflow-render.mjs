@@ -2,7 +2,7 @@
 // per thing drawn, in the order drawn, with every number of its geometry as the SVG writes it.
 // limu's test writes the same lines from its scene.
 import { mutator } from '../lib/mutate.mjs';
-import { unescape, attr, tag, capJoin } from '../lib/svg.mjs';
+import { unescape, attr, tag, capJoin, readCasings } from '../lib/svg.mjs';
 import { FRAGMENTS, agentflowCorpus } from './agentflow.mjs';
 
 const H = 'agentflow-beta\n';
@@ -88,7 +88,14 @@ const elements = (s) => {
 // The palette slot a flow or a node is drawn in, from the first series color it uses.
 const slot = (s) => 's' + (Number(/var\(--pele-series-(\d)/.exec(s)[1]) - 1);
 
-const GROUP = /<g class="pele-(cluster|edge|edge-label|node)[ "]/g;
+const GROUP = /<g class="pele-(cluster|casings|edge|edge-label|node)[ "]/g;
+
+// The color Pele's ink gives a label on a fill a style sets: the fill of its first text, where
+// it is not the muted color a flow's title has otherwise.
+const ink = (s) => {
+  const fill = attr(tag(s, 'text') ?? '', 'fill');
+  return fill === undefined || fill === 'var(--_m)' ? undefined : `ink ${fill}`;
+};
 
 // The lines of an agent flow's SVG.
 export function readSvg(svg) {
@@ -110,14 +117,22 @@ export function readSvg(svg) {
         lines.push(`flow ${id} [${classes}] ${box(rect)} ${slot(s)}`);
         const t = textAt(s);
         if (t) lines.push(t);
+        const i = ink(s);
+        if (i) lines.push(i);
         break;
       }
+      case 'casings':
+        lines.push(...readCasings(s));
+        break;
       case 'edge': {
         const path = tag(s, 'path');
         const flags = path.includes(' stroke-dasharray="3 4"') ? ' dotted' : '';
         lines.push(`edge ${id} [${classes}]${flags} ${attr(path, 'd')}`);
         // The edge's line, in the group of all of them and its own.
         lines.push(`stroke ${capJoin([tag(svg, 'g class="pele-edges"'), open, path])}`);
+        // The color of the fill the edge lies inside, which it takes.
+        const over = attr(open, 'stroke');
+        if (over !== undefined) lines.push(`ink ${over}`);
         for (const m of s.matchAll(/<(path|circle) class="pele-marker"[^>]*>/g)) {
           lines.push(m[1] === 'path' ? `m ${attr(m[0], 'd')}` : `m o ${attr(m[0], 'cx')},${attr(m[0], 'cy')}`);
         }
@@ -134,12 +149,27 @@ export function readSvg(svg) {
         lines.push(...elements(s));
         const t = textAt(s);
         if (t) lines.push(t);
+        const i = ink(s);
+        if (i) lines.push(i);
         break;
       }
     }
   }
   return lines;
 }
+
+// Fills a style sets, as Pele's render tests draw them: labels in the color that stands out on
+// them, edges inside one in that color, and casings under edges that cross one.
+const FILLS = [
+  'agentflow-beta TB\n  flow f["Flow"]\n    a["A"] --> b["B"]\n  end\n  flow p["Packed"]\n    c["C"]\n  end\n  p@{ view: "collapsed" }\n  b --> d["D"]\n  style f fill:#FFF9C4\n  style a fill:#1f3a5f\n  style b fill:#1f3a5f,color:#eee\n  style p fill:navy',
+  'agentflow-beta TB\n  flow f["Flow"]\n    a["A"] --> b["B"]\n  end\n  b --> c["C"]\n  c --> d["D"]\n  style f fill:#FFF9C4',
+  'agentflow-beta TB\n  flow f[Flow]\n    a[A]\n  end\n  f --> a\n  style f fill:white',
+  'agentflow-beta LR\n  flow f["Flow"]\n    a --> b\n    b --x a\n    a -.- b\n    b --> b\n    flow g["Inner"]\n      c --> d\n    end\n    b --> c\n  end\n  e --> c\n  d --> e\n  style f fill:navy\n  style g fill:#BBDEFB\n  linkStyle 1 stroke:#f00\n  linkStyle 6 stroke-width:3px,opacity:0.5',
+  'agentflow-beta TB\n  a@{ shape: tool } --> b@{ shape: refdoc } --> c@{ shape: decision } --> d@{ shape: input } --> e@{ shape: action }\n  connector k\n  e --> k\n  style a fill:#000\n  style b fill:#000\n  style c fill:#fff\n  style d fill:#000\n  style e fill:#000\n  style k fill:#000',
+  ...['none', 'transparent', 'rgba(0,0,0,0.3)', '#BBDEFB80', 'navy;fill-opacity:abc', 'url(#x)', 'black,opacity:0', 'white,color:#r:#333'].map(
+    (fill) => `agentflow-beta TB\nflow f\n  a --> b\nend\na --> c\nstyle f fill:${fill}\nstyle a fill:${fill}`
+  ),
+];
 
 export default async function ({ pele, src, cases, write, random }) {
   const { render, PeleError } = await src('index.ts');
@@ -179,7 +209,8 @@ export default async function ({ pele, src, cases, write, random }) {
     if (draw(source) && drawn++ % 3 === 0) draw(source, 360);
   };
   agentflows.forEach(each);
-  const next = mutator(agentflows, FRAGMENTS, random(12));
+  FILLS.forEach(each);
+  const next = mutator([...agentflows, ...FILLS], FRAGMENTS, random(12));
   while (drawn < 2500) {
     const s = next();
     if (s.length <= 3000) each(s);
