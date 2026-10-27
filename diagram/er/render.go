@@ -212,6 +212,12 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if author.Italic {
 			face |= text.Italic
 		}
+		// The type, name and keys of an attribute are set in the monospace face where the
+		// options list attributes, unless the author gives the entity a font family.
+		mono := face
+		if o.Monospace&layout.Attributes != 0 && !css.FontFamilyDeclared(decls) {
+			mono |= text.Mono
+		}
 		nameSize, rowSize, keySize := size, smallSize, jsmath.Round(float64(size*0.75))
 		if author.FontSize > 0 {
 			nameSize, rowSize, keySize = author.FontSize, author.FontSize, author.FontSize
@@ -275,9 +281,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 				var widths [4]float64
 				for _, a := range node.Attributes {
 					cells := [4]text.Label{
-						labelOf(cellText(a.Type), true, rowSize, noWrap, face),
-						labelOf(cellText(a.Name), true, rowSize, noWrap, face),
-						labelOf(strings.Join(a.Keys, ", "), false, keySize, noWrap, face),
+						labelOf(cellText(a.Type), true, rowSize, noWrap, mono),
+						labelOf(cellText(a.Name), true, rowSize, noWrap, mono),
+						labelOf(strings.Join(a.Keys, ", "), false, keySize, noWrap, mono),
 						labelOf(cellText(a.Comment), true, rowSize, commentWrap, face),
 					}
 					h := rowLine
@@ -606,7 +612,7 @@ func entity(v *view, x, y float64, classes []string, o *layout.Options) []scene.
 			name = n.Label
 		}
 		display := text.DecodeEntities(name)
-		if _, ok := url.LinkURL(url.SanitizeURL(display), true, o.LinkSchemes); ok {
+		if url.InternalLink(display, true, o.LinkSchemes) {
 			it.Link = display
 		}
 	}

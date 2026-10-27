@@ -24,6 +24,9 @@ type peleRender struct {
 	Cases []struct {
 		Src      string  `json:"src"`
 		MaxWidth float64 `json:"maxWidth"`
+		// Mono says the attributes are set in the monospace face, as Pele's monospace option
+		// lists them.
+		Mono bool `json:"mono"`
 		fixture.Drawing
 	} `json:"cases"`
 }
@@ -49,10 +52,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(db, pre.Config, &layout.Options{MaxWidth: c.MaxWidth}))
+		o := &layout.Options{MaxWidth: c.MaxWidth}
+		if c.Mono {
+			o.Monospace = layout.Attributes
+		}
+		got := sceneLines(Layout(db, pre.Config, o))
 		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
 			if failed++; failed <= 20 {
-				t.Errorf("Layout(%q, max %v), %s", c.Src, c.MaxWidth, msg)
+				t.Errorf("Layout(%q, max %v, mono %v), %s", c.Src, c.MaxWidth, c.Mono, msg)
 			}
 		}
 	}
@@ -129,12 +136,34 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Align != scene.Start {
 				lines = append(lines, "misaligned "+kind)
 			}
+			if allMono(it.Label) {
+				kind += " mono"
+			}
 			lines = append(lines, kind+" "+num(it.Label.Size)+" "+cellAt(it.Label, it.At.X, it.At.Y))
 		default:
 			lines = append(lines, "unknown role "+string(it.Role))
 		}
 	}
 	return lines
+}
+
+// allMono reports whether every span of a label with text is in the monospace face, and there
+// is one: whether Pele's textLeft names the monospace family on the label's text, as it does
+// where Pele's sharedStyle holds Mono.
+func allMono(l *text.Label) bool {
+	any := false
+	for _, line := range l.Lines {
+		for _, span := range line {
+			if span.Icon != "" || span.Text == "" {
+				continue
+			}
+			if span.Face&text.Mono == 0 {
+				return false
+			}
+			any = true
+		}
+	}
+	return any
 }
 
 // cellAt is where Pele's textLeft puts a cell's text, which starts at x and is centered on y
