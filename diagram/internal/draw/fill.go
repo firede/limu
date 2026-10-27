@@ -124,8 +124,8 @@ func enters(points []float64, l, t, r, b float64) bool {
 // FillUnder is Pele's fillUnder: of fills, the innermost that holds the whole of an edge's
 // path and the tips of its markers, given as x and y in turn. It gives the index of that fill,
 // or -1 where the edge enters none, and reports crossing where the edge enters a fill whose
-// border it crosses, as Pele's gives ''. A fill the edge only touches, within half a unit of
-// its border, does not count.
+// border it crosses, where Pele's gives the empty string. A fill the edge only touches,
+// within half a unit of its border, does not count.
 func FillUnder(p *scene.Path, tips []float64, fills []Fill) (holder int, crossing bool) {
 	if len(fills) == 0 {
 		return -1, false
