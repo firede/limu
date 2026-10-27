@@ -47,7 +47,7 @@ const (
 // A view is a node as it is drawn: Pele's View. w and h are the size of what is drawn; the
 // layout's box is larger when the node carries a self-relationship.
 type view struct {
-	node       *graphNode
+	node   *graphNode
 	kind   int
 	author css.Author
 	// decls are the declarations of the node's classes and styles, which say whether it sets
@@ -913,7 +913,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 		ground, cased := draw.OnFills(path.Path, []float64{path.SX, path.SY, path.EX, path.EY}, fills, line)
 		own.Ground = ground
 		if cased {
-			if c := draw.Casing(RoleCasing, path.Path, ends, author.Style, false); c != nil {
+			if c := draw.Casing(RoleCasing, path.Path, ends, line, false); c != nil {
 				c.ID = edge.ID
 				casings = append(casings, *c)
 			}

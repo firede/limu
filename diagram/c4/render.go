@@ -323,10 +323,11 @@ func lay(db *DB, o *layout.Options, tight bool, gap float64) (*scene.Scene, int,
 		}
 		// A relation inside one fill is drawn in the color of its labels, and one that crosses
 		// the border of a fill is laid on a casing, as Pele's overFills finds.
-		ground, cased := draw.OnFills(r.path, []float64{r.sx, r.sy, r.ex, r.ey}, fills, userDecls("", rel.LineColor, ""))
+		line := userDecls("", rel.LineColor, "")
+		ground, cased := draw.OnFills(r.path, []float64{r.sx, r.sy, r.ex, r.ey}, fills, line)
 		it.Style.Ground = ground
 		if cased {
-			if c := draw.Casing(RoleCasing, r.path, it.Ends, it.Author, false); c != nil {
+			if c := draw.Casing(RoleCasing, r.path, it.Ends, line, false); c != nil {
 				c.ID = it.ID
 				casings = append(casings, *c)
 			}
