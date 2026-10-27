@@ -354,7 +354,12 @@ A few differences from Pele are on purpose, or known and left alone.
   whole. With a measurer that kerns, the gap between them isn't quite Pele's.
 - A link's host outside ASCII is lowercased and written in Punycode without the whole of
   UTS #46 (`internal/url`). Its other mappings, such as those of ligatures and combining
-  marks, aren't made, so a few such hosts come out differently from Node's.
+  marks, aren't made, so a few such hosts come out differently from Node's. Since Pele 1.12
+  hands a link with its percent escapes to the URL parser, such a host can be written in
+  escapes too, as `https:%E2%80%8Bx.y`, whose zero-width space Node drops and limu doesn't.
+- Pele picks the color of text on a fill from its own two colors, and limu from the theme's
+  foreground and background. With the default theme they're the same, and with another
+  theme a fill near the middle may take the other one.
 
 ## Testing
 

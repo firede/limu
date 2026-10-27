@@ -107,7 +107,7 @@ Diagrams that can get narrower do so to fit `layout.Options.MaxWidth`. A wide fl
 
 ### Subgraphs
 
-A flowchart subgraph keeps its own `direction`, even when it links to nodes outside it.
+As in Mermaid, a flowchart subgraph that an edge crosses, from a node inside it to one outside, takes its parent's direction. Its own `direction` applies only when no edge crosses its border.
 
 ### Limits
 
