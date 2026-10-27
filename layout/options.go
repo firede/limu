@@ -32,8 +32,8 @@ type Monospace uint8
 const (
 	// Members are the attributes and methods of a class diagram's classes ("members").
 	Members Monospace = 1 << iota
-	// Attributes are the attributes of an entity relationship diagram's entities
-	// ("attributes").
+	// Attributes are the types, names and keys of the attributes of an entity relationship
+	// diagram's entities ("attributes"). Their comments keep the regular face.
 	Attributes
 	// Files are the names of a tree view's entries ("files").
 	Files
