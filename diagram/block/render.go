@@ -1131,7 +1131,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		edgeEnds := path.Ends(start, end)
 		ground, cased := draw.OnFills(path.Path, []float64{path.SX, path.SY, path.EX, path.EY}, fills, nil)
 		if cased {
-			if c := draw.Casing(RoleCasing, path.Path, edgeEnds, style.Style{}, edge.Thickness == "thick"); c != nil {
+			if c := draw.Casing(RoleCasing, path.Path, edgeEnds, nil, edge.Thickness == "thick"); c != nil {
 				c.ID = edge.ID
 				casings = append(casings, *c)
 			}

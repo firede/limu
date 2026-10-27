@@ -583,6 +583,12 @@ func Sets(decls []string, prop string) bool {
 	return ok
 }
 
+// Value is the value resolveStyle keeps for a property, the last one given and trimmed, read
+// or not, as Pele takes it from the style it writes with /[";]prop:([^;"]+);/.
+func Value(decls []string, prop string) (string, bool) {
+	return shapeValue(decls, prop)
+}
+
 // shapeValue is the value resolveStyle keeps for a property of a shape, the last one given.
 func shapeValue(decls []string, prop string) (string, bool) {
 	var value string
