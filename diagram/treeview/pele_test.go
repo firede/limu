@@ -176,7 +176,7 @@ func TestParseMatchesPele(t *testing.T) {
 			ok = compare(t, "tree", c.Src, dumpAST(tree), c.Direct.AST) && ok
 		}
 
-		text, lineMap, err := preprocessBoxDrawing(c.Src)
+		text, lineMap, _, err := preprocessBoxDrawing(c.Src)
 		switch {
 		case err != nil && c.Box.Error == nil:
 			t.Errorf("preprocessBoxDrawing(%q): %v, Pele had none", c.Src, err)
