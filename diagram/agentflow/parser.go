@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/edit"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -26,6 +27,7 @@ var (
 		t_connector, t_global, t_end, t_DOWN, t_UP, t_START_LINK)
 	stylePartTokens = tokenSet(t_NUM, t_NODE_STRING, t_COLON, t_SPACE, t_BRKT, t_STYLE)
 	separatorTokens = tokenSet(t_NEWLINE, t_SEMI, t_EOF, t_COMMENT)
+	trailingTokens  = tokenSet(t_COMMENT, t_NEWLINE, t_SPACE, t_EOF)
 )
 
 const (
@@ -59,7 +61,9 @@ type parseError struct{ err error }
 // and the metadata block a node statement read last, which Pele keeps in the closure's
 // variables pendingData, dataFrom and dataTo.
 type parser struct {
-	src         string
+	src         string      // the text the lexer reads
+	source      string      // the text the parser was given, where errors are located
+	trims       []edit.Edit // what braceTrail replaced in source to make src
 	toks        []tok
 	i           int
 	db          *DB
@@ -70,13 +74,15 @@ type parser struct {
 }
 
 // braceTrail is source.replace(/}[^\S\n]*\n/g, '}\n'): Mermaid trims the white space between
-// a closing brace and the end of its line before parsing.
+// a closing brace and the end of its line before parsing. It also gives each replacement it
+// makes, as replacements(source, RE_BRACE_TRAIL, 2) records them.
 // It is the first line of Pele's parseAgentflow, with RE_BRACE_TRAIL.
-func braceTrail(s string) string {
+func braceTrail(s string) (string, []edit.Edit) {
 	if !strings.Contains(s, "}") {
-		return s
+		return s, nil
 	}
 	var b strings.Builder
+	var edits []edit.Edit
 	last := 0
 	for i := 0; i < len(s); i++ {
 		if s[i] != '}' {
@@ -95,21 +101,22 @@ func braceTrail(s string) string {
 		}
 		b.WriteString(s[last : i+1])
 		b.WriteByte('\n')
+		edits = append(edits, edit.Edit{From: i, To: j + 1, Text: "}\n"})
 		last = j + 1
 		i = j
 	}
 	if last == 0 {
-		return s
+		return s, nil
 	}
 	b.WriteString(s[last:])
-	return b.String()
+	return b.String(), edits
 }
 
 // parseInto parses an agent flow's text into db, as Pele's parseAgentflow does. An error is
 // a *diagram.Error.
 func parseInto(source string, db *DB) (err error) {
-	src := braceTrail(source)
-	p := &parser{src: src, toks: tokenize(src), db: db}
+	src, trims := braceTrail(source)
+	p := &parser{src: src, source: source, trims: trims, toks: tokenize(src), db: db}
 	defer func() {
 		if r := recover(); r != nil {
 			pe, ok := r.(parseError)
@@ -147,10 +154,25 @@ func (p *parser) check(err error) {
 // error token gives the lexer's error, any other the tokens that were expected.
 func (p *parser) fail(expected string) {
 	t := p.toks[p.i]
-	if t.typ == t_ERROR {
-		panic(parseError{common.SyntaxError("agentflow", p.src, t.start, "", true)})
+	from := t.start
+	if t.typ == t_EOF || t.typ == t_END {
+		// Comments are tokens here, so the error goes before the trailing ones.
+		k := p.i
+		for k > 0 && trailingTokens[p.toks[k-1].typ] {
+			k--
+		}
+		from = len(chars.TrimEnd(p.src[:p.toks[k].start]))
 	}
-	panic(parseError{common.SyntaxError("agentflow", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
+	// The error is located in the text the parser was given, before the blanks after a brace
+	// were trimmed.
+	at := from
+	if p.src != p.source {
+		at = edit.InputOffset([][]edit.Edit{p.trims}, from)
+	}
+	if t.typ == t_ERROR {
+		panic(parseError{common.SyntaxError("agentflow", p.source, at, "", true)})
+	}
+	panic(parseError{common.SyntaxError("agentflow", p.source, at, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 }
 
 // span is the span from the start of token a to the end of token b.

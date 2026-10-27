@@ -219,15 +219,15 @@ func loadCases(t *testing.T) []peleCase {
 	return p.States
 }
 
-// check parses the source as the parser of the type reads it, and compares the tokens, the DB
-// and the graph, or the error, with what Pele made of it.
-func check(t *testing.T, label, src, parsed string, title string, c *peleCase) bool {
+// check lexes the source as the parser of the type reads it, parses it with parse, and
+// compares the tokens, the DB and the graph, or the error, with what Pele made of it.
+func check(t *testing.T, label, src, parsed string, parse func() (*DB, error), c *peleCase) bool {
 	t.Helper()
 	toks, lexError := dumpTokens(parsed)
 	if !compare(t, label+"tokens", src, toks, c.Tokens) || !compare(t, label+"lexical error", src, lexError, c.LexError) {
 		return false
 	}
-	db, err := Parse(parsed, title)
+	db, err := parse()
 	switch {
 	case err != nil && c.Error == nil:
 		t.Errorf("%sparse of %q: %v, Pele had none", label, src, err)
@@ -268,9 +268,9 @@ func TestParseMatchesPele(t *testing.T) {
 			t.Errorf("type of %q: %q, Pele %v", c.Src, typ, c.Type)
 			ok = false
 		case typ != diagram.State:
-			ok = check(t, "direct ", c.Src, c.Src, "", c.Direct)
+			ok = check(t, "direct ", c.Src, c.Src, func() (*DB, error) { return Parse(c.Src, "") }, c.Direct)
 		default:
-			ok = check(t, "", c.Src, p.Source(false), p.Title, &c)
+			ok = check(t, "", c.Src, p.Source(false), func() (*DB, error) { return ParsePrepared(p) }, &c)
 		}
 		if !ok {
 			if failed++; failed >= 10 {

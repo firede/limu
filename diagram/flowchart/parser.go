@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/edit"
 	"github.com/firede/limu/internal/chars"
 )
 
@@ -46,7 +47,9 @@ type frame struct {
 type parseError struct{ err error }
 
 type parser struct {
-	src         string
+	src         string      // the text the lexer reads
+	source      string      // the text the parser was given, where errors are located
+	trims       []edit.Edit // what braceTrail replaced in source to make src
 	toks        []tok
 	i           int
 	db          *DB
@@ -55,13 +58,15 @@ type parser struct {
 }
 
 // braceTrail is source.replace(/}\s*\n/g, '}\n'): Mermaid trims the white space between a
-// closing brace and the end of its line before parsing.
+// closing brace and the end of its line before parsing. It also gives each replacement it
+// makes, as replacements(source, RE_BRACE_TRAIL, 2) records them.
 // Pele's parseFlowchart does this with RE_BRACE_TRAIL.
-func braceTrail(s string) string {
+func braceTrail(s string) (string, []edit.Edit) {
 	if !strings.Contains(s, "}") {
-		return s
+		return s, nil
 	}
 	var b strings.Builder
+	var edits []edit.Edit
 	last := 0
 	for i := 0; i < len(s); i++ {
 		if s[i] != '}' {
@@ -75,20 +80,21 @@ func braceTrail(s string) string {
 		b.WriteString(s[last : i+1])
 		b.WriteByte('\n')
 		last = i + 1 + nl + 1
+		edits = append(edits, edit.Edit{From: i, To: last, Text: "}\n"})
 		i = last - 1
 	}
 	if last == 0 {
-		return s
+		return s, nil
 	}
 	b.WriteString(s[last:])
-	return b.String()
+	return b.String(), edits
 }
 
 // parseInto parses a flowchart's text into db, as Pele's parseFlowchart does. An error is a
 // *diagram.Error.
 func parseInto(source string, db *DB) (err error) {
-	src := braceTrail(source)
-	p := &parser{src: src, toks: tokenize(src), db: db}
+	src, trims := braceTrail(source)
+	p := &parser{src: src, source: source, trims: trims, toks: tokenize(src), db: db}
 	defer func() {
 		if r := recover(); r != nil {
 			pe, ok := r.(parseError)
@@ -123,13 +129,18 @@ func (p *parser) check(err error) {
 }
 
 // fail stops the parse with a syntax error at the token the parser is at, saying what was
-// expected there, as Pele's fail does.
+// expected there, as Pele's fail does. The error is located in the text the parser was given,
+// before the blanks after a brace were trimmed.
 func (p *parser) fail(expected string) {
 	t := p.toks[p.i]
-	if t.typ == t_ERROR {
-		panic(parseError{common.SyntaxError("flowchart", p.src, t.start, "", true)})
+	at := t.start
+	if p.src != p.source {
+		at = edit.InputOffset([][]edit.Edit{p.trims}, at)
 	}
-	panic(parseError{common.SyntaxError("flowchart", p.src, t.start, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
+	if t.typ == t_ERROR {
+		panic(parseError{common.SyntaxError("flowchart", p.source, at, "", true)})
+	}
+	panic(parseError{common.SyntaxError("flowchart", p.source, at, "Expecting "+expected+", got '"+tokenNames[t.typ]+"'", false)})
 }
 
 // expect gives the text of the token the parser is at and moves past it, or fails if the
