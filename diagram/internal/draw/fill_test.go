@@ -32,3 +32,27 @@ func TestFillUnder(t *testing.T) {
 		}
 	}
 }
+
+// Pele leaves out the casing of an edge stroked in none or transparent as written, and only
+// then.
+func TestCasingOfNone(t *testing.T) {
+	path := new(scene.Path).MoveTo(0, 0).LineTo(10, 0)
+	for _, c := range []struct {
+		line  []string
+		cased bool
+	}{
+		{nil, true},
+		{[]string{"stroke:none"}, false},
+		{[]string{"stroke: transparent !important"}, false},
+		{[]string{"stroke:NONE"}, true},
+		{[]string{"stroke:rgba(0,0,0,0)"}, true},
+		{[]string{"stroke:none", "stroke:red"}, true},
+	} {
+		if got := Casing("x", path, [2]scene.Marker{}, c.line, false) != nil; got != c.cased {
+			t.Errorf("Casing of %q: %v", c.line, got)
+		}
+	}
+	if it := Casing("x", path, [2]scene.Marker{}, []string{"stroke-width:3"}, false); it.Style.StrokeWidth.Or(0) != 7 {
+		t.Errorf("width %v", it.Style.StrokeWidth)
+	}
+}

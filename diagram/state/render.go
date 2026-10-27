@@ -969,7 +969,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		ground, cased := draw.OnFills(path.Path, []float64{path.EX, path.EY}, fills, nil)
 		it.Style.Ground = ground
 		if cased {
-			if casing := draw.Casing(RoleCasing, path.Path, it.Ends, style.Style{}, false); casing != nil {
+			if casing := draw.Casing(RoleCasing, path.Path, it.Ends, nil, false); casing != nil {
 				casings = append(casings, *casing)
 			}
 		}

@@ -207,14 +207,15 @@ const caseWidth = 4
 // border of a fill: its path and the outlines of its markers stroked in the background, wider
 // than the edge, with round ends and corners, as Pele's edgeCasing and casingsSvg draw it, so
 // that the edge stands out where it runs over the fill. Its width is that of the edge, the
-// width author gives it or 2.5 where it is thick, and four more, and it takes the author's
-// opacities. It gives nil for an edge whose author strokes it in none, which needs none. A
-// diagram puts its casings after its groups and before its edges, as Pele does.
-func Casing(role scene.Role, path *scene.Path, ends [2]scene.Marker, author style.Style, thick bool) *scene.Item {
-	// Pele draws none for a stroke of none or transparent.
-	if s := author.Stroke; s.Set() && (!s.Visible() || s.Token().Name() == "" && s.Own().A == 0) {
+// width its author's declarations, line, give it or 2.5 where it is thick, and four more, and
+// it takes the author's opacities. It gives nil for an edge whose author strokes it in none
+// or transparent, written so, which needs none. A diagram puts its casings after its groups
+// and before its edges, as Pele does.
+func Casing(role scene.Role, path *scene.Path, ends [2]scene.Marker, line []string, thick bool) *scene.Item {
+	if v, ok := css.Value(line, "stroke"); ok && (v == "none" || v == "transparent") {
 		return nil
 	}
+	author := css.Declarations(line).Style
 	width := author.StrokeWidth.Or(1)
 	if thick {
 		width = 2.5
