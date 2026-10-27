@@ -81,6 +81,7 @@ type view struct {
 	node     *GraphNode
 	kind     kind
 	author   css.Author
+	decls    []string
 	hasStyle bool
 	label    text.Label
 	lines    []text.Label
@@ -338,7 +339,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		if author.FontSize > 0 {
 			fontSize = author.FontSize
 		}
-		v.author, v.hasStyle = author, true
+		v.author, v.decls, v.hasStyle = author, decls, true
 		var c graphs.CNode
 		made := false
 		switch v.kind {
@@ -608,7 +609,8 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		order = append(order, children[order[q]]...)
 	}
 
-	var clusters, dividers, nodes, notes, edges, labels []scene.Item
+	var clusters, dividers, nodes, notes, casings, edges, labels []scene.Item
+	var fills []draw.Fill
 	dividerStyle := style.Style{Stroke: style.Border, Fill: style.None, Dash: style.Dashes(4, 4), Radius: style.N(corner)}
 	// divide draws the dashed lines between the regions among a composite's members.
 	divide := func(items []int, left, top, right, bottom float64) {
@@ -691,6 +693,9 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		y := c.Y + pad
 		w, h := v.w, v.h
 		author := v.author.Style
+		// A label lies on its state's fill, and takes the color that stands out on a fill its
+		// author sets, as Pele's inkFill gives it.
+		inks := css.InksText(v.decls, v.decls)
 		it := scene.Item{
 			Kind: scene.Node, Role: roles[v.kind], Shape: scene.Shape(node.Shape), ID: node.ID,
 			Class: classNames(node.CSSClasses), Box: scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h},
@@ -705,7 +710,14 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			box := scene.Rect{X: left, Y: top, W: c.W, H: c.H}
 			it.Kind, it.Box = scene.Group, box
 			it.Parts = []scene.Part{{Box: box, Rounded: true}}
-			it.Style = style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Fg, Radius: style.N(corner)}
+			if css.Paints(v.decls) {
+				fills = append(fills, draw.Fill{Box: [4]float64{left, top, left + c.W, top + c.H}, Decls: v.decls})
+			}
+			it.Style = style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Fg, Radius: style.N(corner), OnFill: inks}
+			// A fill its author sets is drawn at full opacity.
+			if css.Sets(v.decls, "fill") {
+				it.Style.FillOpacity = style.Num{}
+			}
 			if v.titleH > 0 {
 				rule := new(scene.Path).MoveTo(left, top+v.titleH).LineTo(left+c.W, top+v.titleH)
 				it.Parts = append(it.Parts, scene.Part{Path: rule, Paint: scene.StrokeOnly})
@@ -742,7 +754,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			it.Label, it.At = &v.label, scene.Point{X: x, Y: y}
 		default:
 			it.Parts = []scene.Part{{Box: it.Box, Rounded: true}}
-			it.Style = style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg, Radius: style.N(min(corner, h/2))}
+			it.Style = style.Style{Fill: style.Surface, Stroke: style.Border, Text: style.Fg, Radius: style.N(min(corner, h/2)), OnFill: inks}
 			if v.kind == kState {
 				it.Label, it.At = &v.label, scene.Point{X: x, Y: y}
 				break
@@ -752,12 +764,17 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			it.Parts = append(it.Parts, scene.Part{Path: rule, Paint: scene.StrokeOnly})
 			it.Label, it.At = &v.label, scene.Point{X: x, Y: y + (at - v.label.Height/2)}
 			at += 14
+			// The descriptions lie on the state's fill too.
+			var ground style.Paint
+			if inks {
+				ground = author.Fill
+			}
 			for k := range v.lines {
 				line := &v.lines[k]
 				extra = append(extra, scene.Item{
 					Kind: scene.Text, Role: RoleDescription, ID: node.ID, Label: line,
 					At:     scene.Point{X: x, Y: y + (at + line.Height/2)},
-					Style:  style.Style{Text: style.Fg},
+					Style:  style.Style{Text: style.Fg, TextGround: ground},
 					Author: style.Style{Text: author.Text},
 				})
 				at += line.Height
@@ -946,6 +963,16 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			it.Role = RoleNoteEdge
 			it.Style = style.Style{Stroke: style.Border, Fill: style.None, Dash: style.Dashes(3, 4), Cap: style.CapRound}
 		}
+		// A transition inside one fill an author sets takes the color that stands out on it,
+		// and one that crosses the border of one is laid on a casing, as Pele's overFills
+		// and edgeCasing draw them.
+		ground, cased := draw.OnFills(path.Path, []float64{path.EX, path.EY}, fills, nil)
+		it.Style.Ground = ground
+		if cased {
+			if casing := draw.Casing(RoleCasing, path.Path, it.Ends, style.Style{}, false); casing != nil {
+				casings = append(casings, *casing)
+			}
+		}
 		for k := 0; k+1 < len(route); k += 3 {
 			it.Route = append(it.Route, scene.Point{X: route[k], Y: route[k+1]})
 		}
@@ -975,7 +1002,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 		Title:    db.AccTitle,
 		Desc:     db.AccDescr,
 	}
-	for _, layer := range [][]scene.Item{clusters, dividers, edges, labels, nodes, notes} {
+	for _, layer := range [][]scene.Item{clusters, dividers, casings, edges, labels, nodes, notes} {
 		sc.Items = append(sc.Items, layer...)
 	}
 	common.WithTitle(sc, db.Title, RoleTitle, measure, size, pad)

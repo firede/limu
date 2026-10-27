@@ -86,6 +86,14 @@ func sceneLines(sc *scene.Scene) []string {
 			lines = append(lines, textAt(l, cx, cy))
 		}
 	}
+	// ink writes the color an item's label takes on a fill a style sets, if it takes one.
+	ink := func(it *scene.Item) {
+		if it.Label != nil && len(it.Label.Lines) > 0 {
+			if s := pelesvg.TextInk(it); s != "" {
+				lines = append(lines, "ink "+s)
+			}
+		}
+	}
 	rect := func(kind string, r scene.Rect, cx, cy float64, rx string) {
 		lines = append(lines, kind+" "+pt(r.X-cx, r.Y-cy)+","+num(r.W)+","+num(r.H)+" "+rx)
 	}
@@ -129,10 +137,16 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "tip "+peleText(it.Tooltip))
 			}
 			rect("rect", it.Parts[0].Box, 0, 0, radius(it))
+			if _, ok := it.Style.FillOpacity.Get(); !ok {
+				lines = append(lines, "opaque")
+			}
 			for _, part := range it.Parts[1:] {
 				lines = append(lines, "path "+pelesvg.D(part.Path))
 			}
 			label(it.Label, it.At.X, it.At.Y)
+			ink(it)
+		case RoleCasing:
+			lines = append(lines, pelesvg.CasingLine(it))
 		case RoleDivider:
 			if p := it.Parts[0]; p.Path != nil {
 				lines = append(lines, "divider "+pelesvg.D(p.Path))
@@ -144,7 +158,11 @@ func sceneLines(sc *scene.Scene) []string {
 			if it.Role == RoleNoteEdge {
 				kind = "note-edge"
 			}
-			lines = append(lines, "edge "+id+" "+kind, "path "+pelesvg.D(it.Parts[0].Path), "stroke "+pelesvg.CapJoin(it))
+			lines = append(lines, "edge "+id+" "+kind)
+			if s := pelesvg.StrokeInk(it); s != "" {
+				lines = append(lines, "ink "+s)
+			}
+			lines = append(lines, "path "+pelesvg.D(it.Parts[0].Path), "stroke "+pelesvg.CapJoin(it))
 			for _, m := range it.Ends {
 				if s := peleMarker(m); s != "" {
 					lines = append(lines, "m "+s)
@@ -160,6 +178,7 @@ func sceneLines(sc *scene.Scene) []string {
 				check("description", it.At.X-cx, 0)
 				check("description", it.At.Y-cy, y)
 				lines = append(lines, textAt(it.Label, 0, y))
+				ink(it)
 			}
 			descAt += it.Label.Height
 		default:
@@ -213,6 +232,7 @@ func sceneLines(sc *scene.Scene) []string {
 				box(it.Parts[0])
 				if !described {
 					label(it.Label, 0, 0)
+					ink(it)
 					break
 				}
 				at := padY - h/2 + it.Label.Height
@@ -222,6 +242,7 @@ func sceneLines(sc *scene.Scene) []string {
 				check("label", it.At.X-cx, 0)
 				check("label", it.At.Y-cy, y)
 				label(it.Label, 0, y)
+				ink(it)
 				descAt = at + 14
 			}
 		}

@@ -9,14 +9,15 @@ import (
 )
 
 // An author's fill and fill opacity cascade each on their own, as a browser takes the style
-// Pele writes over the attributes it writes beside it. Pele 1.8.0 draws these diagrams so:
+// Pele writes over the attributes it writes beside it, and a group whose fill its author sets
+// is drawn at full opacity. Pele 1.12.0 draws these diagrams so:
 //
 //	style A fill-opacity:0.5,stroke-opacity:0.25 on a flowchart's node:
 //	  <rect fill="var(--_s)" stroke="var(--_b)" style="rx:var(--_r);fill-opacity:0.5;stroke-opacity:0.25;"/>
 //	classDef red fill:red on a subgraph:
-//	  <rect fill="var(--_a)" fill-opacity="0.5" stroke="var(--_b)" style="rx:var(--_r);fill:red;"/>
+//	  <rect fill="var(--_a)" stroke="var(--_b)" style="rx:var(--_r);fill:red;"/>
 //	classDef red fill:red on a state composite:
-//	  <rect rx="10" fill="var(--_a)" fill-opacity="0.5" stroke="var(--_b)" style="fill:red;"/>
+//	  <rect rx="10" fill="var(--_a)" stroke="var(--_b)" style="fill:red;"/>
 //	linkStyle 0 stroke:red,stroke-opacity:0.25 on an edge, its arrowhead in the group:
 //	  <g class="pele-edge" style="stroke:red;stroke-opacity:0.25;">… <path class="pele-marker" fill="red" stroke="none"/>
 func TestAuthorOpacitiesAsPele(t *testing.T) {
@@ -34,9 +35,9 @@ func TestAuthorOpacitiesAsPele(t *testing.T) {
 		{"flowchart LR\n  A --> B\n  style A fill-opacity:0.5,stroke-opacity:0.25", "flowchart.node", "A",
 			at(th.Surface, 128), at(th.Border, 64), th.Border},
 		{"flowchart LR\n  subgraph S\n    A\n  end\n  classDef red fill:red\n  class S red", "flowchart.cluster", "S",
-			at(red, 128), th.Border, th.Border},
+			red, th.Border, th.Border},
 		{"stateDiagram-v2\n  state C {\n    a --> b\n  }\n  classDef red fill:red\n  class C red", "state.composite", "C",
-			at(red, 128), th.Border, th.Border},
+			red, th.Border, th.Border},
 		{"flowchart LR\n  A --> B\n  linkStyle 0 stroke:red,stroke-opacity:0.25", "flowchart.edge", "L_A_B_0",
 			style.Color{}, at(red, 64), red},
 	} {
