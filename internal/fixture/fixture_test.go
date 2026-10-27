@@ -139,7 +139,7 @@ func isDigest(s string) bool {
 }
 
 func TestCheck(t *testing.T) {
-	pinned := `"pele":{"version":"1.9.0","commit":"e7f092a4de147cc32210913c20e36eaa5fcd0ef1","arch":"arm64","node":"v24.22.0"}`
+	pinned := `"pele":{"version":"1.12.0","commit":"8aff183be57021b533f319a29341a529be934b08","arch":"arm64","node":"v24.22.0"}`
 	for _, c := range []struct {
 		json string
 		ok   bool
@@ -148,12 +148,12 @@ func TestCheck(t *testing.T) {
 		{`{` + pinned + `,"cases":[1],"more":{"x":[]}}`, true},
 		{`{` + pinned + `,"cases":[]}`, false},
 		{`{` + pinned + `,"cases":[ ]}`, false},
-		{`{"pele":{"version":"1.9.0","commit":"0000000"},"cases":[1]}`, false},
-		{`{"pele":{"version":"1.8.0","commit":"8fad23bd51783e4df1204e177a7fb0d2a30dcd13"},"cases":[1]}`, false},
+		{`{"pele":{"version":"1.12.0","commit":"0000000"},"cases":[1]}`, false},
+		{`{"pele":{"version":"1.9.0","commit":"e7f092a4de147cc32210913c20e36eaa5fcd0ef1"},"cases":[1]}`, false},
 		{`{"cases":[1]}`, false},
 		// The architecture and the version of Node are recorded and not compared.
-		{`{"pele":{"version":"1.9.0","commit":"e7f092a4de147cc32210913c20e36eaa5fcd0ef1"},"cases":[1]}`, true},
-		{`{"pele":{"version":"1.9.0","commit":"e7f092a4de147cc32210913c20e36eaa5fcd0ef1","arch":"x64","node":"v26.0.0"},"cases":[1]}`, true},
+		{`{"pele":{"version":"1.12.0","commit":"8aff183be57021b533f319a29341a529be934b08"},"cases":[1]}`, true},
+		{`{"pele":{"version":"1.12.0","commit":"8aff183be57021b533f319a29341a529be934b08","arch":"x64","node":"v26.0.0"},"cases":[1]}`, true},
 	} {
 		if err := Check([]byte(c.json)); (err == nil) != c.ok {
 			t.Errorf("Check(%s) = %v", c.json, err)
