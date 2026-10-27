@@ -48,6 +48,10 @@ func hexDigits(s string, i int) int {
 	return i
 }
 
+// ruleNameChar reports whether a byte is in [A-Za-z0-9-], which goes on a rule name after its
+// first letter. The title of ABNF_TOKENS gives way to it.
+func ruleNameChar(c byte) bool { return chars.IsLetter(int(c)) || chars.IsDigit(int(c)) || c == '-' }
+
 // abnfTokens is Pele's ABNF_TOKENS.
 var abnfTokens = append(append([]common.TokenType{
 	opening("railroad-abnf-beta", abnfName),
@@ -60,7 +64,7 @@ var abnfTokens = append(append([]common.TokenType{
 	literal(")"),
 	literal("["),
 	literal("]"),
-	titleToken,
+	title(ruleNameChar),
 	accTitleToken,
 	accDescrToken,
 	// /[A-Za-z][A-Za-z0-9-]*/y
@@ -69,7 +73,7 @@ var abnfTokens = append(append([]common.TokenType{
 			return -1
 		}
 		i := at + 1
-		for i < len(s) && (chars.IsLetter(int(s[i])) || chars.IsDigit(int(s[i])) || s[i] == '-') {
+		for i < len(s) && ruleNameChar(s[i]) {
 			i++
 		}
 		return i

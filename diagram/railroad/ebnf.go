@@ -81,7 +81,7 @@ var ebnfTokens = append(append([]common.TokenType{
 	literal("*"),
 	literal("+"),
 	literal("-", ebnfYAML),
-	titleToken,
+	title(wordOrDash),
 	accTitleToken,
 	accDescrToken,
 	identifier("EBNF_ID"),

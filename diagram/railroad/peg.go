@@ -39,7 +39,7 @@ var pegTokens = append(append([]common.TokenType{
 	literal("("),
 	literal(")"),
 	literal("."),
-	titleToken,
+	title(wordOrDash),
 	accTitleToken,
 	accDescrToken,
 	identifier("PEG_ID"),

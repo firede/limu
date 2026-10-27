@@ -104,6 +104,13 @@ func wordRun(s string, i int) int {
 	return i
 }
 
+// nameRest reports whether /(?!%%)[^\n\r]/ matches at byte i, which is where a character
+// other than a line break follows that does not start a comment. A title gives way to it in
+// Pele's TREEVIEW_TOKENS, through titleBefore, so that `titles` is a name.
+func nameRest(s string, i int) bool {
+	return i < len(s) && s[i] != '\n' && s[i] != '\r' && !strings.HasPrefix(s[i:], "%%")
+}
+
 // keyword is Pele's keyword('treeView-beta'), with a name that runs on longer taking its
 // place.
 var keyword = func() common.TokenType {
@@ -117,7 +124,7 @@ var treeViewTokens = []common.TokenType{
 	keyword,
 	common.AccDescr("ACC_DESCR"),
 	common.AccTitleToken,
-	common.TitleToken,
+	common.TitleBefore(nameRest),
 	// /[ \t]+:::[ \t]*[A-Za-z_][\w-]*/y
 	{Name: "CLASS_ANNOTATION", First: "\t ", Match: func(s string, at int) int {
 		return matchRun(s, at, func(i int) int {
