@@ -6,6 +6,7 @@
 import { enc, peleError } from '../lib/value.mjs';
 import { lone, picker, testStrings, docs } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The fragments of Pele's tests/wardley/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -435,6 +436,7 @@ export function dumpModel(m) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -473,7 +475,7 @@ export default async function ({ src, pele, write, random }) {
     }
     if (out.type !== 'wardley') return out;
     try {
-      out.model = dumpModel(wardley.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
+      out.model = dumpModel(located(source, false, () => wardley.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title)));
     } catch (e) {
       Object.assign(out, caught(e));
     }

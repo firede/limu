@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { enc, peleError } from '../lib/value.mjs';
 import { fileLiterals, testFiles, docs, lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // Pele's fragments, tests/agentflow/oracle.test.ts, and more of what Pele reads beyond the
 // grammar: metadata, shapes, flows, connectors.
@@ -386,6 +387,7 @@ export function agentflowCorpus(pele, cases) {
 }
 
 export default async function ({ pele, src, cases, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -427,9 +429,9 @@ export default async function ({ pele, src, cases, write, random }) {
     if (type !== 'agentflow') return { type, direct: direct(source) };
     try {
       const config = pre.config;
-      const db = agentflow.parse(encodeEntities(pre.withComments) + '\n', config, pre.title, pre.lineOffset, {
+      const db = located(source, true, () => agentflow.parse(encodeEntities(pre.withComments) + '\n', config, pre.title, pre.lineOffset, {
         maxEdges: maxEdges < 0 ? undefined : maxEdges,
-      });
+      }));
       const graph = agentGraph(db, config);
       return { type, db: dumpDb(db), graph: dumpGraph(graph) };
     } catch (e) {

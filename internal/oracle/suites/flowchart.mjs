@@ -4,6 +4,7 @@
 import { enc, peleError } from '../lib/value.mjs';
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // Pele's fragments, tests/flowchart/oracle.test.ts, and more of what Pele reads beyond the
 // grammar: metadata, links, Unicode.
@@ -271,6 +272,7 @@ function dumpGraph(graph) {
 }
 
 export default async function ({ src, cases, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -308,9 +310,9 @@ export default async function ({ src, cases, write, random }) {
     if (type !== 'flowchart') return { type, direct: direct(source) };
     try {
       const config = pre.config;
-      const db = flowchart.parse(encodeEntities(pre.text) + '\n', config, pre.title, pre.lineOffset, {
+      const db = located(source, false, () => flowchart.parse(encodeEntities(pre.text) + '\n', config, pre.title, pre.lineOffset, {
         maxEdges: maxEdges < 0 ? undefined : maxEdges,
-      });
+      }));
       const flow = config.flowchart ?? {};
       const graph = buildFlowGraph(db, typeof flow.curve === 'string' ? flow.curve : undefined);
       return { type, db: dumpDb(db), graph: dumpGraph(graph) };

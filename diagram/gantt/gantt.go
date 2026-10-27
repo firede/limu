@@ -15,6 +15,7 @@
 package gantt
 
 import (
+	"github.com/firede/limu/diagram/internal/common"
 	"math"
 	"time"
 
@@ -116,7 +117,9 @@ func Parse(source string, config diagram.Config, title string) (*DB, error) {
 
 // ParsePrepared parses a prepared gantt chart, giving Parse what Pele's parse is given.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Config, p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*DB, error) {
+		return Parse(src, p.Config, p.Title)
+	})
 }
 
 // trim is JavaScript's trim, as Pele's String.prototype.trim calls give it.

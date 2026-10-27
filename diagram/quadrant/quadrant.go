@@ -8,6 +8,7 @@ package quadrant
 
 import (
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
 )
 
 // Text is a label of the chart, Pele's QuadrantText: plain text, or markdown when it was
@@ -73,5 +74,7 @@ func Parse(source, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared quadrant chart.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }

@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { enc, peleError } from '../lib/value.mjs';
 import { fileLiterals, testFiles, docs, arrayIn, lone, picker } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The text Mermaid's broken rule for markdown strings matches, as Pele's lexer has it.
 export const BROKEN =
@@ -289,6 +290,7 @@ function dumpModel(m) {
 
 // Each case's tokens, with where each starts in UTF-16 code units, and its model or error.
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -327,7 +329,7 @@ export default async function ({ src, pele, write, random }) {
       return { ...out, ...caught(e) };
     }
     if (out.type !== 'xychart') return out;
-    const piped = parsed(() => xychart.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
+    const piped = parsed(() => located(source, false, () => xychart.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title)));
     // Most text comes out of the pipeline as it went in, and parses the same.
     if (JSON.stringify(piped) === JSON.stringify(out.direct)) return { ...out, same: true };
     return { ...out, ...piped };

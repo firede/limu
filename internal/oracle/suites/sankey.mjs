@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { enc, peleError } from '../lib/value.mjs';
 import { arrayIn, docs, fileLiterals, lone, picker } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The fragments of Pele's tests/sankey/oracle.test.ts, and some for the preparation of the
 // text and the reading of numbers.
@@ -157,6 +158,7 @@ function dumpModel(m) {
 // Each case's tokens, with where each starts in UTF-16 code units, its text as prepared, and
 // its model or error.
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities, cleanupComments } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -196,7 +198,7 @@ export default async function ({ src, pele, write, random }) {
       return { ...out, ...caught(e) };
     }
     if (out.type !== 'sankey') return out;
-    const piped = parsed(() => sankey.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
+    const piped = parsed(() => located(source, false, () => sankey.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title)));
     if (JSON.stringify(piped) === JSON.stringify(out.direct)) return { ...out, same: true };
     return { ...out, ...piped };
   };

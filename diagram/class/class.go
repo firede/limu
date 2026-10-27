@@ -4,7 +4,10 @@
 // lays them out as a scene.
 package class
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // Parse parses a class diagram's text, as the parse of Pele's class diagram does: source is
 // what diagram.Prepared.Source gives, and title the title its front matter gives, "" for
@@ -23,7 +26,9 @@ func Parse(source, title string) (*DB, error) {
 // ParsePrepared parses a prepared class diagram, with the text and the title Pele's core passes
 // to the parse of its class diagram.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*DB, error) {
+		return Parse(src, p.Title)
+	})
 }
 
 // hierarchical reports whether a class diagram's config nests namespaces, as Pele's render

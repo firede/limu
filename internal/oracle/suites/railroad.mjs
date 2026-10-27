@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { enc, peleError } from '../lib/value.mjs';
 import { lone, testStrings, docs } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The generators of Pele's tests/support/railroad-oracle.ts, as they are there.
 
@@ -580,6 +581,7 @@ function depth(s) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -630,7 +632,7 @@ export default async function ({ src, pele, write, random }) {
     }
     if (out.type !== 'railroad') return out;
     try {
-      const m = railroad.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title);
+      const m = located(source, false, () => railroad.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
       out.model = {
         notation: m.notation,
         title: opt(m.title),

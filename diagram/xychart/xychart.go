@@ -8,6 +8,7 @@
 package xychart
 
 import (
+	"github.com/firede/limu/diagram/internal/common"
 	"math"
 
 	"github.com/firede/limu/diagram"
@@ -80,7 +81,9 @@ func Parse(source, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared XY chart.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }
 
 // nan is the value of a category that has none.

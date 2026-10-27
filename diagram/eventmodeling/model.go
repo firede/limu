@@ -298,5 +298,7 @@ func Parse(source, title string) (*Model, error) {
 // ParsePrepared parses a prepared event modeling diagram. Its comment lines are kept, as
 // Pele keeps them, for a data block to show them.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(true), p.Title)
+	return common.ParsePrepared(p, true, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }

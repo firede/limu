@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { peleError } from '../lib/value.mjs';
 import { arrayIn, docs, fileLiterals, lone, picker, testFiles } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The fragments of Pele's tests/ishikawa/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -187,6 +188,7 @@ function dumpModel(m) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -225,7 +227,7 @@ export default async function ({ src, pele, write, random }) {
       return { ...out, ...caught(e) };
     }
     if (out.type !== 'ishikawa') return out;
-    Object.assign(out, parsed(() => ishikawa.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title)));
+    Object.assign(out, parsed(() => located(source, false, () => ishikawa.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title))));
     return out;
   };
 

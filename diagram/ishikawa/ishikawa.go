@@ -8,7 +8,10 @@
 // in errors are UTF-16 code units, as Pele's are.
 package ishikawa
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // A Node is the effect or a cause, Pele's IshikawaNode.
 type Node struct {
@@ -40,5 +43,7 @@ func Parse(source, title string, hasTitle bool) (*Model, error) {
 
 // ParsePrepared parses a prepared Ishikawa diagram.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title, p.HasTitle)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title, p.HasTitle)
+	})
 }

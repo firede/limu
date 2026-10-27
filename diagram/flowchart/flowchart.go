@@ -3,7 +3,10 @@
 // fill, and buildGraph, which resolves the DB into the nodes and edges that are drawn.
 package flowchart
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // Parse parses a flowchart's text, as the parse of Pele's flowchart diagram does: source is
 // what diagram.Prepared.Source gives, config the diagram's configuration, and title the title
@@ -25,7 +28,9 @@ func Parse(source string, config diagram.Config, title string, lineOffset int, l
 // It is limu's own: it hands Parse what Pele's caller hands the parse of its flowchart
 // diagram.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Config, p.Title, p.LineOffset, p.Limits)
+	return common.ParsePrepared(p, false, func(src string) (*DB, error) {
+		return Parse(src, p.Config, p.Title, p.LineOffset, p.Limits)
+	})
 }
 
 // defaultCurve is the curve the flowchart's config gives its edges, as Pele's render reads

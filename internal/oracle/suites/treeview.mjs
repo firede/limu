@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { enc, peleError } from '../lib/value.mjs';
 import { literals, lone, picker, testFiles, unquote, docs } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The fragments of Pele's tests/treeview/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -280,6 +281,7 @@ export function randomDiagrams(rnd) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -340,7 +342,7 @@ export default async function ({ src, pele, write, random }) {
     }
     if (out.type !== 'treeView') return out;
     try {
-      const m = treeView.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title);
+      const m = located(source, false, () => treeView.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
       const icons = iconConfig(pre.config);
       out.model = {
         title: opt(m.title),

@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { enc, peleError } from '../lib/value.mjs';
 import { arrayIn, lone, picker, testStrings, docs } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // The fragments of Pele's tests/info/oracle.test.ts, and more.
 export const FRAGMENTS = [
@@ -115,6 +116,7 @@ export function randomDiagrams(rnd) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -155,7 +157,7 @@ export default async function ({ src, pele, write, random }) {
     }
     if (out.type !== 'info') return out;
     try {
-      const m = info.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title);
+      const m = located(source, false, () => info.parse(encodeEntities(pre.text) + '\n', pre.config, pre.title));
       out.model = { title: opt(m.title), accTitle: opt(m.accTitle), accDescr: opt(m.accDescr) };
     } catch (e) {
       Object.assign(out, caught(e));

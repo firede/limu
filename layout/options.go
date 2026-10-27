@@ -25,6 +25,22 @@ const (
 	Straight
 )
 
+// Monospace is a set of the parts of diagrams that are set in the monospace face, as Pele's
+// monospace option lists them. A part the author gives a font of its own keeps it.
+type Monospace uint8
+
+const (
+	// Members are the attributes and methods of a class diagram's classes ("members").
+	Members Monospace = 1 << iota
+	// Attributes are the attributes of an entity relationship diagram's entities
+	// ("attributes").
+	Attributes
+	// Files are the names of a tree view's entries ("files").
+	Files
+	// Messages are the text of a sequence diagram's messages ("messages").
+	Messages
+)
+
 // Options are what a layout takes besides the diagram.
 type Options struct {
 	Measurer text.Measurer // nil is text.Arial
@@ -57,6 +73,9 @@ type Options struct {
 	Snap float64
 	// Routing is how edges run, in the diagrams laid out in ranks.
 	Routing Routing
+	// Monospace is the parts of diagrams set in the monospace face, Pele's monospace option.
+	// They are measured in it, so it changes where things are.
+	Monospace Monospace
 
 	// Now is the time a diagram that places things in time takes as the present: where a
 	// gantt chart draws today, and where a task with no start begins. The zero time is

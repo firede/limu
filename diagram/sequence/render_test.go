@@ -159,7 +159,7 @@ func ends(s style.Style, stroke string, join style.Join) string {
 // clean drops what XML does not allow, as Pele's esc does.
 func clean(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

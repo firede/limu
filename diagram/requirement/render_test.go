@@ -312,7 +312,7 @@ func sharedFace(l *text.Label) text.Face {
 // dropControls drops the characters XML does not allow, as Pele's esc does.
 func dropControls(s string) string {
 	return strings.Map(func(r rune) rune {
-		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f {
+		if r < 0x20 && r != '\t' && r != '\n' && r != '\r' || r == 0x7f || r == 0xfffe || r == 0xffff {
 			return -1
 		}
 		return r

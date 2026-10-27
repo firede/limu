@@ -7,7 +7,10 @@
 // code units, as Pele's are.
 package gitgraph
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // gitGraphAst is a git graph's text as the parser reads it, Pele's GitGraphAst. A string
 // Pele may leave undefined is nil where it does.
@@ -107,5 +110,7 @@ func Parse(source string, config diagram.Config, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared git graph.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Config, p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Config, p.Title)
+	})
 }

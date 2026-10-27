@@ -10,7 +10,10 @@
 // state's name) and state.title.
 package state
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // Parse parses a state diagram's text, as the parse of Pele's state diagram does: source is
 // what diagram.Prepared.Source gives, and title the title its front matter gives, "" for none.
@@ -28,5 +31,7 @@ func Parse(source string, title string) (*DB, error) {
 
 // ParsePrepared parses a prepared state diagram.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*DB, error) {
+		return Parse(src, p.Title)
+	})
 }

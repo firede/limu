@@ -13,7 +13,10 @@
 // its lifeline and, mirrored, at its foot; its kind its shape).
 package sequence
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // The kinds of message, as Mermaid numbers them: Pele's LINETYPE.
 const (
@@ -195,5 +198,7 @@ func Parse(source string, config diagram.Config, title string) (*DB, error) {
 // ParsePrepared parses a prepared sequence diagram. It is limu's own: Pele's core hands its
 // parse the source, the config and the title itself.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Config, p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*DB, error) {
+		return Parse(src, p.Config, p.Title)
+	})
 }

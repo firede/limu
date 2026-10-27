@@ -7,7 +7,10 @@
 // units, as Pele's are.
 package sankey
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // Node is a node of a diagram, Pele's SankeyNode: its id as written, with the entities of the
 // text encoded as Pele's preprocessing leaves them, and its place in Model.Nodes.
@@ -74,5 +77,7 @@ func Parse(source, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared sankey diagram.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }

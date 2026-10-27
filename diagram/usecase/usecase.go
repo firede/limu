@@ -7,7 +7,10 @@
 // errors are UTF-16 code units, as Pele's are.
 package usecase
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // LabelType is how a label's text is read: "text", or "markdown" for a label written in
 // backquotes.
@@ -206,5 +209,7 @@ func Parse(source, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared use case diagram.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }

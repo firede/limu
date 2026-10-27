@@ -8,7 +8,10 @@
 // units, as Pele's are.
 package block
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // A Block is a block, an edge, or a statement that sets columns, classes or styles, in one
 // shape, as Pele's Block is, after Mermaid. A field Pele may leave undefined is nil here, or
@@ -68,5 +71,7 @@ func Parse(source, title string) (*DB, error) {
 
 // ParsePrepared parses a prepared block diagram.
 func ParsePrepared(p *diagram.Prepared) (*DB, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*DB, error) {
+		return Parse(src, p.Title)
+	})
 }

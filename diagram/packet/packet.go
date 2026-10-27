@@ -138,5 +138,7 @@ func Parse(source string, config diagram.Config, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared packet diagram.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Config, p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Config, p.Title)
+	})
 }

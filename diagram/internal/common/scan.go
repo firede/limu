@@ -50,9 +50,8 @@ func KeywordAt(src string, p int, word string) bool {
 }
 
 // SkipTrivia skips comments and white space, as Pele's skipTrivia does. It stops at a line
-// break that starts a token, which is a NEWLINE. Jison compiles `\%%` to a single `%`, so one
-// percent sign starts a comment, and the second comment rule takes any character before `%%`
-// with it, a line break included.
+// break that starts a token, which is a NEWLINE. Jison compiles `\%%` to `%`, so a single `%`
+// starts a comment.
 func SkipTrivia(src string, from int) int {
 	n := len(src)
 	p := from
@@ -61,10 +60,6 @@ func SkipTrivia(src string, from int) int {
 		switch {
 		case c == '%' && chars.Unit(src, p+1) != '{':
 			p = LineEnd(src, p)
-		// After a character above the Basic Multilingual Plane, JavaScript reads its low
-		// surrogate, which is no percent sign.
-		case c != '}' && size < 4 && chars.Unit(src, p+size) == '%' && chars.Unit(src, p+size+1) == '%':
-			p = LineEnd(src, p+size+2)
 		case c == '\n':
 			return p
 		case chars.IsSpace(c):

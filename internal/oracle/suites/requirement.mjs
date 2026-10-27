@@ -4,6 +4,7 @@
 import { peleError } from '../lib/value.mjs';
 import { lone, picker } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // Pele's fragments, tests/requirement/oracle.test.ts, and more of what reaches past the
 // grammar: Unicode, entities, front matter.
@@ -288,6 +289,7 @@ export function corpus(cases) {
 }
 
 export default async function ({ src, cases, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -330,7 +332,7 @@ export default async function ({ src, cases, write, random }) {
     if (type !== 'requirement') return { type, direct: direct(source) };
     const text = encodeEntities(pre.text) + '\n';
     try {
-      const db = requirement.parse(text, pre.config, pre.title);
+      const db = located(source, false, () => requirement.parse(text, pre.config, pre.title));
       return { type, tokens: tokens(text), db: dumpDb(db), graph: dumpGraph(buildRequirementGraph(db)) };
     } catch (e) {
       return { type, tokens: tokens(text), ...caught(e) };

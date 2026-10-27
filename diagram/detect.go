@@ -169,7 +169,7 @@ func detect(cleaned string) Type {
 // finds it. Its error is one of its front matter. Bytes that are not UTF-8 are read as
 // Prepare reads them.
 func DetectType(text string) (Type, error) {
-	pre, err := preprocess(chars.Decode(text))
+	pre, err := preprocess(chars.Decode(text), nil)
 	if err != nil {
 		return "", err
 	}

@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { enc, peleError } from '../lib/value.mjs';
 import { literals, testFiles, lone, picker, docs } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { locator } from '../lib/located.mjs';
 
 // Pele's fragments, tests/git/oracle.test.ts.
 export const FRAGMENTS = [
@@ -335,6 +336,7 @@ function dumpModel(m) {
 }
 
 export default async function ({ src, pele, write, random }) {
+  const located = await locator(src);
   const { preprocess, encodeEntities } = await src('preprocess.ts');
   const { detect } = await src('detect.ts');
   const { PeleError } = await src('errors.ts');
@@ -345,15 +347,17 @@ export default async function ({ src, pele, write, random }) {
     if (!(e instanceof PeleError)) throw e;
     return { error: peleError(e) };
   };
-  const parsed = (text, config, title) => {
+  // With source, as Pele's parseSource parses the text of source.
+  const parsed = (text, config, title, source) => {
+    const run = source === undefined ? (f) => f() : (f) => located(source, false, f);
     let ast;
     try {
-      ast = parseGit(text);
+      ast = run(() => parseGit(text));
     } catch (e) {
       return caught(e);
     }
     try {
-      return { ast: dumpAst(ast), model: dumpModel(buildGit(ast, config, title)) };
+      return { ast: dumpAst(ast), model: dumpModel(run(() => buildGit(ast, config, title))) };
     } catch (e) {
       return { ast: dumpAst(ast), ...caught(e) };
     }
@@ -369,7 +373,7 @@ export default async function ({ src, pele, write, random }) {
       return { ...out, ...caught(e) };
     }
     if (out.type !== 'gitGraph') return out;
-    const piped = parsed(encodeEntities(pre.text) + '\n', pre.config, pre.title);
+    const piped = parsed(encodeEntities(pre.text) + '\n', pre.config, pre.title, source);
     if (JSON.stringify(piped) === JSON.stringify(out.direct)) return { ...out, same: true };
     return { ...out, ...piped };
   };

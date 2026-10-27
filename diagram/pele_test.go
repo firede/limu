@@ -79,7 +79,7 @@ func TestPreprocessMatchesPele(t *testing.T) {
 	}
 	failed := 0
 	for _, c := range p.Preprocessed {
-		got, err := preprocess(c.Source)
+		got, err := preprocess(c.Source, nil)
 		if c.Error != nil {
 			if !sameError(err, c.Error) {
 				t.Errorf("preprocess(%q)\n got error %#v\nPele %#v", c.Source, err, c.Error)
@@ -127,7 +127,7 @@ func TestEncodeEntitiesMatchesPele(t *testing.T) {
 		t.Fatalf("only %d cases", len(p.Encoded))
 	}
 	for _, c := range p.Encoded {
-		if got := encodeEntities(c.Text); got != c.Encoded {
+		if got := encodeEntities(c.Text, nil); got != c.Encoded {
 			t.Errorf("encodeEntities(%q)\n got %q\nPele %q", c.Text, got, c.Encoded)
 		}
 	}

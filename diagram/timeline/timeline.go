@@ -7,7 +7,10 @@
 // units, as Pele's are.
 package timeline
 
-import "github.com/firede/limu/diagram"
+import (
+	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/common"
+)
 
 // Period is a time period and its events, Pele's TimelinePeriod.
 type Period struct {
@@ -47,5 +50,7 @@ func Parse(source, title string) (*Model, error) {
 
 // ParsePrepared parses a prepared timeline diagram.
 func ParsePrepared(p *diagram.Prepared) (*Model, error) {
-	return Parse(p.Source(false), p.Title)
+	return common.ParsePrepared(p, false, func(src string) (*Model, error) {
+		return Parse(src, p.Title)
+	})
 }
