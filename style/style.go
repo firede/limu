@@ -224,10 +224,11 @@ type Style struct {
 	OnFill bool
 	// Ground is the fill under the part where it lies inside a fill its author sets on
 	// another part, as an edge inside a group with a fill of its own. Unless an override or
-	// the part's author sets a stroke, the part is stroked in the theme's Fg or Bg, whichever
-	// stands out more against the ground, as Pele draws an edge inside one fill in the color
-	// of that fill's labels, and what it paints Hollow is filled with the ground, as Pele's
-	// hollowOn fills a marker. A diagram sets it only on a fill ink can pick a color on.
+	// the part's author sets them, the part's stroke and text are drawn in the theme's Fg or
+	// Bg, whichever stands out more against the ground, as Pele draws an edge or a label
+	// inside one fill in the color of that fill's labels, and what it paints Hollow is filled
+	// with the ground, as Pele's hollowOn fills a marker. A diagram sets it only on a fill ink
+	// can pick a color on.
 	Ground Paint
 }
 
@@ -307,9 +308,14 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 			s.Text = text
 		}
 	}
-	if s.Ground.Visible() && !set.Stroke.Set() {
-		if stroke, ok := ink(th, Style{Fill: s.Ground}); ok {
-			s.Stroke = stroke
+	if s.Ground.Visible() {
+		if on, ok := ink(th, Style{Fill: s.Ground}); ok {
+			if !set.Stroke.Set() {
+				s.Stroke = on
+			}
+			if !set.Text.Set() {
+				s.Text = on
+			}
 		}
 	}
 	if !s.StrokeWidth.set {

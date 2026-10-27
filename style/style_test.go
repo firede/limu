@@ -194,7 +194,7 @@ func TestGround(t *testing.T) {
 	navy := Of(Hex("#000080"))
 	own := Style{Stroke: Line, Ground: navy}
 	r := look.Resolve("x", own, Style{})
-	if r.Stroke != th.Bg || r.Marker != th.Bg || r.Hollow != Hex("#000080") || r.Bg != th.Bg {
+	if r.Stroke != th.Bg || r.Marker != th.Bg || r.Text != th.Bg || r.Hollow != Hex("#000080") || r.Bg != th.Bg {
 		t.Errorf("on navy: %+v", r)
 	}
 	if r := look.Resolve("x", own, Style{Stroke: Of(Hex("#f00"))}); r.Stroke != Hex("#f00") {
