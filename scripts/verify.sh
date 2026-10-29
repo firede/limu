@@ -2,8 +2,7 @@
 # Runs every check of the repository: go vet, gofmt and the tests, which compare what limu
 # does with fixtures written from Pele and with golden files, in limu's module and in the
 # limumygo module, which ./... does not reach, with its playground's shell for browsers,
-# which only a build for js/wasm compiles, and go vet in the website's module, whose ./...
-# would reach into node_modules. Works offline once limumygo's modules are
+# which only a build for js/wasm compiles. Works offline once limumygo's modules are
 # downloaded, from any directory; Node and Pele are needed only to write the fixtures anew
 # (scripts/oracle.sh).
 set -eu
@@ -22,5 +21,4 @@ if [ -n "$unformatted" ]; then
 fi
 go test -count=1 ./...
 (cd limumygo && go vet ./... && GOOS=js GOARCH=wasm go vet ./examples/playground && go test -count=1 ./...)
-(cd website && go vet ./gen)
 echo PASSED

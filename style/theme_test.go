@@ -2,9 +2,10 @@ package style
 
 import "testing"
 
-// Kohu and KohuDark keep the contrast docs/website.md holds them to: text at 7:1 against
-// the background and surfaces, muted text, lines and the accent at 4.5:1 against the
-// background, the series at 3:1 and outlines at 2.5:1 against the surface.
+// Kohu and KohuDark keep the contrast the website holds them to, in docs/website.md of
+// firede/limu-website: text at 7:1 against the background and surfaces, muted text, lines
+// and the accent at 4.5:1 against the background, the series at 3:1 and outlines at 2.5:1
+// against the surface.
 func TestKohuContrast(t *testing.T) {
 	for name, th := range map[string]*Theme{"Kohu": Kohu(), "KohuDark": KohuDark()} {
 		check := func(what string, a, b Color, least float64) {

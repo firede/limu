@@ -15,8 +15,9 @@
 //	go run ./examples/playground -png playground.png -src diagram.mmd -appearance Dark
 //
 // In a browser it is the website's playground, compiled to WebAssembly by
-// website/scripts/playground.mjs; it takes the text from the URL's fragment, as the
-// website's links have it, and is light or dark as the page is.
+// scripts/playground.mjs of firede/limu-website, at the release the site follows; it takes
+// the text from the URL's fragment, as the website's links have it, and is light or dark as
+// the page is.
 //
 // It is an example, not an API: it may change in any way.
 package main

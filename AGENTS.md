@@ -57,6 +57,17 @@ layout.
 - The port follows Pele 1.12.0, commit 8aff183. To follow a newer Pele, write the fixtures
   anew from it and port what its diff changed.
 
+## Releasing
+
+- limu is released as a tag `v…` with a release on GitHub, and limumygo as a tag
+  `limumygo/v…`, whose go.mod requires the release of limu it is built with.
+- The website, [firede/limu-website](https://github.com/firede/limu-website), shows releases
+  of limu and limumygo, not this repository's main branch. After a release, follow it there:
+  require it in that repository's go.mod, as its README says, and change its documents for
+  what the release changed. Its daily check fails until the site follows the latest release.
+- A release's notes list what changed that the site describes, such as the API, the
+  options, the types limu reads and the Pele it follows, so that following it misses none.
+
 ## Writing
 
 Comments and documents are plain and exact. Say what a thing does and why, in full

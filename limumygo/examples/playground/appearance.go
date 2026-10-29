@@ -36,8 +36,9 @@ const (
 var appearanceNames = []string{appearanceSystem, appearanceLight, appearanceDark}
 
 // A palette is the colors of one of the website's themes, by the names of its CSS
-// variables in website/src/styles/base.scss, so that the playground looks as the site
-// around it does. TestPalettes holds them to that file.
+// variables in src/styles/base.scss of firede/limu-website, so that the playground looks as
+// the site around it does. The website's TestPalettes holds the palettes of the release it
+// builds to that file, reading them from kohu and kohuDark, so their names and fields stay.
 type palette struct {
 	dark bool
 
@@ -152,7 +153,7 @@ func mixUI(a, b ui.Color, f float64) ui.Color {
 }
 
 // codeTheme is the editor's theme in the colors of p, each kind of token in the color the
-// site's highlighter gives it (website/src/lib/highlight.ts): a link's arrow as
+// site's highlighter gives it (src/lib/highlight.ts of firede/limu-website): a link's arrow as
 // punctuation, and front matter and directives, which say how to draw the rest, as the
 // keys of front matter.
 func (p palette) codeTheme() *editor.Theme {

@@ -75,12 +75,12 @@ func withType(state uint64, t diagram.Type) uint64 {
 }
 
 // Tokenize highlights a line of Mermaid's text, given the state the line before ended in, as
-// the website's highlighter does (website/src/lib/highlight.ts): front matter and
-// directives as meta, comments, the word that says the diagram's type, the keywords of its
-// type, and directions; names as variables, and labels, in a node's shape, between the |s
-// of an edge or after a colon, as strings; numbers, colors, and arrows and the other
-// operators; a class given with ::: as a keyword, and the declarations of a style as
-// properties and their values. It is the Tokenizer of Language.
+// the website's highlighter does (src/lib/highlight.ts of firede/limu-website): front matter
+// and directives as meta, comments, the word that says the diagram's type, the keywords of its
+// type, and directions; names as variables, and labels, in a node's shape, between the |s of
+// an edge or after a colon, as strings; numbers, colors, and arrows and the other operators; a
+// class given with ::: as a keyword, and the declarations of a style as properties and their
+// values. It is the Tokenizer of Language.
 func Tokenize(line string, state uint64, toks []editor.Token) ([]editor.Token, uint64) {
 	first := state&begun == 0
 	state |= begun

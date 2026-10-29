@@ -10,10 +10,11 @@ import (
 )
 
 // keywordsJSON holds the keywords of each type, which the website's highlighter reads too
-// (website/src/lib/highlight.ts), so that both highlight the same words:
+// (src/lib/highlight.ts of firede/limu-website, from the release the site follows), so that
+// both highlight the same words:
 //
 //   - starts: the words that start a statement of each type, as Pele's playground lists
-//     them for completion (website/src/lib/playground-completions.ts, keywords);
+//     them for completion (src/lib/playground-completions.ts, keywords);
 //   - inline: words that are keywords wherever they are in a statement of the type, not
 //     only at its start;
 //   - common: the words that start a statement of every type;

@@ -49,10 +49,11 @@ const source = `flowchart LR
 const pad = 16
 
 func main() {
-	out := flag.String("out", "../website/public/pictures", "the directory to write the pictures to")
+	// The website, firede/limu-website, is checked out beside limu.
+	out := flag.String("out", "../../limu-website/public/pictures", "the directory to write the pictures to")
 	scale := flag.Float64("scale", 2, "device pixels per DIP of the PNG pictures")
 	font := flag.String("font", "", "Hanken Grotesk as a TrueType file, to draw the pictures for links with")
-	mark := flag.String("mark", "../website/public/mark.svg", "limu's mark as SVG")
+	mark := flag.String("mark", "../../limu-website/public/mark.svg", "limu's mark as SVG")
 	flag.Parse()
 
 	sc, err := limu.Layout(source, &layout.Options{Measurer: limumygo.DefaultFonts})
