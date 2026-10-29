@@ -203,7 +203,7 @@ const cardFont = "Hanken Grotesk"
 // bottom up, as the bubbles it is drawn in rise.
 const cardSource = `flowchart BT
   mermaid((Mermaid)) -->|layout| scene((Scene))
-  scene --> mygo((MyGo))
+  scene --> native((Native))
   scene --> svg((SVG))`
 
 // water is the shader of the sea a picture for links is set in: light near the surface
@@ -313,8 +313,8 @@ func card(w, h int, mark *ui.SVG) *image.RGBA {
 			x := r.X + 80*k
 			p.RichText(x-6*k, r.Y+150*k, 0, ui.Span{Text: "limu", Font: cardFont, Size: 128 * k, Weight: 700, Color: white})
 			p.RichText(x, r.Y+330*k, 0,
-				ui.Span{Text: "A diagram layout engine in Go.\n", Font: cardFont, Size: 38 * k, Weight: 600, Color: white},
-				ui.Span{Text: "Drawn natively with MyGo, or as SVG.", Font: cardFont, Size: 38 * k, Weight: 400, Color: white.Alpha(0.85)})
+				ui.Span{Text: "A diagram layout engine in Rust and Go.\n", Font: cardFont, Size: 38 * k, Weight: 600, Color: white},
+				ui.Span{Text: "Drawn natively, in a terminal, or as SVG.", Font: cardFont, Size: 38 * k, Weight: 400, Color: white.Alpha(0.85)})
 			p.RichText(x, r.Y+H-90*k, 0, ui.Span{Text: "limu.firede.com", Font: cardFont, Size: 26 * k, Weight: 500, Color: white.Alpha(0.8)})
 		})
 	}, w, h, 1)
