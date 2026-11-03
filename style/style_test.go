@@ -23,6 +23,11 @@ func TestParseColor(t *testing.T) {
 		{"hsl(120, 100%, 50%)", Color{0, 255, 0, 255}, true},
 		{"hsl(0deg 100% 50%)", Color{255, 0, 0, 255}, true},
 		{"hsla(240, 100%, 50%, 0.25)", Color{0, 0, 255, 64}, true},
+		{"hsl(0.5turn 100% 50%)", Color{0, 255, 255, 255}, true},
+		{"hsl(200grad 100% 50%)", Color{0, 255, 255, 255}, true},
+		{"hsl(3.141592653589793rad 100% 50%)", Color{0, 255, 255, 255}, true},
+		{"hsl(10%turn 100% 50%)", Color{}, false},
+		{"rgb(none 255 none)", Color{0, 255, 0, 255}, true},
 		{"var(--x)", Color{}, false},
 		{"currentColor", Color{}, false},
 		{"rgb(1,2)", Color{}, false},
@@ -243,5 +248,35 @@ func TestShadeOnAuthorFill(t *testing.T) {
 	}
 	if r := look.Resolve("er.entity", Style{}, Style{}); r.Shade != look.ThemeOrDefault().Bg {
 		t.Errorf("resolved under an override's fill: %v", r.Shade)
+	}
+}
+
+// WithSeries replaces the theme's series colors with those a palette sets, settling a paint of
+// the theme's in it, and leaves the look as it is where the palette sets none.
+func TestWithSeries(t *testing.T) {
+	look := &Look{Overrides: Overrides{"pie.slice": {Stroke: Accent}}}
+	if look.WithSeries([8]Paint{}) != look {
+		t.Error("a palette that sets nothing changed the look")
+	}
+	var series [8]Paint
+	series[0] = Of(Hex("#ffeb3b"))
+	series[1] = Fg
+	series[2] = None
+	got := look.WithSeries(series)
+	th := Default()
+	want := th.Series
+	want[0], want[1], want[2] = Hex("#ffeb3b"), th.Fg, Color{}
+	if got.ThemeOrDefault().Series != want {
+		t.Errorf("series %v, not %v", got.ThemeOrDefault().Series, want)
+	}
+	if got.Overrides["pie.slice"].Stroke != Accent {
+		t.Error("the overrides were lost")
+	}
+	if Default().Series != th.Series {
+		t.Error("the theme was changed")
+	}
+	// Text on a series is picked on the palette's color.
+	if s := got.Cascade("pie.slice-label", Style{Text: Bg, TextGround: Series(0)}, Style{}); s.Text != Fg {
+		t.Errorf("text on the palette's yellow in %v", s.Text)
 	}
 }

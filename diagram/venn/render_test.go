@@ -65,7 +65,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 				overlaps++
 			}
 		}
-		if msg := f.Diff(k, &c.Drawing, got, peleLine); msg != "" {
+		if msg := f.Diff(k, &c.Drawing, got, readLine); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
@@ -321,11 +321,21 @@ func textPaint(it *scene.Item) string {
 	return textPaints[it.Style.Text]
 }
 
+// readLine reads a line of Pele's as peleLine does, and the series colors Pele's palette sets
+// as limu reads them, which the suite keeps in full.
+func readLine(line string) string {
+	if strings.HasPrefix(line, "series ") {
+		return pelesvg.ReadSeries(line, css.PaletteColor)
+	}
+	return peleLine(line)
+}
+
 // sceneLines writes a scene as the oracle reads Pele's SVG.
 func sceneLines(sc *scene.Scene) []string {
 	num := chars.NumberString
 	pt := func(x, y float64) string { return num(x) + "," + num(y) }
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
+	lines = append(lines, pelesvg.Series(sc)...)
 	// A label as Pele's labelSvg writes it about At: one text with no spans when it is one
 	// line of one span of plain text, and otherwise spans, with the emphasis every span has
 	// written on the text, unless the attributes give a weight of their own, and the rest on

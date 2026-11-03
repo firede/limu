@@ -5,6 +5,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -96,9 +97,11 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		o = &layout.Options{}
 	}
 	natural := option(config, "width", 320, 1, 4000)
-	return common.FitWidth(o, natural, 160, func(width float64, tight bool) *scene.Scene {
+	sc := common.FitWidth(o, natural, 160, func(width float64, tight bool) *scene.Scene {
 		return draw(m, config, o, width, (option(config, "height", 320, 1, 4000)*width)/natural, tight)
 	})
+	sc.Palette = css.ReadPalette("radar", config).Series
+	return sc
 }
 
 // draw lays the chart out at a width and a height, as Pele's draw does: about its center,

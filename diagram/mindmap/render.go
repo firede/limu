@@ -6,6 +6,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -439,6 +440,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 		Width:    math.Ceil(width + 2*pad),
 		Height:   math.Ceil(maxY - minY + titleHeight + 2*pad),
 		FontSize: size,
+		Palette:  css.ReadPalette("mindmap", config).Series,
 	}
 	ox := pad - minX + (width-maxX+minX)/2
 	oy := pad + titleHeight - minY

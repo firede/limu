@@ -5,6 +5,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -60,6 +61,7 @@ func roundedBox(x, y, w, h float64, role scene.Role, kind scene.Kind, s style.St
 
 // lay lays out a timeline, across or down, as Pele's draw does.
 func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *scene.Scene {
+	palette := css.ReadPalette("timeline", config)
 	pad := o.Pad()
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
@@ -154,16 +156,34 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 	eventW := eventTextW() + 2*padX
 	chipHeight := func(l *text.Label) float64 { return max(l.Height, lineHeight) + 2*padY }
 	eventHeight := func(l *text.Label) float64 { return max(l.Height, eventLineHeight) + 2*padY }
-	colorOf := func(g *group, period int) style.Paint {
+	// seriesOf is the series a group's period is drawn in, and false where it is drawn in no
+	// series, as Pele's seriesOf.
+	seriesOf := func(g *group, period int) (int, bool) {
 		switch {
 		case g.section >= 0:
-			return style.Series(g.section)
+			return g.section, true
 		case hasSections:
-			return style.Muted
+			return 0, false
 		case multicolor:
-			return style.Series(period)
+			return period, true
 		}
-		return style.Series(0)
+		return 0, true
+	}
+	colorOf := func(g *group, period int) style.Paint {
+		series, ok := seriesOf(g, period)
+		if !ok {
+			return style.Muted
+		}
+		return style.Series(series)
+	}
+	// onColor is the ground of a label on a series, where the palette sets it and ink picks a
+	// color on it, as Pele's onColor gives the label that color; elsewhere the label keeps the
+	// background's color.
+	onColor := func(series int, ok bool) style.Paint {
+		if !ok {
+			return style.Paint{}
+		}
+		return palette.Ground(series)
 	}
 
 	hasEvents := false
@@ -210,14 +230,14 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 	}
 	var items []scene.Item
 	header := func(g *group, label text.Label, x, y, w, h float64) {
-		it := roundedBox(x, y, w, h, RoleSection, scene.Group, style.Style{Fill: style.Series(g.section), Text: style.Bg})
+		it := roundedBox(x, y, w, h, RoleSection, scene.Group, style.Style{Fill: style.Series(g.section), Text: style.Bg, TextGround: onColor(g.section, true)})
 		it.ID = chars.Trim(m.Sections[g.section])
 		it.Label = &label
 		it.At = scene.Point{X: x + w/2, Y: y + h/2}
 		items = append(items, it)
 	}
-	period := func(i int, color style.Paint, x, y, h float64) {
-		it := roundedBox(x, y, colW, h, RolePeriod, scene.Node, style.Style{Fill: color, Text: style.Bg})
+	period := func(i int, g *group, color style.Paint, x, y, h float64) {
+		it := roundedBox(x, y, colW, h, RolePeriod, scene.Node, style.Style{Fill: color, Text: style.Bg, TextGround: onColor(seriesOf(g, i))})
 		it.ID = chars.Trim(periods[i].Text)
 		label := periodLabels[i]
 		it.Label = &label
@@ -303,7 +323,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 				if len(cards) > 0 {
 					d.MoveTo(axisX, cy).LineTo(spineX, cy).LineTo(spineX, last)
 				}
-				period(i, color, left, cy-h/2, h)
+				period(i, g, color, left, cy-h/2, h)
 				connector(d)
 				dot(axisX, cy, color)
 				items = append(items, cards...)
@@ -378,7 +398,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 					ey += eh + eventGap
 				}
 				bottom = max(bottom, ey-eventGap)
-				period(i, color, x, periodsY, chipH)
+				period(i, g, color, x, periodsY, chipH)
 				connector(d)
 				dot(cx, axisY, color)
 				items = append(items, cards...)
@@ -408,5 +428,6 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 		Title:    m.AccTitle,
 		Desc:     m.AccDescr,
 		Items:    items,
+		Palette:  palette.Series,
 	}
 }

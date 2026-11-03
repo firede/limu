@@ -181,6 +181,57 @@ func TestRenderFillOpacity(t *testing.T) {
 	}
 }
 
+// A scene's palette sets the series colors on the root, as Pele's palette does, and replaces
+// the theme's where they are used: in their variables' fallbacks, in their opacities, and in
+// the color picked for text on them.
+func TestRenderPalette(t *testing.T) {
+	l := text.Layout("50%", text.Options{Measurer: text.Arial, Size: 14})
+	slice := func(n int) scene.Item {
+		return scene.Item{
+			Kind: scene.Mark, Role: "pie.slice", Box: scene.Rect{W: 10, H: 10},
+			Parts: []scene.Part{{Box: scene.Rect{W: 10, H: 10}, Paint: scene.FillOnly}},
+			Label: &l, At: scene.Point{X: 5, Y: 5},
+			Style: style.Style{Fill: style.Series(n), Text: style.Bg, TextGround: style.Series(n)},
+		}
+	}
+	sc := &scene.Scene{Type: "pie", Width: 40, Height: 10, FontSize: 16, Items: []scene.Item{slice(0), slice(1), slice(2), slice(3)}}
+	sc.Palette[0] = style.Of(style.Hex("#ffeb3b80"))
+	sc.Palette[1] = style.Fg
+	sc.Palette[2] = style.None
+	got := Render(sc, nil)
+	for _, want := range []string{
+		`style="font-family:var(--limu-font,sans-serif);--limu-series-1:#ffeb3b;--limu-series-2:var(--limu-fg,#1f1f1f);--limu-series-3:transparent"`,
+		`fill="var(--limu-series-1,#ffeb3b)" fill-opacity="0.5"`,
+		`fill="var(--limu-series-2,#1f1f1f)"`,
+		`fill="var(--limu-series-3,#000000)" fill-opacity="0"`,
+		// The theme's series 4, which the palette leaves.
+		`fill="var(--limu-series-4,#e45756)"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("no %s in\n%s", want, got)
+		}
+	}
+	// Text on the light yellow is in the foreground, which the root gives it, and on the
+	// foreground in the background.
+	var texts []string
+	for _, part := range strings.Split(got, "<text ")[1:] {
+		texts = append(texts, part[:strings.IndexByte(part, '>')])
+	}
+	want := []string{"", "var(--limu-bg,#ffffff)", "var(--limu-bg,#ffffff)", ""}
+	for i, attrs := range texts {
+		fill := ""
+		if at := strings.Index(attrs, ` fill="`); at >= 0 {
+			fill = attrs[at+7 : at+7+strings.IndexByte(attrs[at+7:], '"')]
+		}
+		if i >= len(want) || fill != want[i] {
+			t.Errorf("text %d filled %q:\n%s", i, fill, got)
+		}
+	}
+	if got := Render(sc, &Options{Literal: true}); strings.Contains(got, "--limu-series") || !strings.Contains(got, `fill="#ffeb3b" fill-opacity="0.5"`) {
+		t.Errorf("the palette not written as colors:\n%s", got)
+	}
+}
+
 // An item's tags and then its classes are written as the element's classes.
 func TestRenderTagsAndClasses(t *testing.T) {
 	sc := &scene.Scene{Width: 10, Height: 10, Items: []scene.Item{{

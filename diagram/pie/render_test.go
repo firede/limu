@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -52,8 +53,8 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		sc := Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding})
-		got := sceneLines(sc, c.Line)
-		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
+		got := sceneLines(sc, c.LineRead(readSeries))
+		if msg := f.Diff(k, &c.Drawing, got, readSeries); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v, padding %v), %s", c.Src, c.MaxWidth, c.FontSize, (&layout.Options{Padding: c.Padding}).Pad(), msg)
 			}
@@ -75,6 +76,10 @@ func TestLayoutMatchesPele(t *testing.T) {
 		t.Errorf("only %d pies with percentages outside, %d with no slice", outside, empty)
 	}
 }
+
+// readSeries reads the series colors Pele's palette sets as limu reads them, which the suite
+// keeps in full.
+func readSeries(line string) string { return pelesvg.ReadSeries(line, css.PaletteColor) }
 
 // paintName is a paint as Pele's SVG names it, "-" for none given.
 func paintName(p style.Paint) string {
@@ -143,6 +148,7 @@ func sceneLines(sc *scene.Scene, want func(int) string) []string {
 	if sc.Desc != "" {
 		lines = append(lines, "acc-desc "+pelesvg.ID(sc.Desc))
 	}
+	lines = append(lines, pelesvg.Series(sc)...)
 	hint := func() string { return want(len(lines)) }
 	contexts := map[scene.Role]string{RoleTitle: "title", RoleSliceLabel: "slice-labels", RoleLegend: "legend"}
 	// Where Pele's text puts the first line of a label, with its fill, anchor and size and the
@@ -167,7 +173,11 @@ func sceneLines(sc *scene.Scene, want func(int) string) []string {
 			}
 			content = append(content, pelesvg.ID(s))
 		}
-		lines = append(lines, contexts[it.Role]+" t "+pt(x, y)+" "+paintName(it.Style.Text)+" middle "+n(l.Size)+" | "+strings.Join(content, " | "))
+		paint := paintName(it.Style.Text)
+		if ink := pelesvg.SeriesInk(sc, it); ink.Set() {
+			paint = pelesvg.InkNames[ink]
+		}
+		lines = append(lines, contexts[it.Role]+" t "+pt(x, y)+" "+paint+" middle "+n(l.Size)+" | "+strings.Join(content, " | "))
 	}
 	pen := func(it *scene.Item) string {
 		width := "-"

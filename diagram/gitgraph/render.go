@@ -6,6 +6,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
@@ -284,6 +285,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 		}
 	}
 
+	palette := css.ReadPalette("gitGraph", config)
 	var items []scene.Item
 	if showBranches {
 		for i := 0; i < laneCount; i++ {
@@ -319,7 +321,8 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 					Box:   box,
 					Parts: []scene.Part{{Box: box, Rounded: true, Paint: scene.FillOnly}},
 					Label: name, At: scene.Point{X: cx, Y: cy},
-					Style: style.Style{Fill: color, Stroke: style.None, Text: style.Bg},
+					// On a series the palette sets, the label takes the color ink picks on it.
+					Style: style.Style{Fill: color, Stroke: style.None, Text: style.Bg, TextGround: palette.Ground(i)},
 				})
 			}
 		}
@@ -532,7 +535,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 	for _, t := range turns {
 		place(&items[t.item], t, dx, dy)
 	}
-	sc := &scene.Scene{Type: "gitGraph", Width: width, Height: height, FontSize: size, Title: m.AccTitle, Desc: m.AccDescr}
+	sc := &scene.Scene{Type: "gitGraph", Width: width, Height: height, FontSize: size, Title: m.AccTitle, Desc: m.AccDescr, Palette: palette.Series}
 	if len(title.Lines) > 0 {
 		sc.Items = append(sc.Items, scene.Item{
 			Kind: scene.Text, Role: RoleTitle, Label: &title,

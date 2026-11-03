@@ -96,6 +96,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	if o == nil {
 		o = &layout.Options{}
 	}
+	palette := css.ReadPalette("treemap", config)
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
 	tiny := jsmath.Round(size * 0.75)
@@ -147,6 +148,12 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		var ground style.Paint
 		if onFill {
 			ground = author.Style.Fill
+		}
+		// Text on a series the palette sets is drawn in the color ink picks on it, unless the
+		// author sets a fill, as Pele's seriesInkFill gives it.
+		var seriesGround style.Paint
+		if !css.Sets(node.CSS, "fill") {
+			seriesGround = palette.Ground(b.series)
 		}
 		color := style.Series(b.series)
 		x := left + b.x
@@ -212,6 +219,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			}
 			// A section is a tint of its color, unless a class gives it a fill of its own.
 			it.Style.Fill, it.Style.Stroke, it.Style.Text, it.Style.OnFill = color, color, style.Fg, onFill
+			it.Style.TextGround = seriesGround
 			if !css.FillDeclared(node.CSS) {
 				it.Style.FillOpacity = style.N(0.12)
 			}
@@ -251,7 +259,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 					Kind: scene.Text, Role: RoleValue, ID: node.Name,
 					Label: common.Line(value, valueWidth, valueSize, face), Align: scene.End,
 					At:     scene.Point{X: x + b.w - sideInset - 2, Y: baseline},
-					Style:  style.Style{Text: style.Muted, Ground: ground},
+					Style:  style.Style{Text: style.Muted, Ground: ground, TextGround: seriesGround},
 					Author: valueAuthor,
 				}
 			}
@@ -264,6 +272,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 
 		it.Kind, it.Role = scene.Node, RoleLeaf
 		it.Style.Fill, it.Style.Stroke, it.Style.Text, it.Style.OnFill = color, style.None, style.Bg, onFill
+		it.Style.TextGround = seriesGround
 		room := b.w - 8
 		smallest := least
 		tallest := min(size, math.Floor((b.h-4)/lineSpacing))
@@ -299,7 +308,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 						Kind: scene.Text, Role: RoleValue, ID: node.Name,
 						Label:  common.Line(value, valueWidth, valueSize, face),
 						At:     scene.Point{X: cx, Y: cy + lines/2 - (valueSize*lineSpacing)/2},
-						Style:  style.Style{Text: style.Bg, Ground: ground},
+						Style:  style.Style{Text: style.Bg, Ground: ground, TextGround: seriesGround},
 						Author: valueAuthor,
 					}
 				}
@@ -319,6 +328,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		FontSize: size,
 		Title:    m.AccTitle,
 		Desc:     m.AccDescr,
+		Palette:  palette.Series,
 	}
 	if !title.Empty() {
 		sc.Items = append(sc.Items, scene.Item{

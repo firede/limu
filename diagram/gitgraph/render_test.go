@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/layout"
@@ -50,7 +51,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
+		if msg := f.Diff(k, &c.Drawing, got, readSeries); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
@@ -74,11 +75,20 @@ func paintName(p style.Paint) string {
 	return "?"
 }
 
+// readSeries reads the series colors Pele's palette sets as limu reads them, which the suite
+// keeps in full.
+func readSeries(line string) string { return pelesvg.ReadSeries(line, css.PaletteColor) }
+
+// inkNames are the colors Pele's ink picks for a label on a series, as the oracle names them,
+// by the theme's paints the default look settles them as.
+var inkNames = map[style.Paint]string{style.Fg: "on-light", style.Bg: "on-dark"}
+
 // sceneLines writes a scene as the oracle reads Pele's SVG.
 func sceneLines(sc *scene.Scene) []string {
 	num := pelesvg.Num
 	pt := func(x, y float64) string { return num(x) + "," + num(y) }
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
+	lines = append(lines, pelesvg.Series(sc)...)
 	paint := func(it *scene.Item, part *scene.Part) string {
 		fill, stroke := it.Style.Fill, it.Style.Stroke
 		switch part.Paint {
@@ -156,7 +166,11 @@ func sceneLines(sc *scene.Scene) []string {
 			return
 		}
 		shift := float64(l.Size * 0.35)
-		lines = append(lines, "t "+pt(it.At.X, it.At.Y-l.Height/2+l.LineHeight/2+shift)+" f="+paintName(it.Style.Text))
+		fill := paintName(it.Style.Text)
+		if ink := pelesvg.SeriesInk(sc, it); ink.Set() {
+			fill = inkNames[ink]
+		}
+		lines = append(lines, "t "+pt(it.At.X, it.At.Y-l.Height/2+l.LineHeight/2+shift)+" f="+fill)
 	}
 	for i := 0; i < len(sc.Items); i++ {
 		it := &sc.Items[i]

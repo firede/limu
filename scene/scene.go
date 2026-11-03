@@ -30,6 +30,12 @@ type Scene struct {
 	FontSize      float64 // of text with no size of its own
 	Title, Desc   string  // for assistive technology: accTitle and accDescr
 	Items         []Item  // in the order they are drawn
+	// Palette is the series colors the diagram's own theme variables set, as Pele's palette
+	// reads them, which replace the theme's series colors for this scene: style.Series(i) is
+	// drawn in Palette[i] where that is set. An entry is a color, None for transparent, or
+	// Fg for currentColor. A backend draws with style.Look.WithSeries, and the svg package
+	// also writes the set ones as --limu-series-N on its root.
+	Palette [8]style.Paint
 }
 
 // A Kind is the sort of thing an item is.

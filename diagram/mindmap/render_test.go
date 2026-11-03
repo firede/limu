@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
@@ -67,7 +68,7 @@ func TestLayoutMatchesPele(t *testing.T) {
 			o.Icons = icons
 		}
 		got := sceneLines(t, Layout(m, pre.Config, o))
-		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
+		if msg := f.Diff(k, &c.Drawing, got, readSeries); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, %+v), %s", c.Src, *o, msg)
 			}
@@ -107,12 +108,17 @@ func paintName(p style.Paint) string {
 	return "?"
 }
 
+// readSeries reads the series colors Pele's palette sets as limu reads them, which the suite
+// keeps in full.
+func readSeries(line string) string { return pelesvg.ReadSeries(line, css.PaletteColor) }
+
 // sceneLines writes a scene as the oracle reads Pele's SVG, every number as JavaScript's
 // String writes it.
 func sceneLines(t *testing.T, sc *scene.Scene) []string {
 	n := chars.NumberString
 	pt := func(x, y float64) string { return n(x) + "," + n(y) }
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
+	lines = append(lines, pelesvg.Series(sc)...)
 	label := func(it *scene.Item, class string) {
 		l := it.Label
 		if l == nil {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -757,6 +758,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 		FontSize: size,
 		Title:    m.AccTitle,
 		Desc:     m.AccDescr,
+		Palette:  css.ReadPalette("xychart", config).Series,
 	}
 	if !title.Empty() {
 		sc.Items = append(sc.Items, scene.Item{

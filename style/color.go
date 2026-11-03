@@ -34,7 +34,8 @@ func (c Color) String() string {
 
 // ParseColor reads a CSS color: a hex color, rgb() or rgba(), hsl() or hsla(), a named
 // color or transparent, with the white space of CSS about it, its names in either case of
-// their ASCII letters. It reports false for anything else, such as currentColor or var().
+// their ASCII letters. A hue may be in degrees, gradians, radians or turns, and a channel
+// none, which is 0. It reports false for anything else, such as currentColor or var().
 func ParseColor(s string) (Color, bool) {
 	s = lowerASCII(cssTrim(s))
 	if strings.HasPrefix(s, "#") {
@@ -100,8 +101,12 @@ func function(s string) (string, []string, bool) {
 	return s[:open], args, true
 }
 
-// number reads a number, or a percentage of full; it reports whether it was a percentage.
+// number reads a number, or a percentage of full, or none, which is 0; it reports whether it
+// was a percentage.
 func number(s string, full float64) (float64, bool, bool) {
+	if s == "none" {
+		return 0, false, true
+	}
 	pct := strings.HasSuffix(s, "%")
 	f, err := strconv.ParseFloat(strings.TrimSuffix(s, "%"), 64)
 	if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
@@ -143,7 +148,7 @@ func parseHSL(args []string) (Color, bool) {
 	if len(args) != 3 && len(args) != 4 {
 		return Color{}, false
 	}
-	h, _, ok1 := number(strings.TrimSuffix(args[0], "deg"), 360)
+	h, ok1 := hue(args[0])
 	s, _, ok2 := number(args[1], 1)
 	l, _, ok3 := number(args[2], 1)
 	if !ok1 || !ok2 || !ok3 {
@@ -163,6 +168,21 @@ func parseHSL(args []string) (Color, bool) {
 	}
 	a, ok := alpha(args)
 	return Color{channel(f(0) * 255), channel(f(8) * 255), channel(f(4) * 255), a}, ok
+}
+
+// hue reads a hue in degrees: a number, or an angle in degrees, gradians, radians or turns.
+func hue(s string) (float64, bool) {
+	for _, u := range [...]struct {
+		name string
+		deg  float64
+	}{{"deg", 1}, {"grad", 0.9}, {"rad", 180 / math.Pi}, {"turn", 360}} {
+		if v, ok := strings.CutSuffix(s, u.name); ok {
+			f, pct, ok := number(v, 360)
+			return f * u.deg, ok && !pct
+		}
+	}
+	f, _, ok := number(s, 360)
+	return f, ok
 }
 
 // The named colors of CSS.
