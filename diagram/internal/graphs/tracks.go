@@ -455,7 +455,7 @@ func straighten(g *graph, xs []float64, empty []bool, firstDummy, span []int, se
 		for i := 0; i < len(row); {
 			twins = twins[:0]
 			j := i
-			for ; j < len(row) && math.Abs(from[row[j]]-from[row[i]]) < 1 && math.Abs(to[row[j]]-to[row[i]]) < 1; j++ {
+			for ; j < len(row) && math.Abs(from[row[j]]-from[row[i]]) < twin && math.Abs(to[row[j]]-to[row[i]]) < twin; j++ {
 				twins = append(twins, row[j])
 			}
 			// The twins keep the order the rank gave them, so that two edges do not swap sides on

@@ -201,9 +201,15 @@ const crossedSlope = 0.5
 // How far out of line two points may be and still count as in line.
 const inLine = 0.5
 
+// How far apart two edges may be at both ends and still count as twins.
+const twin = 1
+
 // A node, with whatever it is already in line with, moves this far at most to bring one more
 // of its edges into line.
 const snapReach = 12
+
+// Bends with no node in line with them move this far at most to bring an edge into line.
+const bendSnap = 24
 
 // An end that cannot be brought into line leans towards where its edge goes, but keeps this
 // far from the ends of the part of its side that edges spread along. On a narrow node that
@@ -743,6 +749,8 @@ func layered(nodes []lNode, edges []lEdge, opt LayeredOptions) layeredResult {
 		}
 	}
 
+	alignPorts(g, xs, empty)
+
 	// A rank that holds nothing but the bends of edges is only there because some other edge
 	// has a label or a twin. Its bends move onto the straight line between the ends of their
 	// edges, and one that gets there is left out of the route, so that the edge is drawn as a
@@ -1193,6 +1201,12 @@ func rank(nodes []lNode, edges []lEdge, step int) {
 	}
 
 	r := make([]int, n)
+	// Start ports go above every node later, so they don't push their targets down a rank.
+	for i := 0; i < n; i++ {
+		if nodes[i].Kind == kindStartPort {
+			r[i] = -step
+		}
+	}
 	indeg := make([]int, n)
 	for i := 0; i < n; i++ {
 		indeg[i] = inStart[i+1] - inStart[i]
