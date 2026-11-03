@@ -5,7 +5,10 @@
 // Border, Series(2)…) rather than by value, so a change of theme only redraws.
 //
 // Overrides are the second: a Style for each role of the parts of diagrams, such as
-// "flowchart.node" or "sequence.actor", that sets some of what the theme gives.
+// "flowchart.node" or "sequence.actor", that sets some of what the theme gives. Over them
+// lies the style the diagram's author set in its text, with style and classDef lines and a
+// palette, which a scene's items carry apart from the diagram's own. A Look that is ThemeOnly
+// leaves it out, for a host that draws with its design tokens alone.
 //
 // The third, drawing a part some way of one's own, belongs to the backends, as each draws
 // with tools of its own; see the svg package.

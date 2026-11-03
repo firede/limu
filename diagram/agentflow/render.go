@@ -78,7 +78,8 @@ type view struct {
 	w, h   float64
 	dy     float64
 	loops  int
-	// filled is whether the author's style declares a fill, which replaces the wash of a tint.
+	// filled is whether the author's style declares a fill, which is drawn opaque in place of
+	// the wash of a tint.
 	filled bool
 }
 
@@ -92,15 +93,11 @@ func slot(n *graphNode) int {
 }
 
 // tint is a palette color as an outline with a light wash of the same color inside, as Pele's
-// tint draws it: the wash a fill opacity, which Pele writes only where the author declares no
-// fill, so that a fill the author sets is opaque, and a fill opacity the author sets with no
-// fill washes the palette color at it.
-func tint(slot int, wash float64, filled bool) style.Style {
-	s := style.Style{Fill: style.Series(slot), Stroke: style.Series(slot)}
-	if !filled {
-		s.FillOpacity = style.N(wash)
-	}
-	return s
+// tint draws it: the wash a fill opacity. Pele writes it only where the author declares no fill,
+// so that a fill the author sets is opaque, which the author's style gives with css.Opaque, and
+// a fill opacity the author sets with no fill washes the palette color at it.
+func tint(slot int, wash float64) style.Style {
+	return style.Style{Fill: style.Series(slot), Stroke: style.Series(slot), FillOpacity: style.N(wash)}
 }
 
 // A held edge runs between a node and a flow around it, which the layout has no place for.
@@ -452,7 +449,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			if css.Paints(v.decls) {
 				fills = append(fills, draw.Fill{Box: [4]float64{x - c.W/2, y - c.H/2, x + c.W/2, y + c.H/2}, Decls: v.decls})
 			}
-			own := tint(slot(n), 0.06, v.filled)
+			own := tint(slot(n), 0.06)
 			// The title lies on the flow's fill, and takes the color that stands out on a fill
 			// its author sets, as Pele's inkFill gives it.
 			own.Text, own.OnFill = style.Muted, css.InksText(v.decls, v.decls)
@@ -460,7 +457,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 				Kind: scene.Group, Role: RoleFlow, ID: n.ID, Class: classes, Tags: tags, Box: box,
 				Parts:  []scene.Part{{Box: box, Rounded: true}},
 				Style:  own,
-				Author: v.author.Style,
+				Author: css.Opaque(v.author.Style, v.filled),
 			}
 			if !v.label.Empty() {
 				cluster.Label = &v.label
@@ -474,7 +471,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 		box := scene.Rect{X: x - w/2, Y: y - h/2, W: w, H: h}
 		it := scene.Item{
 			Kind: scene.Node, Shape: scene.Shape(v.shape), ID: n.ID, Class: classes, Tags: tags, Box: box,
-			Author: v.author.Style,
+			Author: css.Opaque(v.author.Style, v.filled),
 			Label:  &v.label, At: scene.Point{X: x, Y: y + v.dy},
 			Tooltip: n.Tooltip,
 		}
@@ -483,7 +480,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			s := slot(n)
 			it.Role = RoleCollapsed
 			it.Parts = []scene.Part{{Box: box, Rounded: true}}
-			it.Style = tint(s, 0.06, v.filled)
+			it.Style = tint(s, 0.06)
 			// What the author set for lines styles the rule, and fills nothing.
 			line := v.author.Style
 			line.Fill = style.Paint{}
@@ -515,7 +512,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, down bool) *scene.Sce
 			}
 			it.Role = scene.Role("agentflow." + kind)
 			it.Parts = draw.Outline(v.shape, x, y, w, h)
-			it.Style = tint(s, 0.14, v.filled)
+			it.Style = tint(s, 0.14)
 		}
 		// The label lies on the node's fill, unless its shape is drawn bare.
 		it.Style.OnFill = (v.shape == collapsed || draw.ShapeFilled(v.shape)) && css.InksText(v.decls, v.decls)

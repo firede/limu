@@ -98,6 +98,18 @@ func FillDeclared(decls []string) bool {
 	return strings.HasPrefix(css, "fill:") || strings.Contains(css, ";fill:")
 }
 
+// Opaque is the style an author gave a part that the diagram draws in a translucent fill of its
+// own unless its author sets a fill, as Pele's setsFill leaves out the part's fill-opacity:
+// where filled, the style is drawn at full opacity unless it sets an opacity for its fill. The
+// full opacity is the author's, and the part's own style keeps its translucency, so that a look
+// that leaves out the author's style draws the part as if its author had set no fill.
+func Opaque(author style.Style, filled bool) style.Style {
+	if _, ok := author.FillOpacity.Get(); filled && !ok {
+		author.FillOpacity = style.N(1)
+	}
+	return author
+}
+
 // FontFamilyDeclared reports whether declarations set a font family with a value that is not
 // dropped: whether the text style Pele's resolveStyle writes matches /[";]font-family:/, as
 // the diagrams that set a part in the monospace face where the author gave no font of its

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -50,15 +51,22 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		var got []string
-		sc, err := Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize})
+		read := func(line string) string { return line }
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}
+		sc, err := Layout(m, pre.Config, o)
 		if err != nil {
 			e := err.(*diagram.Error)
 			got = []string{"error " + string(e.Code) + " " + e.Message}
 			refused++
 		} else {
-			got = sceneLines(sc)
+			// The palette is checked against the same diagram laid out without it, and the
+			// lines are written with the author's own style.
+			bare, _ := Layout(m, pelesvg.WithoutPalette(pre.Config), o)
+			pal := pelesvg.ReadPalette(sc, bare)
+			read = func(line string) string { return pal.ReadSeries(line, css.PaletteColor) }
+			got = pelesvg.InsertSeries(sceneLines(pal.Bare), pal.Lines)
 		}
-		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}

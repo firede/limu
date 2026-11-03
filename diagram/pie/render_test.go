@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
@@ -51,9 +52,17 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		sc := Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding})
-		got := sceneLines(sc, c.Line)
-		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding}
+		sc := Layout(m, pre.Config, o)
+		// The palette is checked against the same diagram laid out without it, and the lines are
+		// written with the author's own style.
+		pal := pelesvg.ReadPalette(sc, Layout(m, pelesvg.WithoutPalette(pre.Config), o))
+		read := func(line string) string { return pal.ReadSeries(line, css.PaletteColor) }
+		// Pele's lines are hints past the series lines, which are put in after.
+		line := c.LineRead(read)
+		hint := func(i int) string { return line(i + len(pal.Lines)) }
+		got := pelesvg.InsertSeries(sceneLines(pal.Bare, hint), pal.Lines)
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v, padding %v), %s", c.Src, c.MaxWidth, c.FontSize, (&layout.Options{Padding: c.Padding}).Pad(), msg)
 			}
@@ -167,7 +176,11 @@ func sceneLines(sc *scene.Scene, want func(int) string) []string {
 			}
 			content = append(content, pelesvg.ID(s))
 		}
-		lines = append(lines, contexts[it.Role]+" t "+pt(x, y)+" "+paintName(it.Style.Text)+" middle "+n(l.Size)+" | "+strings.Join(content, " | "))
+		paint := paintName(it.Style.Text)
+		if ink := pelesvg.SeriesInk(it); ink.Set() {
+			paint = pelesvg.InkNames[ink]
+		}
+		lines = append(lines, contexts[it.Role]+" t "+pt(x, y)+" "+paint+" middle "+n(l.Size)+" | "+strings.Join(content, " | "))
 	}
 	pen := func(it *scene.Item) string {
 		width := "-"

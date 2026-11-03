@@ -59,13 +59,24 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}
+		sc := Layout(m, pre.Config, o)
+		// The palette is checked against the same diagram laid out without it, and the lines are
+		// written with the author's own style.
+		pal := pelesvg.ReadPalette(sc, Layout(m, pelesvg.WithoutPalette(pre.Config), o))
+		read := func(line string) string {
+			if strings.HasPrefix(line, "series ") {
+				return pal.ReadSeries(line, css.PaletteColor)
+			}
+			return peleLine(line)
+		}
+		got := pelesvg.InsertSeries(sceneLines(pal.Bare), pal.Lines)
 		for _, line := range got {
 			if strings.HasPrefix(line, "overlap ") {
 				overlaps++
 			}
 		}
-		if msg := f.Diff(k, &c.Drawing, got, peleLine); msg != "" {
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}

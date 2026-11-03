@@ -12,6 +12,7 @@
 // middle of the label.
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { keepSeries, paletted, readSeries } from '../lib/palette.mjs';
 import { unescape, attr, n, pt, readHead } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './pie.mjs';
 
@@ -52,7 +53,7 @@ function moved(d, dx, dy) {
 export function readSvg(svg, fontSize) {
   const lines = [];
   const { open: head, body, acc } = readHead(svg);
-  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`, ...acc);
+  lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`, ...acc, ...readSeries(head));
   // The groups open about the element read: each one's context, move, fill, stroke, anchor,
   // size of type and the rest of its pen.
   const stack = [];
@@ -226,5 +227,8 @@ export default async function ({ pele, src, write, random }) {
   }
   // The test writes the curves of an arc as the arc of Pele's line where ArcTo draws it
   // with those curves, so the lines of circles and of paths with arcs are kept in full.
-  write('diagram/pie/testdata/pele/render.json', { cases: out }, { keep: (line) => line.startsWith('circle ') || (line.startsWith('path ') && line.includes(' A ')) });
+  // Some again with a palette set, as Mermaid's palette theme variables set a diagram's own
+  // series colors.
+  for (const s of paletted([...new Set(out.map((c) => c.src))], 'pie', random(45), 200)) each(s);
+  write('diagram/pie/testdata/pele/render.json', { cases: out }, { keep: keepSeries((line) => line.startsWith('circle ') || (line.startsWith('path ') && line.includes(' A '))) });
 }

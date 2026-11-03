@@ -6,9 +6,11 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/firede/limu/internal/fixture"
+	"github.com/firede/limu/layout"
 )
 
 // Pele reads a JavaScript string, which a browser decoded from UTF-8, and a string a browser
@@ -32,6 +34,9 @@ func TestInvalidUTF8IsReplacementCharacter(t *testing.T) {
 		{"\xed\xa0\xbd", "\uFFFD\uFFFD\uFFFD"}, // a lone high surrogate, as WTF-8 writes it
 		{"\xe4\xb8", "\uFFFD"},                 // a sequence that is cut short
 	}
+	// The two layouts of a gantt chart take the same present, which a chart drawn in hours of
+	// the day may show, rather than two moments a minute may part.
+	o := &layout.Options{Now: time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC), Location: time.UTC}
 	for _, path := range paths {
 		data, err := fixture.Read(strings.TrimSuffix(path, ".gz"))
 		if err != nil {
@@ -61,8 +66,8 @@ func TestInvalidUTF8IsReplacementCharacter(t *testing.T) {
 				}
 				b := bad[(i+k)%len(bad)]
 				src, want := c.Src[:at]+b.bytes+c.Src[at:], c.Src[:at]+b.decoded+c.Src[at:]
-				gotScene, gotErr := Layout(src, nil)
-				wantScene, wantErr := Layout(want, nil)
+				gotScene, gotErr := Layout(src, o)
+				wantScene, wantErr := Layout(want, o)
 				if errString(gotErr) != errString(wantErr) || !reflect.DeepEqual(gotScene, wantScene) {
 					t.Errorf("%s case %d: %q laid out unlike %q: %v, %v", path, i, src, want, gotErr, wantErr)
 					continue

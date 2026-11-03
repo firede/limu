@@ -395,14 +395,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, variant *Variant, dow
 			box := scene.Rect{X: x - c.W/2, Y: y - c.H/2, W: c.W, H: c.H}
 			cluster := scene.Item{
 				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Tags: tags, Box: box,
-				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
-				Author: v.author.Style,
-			}
-			// A fill the author sets is drawn at full opacity, as Pele's setsFill leaves out the
-			// group's own fill-opacity.
-			if css.Sets(v.decls, "fill") {
-				cluster.Style.FillOpacity = style.Num{}
+				Parts: []scene.Part{{Box: box, Rounded: true}},
+				Style: style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted},
+				// A fill the author sets is drawn at full opacity.
+				Author: css.Opaque(v.author.Style, css.Sets(v.decls, "fill")),
 			}
 			label := &v.label
 			if !label.Empty() {

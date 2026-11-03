@@ -5,6 +5,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -785,5 +786,8 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 	sc.Items = append(sc.Items, outside...)
 	sc.Items = append(sc.Items, pointLabels...)
 	sc.Items = append(sc.Items, legendItems...)
+	palette := css.ReadPalette("xychart", config)
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc, nil
 }

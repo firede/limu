@@ -2,6 +2,7 @@ package block
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -296,20 +297,43 @@ func pathLine(p *scene.Path, hints []arc) string {
 	return strings.Join(out, " ")
 }
 
-// partsOf writes the parts of an outline, numbers as Pele writes them: the center of a block,
-// taken from its box, may be off the one it was drawn about in the last bit.
-func partsOf(parts []scene.Part) string {
-	var b strings.Builder
-	num := pelesvg.Num
-	for _, p := range parts {
-		r := p.Box
-		fmt.Fprintf(&b, "%s,%s,%s,%s %v %d", num(r.X), num(r.Y), num(r.W), num(r.H), p.Rounded, p.Paint)
-		if p.Path != nil {
-			b.WriteString(" " + pelesvg.D(p.Path))
+// sameParts says whether two outlines are the same but for the last bits of their numbers: the
+// center of a block, taken from its box, may be off the one it was drawn about in the last bit,
+// which can turn a number Pele writes at two decimals the other way.
+func sameParts(a, b []scene.Part) bool {
+	near := func(x, y float64) bool { return math.Abs(x-y) <= 1e-9*max(1, math.Abs(x)) }
+	numbers := func(p *scene.Path) (ops []scene.Op, args []float64) {
+		if p != nil {
+			p.Each(func(op scene.Op, a []float64) {
+				ops = append(ops, op)
+				args = append(args, a...)
+			})
 		}
-		b.WriteString("; ")
+		return ops, args
 	}
-	return b.String()
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		p, q := &a[k], &b[k]
+		if p.Rounded != q.Rounded || p.Paint != q.Paint || (p.Path == nil) != (q.Path == nil) {
+			return false
+		}
+		if !near(p.Box.X, q.Box.X) || !near(p.Box.Y, q.Box.Y) || !near(p.Box.W, q.Box.W) || !near(p.Box.H, q.Box.H) {
+			return false
+		}
+		opsP, argsP := numbers(p.Path)
+		opsQ, argsQ := numbers(q.Path)
+		if !slices.Equal(opsP, opsQ) || len(argsP) != len(argsQ) {
+			return false
+		}
+		for i := range argsP {
+			if !near(argsP[i], argsQ[i]) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // sceneLines writes a scene as the oracle reads Pele's SVG; want is the line Pele drew at an
@@ -356,7 +380,7 @@ func sceneLines(sc *scene.Scene, want func(int) string) []string {
 			}
 			if it.Shape != "block-arrow" {
 				cx, cy := r.X+r.W/2, r.Y+r.H/2
-				if partsOf(it.Parts) != partsOf(draw.Outline(string(it.Shape), cx, cy, r.W, r.H)) {
+				if !sameParts(it.Parts, draw.Outline(string(it.Shape), cx, cy, r.W, r.H)) {
 					lines = append(lines, "parts differ from the outline")
 				}
 			}

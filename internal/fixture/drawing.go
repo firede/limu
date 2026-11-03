@@ -50,30 +50,70 @@ func (d *Drawing) Line(i int) string {
 	return d.Kept[i]
 }
 
+// LineRead is Line for the lines a test writes when it reads Pele's with read: line i of what
+// Pele drew once the lines read reads as "" are taken out, as Line gives it, where the fixture
+// holds it, and "" where it does not.
+func (d *Drawing) LineRead(read func(string) string) func(int) string {
+	var gone []int
+	if d.Digest == "" {
+		for k, line := range d.Lines {
+			if read(line) == "" {
+				gone = append(gone, k)
+			}
+		}
+	} else {
+		for k, line := range d.Kept {
+			if read(line) == "" {
+				gone = append(gone, k)
+			}
+		}
+		slices.Sort(gone)
+	}
+	return func(i int) string {
+		for _, k := range gone {
+			if k <= i {
+				i++
+			}
+		}
+		return d.Line(i)
+	}
+}
+
 // matches says whether got, the lines limu wrote, are the lines of the digest, read with read:
 // the lines kept in full read as got holds them, and the lines in their places and the rest
 // of got together those of the digest.
 func (d *Drawing) matches(got []string, read func(string) string) bool {
-	lines := slices.Clone(got)
-	for k, line := range d.Kept {
-		if k >= len(got) || got[k] != read(line) {
-			return false
-		}
-		lines[k] = line
-	}
-	return Digest(lines) == d.Digest
+	lines, k, _ := d.restore(got, read)
+	return k < 0 && Digest(lines) == d.Digest
 }
 
-// firstKept is the first of the lines kept in full that got does not hold as read reads it,
-// or -1 where it holds them all.
-func (d *Drawing) firstKept(got []string, read func(string) string) int {
-	first := -1
-	for k, line := range d.Kept {
-		if (k >= len(got) || got[k] != read(line)) && (first < 0 || k < first) {
-			first = k
-		}
+// restore is Pele's lines as got holds them: got with each line kept in full in its place,
+// where read reads it as got holds it there, or put in before what got holds there, where read
+// reads it as "", a line limu writes nothing for. Where got does not hold a kept line as read
+// reads it, restore gives that line's index in Pele's lines and in got, and otherwise -1.
+func (d *Drawing) restore(got []string, read func(string) string) ([]string, int, int) {
+	keys := make([]int, 0, len(d.Kept))
+	for k := range d.Kept {
+		keys = append(keys, k)
 	}
-	return first
+	slices.Sort(keys)
+	lines := make([]string, 0, len(got)+len(keys))
+	g := 0
+	for _, k := range keys {
+		for len(lines) < k && g < len(got) {
+			lines = append(lines, got[g])
+			g++
+		}
+		line := d.Kept[k]
+		if r := read(line); r != "" {
+			if len(lines) < k || g >= len(got) || got[g] != r {
+				return nil, k, g
+			}
+			g++
+		}
+		lines = append(lines, line)
+	}
+	return append(lines, got[g:]...), -1, -1
 }
 
 // Drawings is a fixture of drawings, as LoadDrawings reads it, for comparing what limu draws of
@@ -125,7 +165,8 @@ func (f *Drawings) fullCases() ([]Drawing, error) {
 // drew of it, or is "" where they do not. A test that reads some of Pele's lines through
 // limu's own code, as the author's style or the arcs of a path, gives read, which is applied
 // to each of Pele's lines before they are compared; the suite keeps in full each line read
-// changes, as the line cannot be found again from what limu wrote. read may be nil.
+// changes, as the line cannot be found again from what limu wrote. read gives "" for a line
+// limu writes nothing in place of, as a series color limu leaves unset. read may be nil.
 //
 // Where the fixture holds the lines, Diff names the first that differs. Where it holds only
 // a digest, Diff takes the lines from the file ./scripts/oracle.sh --full writes beside the
@@ -145,8 +186,8 @@ func (f *Drawings) Diff(i int, d *Drawing, got []string, read func(string) strin
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		msg := fmt.Sprintf("differs from what Pele drew, of which %s holds only a digest; %s writes every line to %s.gz, to show the first that differs", f.path, write, f.fullPath())
-		if k := d.firstKept(got, read); k >= 0 {
-			msg += fmt.Sprintf(". Of the lines it holds, this one differs: line %d\n got %s\nPele %s", k, At(got, k), read(d.Kept[k]))
+		if _, k, g := d.restore(got, read); k >= 0 {
+			msg += fmt.Sprintf(". Of the lines it holds, this one differs: line %d\n got %s\nPele %s", g, At(got, g), read(d.Kept[k]))
 		}
 		return msg
 	case err != nil:
@@ -160,11 +201,13 @@ func (f *Drawings) Diff(i int, d *Drawing, got []string, read func(string) strin
 	return fmt.Sprintf("differs from the digest of what Pele drew in %s, but not from its lines in %s.gz: read changes a line the suite does not keep in full", f.path, f.fullPath())
 }
 
-// readAll is lines, each read with read.
+// readAll is lines, each read with read, without those read reads as "".
 func readAll(lines []string, read func(string) string) []string {
-	out := make([]string, len(lines))
-	for i, line := range lines {
-		out[i] = read(line)
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if r := read(line); r != "" {
+			out = append(out, r)
+		}
 	}
 	return out
 }

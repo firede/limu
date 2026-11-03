@@ -1,6 +1,7 @@
 package limumygo
 
 import (
+	"image"
 	"strings"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/firede/limu"
 	"github.com/firede/limu/layout"
 	"github.com/firede/limu/scene"
+	"github.com/firede/limu/style"
 )
 
 // diagram lays out a diagram's text with limu, measured with the Go fonts. The host has
@@ -92,4 +94,40 @@ func TestGoldenCJK(t *testing.T) {
     C --> E[("결제 완료")]
     D --> F["`+"`**API 网关**返回 HTTP 200（成功）`"+`"]`)
 	snap(t, "cjk", sc, &Options{Fonts: goFonts}, 1)
+}
+
+// A look that is ThemeOnly draws a flowchart whose author fills a node and a group that edges
+// run inside and across, which lays casings under them, as it draws the flowchart without
+// those fills.
+func TestThemeOnly(t *testing.T) {
+	sc := diagram(t, `flowchart LR
+    subgraph S[Group]
+      A --> B
+    end
+    B --> C
+    D --> A
+    classDef hot fill:#c00,stroke:#600,stroke-width:3px,color:#fff
+    class C hot
+    style S fill:#123456,stroke:#f80,stroke-dasharray:4 2`)
+	bare := diagram(t, `flowchart LR
+    subgraph S[Group]
+      A --> B
+    end
+    B --> C
+    D --> A`)
+	draw := func(sc *scene.Scene, look style.Look) *image.RGBA {
+		w, h := int(sc.Width+0.5), int(sc.Height+0.5)
+		return ui.Render(func(c *ui.Context) {
+			ui.Column(c).Size(float32(w), float32(h)).Background(Color(look.ThemeOrDefault().Bg, 1)).Children(func() {
+				View(c, sc, &Options{Fonts: goFonts, Look: look})
+			})
+		}, w, h, 1)
+	}
+	want := draw(bare, style.Look{})
+	if diff := diffImages(want, draw(sc, style.Look{ThemeOnly: true})); diff != "" {
+		t.Errorf("drawn ThemeOnly: %s", diff)
+	}
+	if diffImages(want, draw(sc, style.Look{})) == "" {
+		t.Error("drawn with the author's colors as without them")
+	}
 }

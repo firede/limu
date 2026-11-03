@@ -129,6 +129,53 @@ func follow(g *graph, empty []bool, e, side int) int {
 	return e
 }
 
+// alignPorts aligns border ports with the ends on their nodes so edges run straight across the
+// gap, as Pele's alignPorts does. Ports are kept edgeSep apart while placed, more than ends on a
+// short side get, so without this an edge turns outside the border and again in the gap. It
+// leaves a rank alone unless every port can move without passing or meeting its neighbors.
+func alignPorts(g *graph, xs []float64, empty []bool) {
+	EF, ET, EFD, ETD := g.EF, g.ET, g.EFD, g.ETD
+	succStart, succE, predStart, predE, layerStart, order := g.succStart, g.succE, g.predStart, g.predE, g.layerStart, g.order
+	var to []float64
+	for _, side := range [2]struct {
+		r    int
+		kind kind
+	}{{0, kindStartPort}, {g.maxRank, kindEndPort}} {
+		s := layerStart[side.r]
+		end := layerStart[side.r+1]
+		start := side.kind == kindStartPort
+		to = to[:0]
+		for i := s; i < end; i++ {
+			v := order[i]
+			degree := predStart[v+1] - predStart[v]
+			if start {
+				degree = succStart[v+1] - succStart[v]
+			}
+			if g.KIND[v] != side.kind || degree != 1 {
+				break
+			}
+			var at float64
+			if start {
+				e := follow(g, empty, succE[succStart[v]], 1)
+				at = xs[ET[e]] + ETD[e]
+			} else {
+				e := follow(g, empty, predE[predStart[v]], 0)
+				at = xs[EF[e]] + EFD[e]
+			}
+			if len(to) > 0 && at < to[len(to)-1]+twin {
+				break
+			}
+			to = append(to, at)
+		}
+		if len(to) == 0 || len(to) != end-s {
+			continue
+		}
+		for i := s; i < end; i++ {
+			xs[order[i]] = to[i-s]
+		}
+	}
+}
+
 // freeEnds counts, as Pele's freeEnds does, how many ends that may move along it each node has
 // on the side its edges arrive at, and on the other. An end that has a side to itself keeps to
 // the middle; ends that share one cannot all be there, so those may move.
@@ -469,9 +516,9 @@ func settle(g *graph, nodes []lNode, xs []float64, EFK, ETK []end, free [2][]int
 	}
 }
 
-// snap brings edges that are nearly straight into line, as Pele's snap does, by moving a node a
-// little across the flow along with everything it is in line with already, where the nodes
-// beside them leave room. What is in line stays in line, so each move leaves one more edge
+// snap brings edges that are nearly straight into line, as Pele's snap does, by moving a node or
+// bend a little across the flow along with everything it is in line with already, where the
+// nodes beside them leave room. What is in line stays in line, so each move leaves one more edge
 // straight.
 func snap(g *graph, xs []float64, empty []bool, opt LayeredOptions) {
 	n, KIND, RANK, EF, ET, EFD, ETD := g.n, g.KIND, g.RANK, g.EF, g.ET, g.EFD, g.ETD
@@ -519,7 +566,7 @@ func snap(g *graph, xs []float64, empty []bool, opt LayeredOptions) {
 		d := math.Abs(off(k))
 		if d < 0.01 {
 			join(a[k], b[k])
-		} else if d <= snapReach {
+		} else if d <= bendSnap {
 			near = append(near, k)
 		}
 	}
@@ -530,6 +577,15 @@ func snap(g *graph, xs []float64, empty []bool, opt LayeredOptions) {
 		return sign(or(math.Abs(off(x))-math.Abs(off(y)), float64(x-y)))
 	})
 	gap := func(v int) float64 { return halfRoom(g, opt, v) }
+	// Whether a block is nothing but bends, which may move further than a node.
+	bends := func(id int) bool {
+		for _, v := range members[id] {
+			if KIND[v] != kindDummy {
+				return false
+			}
+		}
+		return true
+	}
 	// Whether every node of a block can move by shift and keep its room from those beside it.
 	free := func(id int, shift float64) bool {
 		for _, v := range members[id] {
@@ -551,7 +607,7 @@ func snap(g *graph, xs []float64, empty []bool, opt LayeredOptions) {
 			join(a[k], b[k])
 			continue
 		}
-		if math.Abs(d) > snapReach || block[a[k]] == block[b[k]] {
+		if math.Abs(d) > bendSnap || block[a[k]] == block[b[k]] {
 			continue
 		}
 		// The smaller of the two blocks moves, if it can; else the other.
@@ -569,6 +625,9 @@ func snap(g *graph, xs []float64, empty []bool, opt LayeredOptions) {
 			shift := -d
 			if id == upper {
 				shift = d
+			}
+			if math.Abs(d) > snapReach && !bends(id) {
+				continue
 			}
 			if !free(id, shift) {
 				continue

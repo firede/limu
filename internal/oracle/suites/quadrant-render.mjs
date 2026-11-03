@@ -112,6 +112,30 @@ export function readSvg(svg) {
   return lines;
 }
 
+// count sources of drawn, the sources drawn already, with Mermaid's quadrantChart font sizes
+// set, which Pele 1.13 reads, chosen with rnd: sizes in its range and out of it, fractions, and
+// values it passes over, as a string or YAML's infinity. A source that already has front
+// matter or a directive is passed over.
+function sized(drawn, rnd, count) {
+  const pick = (list) => list[Math.floor(rnd() * list.length)];
+  const KEYS = ['titleFontSize', 'quadrantLabelFontSize', 'xAxisLabelFontSize', 'yAxisLabelFontSize', 'pointLabelFontSize'];
+  const VALUES = ['10', '20', '32', '13.5', '4', '72', '2', '100', '-5', '0', '"20"', 'null'];
+  const usable = drawn.filter((s) => s.length <= 2000 && !s.startsWith('---') && !s.includes('%%{'));
+  const out = [];
+  for (let k = 0; k < count && usable.length > 0; k++) {
+    const entries = KEYS.filter(() => rnd() < 0.4).map((key) => [key, pick(VALUES)]);
+    if (entries.length === 0) entries.push([pick(KEYS), pick(VALUES)]);
+    const source = pick(usable);
+    if (rnd() < 0.5) {
+      out.push(`%%{init: {"quadrantChart": {${entries.map(([key, v]) => `"${key}": ${v}`).join(', ')}}}}%%\n${source}`);
+    } else {
+      if (rnd() < 0.2) entries.push([pick(KEYS), pick(['.inf', '-.inf', '.nan'])]);
+      out.push(`---\nconfig:\n  quadrantChart:\n${entries.map(([key, v]) => `    ${key}: ${v}`).join('\n')}\n---\n${source}`);
+    }
+  }
+  return out;
+}
+
 export default async function ({ src, pele, write, random }) {
   const { render, PeleError } = await src('index.ts');
   const { metricsMeasurer } = await src('text/measurer.ts');
@@ -163,5 +187,7 @@ export default async function ({ src, pele, write, random }) {
     const s = next();
     if (s.length <= 3000) each(s);
   }
+  // Some again with Mermaid's font sizes for a quadrant chart set.
+  for (const s of sized([...new Set(out.map((c) => c.src))], random(33), 300)) each(s);
   write('diagram/quadrant/testdata/pele/render.json', { cases: out });
 }

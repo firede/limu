@@ -98,6 +98,34 @@ func TestDiff(t *testing.T) {
 		}
 	}
 
+	// read reads a line as "" where limu writes nothing in its place, and the suite keeps it.
+	dropped := []string{"size 10,10", "series 1 var(--x)", "series 2 red", "edge a-b M0,0"}
+	drops := func(line string) string {
+		switch line {
+		case "series 1 var(--x)":
+			return ""
+		case "series 2 red":
+			return "series 2 #ff0000"
+		}
+		return line
+	}
+	gone := &Drawing{Digest: Digest(dropped), Kept: map[int]string{1: dropped[1], 2: dropped[2]}}
+	for _, c := range []struct {
+		got  []string
+		want string
+	}{
+		{[]string{"size 10,10", "series 2 #ff0000", "edge a-b M0,0"}, ""},
+		{[]string{"size 10,10", "series 1 #000000", "series 2 #ff0000", "edge a-b M0,0"}, "this one differs: line 1\n got series 1 #000000\nPele series 2 #ff0000"},
+		{[]string{"size 10,10", "series 2 #ff0000", "edge a-b M1,1"}, "./scripts/oracle.sh --full <pele> flowchart-render writes every line"},
+	} {
+		if msg := f.Diff(2, gone, c.got, drops); c.want == "" && msg != "" || !strings.Contains(msg, c.want) {
+			t.Errorf("Diff of %q, with a line read drops = %q, not %q", c.got, msg, c.want)
+		}
+	}
+	if line := gone.LineRead(drops)(1); line != "series 2 red" {
+		t.Errorf("LineRead(1) = %q, not the line after the one read drops", line)
+	}
+
 	// The full file holds the lines of the digest, and shows which differs.
 	writeFixture(t, "testdata/pele/render.full.json", map[string]any{"pele": pele, "cases": []map[string]any{
 		{"src": "a", "lines": lines}, {"src": "b", "lines": lines},

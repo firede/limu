@@ -5,6 +5,7 @@
 // where things are on the page, as the scene holds them, and are compared as Pele writes them.
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { keepSeries, paletted, readSeries } from '../lib/palette.mjs';
 import { unescape, attr } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, drawableDiagrams } from './timeline.mjs';
 
@@ -75,6 +76,7 @@ export function readSvg(svg, size) {
   const lines = [];
   const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
   lines.push(`size ${attr(head, 'width')},${attr(head, 'height')}`);
+  lines.push(...readSeries(head));
   for (const m of svg.matchAll(/<(rect|text|path|circle|g)\b[^>]*>/g)) {
     const e = m[0];
     switch (m[1]) {
@@ -143,5 +145,8 @@ export default async function ({ src, pele, write, random }) {
     const s = next();
     if (s.length <= 3000) each(s);
   }
-  write('diagram/timeline/testdata/pele/render.json', { cases: out });
+  // Some again with a palette set, as Mermaid's palette theme variables set a diagram's own
+  // series colors.
+  for (const s of paletted([...new Set(out.map((c) => c.src))], 'timeline', random(45), 200)) each(s);
+  write('diagram/timeline/testdata/pele/render.json', { cases: out }, { keep: keepSeries() });
 }

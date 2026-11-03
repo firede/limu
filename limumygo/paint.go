@@ -84,6 +84,9 @@ func Paint(p *ui.Painter, sc *scene.Scene, x, y float32, o *Options) {
 	}
 	for i := range sc.Items {
 		it := &sc.Items[i]
+		if !o.Look.Draws(string(it.Role)) {
+			continue
+		}
 		s := o.Look.Resolve(string(it.Role), it.Style, it.Author)
 		if o.Draw != nil {
 			o.Draw(pp, it, s, func() { pp.Item(it, s) })
@@ -167,7 +170,7 @@ func (p *Painter) Parts(it *scene.Item, s style.Resolved) {
 			fill = Color(s.Hollow, s.Opacity)
 		case scene.Shade:
 			stroke = ui.Color{}
-			fill = Color(shade(s.Shade, it.Author.Fill.Set()), s.Opacity)
+			fill = Color(shade(s.Shade, !p.o.Look.ThemeOnly && it.Author.Fill.Set()), s.Opacity)
 		case scene.Dot:
 			stroke = ui.Color{}
 			fill = Color(s.Marker, s.Opacity)

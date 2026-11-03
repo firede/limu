@@ -6,6 +6,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/layout"
@@ -453,5 +454,8 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 		})
 	}
 	sc.Items = append(sc.Items, items...)
+	palette := css.ReadPalette("mindmap", config)
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc
 }

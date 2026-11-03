@@ -24,7 +24,7 @@ type Origin struct {
 // Pinned is the version of Pele limu follows; every fixture is written from it. Its Arch and
 // Node are not compared, as the oracle runs only on arm64 and a fixture holds what Pele makes
 // of its cases whichever Node runs it.
-var Pinned = Origin{Version: "1.12.0", Commit: "8aff183be57021b533f319a29341a529be934b08"}
+var Pinned = Origin{Version: "1.13.0", Commit: "3a2f075ee0c3d914f0fad3545fc0f193693975ac"}
 
 // Read is the JSON of the fixture at path, which is kept as path + ".gz".
 func Read(path string) ([]byte, error) {

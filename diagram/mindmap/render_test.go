@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/diagram/internal/draw"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/fixture"
@@ -66,8 +67,13 @@ func TestLayoutMatchesPele(t *testing.T) {
 		if c.Icons {
 			o.Icons = icons
 		}
-		got := sceneLines(t, Layout(m, pre.Config, o))
-		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
+		sc := Layout(m, pre.Config, o)
+		// The palette is checked against the same diagram laid out without it, and the lines are
+		// written with the author's own style.
+		pal := pelesvg.ReadPalette(sc, Layout(m, pelesvg.WithoutPalette(pre.Config), o))
+		read := func(line string) string { return pal.ReadSeries(line, css.PaletteColor) }
+		got := pelesvg.InsertSeries(sceneLines(t, pal.Bare), pal.Lines)
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, %+v), %s", c.Src, *o, msg)
 			}

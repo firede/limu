@@ -73,7 +73,7 @@ func keyOf(ids []string) string {
 // region has most room; and the overlaps a style gives a look of their own outlined. Pele
 // reads nothing of the config for a venn diagram, and draws it at its own size whatever the
 // width of the host.
-func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
+func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	pad := o.Pad()
 	if o == nil {
 		o = &layout.Options{}
@@ -400,6 +400,9 @@ func Layout(m *Model, _ diagram.Config, o *layout.Options) *scene.Scene {
 			y += l.label.Height
 		}
 	}
+	palette := css.ReadPalette("venn", config)
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc
 }
 

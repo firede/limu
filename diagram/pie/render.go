@@ -5,6 +5,7 @@ import (
 
 	"github.com/firede/limu/diagram"
 	"github.com/firede/limu/diagram/internal/common"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/chars"
 	"github.com/firede/limu/internal/jsmath"
 	"github.com/firede/limu/internal/yaml"
@@ -93,9 +94,13 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	if o == nil {
 		o = &layout.Options{}
 	}
-	return common.FitWidth(o, radius0*2, 140, func(diameter float64, tight bool) *scene.Scene {
-		return draw(m, config, o, diameter/2, tight)
+	palette := css.ReadPalette("pie", config)
+	sc := common.FitWidth(o, radius0*2, 140, func(diameter float64, tight bool) *scene.Scene {
+		return draw(m, config, o, &palette, diameter/2, tight)
 	})
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
+	return sc
 }
 
 // clearing is a label placed outside the rim, about the pie's center, as Pele's placedOutside
@@ -104,7 +109,7 @@ type clearing struct{ x, y, width float64 }
 
 // draw lays the pie out with a radius, as Pele's draw does; tight is set when the chart does
 // not fit the width it has with its legend beside it.
-func draw(m *Model, config diagram.Config, o *layout.Options, radius float64, tight bool) *scene.Scene {
+func draw(m *Model, config diagram.Config, o *layout.Options, palette *css.Palette, radius float64, tight bool) *scene.Scene {
 	pad := o.Pad()
 	size := o.Size()
 	small := jsmath.Round(size * 0.875)
@@ -273,7 +278,9 @@ func draw(m *Model, config diagram.Config, o *layout.Options, radius float64, ti
 			l := common.Line(s, measure.Width(s, small, 0), small, 0)
 			labels = append(labels, scene.Item{
 				Kind: scene.Text, Role: RoleSliceLabel, Label: l,
-				At: scene.Point{X: cx + x, Y: cy + y}, Style: style.Style{Text: style.Bg},
+				// On a series the palette sets, the label takes the color ink picks on it.
+				At:    scene.Point{X: cx + x, Y: cy + y},
+				Style: style.Style{Text: style.Bg, TextGround: palette.Ground(index)},
 			})
 		}
 		angle = end

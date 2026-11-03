@@ -11,6 +11,7 @@
 // that a difference in the last bit shows.
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { keepSeries, paletted, readSeries } from '../lib/palette.mjs';
 import { attr, TRANSLATE, n } from '../lib/svg.mjs';
 import { readLabel, withoutPele } from '../lib/limu.mjs';
 import { FRAGMENTS, corpus, hostileCorpus, maps } from './mindmap.mjs';
@@ -24,6 +25,7 @@ export function readSvg(svg) {
   const lines = [];
   const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
   lines.push(`size ${n(Number(attr(head, 'width')))},${n(Number(attr(head, 'height')))}`);
+  lines.push(...readSeries(head));
   const body = svg.slice(svg.indexOf('>') + 1);
   const moves = [];
   const open = [];
@@ -196,5 +198,8 @@ export default async function ({ src, pele, write, random }) {
   const usable = [...seen].filter((s) => s.length <= 3000);
   const next = mutator(usable, FRAGMENTS, random(62));
   for (let i = 0; drawn < 2500 && i < 40000; i++) each(next());
-  write('diagram/mindmap/testdata/pele/render.json', { cases: out });
+  // Some again with a palette set, as Mermaid's palette theme variables set a diagram's own
+  // series colors.
+  for (const s of paletted([...new Set(out.map((c) => c.src))], 'mindmap', random(65), 200)) each(s);
+  write('diagram/mindmap/testdata/pele/render.json', { cases: out }, { keep: keepSeries() });
 }

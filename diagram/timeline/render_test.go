@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/firede/limu/diagram"
+	"github.com/firede/limu/diagram/internal/css"
 	"github.com/firede/limu/internal/fixture"
 	"github.com/firede/limu/internal/pelesvg"
 	"github.com/firede/limu/layout"
@@ -49,8 +50,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		if msg := f.Diff(k, &c.Drawing, got, nil); msg != "" {
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}
+		sc := Layout(m, pre.Config, o)
+		// The palette is checked against the same diagram laid out without it, and the lines are
+		// written with the author's own style.
+		pal := pelesvg.ReadPalette(sc, Layout(m, pelesvg.WithoutPalette(pre.Config), o))
+		read := func(line string) string { return pal.ReadSeries(line, css.PaletteColor) }
+		got := pelesvg.InsertSeries(sceneLines(pal.Bare), pal.Lines)
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
@@ -129,7 +136,11 @@ func sceneLines(sc *scene.Scene) []string {
 	textAt := func(it *scene.Item) string {
 		l := it.Label
 		y := it.At.Y - l.Height/2 + l.LineHeight/2 + float64(l.Size*0.35)
-		s := "t " + pt(it.At.X, y) + " " + paintName(it.Style.Text) + " " + num(l.Size)
+		paint := paintName(it.Style.Text)
+		if ink := pelesvg.SeriesInk(it); ink.Set() {
+			paint = pelesvg.InkNames[ink]
+		}
+		s := "t " + pt(it.At.X, y) + " " + paint + " " + num(l.Size)
 		if it.Align != scene.Middle {
 			s += " not centered"
 		}

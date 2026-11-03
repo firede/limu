@@ -226,3 +226,26 @@ func sceneLines(sc *scene.Scene) []string {
 	}
 	return lines
 }
+
+// A point whose author gives its stroke a width and no color is stroked in the points' color,
+// and a look that leaves out the author's style draws no stroke on it.
+func TestStrokeWidthIsTheAuthors(t *testing.T) {
+	m, err := Parse("quadrantChart\nA: [0.5, 0.5] stroke-width: 4px", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc := Layout(m, nil, &layout.Options{Measurer: text.Arial})
+	for _, it := range sc.Items {
+		if it.Role != RolePoint {
+			continue
+		}
+		if got := new(style.Look).Cascade(string(it.Role), it.Style, it.Author).Stroke; got != style.Series(0) {
+			t.Errorf("stroke %v, want the first series", got)
+		}
+		if got := (&style.Look{ThemeOnly: true}).Cascade(string(it.Role), it.Style, it.Author).Stroke; got.Visible() {
+			t.Errorf("stroke %v under ThemeOnly, want none", got)
+		}
+		return
+	}
+	t.Fatal("no point")
+}

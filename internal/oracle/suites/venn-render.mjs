@@ -10,6 +10,7 @@
 // read as limu reads them.
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { keepSeries, paletted, readSeries } from '../lib/palette.mjs';
 import { unescape, attr, n, pt, stroke } from '../lib/svg.mjs';
 import { corpus, drawableDiagrams, fragments, hostile } from './venn.mjs';
 
@@ -65,6 +66,7 @@ export function readSvg(svg, fontSize) {
   const lines = [];
   const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
   lines.push(`size ${pt(attr(head, 'width'), attr(head, 'height'))}`);
+  lines.push(...readSeries(head));
   const title = svg.indexOf('<text class="pele-title"');
   if (title >= 0) lines.push(text('title', '-', svg.slice(title, svg.indexOf('</text>', title)), fontSize));
   for (const m of svg.matchAll(/<circle class="pele-venn-set"[^>]*>/g)) {
@@ -153,5 +155,8 @@ export default async function ({ pele, src, write, random }) {
   // kept in full, and so are those of sets and texts with a style, css=, which it reads as a
   // browser draws it.
   const keep = (line) => line.startsWith('overlap ') || / css=[^ ]/.test(line);
-  write('diagram/venn/testdata/pele/render.json', { cases: out }, { keep });
+  // Some again with a palette set, as Mermaid's palette theme variables set a diagram's own
+  // series colors.
+  for (const s of paletted([...new Set(out.map((c) => c.src))], 'venn', random(45), 200)) each(s);
+  write('diagram/venn/testdata/pele/render.json', { cases: out }, { keep: keepSeries(keep) });
 }

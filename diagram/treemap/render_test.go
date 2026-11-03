@@ -57,8 +57,19 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding}))
-		if msg := f.Diff(k, &c.Drawing, got, authorLine); msg != "" {
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding}
+		sc := Layout(m, pre.Config, o)
+		// The palette is checked against the same diagram laid out without it, and the lines are
+		// written with the author's own style.
+		pal := pelesvg.ReadPalette(sc, Layout(m, pelesvg.WithoutPalette(pre.Config), o))
+		read := func(line string) string {
+			if strings.HasPrefix(line, "series ") {
+				return pal.ReadSeries(line, css.PaletteColor)
+			}
+			return authorLine(line)
+		}
+		got := pelesvg.InsertSeries(sceneLines(pal.Bare), pal.Lines)
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v, padding %v), %s", c.Src, c.MaxWidth, c.FontSize, (&layout.Options{Padding: c.Padding}).Pad(), msg)
 			}
@@ -93,7 +104,9 @@ func author(view func(style.Style) string, s style.Style) string {
 
 // authorLine is a line of the fixture with the style Pele writes, "css=", read as limu reads
 // declarations, "author=": on a shape as it is, and on a text with its fill, which is the
-// color the author gave, read as that color.
+// color the author gave, read as that color. A section whose author sets a fill, which Pele
+// writes with no fill-opacity of its own, is read as limu lays it out: in its tint, and the
+// full opacity in the author's style, as css.Opaque gives it.
 func authorLine(line string) string {
 	at := strings.Index(line, " css=")
 	if at < 0 {
@@ -112,7 +125,16 @@ func authorLine(line string) string {
 	decls := strings.Split(written, ";")
 	var field string
 	if strings.HasPrefix(line, "section ") || strings.HasPrefix(line, "leaf ") {
-		field = author(shapeView, css.Declarations(decls).Style)
+		filled := strings.HasPrefix(line, "section ") && css.FillDeclared(decls)
+		field = author(shapeView, css.Opaque(css.Declarations(decls).Style, filled))
+		if fill := strings.Index(line, " var(--pele-series-"); filled && fill >= 0 {
+			if opacity := strings.Index(line[fill:], ") - "); opacity >= 0 {
+				opacity += fill + len(") ")
+				line = line[:opacity] + "0.12" + line[opacity+1:]
+				at += len("0.12") - 1
+				end += len("0.12") - 1
+			}
+		}
 	} else {
 		for i, d := range decls {
 			if strings.HasPrefix(d, "fill:") {
@@ -160,9 +182,13 @@ var textPaints = map[style.Paint]string{style.Fg: "var(--_fg)", style.Muted: "va
 var inkNames = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)", style.Bg: "var(--pele-fg-on-dark,#fff)"}
 
 // textPaint is the fill the oracle reads of an item's text: the color the default look picks
-// on a fill, where it picks one, and the diagram's own otherwise. The diagram's own is taken
+// on a series the palette sets or on a fill, where it picks one, and the diagram's own
+// otherwise. The diagram's own is taken
 // as a paint the look never picks, to tell a color picked from it.
-func textPaint(it *scene.Item) string {
+func textPaint(sc *scene.Scene, it *scene.Item) string {
+	if ink := pelesvg.SeriesInk(it); ink.Set() {
+		return inkNames[ink]
+	}
 	var look style.Look
 	own := it.Style
 	own.Text = style.SurfaceAlt
@@ -209,7 +235,7 @@ func sceneLines(sc *scene.Scene) []string {
 			size = num(l.Size)
 		}
 		for _, line := range l.Lines {
-			at := prefix + "t " + pt(it.At.X, y) + " " + size + " " + anchors[it.Align] + " " + textPaint(it) + " " +
+			at := prefix + "t " + pt(it.At.X, y) + " " + size + " " + anchors[it.Align] + " " + textPaint(sc, it) + " " +
 				weight + " " + author(textView, it.Author) + " "
 			if len(line) == 0 {
 				lines = append(lines, at+" ")

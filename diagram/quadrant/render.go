@@ -57,6 +57,15 @@ func length(config diagram.Config, key string, fallback, hi float64) float64 {
 	return fallback
 }
 
+// textSize is one of Mermaid's quadrantChart font sizes, as Pele's textSize reads it: a finite
+// number, kept from 4 to 72, or fallback. Without them the sizes follow the font size.
+func textSize(config diagram.Config, key string, fallback float64) float64 {
+	if v, ok := setting(config, key).(float64); ok && !math.IsInf(v, 0) && !math.IsNaN(v) {
+		return min(72, max(4, v))
+	}
+	return fallback
+}
+
 // hex is a hex code with its #, as Pele's hex writes it.
 func hex(color string) string {
 	if strings.HasPrefix(color, "#") {
@@ -83,8 +92,11 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		o = &layout.Options{}
 	}
 	size := o.Size()
-	axisSize := jsmath.Round(size * 0.875)
-	pointSize := jsmath.Round(size * 0.75)
+	titleSize := textSize(config, "titleFontSize", size)
+	quadrantSize := textSize(config, "quadrantLabelFontSize", size)
+	xAxisSize := textSize(config, "xAxisLabelFontSize", jsmath.Round(size*0.875))
+	yAxisSize := textSize(config, "yAxisLabelFontSize", jsmath.Round(size*0.875))
+	pointSize := textSize(config, "pointLabelFontSize", jsmath.Round(size*0.75))
 	measure := o.Measure()
 	natural := jsmath.Round(max(100, length(config, "chartWidth", 500, 4000)))
 	width := jsmath.Round(common.CapWidth(o, natural, 280, 0))
@@ -101,7 +113,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		return text.Layout(t.Text, text.Options{Measurer: measure, Size: fontSize, MaxWidth: max(most, 40), Markdown: t.Markdown, Icons: o.Icons})
 	}
 
-	title := text.Layout(m.Title, text.Options{Measurer: measure, Size: size, MaxWidth: max(width-float64(2*outer), 40), Face: text.Bold, Icons: o.Icons})
+	title := text.Layout(m.Title, text.Options{Measurer: measure, Size: titleSize, MaxWidth: max(width-float64(2*outer), 40), Face: text.Bold, Icons: o.Icons})
 	titlePad := length(config, "titlePadding", 10, 200)
 	titleSpace := 0.0
 	if title.Height > 0 {
@@ -120,8 +132,8 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	if m.XAxisRight != nil {
 		room = side/2 - 16
 	}
-	xLeft := label(m.XAxisLeft, axisSize, room)
-	xRight := label(m.XAxisRight, axisSize, side/2-16)
+	xLeft := label(m.XAxisLeft, xAxisSize, room)
+	xRight := label(m.XAxisRight, xAxisSize, side/2-16)
 	xHeight := max(xLeft.Height, xRight.Height)
 	xSpace := 0.0
 	if hasX {
@@ -132,8 +144,8 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	if m.YAxisTop != nil {
 		room = tall/2 - 16
 	}
-	yBottom := label(m.YAxisBottom, axisSize, room)
-	yTop := label(m.YAxisTop, axisSize, tall/2-16)
+	yBottom := label(m.YAxisBottom, yAxisSize, room)
+	yTop := label(m.YAxisTop, yAxisSize, tall/2-16)
 	yHeight := max(yBottom.Height, yTop.Height)
 	ySpace := 0.0
 	if hasY {
@@ -188,7 +200,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		if k >= 2 {
 			y = top + h - tileH
 		}
-		l := label(m.Quadrants[k], size, tileW-16)
+		l := label(m.Quadrants[k], quadrantSize, tileW-16)
 		cx := x + tileW/2
 		cy := y + tileH/2
 		if hasPoints {
@@ -273,7 +285,8 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		if strokeWidth != nil {
 			reach = r + min(chars.ParseInt(*strokeWidth, 10), 400)/2
 		}
-		dots = append(dots, dot{cx: cx, cy: cy, reach: reach, text: label(&point.Text, pointSize, 200)})
+		// Mermaid keeps point labels on one line, so only what is wider than the plot wraps.
+		dots = append(dots, dot{cx: cx, cy: cy, reach: reach, text: label(&point.Text, pointSize, w)})
 		it := scene.Item{
 			Kind: scene.Mark, Role: RolePoint, Shape: "circle", ID: point.Text.Text,
 			Box:    scene.Rect{X: cx - r, Y: cy - r, W: 2 * r, H: 2 * r},
@@ -284,9 +297,10 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		if point.Class != "" {
 			it.Class = []string{point.Class}
 		}
-		// A stroke given a width and no color is drawn in the points' color.
+		// A stroke given a width and no color is drawn in the points' color. It is the author's,
+		// as the width is, so a look that leaves out the author's style draws no stroke.
 		if strokeWidth != nil && strokeColor == nil {
-			it.Style.Stroke = style.Series(0)
+			it.Author.Stroke = style.Series(0)
 		}
 		circles = append(circles, it)
 	}
