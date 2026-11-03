@@ -1098,8 +1098,22 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 		} else {
 			it.Parts = draw.Outline(v.shape, v.x, v.y, v.bw, v.bh)
 		}
-		if !v.label.Empty() {
-			it.Label = &v.label
+		label := v.label
+		// A label wrapped in a block that spans columns is laid out again in the room its wider
+		// cell gives, without changing the node's size or the routes found from it, as Pele's
+		// draw does.
+		if v.span > 1 && v.label.Width > 0 && len(v.label.Lines) > 1 && v.bw > v.nw && (v.kind == kindArrow || !fixedShape(v.shape)) {
+			var face text.Face
+			if v.author.Bold {
+				face |= text.Bold
+			}
+			if v.author.Italic {
+				face |= text.Italic
+			}
+			label = labelOf(b.Label, v.label.Size, v.label.Width+(v.bw-v.nw), face)
+		}
+		if !label.Empty() {
+			it.Label = &label
 		}
 		nodes = append(nodes, it)
 	}
