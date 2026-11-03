@@ -328,7 +328,6 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		FontSize: size,
 		Title:    m.AccTitle,
 		Desc:     m.AccDescr,
-		Palette:  palette.Series,
 	}
 	if !title.Empty() {
 		sc.Items = append(sc.Items, scene.Item{
@@ -339,5 +338,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	}
 	sc.Items = append(sc.Items, sections...)
 	sc.Items = append(sc.Items, leaves...)
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc
 }

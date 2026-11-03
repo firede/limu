@@ -2,9 +2,7 @@
 //
 // Colors of the theme are written as CSS variables, --limu-surface and the rest, with the
 // theme's colors as their fallbacks, so a page restyles a diagram without drawing it again;
-// with Options.Literal they are written as colors. The series colors a scene's palette sets
-// (scene.Scene.Palette) replace the theme's, and are also set as --limu-series-N on the root,
-// as Pele sets its palette.
+// with Options.Literal they are written as colors.
 package svg
 
 import (
@@ -47,8 +45,7 @@ func Render(sc *scene.Scene, o *Options) string {
 	if o == nil {
 		o = &Options{}
 	}
-	look := o.Look.WithSeries(sc.Palette)
-	w := &Writer{o: o, look: look, th: look.ThemeOrDefault(), sc: sc}
+	w := &Writer{o: o, th: o.Look.ThemeOrDefault(), sc: sc}
 	b := &w.b
 	b.Grow(256 + 160*len(sc.Items))
 	b.WriteString(`<svg xmlns="http://www.w3.org/2000/svg" class="limu limu-`)
@@ -65,9 +62,6 @@ func Render(sc *scene.Scene, o *Options) string {
 	w.Num(sc.FontSize)
 	b.WriteString(`" style="font-family:`)
 	w.Text(w.family(false))
-	if !o.Literal {
-		w.palette()
-	}
 	b.WriteString(`" fill="`)
 	w.Paint(style.Fg)
 	b.WriteString(`" role="graphics-document document" aria-roledescription="`)
@@ -85,7 +79,7 @@ func Render(sc *scene.Scene, o *Options) string {
 	}
 	for i := range sc.Items {
 		it := &sc.Items[i]
-		st := look.Cascade(string(it.Role), it.Style, it.Author)
+		st := o.Look.Cascade(string(it.Role), it.Style, it.Author)
 		if o.Draw != nil {
 			o.Draw(w, it, st, func() { w.Item(it, st) })
 		} else {
@@ -100,31 +94,9 @@ func Render(sc *scene.Scene, o *Options) string {
 type Writer struct {
 	b     strings.Builder
 	o     *Options
-	look  *style.Look // the options' look, with the scene's palette in its theme
 	th    *style.Theme
 	sc    *scene.Scene
 	icons []icon
-}
-
-// palette writes the series colors the scene's palette sets as the variables of the theme's
-// series, ;--limu-series-N:color, in the root's style, as Pele writes --pele-series-N. A color
-// is written opaque, as the theme's are, since its opacity is written where it is used; one
-// that draws nothing is transparent, and a color of the theme's is its variable.
-func (w *Writer) palette() {
-	for i, p := range w.sc.Palette {
-		if !p.Set() {
-			continue
-		}
-		w.b.WriteString(";--limu-")
-		w.b.WriteString(style.Series(i).Token().Name())
-		w.b.WriteByte(':')
-		if p.Visible() {
-			// A hex color or a variable, which need no escaping.
-			w.Paint(p)
-		} else {
-			w.b.WriteString("transparent")
-		}
-	}
 }
 
 // Raw writes markup as it is.
@@ -381,7 +353,7 @@ func hollow(st style.Style) style.Paint {
 // stripes at an opacity of 0.6 when its style sets a fill. The parts below show through,
 // in SVG and in the limumygo package alike.
 func (w *Writer) shade(it *scene.Item) style.Paint {
-	p, _ := w.look.Shade(it.Author)
+	p, _ := w.o.Look.Shade(it.Author)
 	if it.Author.Fill.Set() {
 		return p.Alpha(0.6)
 	}

@@ -98,7 +98,8 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	sc := common.FitWidth(o, radius0*2, 140, func(diameter float64, tight bool) *scene.Scene {
 		return draw(m, config, o, &palette, diameter/2, tight)
 	})
-	sc.Palette = palette.Series
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc
 }
 

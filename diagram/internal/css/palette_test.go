@@ -1,8 +1,10 @@
 package css
 
 import (
+	"reflect"
 	"testing"
 
+	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
 )
 
@@ -112,7 +114,28 @@ func TestPaletteGround(t *testing.T) {
 			t.Errorf("series %d: ground %v, not %v", i+1, got, want)
 		}
 	}
-	if p.Ground(8) != style.Series(0) || p.Ground(-7) != style.Series(1) {
+	if p.Ground(8) != style.Of(style.Hex("#ffeb3b")) || p.Ground(-7) != style.Of(style.Hex("#000080")) {
 		t.Error("the series do not repeat")
+	}
+}
+
+// The palette's colors go into the author's style of what is drawn in their series, in the
+// fields drawn in it, at the opacity they are drawn at, under what the author's own style sets.
+func TestPalettePaint(t *testing.T) {
+	p := ReadPalette("pie", map[string]any{"themeVariables": map[string]any{"pie1": "red", "pie3": "blue"}})
+	items := []scene.Item{
+		{Style: style.Style{Fill: style.Series(0), Stroke: style.Bg, Text: style.Series(8)}},
+		{Style: style.Style{Fill: style.Series(2).Alpha(0.5), FillOpacity: style.N(0.2)}},
+		{Style: style.Style{Fill: style.Series(1), Stroke: style.Series(0)}, Author: style.Style{Stroke: style.Of(style.Hex("#0f0"))}},
+	}
+	p.Paint(items)
+	for k, want := range []style.Style{
+		{Fill: red, Text: red},
+		{Fill: blue.Alpha(0.5)},
+		{Stroke: style.Of(style.Hex("#0f0"))},
+	} {
+		if got := items[k].Author; !reflect.DeepEqual(got, want) {
+			t.Errorf("item %d: author %+v, not %+v", k, got, want)
+		}
 	}
 }

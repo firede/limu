@@ -412,33 +412,6 @@ func contrast(a, b Color) float64 {
 	return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
 }
 
-// WithSeries is the look with the theme's series colors replaced by the paints series sets, as
-// a scene's palette replaces them (scene.Scene.Palette), and its overrides as they are. A
-// paint of the theme's, as Fg, is settled in the look's theme, and None is a color that draws
-// nothing. Where series sets none, it is l itself.
-func (l *Look) WithSeries(series [8]Paint) *Look {
-	th := l.ThemeOrDefault()
-	var own *Theme
-	for i, p := range series {
-		if !p.Set() {
-			continue
-		}
-		if own == nil {
-			copied := *th
-			own = &copied
-		}
-		own.Series[i] = p.Color(th)
-	}
-	if own == nil {
-		return l
-	}
-	out := &Look{Theme: own}
-	if l != nil {
-		out.Overrides = l.Overrides
-	}
-	return out
-}
-
 // ThemeOrDefault is the look's theme, or Default when it has none. The default is shared:
 // to change it, change a copy.
 func (l *Look) ThemeOrDefault() *Theme {

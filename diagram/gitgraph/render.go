@@ -535,7 +535,7 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 	for _, t := range turns {
 		place(&items[t.item], t, dx, dy)
 	}
-	sc := &scene.Scene{Type: "gitGraph", Width: width, Height: height, FontSize: size, Title: m.AccTitle, Desc: m.AccDescr, Palette: palette.Series}
+	sc := &scene.Scene{Type: "gitGraph", Width: width, Height: height, FontSize: size, Title: m.AccTitle, Desc: m.AccDescr}
 	if len(title.Lines) > 0 {
 		sc.Items = append(sc.Items, scene.Item{
 			Kind: scene.Text, Role: RoleTitle, Label: &title,
@@ -544,6 +544,8 @@ func lay(m *Model, config diagram.Config, o *layout.Options, direction string) *
 		})
 	}
 	sc.Items = append(sc.Items, items...)
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc
 }
 

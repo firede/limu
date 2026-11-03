@@ -50,8 +50,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
-		if msg := f.Diff(k, &c.Drawing, got, readSeries); msg != "" {
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}
+		sc := Layout(m, pre.Config, o)
+		// The palette is checked against the same diagram laid out without it, and the lines are
+		// written with the author's own style.
+		pal := pelesvg.ReadPalette(sc, Layout(m, pelesvg.WithoutPalette(pre.Config), o))
+		read := func(line string) string { return pal.ReadSeries(line, css.PaletteColor) }
+		got := pelesvg.InsertSeries(sceneLines(pal.Bare), pal.Lines)
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
@@ -75,10 +81,6 @@ func paintName(p style.Paint) string {
 	return "?"
 }
 
-// readSeries reads the series colors Pele's palette sets as limu reads them, which the suite
-// keeps in full.
-func readSeries(line string) string { return pelesvg.ReadSeries(line, css.PaletteColor) }
-
 // inkNames are the colors Pele's ink picks for a label on a series, as the oracle names them,
 // by the theme's paints the default look settles them as.
 var inkNames = map[style.Paint]string{style.Fg: "on-light", style.Bg: "on-dark"}
@@ -88,7 +90,6 @@ func sceneLines(sc *scene.Scene) []string {
 	num := pelesvg.Num
 	pt := func(x, y float64) string { return num(x) + "," + num(y) }
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
-	lines = append(lines, pelesvg.Series(sc)...)
 	paint := func(it *scene.Item, part *scene.Part) string {
 		fill, stroke := it.Style.Fill, it.Style.Stroke
 		switch part.Paint {
@@ -167,7 +168,7 @@ func sceneLines(sc *scene.Scene) []string {
 		}
 		shift := float64(l.Size * 0.35)
 		fill := paintName(it.Style.Text)
-		if ink := pelesvg.SeriesInk(sc, it); ink.Set() {
+		if ink := pelesvg.SeriesInk(it); ink.Set() {
 			fill = inkNames[ink]
 		}
 		lines = append(lines, "t "+pt(it.At.X, it.At.Y-l.Height/2+l.LineHeight/2+shift)+" f="+fill)

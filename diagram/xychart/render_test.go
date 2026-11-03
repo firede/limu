@@ -51,15 +51,22 @@ func TestLayoutMatchesPele(t *testing.T) {
 			continue
 		}
 		var got []string
-		sc, err := Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize})
+		read := func(line string) string { return line }
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}
+		sc, err := Layout(m, pre.Config, o)
 		if err != nil {
 			e := err.(*diagram.Error)
 			got = []string{"error " + string(e.Code) + " " + e.Message}
 			refused++
 		} else {
-			got = sceneLines(sc)
+			// The palette is checked against the same diagram laid out without it, and the
+			// lines are written with the author's own style.
+			bare, _ := Layout(m, pelesvg.WithoutPalette(pre.Config), o)
+			pal := pelesvg.ReadPalette(sc, bare)
+			read = func(line string) string { return pal.ReadSeries(line, css.PaletteColor) }
+			got = pelesvg.InsertSeries(sceneLines(pal.Bare), pal.Lines)
 		}
-		if msg := f.Diff(k, &c.Drawing, got, readSeries); msg != "" {
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
@@ -94,10 +101,6 @@ func paintName(p style.Paint) string {
 	return "?"
 }
 
-// readSeries reads the series colors Pele's palette sets as limu reads them, which the suite
-// keeps in full.
-func readSeries(line string) string { return pelesvg.ReadSeries(line, css.PaletteColor) }
-
 // sceneLines writes a scene as the oracle reads Pele's SVG, every number as JavaScript's
 // String writes it.
 func sceneLines(sc *scene.Scene) []string {
@@ -110,7 +113,6 @@ func sceneLines(sc *scene.Scene) []string {
 	if sc.Desc != "" {
 		lines = append(lines, "acc-desc "+pelesvg.ID(sc.Desc))
 	}
-	lines = append(lines, pelesvg.Series(sc)...)
 	contexts := map[scene.Role]string{
 		RoleTitle: "title", RoleAxisLabel: "axis-labels", RoleAxisTitle: "axis-titles",
 		RoleDataLabel: "data-labels", RolePointLabel: "point-labels", RoleLegend: "legend",

@@ -420,6 +420,8 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 			Style: style.Style{Text: style.Fg},
 		}}, items...)
 	}
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(items)
 	return &scene.Scene{
 		Type:     "timeline",
 		Width:    totalWidth,
@@ -428,6 +430,5 @@ func lay(m *Model, config diagram.Config, o *layout.Options, vertical bool) *sce
 		Title:    m.AccTitle,
 		Desc:     m.AccDescr,
 		Items:    items,
-		Palette:  palette.Series,
 	}
 }

@@ -758,7 +758,6 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 		FontSize: size,
 		Title:    m.AccTitle,
 		Desc:     m.AccDescr,
-		Palette:  css.ReadPalette("xychart", config).Series,
 	}
 	if !title.Empty() {
 		sc.Items = append(sc.Items, scene.Item{
@@ -787,5 +786,8 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) (*scene.Scene, e
 	sc.Items = append(sc.Items, outside...)
 	sc.Items = append(sc.Items, pointLabels...)
 	sc.Items = append(sc.Items, legendItems...)
+	palette := css.ReadPalette("xychart", config)
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc, nil
 }

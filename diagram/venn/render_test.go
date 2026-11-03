@@ -59,13 +59,24 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}))
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}
+		sc := Layout(m, pre.Config, o)
+		// The palette is checked against the same diagram laid out without it, and the lines are
+		// written with the author's own style.
+		pal := pelesvg.ReadPalette(sc, Layout(m, pelesvg.WithoutPalette(pre.Config), o))
+		read := func(line string) string {
+			if strings.HasPrefix(line, "series ") {
+				return pal.ReadSeries(line, css.PaletteColor)
+			}
+			return peleLine(line)
+		}
+		got := pelesvg.InsertSeries(sceneLines(pal.Bare), pal.Lines)
 		for _, line := range got {
 			if strings.HasPrefix(line, "overlap ") {
 				overlaps++
 			}
 		}
-		if msg := f.Diff(k, &c.Drawing, got, readLine); msg != "" {
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
@@ -321,21 +332,11 @@ func textPaint(it *scene.Item) string {
 	return textPaints[it.Style.Text]
 }
 
-// readLine reads a line of Pele's as peleLine does, and the series colors Pele's palette sets
-// as limu reads them, which the suite keeps in full.
-func readLine(line string) string {
-	if strings.HasPrefix(line, "series ") {
-		return pelesvg.ReadSeries(line, css.PaletteColor)
-	}
-	return peleLine(line)
-}
-
 // sceneLines writes a scene as the oracle reads Pele's SVG.
 func sceneLines(sc *scene.Scene) []string {
 	num := chars.NumberString
 	pt := func(x, y float64) string { return num(x) + "," + num(y) }
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
-	lines = append(lines, pelesvg.Series(sc)...)
 	// A label as Pele's labelSvg writes it about At: one text with no spans when it is one
 	// line of one span of plain text, and otherwise spans, with the emphasis every span has
 	// written on the text, unless the attributes give a weight of their own, and the rest on

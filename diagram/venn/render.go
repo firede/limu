@@ -286,7 +286,7 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		placed[i] = circle{id: c.id, x: float64(c.x*scale) + ox, y: float64(c.y*scale) + oy, r: float64(c.r * scale)}
 	}
 
-	sc := &scene.Scene{Type: "venn", Width: width, Height: height, FontSize: size, Palette: css.ReadPalette("venn", config).Series}
+	sc := &scene.Scene{Type: "venn", Width: width, Height: height, FontSize: size}
 	if !title.Empty() {
 		sc.Items = append(sc.Items, scene.Item{
 			Kind: scene.Text, Role: RoleTitle, Label: &title,
@@ -400,6 +400,9 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			y += l.label.Height
 		}
 	}
+	palette := css.ReadPalette("venn", config)
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc
 }
 

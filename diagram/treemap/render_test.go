@@ -57,8 +57,19 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		got := sceneLines(Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding}))
-		if msg := f.Diff(k, &c.Drawing, got, readLine); msg != "" {
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize, Padding: c.Padding}
+		sc := Layout(m, pre.Config, o)
+		// The palette is checked against the same diagram laid out without it, and the lines are
+		// written with the author's own style.
+		pal := pelesvg.ReadPalette(sc, Layout(m, pelesvg.WithoutPalette(pre.Config), o))
+		read := func(line string) string {
+			if strings.HasPrefix(line, "series ") {
+				return pal.ReadSeries(line, css.PaletteColor)
+			}
+			return authorLine(line)
+		}
+		got := pelesvg.InsertSeries(sceneLines(pal.Bare), pal.Lines)
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v, padding %v), %s", c.Src, c.MaxWidth, c.FontSize, (&layout.Options{Padding: c.Padding}).Pad(), msg)
 			}
@@ -164,7 +175,7 @@ var inkNames = map[style.Paint]string{style.Fg: "var(--pele-fg-on-light,#1f1f1f)
 // otherwise. The diagram's own is taken
 // as a paint the look never picks, to tell a color picked from it.
 func textPaint(sc *scene.Scene, it *scene.Item) string {
-	if ink := pelesvg.SeriesInk(sc, it); ink.Set() {
+	if ink := pelesvg.SeriesInk(it); ink.Set() {
 		return inkNames[ink]
 	}
 	var look style.Look
@@ -191,21 +202,11 @@ func written(s string) string {
 	}, s)
 }
 
-// readLine reads a line of Pele's as authorLine does, and the series colors Pele's palette
-// sets as limu reads them, which the suite keeps in full.
-func readLine(line string) string {
-	if strings.HasPrefix(line, "series ") {
-		return pelesvg.ReadSeries(line, css.PaletteColor)
-	}
-	return authorLine(line)
-}
-
 // sceneLines writes a scene as the oracle reads Pele's SVG.
 func sceneLines(sc *scene.Scene) []string {
 	num := chars.NumberString
 	pt := func(x, y float64) string { return num(x) + "," + num(y) }
 	lines := []string{"size " + pt(sc.Width, sc.Height)}
-	lines = append(lines, pelesvg.Series(sc)...)
 	// The lines of a label drawn about At, as Pele's text and labelSvg place them, after
 	// prefix: a line of one line of text at its baseline, and a title's lines below each
 	// other from where the first goes.

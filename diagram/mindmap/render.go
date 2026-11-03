@@ -440,7 +440,6 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 		Width:    math.Ceil(width + 2*pad),
 		Height:   math.Ceil(maxY - minY + titleHeight + 2*pad),
 		FontSize: size,
-		Palette:  css.ReadPalette("mindmap", config).Series,
 	}
 	ox := pad - minX + (width-maxX+minX)/2
 	oy := pad + titleHeight - minY
@@ -455,5 +454,8 @@ func lay(m *Model, config diagram.Config, o *layout.Options, down bool) *scene.S
 		})
 	}
 	sc.Items = append(sc.Items, items...)
+	palette := css.ReadPalette("mindmap", config)
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc
 }

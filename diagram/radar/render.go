@@ -100,7 +100,9 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 	sc := common.FitWidth(o, natural, 160, func(width float64, tight bool) *scene.Scene {
 		return draw(m, config, o, width, (option(config, "height", 320, 1, 4000)*width)/natural, tight)
 	})
-	sc.Palette = css.ReadPalette("radar", config).Series
+	palette := css.ReadPalette("radar", config)
+	// The palette is the author's colors on what is drawn in its series.
+	palette.Paint(sc.Items)
 	return sc
 }
 

@@ -49,9 +49,14 @@ func TestLayoutMatchesPele(t *testing.T) {
 			t.Errorf("ParsePrepared(%q): %v", c.Src, err)
 			continue
 		}
-		sc := Layout(m, pre.Config, &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize})
-		got := sceneLines(sc)
-		if msg := f.Diff(k, &c.Drawing, got, readSeries); msg != "" {
+		o := &layout.Options{MaxWidth: c.MaxWidth, FontSize: c.FontSize}
+		sc := Layout(m, pre.Config, o)
+		// The palette is checked against the same diagram laid out without it, and the lines are
+		// written with the author's own style.
+		pal := pelesvg.ReadPalette(sc, Layout(m, pelesvg.WithoutPalette(pre.Config), o))
+		read := func(line string) string { return pal.ReadSeries(line, css.PaletteColor) }
+		got := pelesvg.InsertSeries(sceneLines(pal.Bare), pal.Lines)
+		if msg := f.Diff(k, &c.Drawing, got, read); msg != "" {
 			if failed++; failed <= 20 {
 				t.Errorf("Layout(%q, max %v, size %v), %s", c.Src, c.MaxWidth, c.FontSize, msg)
 			}
@@ -86,10 +91,6 @@ func paintName(p style.Paint) (string, string) {
 	return "?", "?"
 }
 
-// readSeries reads the series colors Pele's palette sets as limu reads them, which the suite
-// keeps in full.
-func readSeries(line string) string { return pelesvg.ReadSeries(line, css.PaletteColor) }
-
 // sceneLines writes a scene as the oracle reads Pele's SVG, every number as JavaScript's
 // String writes it.
 func sceneLines(sc *scene.Scene) []string {
@@ -102,7 +103,6 @@ func sceneLines(sc *scene.Scene) []string {
 	if sc.Desc != "" {
 		lines = append(lines, "acc-desc "+pelesvg.ID(sc.Desc))
 	}
-	lines = append(lines, pelesvg.Series(sc)...)
 	pen := func(it *scene.Item, part *scene.Part) string {
 		fill, opacity := "none", "-"
 		if part.Paint != scene.StrokeOnly {

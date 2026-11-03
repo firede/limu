@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/firede/limu/internal/chars"
+	"github.com/firede/limu/scene"
 	"github.com/firede/limu/style"
 )
 
@@ -46,22 +47,59 @@ type Palette struct {
 	// Series is the color each series takes, where a theme variable sets one limu can read:
 	// a color, None for transparent, or Fg for currentColor, as Pele's root sets the color of
 	// the text. A color Pele passes on that limu can't work out, such as var(--pele-accent),
-	// color-mix() or oklch(), leaves its series unset, in the theme's color.
+	// color-mix() or oklch(), leaves its series unset, in the theme's color. Paint gives the
+	// colors to what is drawn in the series.
 	Series [slots]style.Paint
 	// inks says on which series Pele's ink picks a color for a label, as its palette's inks.
 	inks [slots]bool
 }
 
-// Ground is the ground a label on series i lies on, the series' paint, where the palette sets
-// that series and Pele's ink picks a color for a label on it, and unset otherwise, as Pele's
-// seriesInkFill gives a label a fill. A diagram sets it as the label's style.Style.TextGround,
-// and the style picks the color when the scene is drawn.
+// Ground is the ground a label on series i lies on, the palette's color, where the palette
+// sets that series and Pele's ink picks a color for a label on it, and unset otherwise, as
+// Pele's seriesInkFill gives a label a fill. A diagram sets it as the label's
+// style.Style.TextGround, and the style picks the color when the scene is drawn.
 func (p *Palette) Ground(i int) style.Paint {
 	k := (i%slots + slots) % slots
-	if !p.inks[k] || !p.Series[k].Set() {
+	if !p.inks[k] {
 		return style.Paint{}
 	}
-	return style.Series(k)
+	return p.Series[k]
+}
+
+// Paint gives each item drawn in a series the palette sets the palette's color in its author's
+// style, as Pele's --pele-series-N colors all that its seriesColor names: in each of the fill,
+// the stroke and the text the item's own style draws in that series, at the opacity it draws
+// the series at. What the author's own style sets wins, as Pele's inline style wins over the
+// series' variable. The item's own style keeps the series, so its role in the theme is
+// unchanged.
+func (p *Palette) Paint(items []scene.Item) {
+	for k := range items {
+		it := &items[k]
+		it.Author.Fill = p.over(it.Style.Fill, it.Author.Fill)
+		it.Author.Stroke = p.over(it.Style.Stroke, it.Author.Stroke)
+		it.Author.Text = p.over(it.Style.Text, it.Author.Text)
+	}
+}
+
+// over is the author's paint for a field the item's own style paints with own: the author's
+// own, where it sets one, or the palette's color at own's opacity, where own is a series the
+// palette sets.
+func (p *Palette) over(own, author style.Paint) style.Paint {
+	if author.Set() {
+		return author
+	}
+	n, ok := strings.CutPrefix(own.Token().Name(), "series-")
+	if !ok || own.Base() != 0 {
+		return author
+	}
+	color := p.Series[n[0]-'1']
+	if !color.Set() {
+		return author
+	}
+	if f := own.Factor(); f < 1 {
+		return color.Alpha(float64(f))
+	}
+	return color
 }
 
 // ReadPalette is the palette a diagram's theme variables set, for Pele's name of its type

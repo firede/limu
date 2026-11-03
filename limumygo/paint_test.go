@@ -45,38 +45,6 @@ func TestPictureHooks(t *testing.T) {
 	}
 }
 
-// The series colors a scene's palette sets replace the theme's, as the svg package writes
-// them, and the text on a series is drawn in the color picked on the palette's.
-func TestPalette(t *testing.T) {
-	l := text.Layout("50%", text.Options{Measurer: goFonts, Size: 10})
-	slice := func(n int) scene.Item {
-		return scene.Item{
-			Kind: scene.Mark, Role: "pie.slice", Box: scene.Rect{W: 10, H: 10},
-			Parts: []scene.Part{{Box: scene.Rect{W: 10, H: 10}, Paint: scene.FillOnly}},
-			Label: &l, At: scene.Point{X: 5, Y: 5},
-			Style: style.Style{Fill: style.Series(n), Text: style.Bg, TextGround: style.Series(n)},
-		}
-	}
-	sc := &scene.Scene{Width: 40, Height: 10, FontSize: 10, Items: []scene.Item{slice(0), slice(1), slice(2)}}
-	sc.Palette[0] = style.Of(style.Hex("#ffeb3b80"))
-	sc.Palette[1] = style.Fg
-	th := style.Default()
-	var got []string
-	o := &Options{Fonts: goFonts, Draw: func(p *Painter, it *scene.Item, s style.Resolved, next func()) {
-		got = append(got, fmt.Sprintf("%v %v", s.Fill, s.Text))
-	}}
-	ui.Render(func(c *ui.Context) { View(c, sc, o) }, 80, 20, 1)
-	want := []string{
-		fmt.Sprintf("%v %v", style.Hex("#ffeb3b80"), th.Fg),
-		fmt.Sprintf("%v %v", th.Fg, th.Bg),
-		// The theme's series 3, which the palette leaves.
-		fmt.Sprintf("%v %v", th.Series[2], th.Fg),
-	}
-	if len(got) < len(want) || fmt.Sprint(got[len(got)-len(want):]) != fmt.Sprint(want) {
-		t.Errorf("drawn:\n%q\nwant:\n%q", got, want)
-	}
-}
-
 // A part painted Shade is the background, or over a fill its author set, the background at
 // 60% opacity, as the svg package writes it.
 func TestShade(t *testing.T) {

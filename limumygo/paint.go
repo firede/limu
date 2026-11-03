@@ -82,11 +82,9 @@ func Paint(p *ui.Painter, sc *scene.Scene, x, y float32, o *Options) {
 	if pp.fonts == nil {
 		pp.fonts = DefaultFonts
 	}
-	// The series colors the scene's palette sets replace the theme's.
-	look := o.Look.WithSeries(sc.Palette)
 	for i := range sc.Items {
 		it := &sc.Items[i]
-		s := look.Resolve(string(it.Role), it.Style, it.Author)
+		s := o.Look.Resolve(string(it.Role), it.Style, it.Author)
 		if o.Draw != nil {
 			o.Draw(pp, it, s, func() { pp.Item(it, s) })
 		} else {
