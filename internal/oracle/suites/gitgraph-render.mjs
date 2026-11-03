@@ -11,10 +11,21 @@
 // worked out here from Pele's numbers as limu works them out.
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { keepSeries, paletted, readSeries } from '../lib/palette.mjs';
 import { unescape, attr } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, histories } from './gitgraph.mjs';
 
-const TOKENS = { 'var(--_bg)': 'bg', 'var(--_fg)': 'fg', 'var(--_m)': 'muted', 'var(--_s)': 'surface', 'var(--_b)': 'border', none: 'none' };
+// The theme's tokens, and the colors Pele's ink picks for a label on a series a palette sets.
+const TOKENS = {
+  'var(--_bg)': 'bg',
+  'var(--_fg)': 'fg',
+  'var(--_m)': 'muted',
+  'var(--_s)': 'surface',
+  'var(--_b)': 'border',
+  none: 'none',
+  'var(--pele-fg-on-light,#1f1f1f)': 'on-light',
+  'var(--pele-fg-on-dark,#fff)': 'on-dark',
+};
 // A paint as the test names a token of the theme.
 const paintName = (v) => {
   if (v === undefined) return '-';
@@ -60,6 +71,7 @@ export function readSvg(svg, num) {
   const lines = [];
   const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
   lines.push(`size ${num(Number(attr(head, 'width')))},${num(Number(attr(head, 'height')))}`);
+  lines.push(...readSeries(head));
   let dx = 0;
   let dy = 0;
   const mx = (v) => dx + Number(v);
@@ -279,5 +291,8 @@ export default async function ({ src, pele, write, random }) {
     const s = next();
     if (s.length <= 2000) each(s);
   }
-  write('diagram/gitgraph/testdata/pele/render.json', { cases: out });
+  // Some again with a palette set, as Mermaid's palette theme variables set a diagram's own
+  // series colors.
+  for (const s of paletted([...new Set(out.map((c) => c.src))], 'gitGraph', random(45), 200)) each(s);
+  write('diagram/gitgraph/testdata/pele/render.json', { cases: out }, { keep: keepSeries() });
 }

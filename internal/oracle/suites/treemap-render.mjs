@@ -9,6 +9,7 @@
 // them on each shape and text, for the test to read as limu reads them.
 import { lone } from '../lib/corpus.mjs';
 import { mutator } from '../lib/mutate.mjs';
+import { keepSeries, paletted, readSeries } from '../lib/palette.mjs';
 import { unescape, attr, stroke } from '../lib/svg.mjs';
 import { FRAGMENTS, corpus, randomDiagrams } from './treemap.mjs';
 
@@ -50,6 +51,7 @@ export function readSvg(svg) {
   const lines = [];
   const head = svg.slice(svg.indexOf('<svg'), svg.indexOf('>'));
   lines.push(`size ${attr(head, 'width')},${attr(head, 'height')}`);
+  lines.push(...readSeries(head));
   const root = { size: '-', anchor: 'start', fill: 'var(--_fg)' };
   const title = svg.indexOf('<text class="pele-title"');
   if (title >= 0) texts(svg.slice(title, svg.indexOf('</text>', title)), root, 'title ', lines);
@@ -141,5 +143,8 @@ export default async function ({ pele, src, write, random }) {
   while (drawn < 5000) each(next());
   // The test reads the style Pele writes, css=, as limu reads declarations, so the lines with
   // one are kept in full.
-  write('diagram/treemap/testdata/pele/render.json', { cases: out }, { keep: (line) => / css=[^ ]/.test(line) });
+  // Some again with a palette set, as Mermaid's palette theme variables set a diagram's own
+  // series colors.
+  for (const s of paletted([...new Set(out.map((c) => c.src))], 'treemap', random(45), 200)) each(s);
+  write('diagram/treemap/testdata/pele/render.json', { cases: out }, { keep: keepSeries((line) => / css=[^ ]/.test(line)) });
 }
