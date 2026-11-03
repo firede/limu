@@ -297,9 +297,10 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 		if point.Class != "" {
 			it.Class = []string{point.Class}
 		}
-		// A stroke given a width and no color is drawn in the points' color.
+		// A stroke given a width and no color is drawn in the points' color. It is the author's,
+		// as the width is, so a look that leaves out the author's style draws no stroke.
 		if strokeWidth != nil && strokeColor == nil {
-			it.Style.Stroke = style.Series(0)
+			it.Author.Stroke = style.Series(0)
 		}
 		circles = append(circles, it)
 	}
