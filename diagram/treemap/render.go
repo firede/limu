@@ -220,9 +220,8 @@ func Layout(m *Model, config diagram.Config, o *layout.Options) *scene.Scene {
 			// A section is a tint of its color, unless a class gives it a fill of its own.
 			it.Style.Fill, it.Style.Stroke, it.Style.Text, it.Style.OnFill = color, color, style.Fg, onFill
 			it.Style.TextGround = seriesGround
-			if !css.FillDeclared(node.CSS) {
-				it.Style.FillOpacity = style.N(0.12)
-			}
+			it.Style.FillOpacity = style.N(0.12)
+			it.Author = css.Opaque(it.Author, css.FillDeclared(node.CSS))
 			var shown *scene.Item
 			short := b.header < header
 			labelSize, valueSize := small, tiny

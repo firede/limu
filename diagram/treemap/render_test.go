@@ -104,7 +104,9 @@ func author(view func(style.Style) string, s style.Style) string {
 
 // authorLine is a line of the fixture with the style Pele writes, "css=", read as limu reads
 // declarations, "author=": on a shape as it is, and on a text with its fill, which is the
-// color the author gave, read as that color.
+// color the author gave, read as that color. A section whose author sets a fill, which Pele
+// writes with no fill-opacity of its own, is read as limu lays it out: in its tint, and the
+// full opacity in the author's style, as css.Opaque gives it.
 func authorLine(line string) string {
 	at := strings.Index(line, " css=")
 	if at < 0 {
@@ -123,7 +125,16 @@ func authorLine(line string) string {
 	decls := strings.Split(written, ";")
 	var field string
 	if strings.HasPrefix(line, "section ") || strings.HasPrefix(line, "leaf ") {
-		field = author(shapeView, css.Declarations(decls).Style)
+		filled := strings.HasPrefix(line, "section ") && css.FillDeclared(decls)
+		field = author(shapeView, css.Opaque(css.Declarations(decls).Style, filled))
+		if fill := strings.Index(line, " var(--pele-series-"); filled && fill >= 0 {
+			if opacity := strings.Index(line[fill:], ") - "); opacity >= 0 {
+				opacity += fill + len(") ")
+				line = line[:opacity] + "0.12" + line[opacity+1:]
+				at += len("0.12") - 1
+				end += len("0.12") - 1
+			}
+		}
 	} else {
 		for i, d := range decls {
 			if strings.HasPrefix(d, "fill:") {

@@ -673,14 +673,10 @@ func lay(m *Model, config diagram.Config, o *layout.Options, turned bool) *scene
 			}
 			it := scene.Item{
 				Kind: scene.Group, Role: RoleSystem, Shape: "rect", ID: n.ID, Class: common.ClassNames(strings.Join(boundaryClasses[n.ID], " ")),
-				Box:    scene.Rect{X: left, Y: top, W: c.W, H: c.H},
-				Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted, OnFill: inks},
-				Author: v.author.Style,
-			}
-			// A boundary is drawn at half its opacity, unless its author sets a fill, as
-			// Pele's setsFill tests.
-			if !css.FillDeclared(v.decls) {
-				it.Style.FillOpacity = style.N(0.5)
+				Box:   scene.Rect{X: left, Y: top, W: c.W, H: c.H},
+				Style: style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted, OnFill: inks},
+				// A boundary is drawn at half its opacity, unless its author sets a fill.
+				Author: css.Opaque(v.author.Style, css.FillDeclared(v.decls)),
 			}
 			if n.BoundaryType == "package" {
 				it.Shape = "package"

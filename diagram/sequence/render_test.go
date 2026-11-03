@@ -126,7 +126,7 @@ func inked(it *scene.Item) (txt, stroke string) {
 // the author set a fill.
 func partPaint(it *scene.Item, paint scene.Painting) string {
 	_, stroke := inked(it)
-	fill := paintName(pelesvg.OwnFill(it))
+	fill := paintName(pelesvg.TintFill(it))
 	switch paint {
 	case scene.StrokeOnly:
 		fill = "none"

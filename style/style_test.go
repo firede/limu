@@ -1,6 +1,9 @@
 package style
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestParseColor(t *testing.T) {
 	for _, c := range []struct {
@@ -248,5 +251,42 @@ func TestShadeOnAuthorFill(t *testing.T) {
 	}
 	if r := look.Resolve("er.entity", Style{}, Style{}); r.Shade != look.ThemeOrDefault().Bg {
 		t.Errorf("resolved under an override's fill: %v", r.Shade)
+	}
+}
+
+// A look that is ThemeOnly leaves out the author's style, and the grounds a diagram sets on a
+// fill the author set, and draws what the theme and the overrides give, OnFill picking the
+// text's color on an override's fill.
+func TestThemeOnly(t *testing.T) {
+	navy := Of(Hex("#000080"))
+	only := &Look{ThemeOnly: true, Overrides: Overrides{"x.lit": {Fill: navy}}}
+	plain := &Look{Overrides: only.Overrides}
+	own := Style{Fill: Surface, Stroke: Border, Text: Muted, OnFill: true, FillOpacity: N(0.5)}
+	author := Style{
+		Fill: Of(Hex("#ffd700")), Stroke: Of(Hex("#f00")), Text: Of(Hex("#0f0")),
+		FillOpacity: N(1), StrokeOpacity: N(0.5), StrokeWidth: N(3), Radius: N(9), Dash: Dashes(4, 2),
+		Cap: CapRound, Join: JoinRound, Opacity: N(0.8),
+	}
+	for _, role := range []string{"x", "x.lit"} {
+		if got, want := only.Cascade(role, own, author), plain.Cascade(role, own, Style{}); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s: %+v, want %+v", role, got, want)
+		}
+	}
+	if got := only.Resolve("x.lit", own, author).Text; got != Default().Bg {
+		t.Errorf("text on an override's navy: %v", got)
+	}
+	grounded := Style{Stroke: Line, Ground: navy, TextGround: navy}
+	if got, want := only.Resolve("x", grounded, Style{}), plain.Resolve("x", Style{Stroke: Line}, Style{}); !reflect.DeepEqual(got, want) {
+		t.Errorf("grounds: %+v, want %+v", got, want)
+	}
+	if p, ok := only.Shade(Style{Fill: navy}); p != Bg || ok {
+		t.Errorf("shade on an author's navy: %v %v", p, ok)
+	}
+	if only.Draws("flowchart.casing") || !only.Draws("flowchart.edge") || !plain.Draws("flowchart.casing") {
+		t.Error("Draws")
+	}
+	var none *Look
+	if !none.Draws("er.casing") {
+		t.Error("a nil look leaves out a casing")
 	}
 }

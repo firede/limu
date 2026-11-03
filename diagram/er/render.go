@@ -449,14 +449,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			// the author gives it, as Pele's inkFill picks it.
 			cluster := scene.Item{
 				Kind: scene.Group, Role: RoleCluster, ID: n.ID, Class: classes, Box: box,
-				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted, OnFill: css.InksText(v.decls, v.decls)},
-				Author: v.author.Style,
-			}
-			// A subgraph is drawn at half its opacity, unless its author sets a fill, as
-			// Pele's setsFill tests.
-			if !css.FillDeclared(v.decls) {
-				cluster.Style.FillOpacity = style.N(0.5)
+				Parts: []scene.Part{{Box: box, Rounded: true}},
+				Style: style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted, OnFill: css.InksText(v.decls, v.decls)},
+				// A subgraph is drawn at half its opacity, unless its author sets a fill.
+				Author: css.Opaque(v.author.Style, css.FillDeclared(v.decls)),
 			}
 			if !v.label.Empty() {
 				cluster.Label = &v.label

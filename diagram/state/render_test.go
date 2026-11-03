@@ -137,7 +137,7 @@ func sceneLines(sc *scene.Scene) []string {
 				lines = append(lines, "tip "+peleText(it.Tooltip))
 			}
 			rect("rect", it.Parts[0].Box, 0, 0, radius(it))
-			if _, ok := it.Style.FillOpacity.Get(); !ok {
+			if pelesvg.Opaque(it) {
 				lines = append(lines, "opaque")
 			}
 			for _, part := range it.Parts[1:] {

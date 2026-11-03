@@ -1,6 +1,9 @@
 package style
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
 // A Paint is what a part is filled, stroked or written with: a color of the theme, a color
 // of its own, or nothing. The zero Paint is unset, and takes what is under it.
@@ -303,18 +306,38 @@ type Overrides map[string]Style
 type Look struct {
 	Theme     *Theme // nil is Default
 	Overrides Overrides
+	// ThemeOnly draws a scene with the theme and the overrides alone, leaving out all that
+	// the diagram's author set for painting: the style the author gave each part, a
+	// palette's colors among it, the colors picked for what lies on a fill the author set,
+	// and the casings drawn about the lines inside such a fill. A host sets it to keep a
+	// look its design tokens restrict. It moves nothing: the size, weight and slant of text
+	// the author set stay, as the layout measured them.
+	ThemeOnly bool
+}
+
+// Draws reports whether a backend draws the parts of a role: all but the casings, the
+// roles ending in ".casing", where the look is ThemeOnly, since a diagram draws a casing
+// only about a line inside a fill the author set.
+func (l *Look) Draws(role string) bool {
+	return l == nil || !l.ThemeOnly || !strings.HasSuffix(role, ".casing")
 }
 
 var defaultTheme = Default()
 
 // Cascade is the style of a part of a role: the theme's measures under the diagram's own
 // style for the part, under the overrides for its role, under the style its author gave it
-// in the diagram's text. Text is written in Fg unless something sets another paint.
+// in the diagram's text. Text is written in Fg unless something sets another paint. Where
+// the look is ThemeOnly, the author's style is left out, and so are the part's Ground and
+// TextGround, which a diagram sets only on a fill the author set.
 func (l *Look) Cascade(role string, own, author Style) Style {
 	th := l.ThemeOrDefault()
 	var over Style
 	if l != nil {
 		over = l.Overrides[role]
+		if l.ThemeOnly {
+			author = Style{}
+			own.Ground, own.TextGround = Paint{}, Paint{}
+		}
 	}
 	s := author.Over(over.Over(own))
 	set := author.Over(over)
@@ -357,8 +380,12 @@ func (l *Look) Cascade(role string, own, author Style) Style {
 // picks a color on, the other of Fg and Bg, the one that stands out less on the fill, as Pele
 // 1.12 keeps an entity's stripes light on a light fill and dark on a dark one. It reports
 // whether it was picked on a fill. A fill an override sets leaves the shade the theme's Bg,
-// since the backend lays a shade at an opacity only over a fill the author sets.
+// since the backend lays a shade at an opacity only over a fill the author sets. Where the
+// look is ThemeOnly, the shade is the theme's Bg, as for a part its author set no fill on.
 func (l *Look) Shade(author Style) (Paint, bool) {
+	if l != nil && l.ThemeOnly {
+		return Bg, false
+	}
 	on, ok := ink(l.ThemeOrDefault(), author)
 	switch {
 	case !ok:

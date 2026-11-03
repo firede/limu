@@ -101,7 +101,7 @@ func sceneLines(sc *scene.Scene) []string {
 			lines = append(lines, "title "+textAt(it.Label, it.At.X, it.At.Y))
 		case RoleCluster:
 			opaque := ""
-			if _, ok := it.Style.FillOpacity.Get(); !ok {
+			if pelesvg.Opaque(it) {
 				opaque = " opaque"
 			}
 			lines = append(lines, fmt.Sprintf("cluster %s [%s] %s %s%s", id, classes, box(it.Box), pen(it, ""), opaque))

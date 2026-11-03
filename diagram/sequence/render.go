@@ -283,14 +283,15 @@ func writesFill(value string) bool {
 }
 
 // fillStyle is how a box or a shaded block whose author gave it a fill is painted: in the
-// theme's alternate surface, at half its opacity where no fill is written, and the author's
-// fill over it. Pele writes these as the fill-opacity and the resolveStyle of a fill in its
-// draw, for the boxes and the rect blocks alike.
+// theme's alternate surface at half its opacity, and, where a fill is written, the author's fill
+// over it at full opacity. Pele writes these as the fill-opacity and the resolveStyle of a fill
+// in its draw, for the boxes and the rect blocks alike.
 func fillStyle(fill string, written bool) (style.Style, style.Style) {
+	own := style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5)}
 	if !written {
-		return style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5)}, style.Style{}
+		return own, style.Style{}
 	}
-	return style.Style{Fill: style.SurfaceAlt}, css.Declarations([]string{"fill:" + fill}).Style
+	return own, css.Opaque(css.Declarations([]string{"fill:" + fill}).Style, true)
 }
 
 // Layout lays a sequence diagram out as a scene, as Pele's renderSequence draws it: loosely,

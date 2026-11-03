@@ -79,6 +79,9 @@ func Render(sc *scene.Scene, o *Options) string {
 	}
 	for i := range sc.Items {
 		it := &sc.Items[i]
+		if !o.Look.Draws(string(it.Role)) {
+			continue
+		}
 		st := o.Look.Cascade(string(it.Role), it.Style, it.Author)
 		if o.Draw != nil {
 			o.Draw(w, it, st, func() { w.Item(it, st) })
@@ -349,12 +352,12 @@ func hollow(st style.Style) style.Paint {
 
 // shade is the fill of an item's parts painted Shade: the paint the look's Shade picks, the
 // theme's background or, on a fill ink picks a color on, the other of the two it picks from,
-// and when the item's author set a fill, that paint at 60% over it, as Pele draws an entity's
-// stripes at an opacity of 0.6 when its style sets a fill. The parts below show through,
-// in SVG and in the limumygo package alike.
+// and when the item's author set a fill the look draws, that paint at 60% over it, as Pele
+// draws an entity's stripes at an opacity of 0.6 when its style sets a fill. The parts below
+// show through, in SVG and in the limumygo package alike.
 func (w *Writer) shade(it *scene.Item) style.Paint {
 	p, _ := w.o.Look.Shade(it.Author)
-	if it.Author.Fill.Set() {
+	if !w.o.Look.ThemeOnly && it.Author.Fill.Set() {
 		return p.Alpha(0.6)
 	}
 	return p

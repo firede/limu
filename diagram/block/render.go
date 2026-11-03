@@ -1068,13 +1068,10 @@ func lay(db *DB, config diagram.Config, o *layout.Options, tight bool) (*scene.S
 			}
 			it := scene.Item{
 				Kind: scene.Group, Role: RoleComposite, ID: b.ID, Class: classes, Box: box,
-				Parts:  []scene.Part{{Box: box, Rounded: true}},
-				Style:  style.Style{Fill: style.SurfaceAlt, Stroke: style.Border, Text: style.Muted, OnFill: css.InksText(v.decls, v.decls)},
-				Author: v.author.Style,
-			}
-			// A composite is drawn at half its opacity, unless its author sets a fill.
-			if !css.FillDeclared(v.decls) {
-				it.Style.FillOpacity = style.N(0.5)
+				Parts: []scene.Part{{Box: box, Rounded: true}},
+				Style: style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Muted, OnFill: css.InksText(v.decls, v.decls)},
+				// A composite is drawn at half its opacity, unless its author sets a fill.
+				Author: css.Opaque(v.author.Style, css.FillDeclared(v.decls)),
 			}
 			if !v.label.Empty() {
 				it.Label = &v.label

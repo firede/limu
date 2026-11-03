@@ -60,6 +60,26 @@ func OwnFill(it *scene.Item) style.Paint {
 	return it.Style.Fill.Alpha(it.Style.FillOpacity.Or(1))
 }
 
+// TintFill is OwnFill for a part the diagram draws in a translucent fill of its own unless its
+// author sets a fill: at full opacity where Opaque, as Pele then writes no fill-opacity.
+func TintFill(it *scene.Item) style.Paint {
+	if Opaque(it) {
+		return it.Style.Fill
+	}
+	return OwnFill(it)
+}
+
+// Opaque says whether Pele leaves out the fill-opacity of a part the diagram draws in a
+// translucent fill of its own, as it does where the part's author sets a fill. limu keeps the
+// part's own opacity and gives the author's style a full one (css.Opaque), so Opaque reads that
+// style: true where it sets a fill opacity along with a fill, or a full one. Where the author
+// writes a fill opacity and limu reads no fill beside it, Opaque can differ from Pele's
+// attribute, but not in what is drawn, as the author's opacity covers the part's own.
+func Opaque(it *scene.Item) bool {
+	opacity, ok := it.Author.FillOpacity.Get()
+	return ok && (opacity == 1 || it.Author.Fill.Set())
+}
+
 // The colors Pele's ink gives what lies on a fill a style sets, by the theme's paint that
 // stands for each: ON_LIGHT is the theme's Fg, and ON_DARK its Bg.
 var inks = map[style.Paint]string{
@@ -153,7 +173,7 @@ func FlowLines(sc *scene.Scene) []string {
 			}
 		case "flowchart.cluster":
 			lines = append(lines, fmt.Sprintf("cluster %s [%s] %s", id, classes, box(it.Box, 0, 0)))
-			if _, ok := it.Style.FillOpacity.Get(); !ok {
+			if Opaque(it) {
 				lines = append(lines, "opaque")
 			}
 			label(it.Label, it.At.X, it.At.Y)

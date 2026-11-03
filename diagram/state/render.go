@@ -715,9 +715,7 @@ func lay(db *DB, config diagram.Config, o *layout.Options, turned bool) *scene.S
 			}
 			it.Style = style.Style{Fill: style.SurfaceAlt, FillOpacity: style.N(0.5), Stroke: style.Border, Text: style.Fg, Radius: style.N(corner), OnFill: inks}
 			// A fill its author sets is drawn at full opacity.
-			if css.Sets(v.decls, "fill") {
-				it.Style.FillOpacity = style.Num{}
-			}
+			it.Author = css.Opaque(it.Author, css.Sets(v.decls, "fill"))
 			if v.titleH > 0 {
 				rule := new(scene.Path).MoveTo(left, top+v.titleH).LineTo(left+c.W, top+v.titleH)
 				it.Parts = append(it.Parts, scene.Part{Path: rule, Paint: scene.StrokeOnly})
