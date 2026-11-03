@@ -81,21 +81,25 @@ An item also carries what a plain backend needs to draw it.
 - `Label` is text laid out in lines and spans, already measured, with the point it's drawn
   around, its alignment and its rotation.
 - `Style` holds the diagram's own colors for the item, as theme tokens, and `Author` holds
-  what the diagram's author set with `classDef` and `style` lines.
+  what the diagram's author set with `classDef` and `style` lines and with a palette.
 
 A part's `Painting` says which of the style's colors it takes, so a part keeps its role
 when a theme changes them.
 
-A scene also carries its `Palette`, the series colors the diagram's own theme variables set,
-as Pele 1.13 reads Mermaid's palette variables. They are `pie1`…`pie8` for pie charts,
-`git0`…`git7` for git graphs, `cScale0`…`cScale7` for timelines, radar charts and treemaps,
-`cScale1`…`cScale8` for mindmaps, `venn1`…`venn8` for venn diagrams, which repeat the ones
-set, and `xyChart.plotColorPalette` for XY charts, a list that repeats. Each entry is a
-color, `None` for `transparent`, `Fg` for `currentColor`, or unset where the variable leaves
-the theme's color. The palette changes no position, so it is style. It replaces the theme's
-series colors only for that scene, and a backend draws with `Look.WithSeries`, which gives a
-look whose theme has them in its series. A color an override or the author sets still wins
-over the series it would take.
+A palette is the series colors a diagram's own theme variables set, as Pele 1.13 reads
+Mermaid's palette variables. They are `pie1`…`pie8` for pie charts, `git0`…`git7` for git
+graphs, `cScale0`…`cScale7` for timelines, radar charts and treemaps, `cScale1`…`cScale8`
+for mindmaps, `venn1`…`venn8` for venn diagrams, which repeat the ones set, and
+`xyChart.plotColorPalette` for XY charts, a list that repeats. Each entry is a color,
+`None` for `transparent`, `Fg` for `currentColor`, or unset where the variable leaves the
+theme's color. In six of those diagrams a palette is the only way the text sets a color, and
+in treemaps and venn diagrams it sits beside their style lines, so it is the author's color
+like any other. A diagram writes it into the `Author` style of each item it draws in a series
+the palette sets, in the fill, the stroke or the text the item takes the series in, at the
+opacity it draws the series at. The item's own `Style` keeps the series, so its role in the
+theme doesn't change. Where the author's own style lines set the same field, they win, as
+Pele's inline style wins over its series variable. `css.ReadPalette` reads a palette, and
+`Palette.Paint` gives its colors to the items.
 
 | Painting | Fill | Stroke | For |
 |---|---|---|---|
@@ -211,10 +215,7 @@ Style has three levels, from the least a host does to the most.
    from, by token. The tokens are `Bg`, `Fg`, `Muted`, `Line`, `Surface`, `SurfaceAlt`,
    `Border`, `Accent`, `Critical`, eight series, a corner radius and a stroke width. The svg
    package writes them as CSS variables such as `--limu-surface`, with the theme's colors as
-   fallbacks. Where a scene's palette sets a series, it also sets `--limu-series-N` on the
-   root's style, as Pele sets `--pele-series-N`, so that what uses the series takes the
-   palette's color over a page's own. The color is written opaque, since its opacity is
-   written where it is used, as the theme's are. `style.Default()` is Pele's light theme, and `style.Kohu()` and
+   fallbacks. `style.Default()` is Pele's light theme, and `style.Kohu()` and
    `style.KohuDark()` are limu's own light and dark themes.
 2. **Overrides** (`style.Overrides`) lay a `style.Style` for a role over the diagram's own
    style for its parts. Whatever a style leaves unset comes from the level beneath.
@@ -229,10 +230,35 @@ Style has three levels, from the least a host does to the most.
    limumygo's `DrawIcon` and `DrawImage`.
 
 A part's style cascades from the theme's measures, through the diagram's own style for the
-part and the overrides for its role, to what the author set in the diagram's text. The fill
-and stroke opacities (`FillOpacity`, `StrokeOpacity`) cascade separately from the paints,
-as CSS cascades fill-opacity separately from fill. So a fill the author sets on a part the
-diagram draws at some opacity is drawn at that opacity.
+part and the overrides for its role, to the author's style, what the author set in the
+diagram's text with style and `classDef` lines and a palette. The author's style is on top,
+so its colors, a palette's among them, win over a host's overrides. The fill and stroke
+opacities (`FillOpacity`, `StrokeOpacity`) cascade separately from the paints, as CSS
+cascades fill-opacity separately from fill. So a fill the author sets on a part the diagram
+draws at some opacity is drawn at that opacity. Where Pele draws a group in a translucent
+fill of its own unless the author fills it, as a flowchart's subgraph or a treemap's
+section, the group's own style keeps the translucency and the author's style gets the full
+opacity (`css.Opaque`), so the decision is the author's.
+
+A host whose look is restricted to its design tokens can't have the author's colors win
+over them. It sets `Look.ThemeOnly`, and the cascade leaves the author's style out: its
+paints, opacities, widths, dashes, caps, joins and radius, the palette's colors among them.
+It also leaves out what a diagram set only because the author filled something, the
+`Ground` and `TextGround` picked on that fill and the darker or lighter `Shade` of its
+stripes, and the backends don't draw the casings laid under edges that cross such a fill
+(`Look.Draws`). `OnFill` still picks the color of text on a fill an override sets, since
+overrides are the host's. The switch moves nothing, so the weight, slant and size of text
+the author set stay, as layout measured them. The svg package still writes the classes the
+author named, which a page's own CSS may style.
+
+The switch can't undo what the author's text decided in layout.
+
+- What the author set that changes a size stays, since layout placed things by it. A
+  quadrant chart's point keeps the radius its author gave it, and its label keeps the room
+  it left for the width of the point's stroke, though the stroke isn't drawn.
+- Where a diagram sets `OnFill` because the author's fill is one ink picks a color on, it
+  stays set, so a part the author filled picks the color of its text on a fill an override
+  sets, where the same part with no fill of the author's keeps the theme's text color.
 
 A style also says how a stroked line ends and turns, with its `Cap` (butt, round or square)
 and its `Join` (miter, round or bevel), as SVG's stroke-linecap and stroke-linejoin do. They
@@ -265,10 +291,9 @@ instead, an item drawn under it in the background's color and four units wider, 
 
 A palette's color can be dark too. Where Pele 1.13 gives a label on a series the color its
 ink picks on the palette's color, as for a pie's percentages, a git graph's branch names,
-a timeline's sections and periods and a treemap's labels, limu sets the series as the
-label's `TextGround`. The style picks the color on the series as the scene's palette draws
-it. `css.ReadPalette` reads the palette and says, with `Palette.Ground`, on which series
-Pele's ink would pick a color.
+a timeline's sections and periods and a treemap's labels, limu sets the palette's color as
+the label's `TextGround`, and the style picks the color on it. `Palette.Ground` gives that
+color on a series where Pele's ink would pick one.
 
 limumygo draws what the svg package writes, but not in every way as a browser draws SVG.
 
@@ -425,6 +450,19 @@ arcs of a path, and give that reading to `Drawings.Diff`. Their suite keeps in f
 the digest, each line the reading changes, and the reading must change no other line. A
 reading may drop a kept line where limu writes nothing in its place, as a test drops Pele's
 `series` line for a palette color limu leaves unset.
+
+The tests of the eight diagrams with a palette check that the scene carries exactly the
+palette Pele set. Each lays the diagram out twice, with its configuration and without its
+theme variables, and `pelesvg.ReadPalette` compares the two scenes item by item. Only the
+author's paints and a label's `TextGround` may differ. Each item drawn in a series has the
+palette's color in its author's style, in the field the series is drawn in and at the
+series' opacity, unless the author's own style sets that field, and the color is the same
+in every item of the series. From that it writes one `series N color` line for each series
+the scene draws something in, which is compared with Pele's `series` lines read through
+limu's reading of the color, and the other lines are written from the scene without the
+palette, with the author's own style. The switch is checked in `themeonly_test.go` and in
+limumygo's tests, which draw diagrams with style lines, classes, casings and palettes with
+`ThemeOnly` set and compare them with the same diagrams without those lines.
 `./scripts/oracle.sh --full` also writes every case's lines beside the fixture, in a file
 git ignores, to find which line differs from a digest. The fixture is still what the tests
 compare with. The render suites of pie charts, treemaps and flowcharts include cases with a
