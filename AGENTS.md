@@ -46,7 +46,8 @@ layout.
   the lines of each case after them. Tests compare with `fixture.LoadDrawings` and
   `Drawings.Diff`. A test that reads Pele's lines through limu's code before comparing
   needs its suite to keep in full (`keep`) every line that reading changes, and the reading
-  must change no other line. To see which line differs from a digest, run
+  must change no other line. A reading may drop a kept line by reading it as "", where limu
+  writes nothing in its place. To see which line differs from a digest, run
   `./scripts/oracle.sh --full <pele> <suite>`, which writes the full lines to a file git
   ignores.
 - Matching Pele to the last bit is how the port is checked, not what limu is for. Go as far
@@ -54,7 +55,7 @@ layout.
   write code whose only use is to match a platform's library to the last bit, as copying
   the C library's `pow` would be. Where such a difference can't be avoided, note it as a
   difference of the platform and leave the cases it affects out of the comparison.
-- The port follows Pele 1.12.0, commit 8aff183. To follow a newer Pele, write the fixtures
+- The port follows Pele 1.13.0, commit 3a2f075. To follow a newer Pele, write the fixtures
   anew from it and port what its diff changed.
 
 ## Releasing

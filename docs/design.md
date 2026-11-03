@@ -86,6 +86,17 @@ An item also carries what a plain backend needs to draw it.
 A part's `Painting` says which of the style's colors it takes, so a part keeps its role
 when a theme changes them.
 
+A scene also carries its `Palette`, the series colors the diagram's own theme variables set,
+as Pele 1.13 reads Mermaid's palette variables. They are `pie1`…`pie8` for pie charts,
+`git0`…`git7` for git graphs, `cScale0`…`cScale7` for timelines, radar charts and treemaps,
+`cScale1`…`cScale8` for mindmaps, `venn1`…`venn8` for venn diagrams, which repeat the ones
+set, and `xyChart.plotColorPalette` for XY charts, a list that repeats. Each entry is a
+color, `None` for `transparent`, `Fg` for `currentColor`, or unset where the variable leaves
+the theme's color. The palette changes no position, so it is style. It replaces the theme's
+series colors only for that scene, and a backend draws with `Look.WithSeries`, which gives a
+look whose theme has them in its series. A color an override or the author sets still wins
+over the series it would take.
+
 | Painting | Fill | Stroke | For |
 |---|---|---|---|
 | `FillAndStroke` | the style's fill | the style's stroke | most outlines |
@@ -200,7 +211,10 @@ Style has three levels, from the least a host does to the most.
    from, by token. The tokens are `Bg`, `Fg`, `Muted`, `Line`, `Surface`, `SurfaceAlt`,
    `Border`, `Accent`, `Critical`, eight series, a corner radius and a stroke width. The svg
    package writes them as CSS variables such as `--limu-surface`, with the theme's colors as
-   fallbacks. `style.Default()` is Pele's light theme, and `style.Kohu()` and
+   fallbacks. Where a scene's palette sets a series, it also sets `--limu-series-N` on the
+   root's style, as Pele sets `--pele-series-N`, so that what uses the series takes the
+   palette's color over a page's own. The color is written opaque, since its opacity is
+   written where it is used, as the theme's are. `style.Default()` is Pele's light theme, and `style.Kohu()` and
    `style.KohuDark()` are limu's own light and dark themes.
 2. **Overrides** (`style.Overrides`) lay a `style.Style` for a role over the diagram's own
    style for its parts. Whatever a style leaves unset comes from the level beneath.
@@ -248,6 +262,13 @@ declarations as Pele reads them. An edge that crosses the border of a fill gets 
 instead, an item drawn under it in the background's color and four units wider, as Pele's
 `edgeCasing` draws one, so that the edge stands out where it runs over the fill.
 `draw.FillUnder` finds which fill holds an edge, and `draw.Casing` makes the casing.
+
+A palette's color can be dark too. Where Pele 1.13 gives a label on a series the color its
+ink picks on the palette's color, as for a pie's percentages, a git graph's branch names,
+a timeline's sections and periods and a treemap's labels, limu sets the series as the
+label's `TextGround`. The style picks the color on the series as the scene's palette draws
+it. `css.ReadPalette` reads the palette and says, with `Palette.Ground`, on which series
+Pele's ink would pick a color.
 
 limumygo draws what the svg package writes, but not in every way as a browser draws SVG.
 
@@ -357,6 +378,12 @@ A few differences from Pele are on purpose, or known and left alone.
   marks, aren't made, so a few such hosts come out differently from Node's. Since Pele 1.12
   hands a link with its percent escapes to the URL parser, such a host can be written in
   escapes too, as `https:%E2%80%8Bx.y`, whose zero-width space Node drops and limu doesn't.
+- Pele passes a palette's color on to the browser as it was written, once it has checked that
+  it is a color and reads only Pele's own variables. limu reads hex codes, named colors,
+  `rgb()`, `rgba()`, `hsl()`, `hsla()`, `transparent` and `currentColor`. A color that
+  depends on the page, as `var(--pele-accent)`, `color-mix()` and `light-dark()`, and one
+  in a space limu doesn't convert, as `oklch()`, `lab()`, `hwb()` and `color()`, leaves its
+  series in the theme's color.
 - Pele picks the color of text on a fill from its own two colors, and limu from the theme's
   foreground and background. With the default theme they're the same, and with another
   theme a fill near the middle may take the other one.
@@ -395,7 +422,9 @@ of its first cases (`fixture.FullCases`, the same as `FULL` in `run.mjs`) and a 
 the lines of each case after them, and a test compares the digest of the lines it writes.
 Some tests read Pele's lines through limu's own code first, as for the author's style or the
 arcs of a path, and give that reading to `Drawings.Diff`. Their suite keeps in full, beside
-the digest, each line the reading changes, and the reading must change no other line.
+the digest, each line the reading changes, and the reading must change no other line. A
+reading may drop a kept line where limu writes nothing in its place, as a test drops Pele's
+`series` line for a palette color limu leaves unset.
 `./scripts/oracle.sh --full` also writes every case's lines beside the fixture, in a file
 git ignores, to find which line differs from a digest. The fixture is still what the tests
 compare with. The render suites of pie charts, treemaps and flowcharts include cases with a
@@ -428,7 +457,7 @@ Pele draws with lines and curves. A circle, an ellipse, a box with corners of it
 path with an arc are drawn by a `scene.Path` in cubic curves that only come close, so they
 are compared as figures, within a tolerance.
 
-The port follows Pele 1.12.0, commit `8aff183`. Each fixture records the version and commit
+The port follows Pele 1.13.0, commit `3a2f075`. Each fixture records the version and commit
 it was written from, and the architecture and Node version that wrote it. The tests read
 fixtures with `fixture.Load`, which fails on a fixture written from another version or
 commit of Pele, or on one with an empty list at its top level, as a suite that found no
