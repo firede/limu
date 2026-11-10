@@ -32,6 +32,10 @@ const (
 	monoStack = `ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace`
 )
 
+// barHeight is the height of the bar over the text and of the bar over the output, in DIPs,
+// so that the two line up whatever each holds.
+const barHeight = 37
+
 // The views of the output pane.
 const (
 	viewDiagram = iota
@@ -97,10 +101,11 @@ func newApp(src, appearance string) *app {
 		appearance: appearance,
 	}
 	a.buf.SetLanguage(mermaid.Language)
-	a.code = &editor.State{Buffer: a.buf, Label: "Mermaid text", Placeholder: "Type a Mermaid diagram, or choose one of the Examples."}
+	// Neither editor scrolls past its last line: a text that fits its pane does not scroll.
+	a.code = &editor.State{Buffer: a.buf, Label: "Mermaid text", Placeholder: "Type a Mermaid diagram, or choose one of the Examples.", NoScrollPastEnd: true}
 	a.svgBuf = editor.NewBuffer("")
 	a.svgBuf.SetLanguage(editor.LanguageFor("diagram.svg"))
-	a.svgCode = &editor.State{Buffer: a.svgBuf, Label: "SVG", ReadOnly: true, SoftWrap: true}
+	a.svgCode = &editor.State{Buffer: a.svgBuf, Label: "SVG", ReadOnly: true, SoftWrap: true, NoScrollPastEnd: true}
 	if !knownAppearance(a.appearance) {
 		a.appearance = appearanceSystem
 	}
@@ -173,7 +178,7 @@ func (a *app) toolbar(c *ui.Context, ap *appearance) {
 				}
 			})
 		}
-	}).Label("Text").FillWidth().Padding(4, 8).Background(t.Background).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
+	}).Label("Text").FillWidth().Height(barHeight).Padding(4, 8).Background(t.Background).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
 }
 
 // output is the pane of what limu makes of the text: the diagram, or its SVG, under a bar
@@ -201,7 +206,7 @@ func (a *app) output(c *ui.Context, ap *appearance) {
 					a.downloadPNG(ap)
 				}
 			})
-		}).Label("Output").FillWidth().Padding(4, 8).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
+		}).Label("Output").FillWidth().Height(barHeight).Padding(4, 8).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
 		switch {
 		case a.scene == nil:
 			ui.Column(c).Grow(1).FillWidth().Center().Padding(24).Gap(6).Children(func() {

@@ -18,10 +18,11 @@ func icon(paths string) *ui.SVG {
 		`fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">` + paths + `</svg>`))
 }
 
-// iconButton is a button that shows an icon, 16 DIPs high, in place of a label, which
-// names it to assistive technology and to a toolbar's menu of what does not fit.
+// iconButton is a square button, 28 DIPs wide, that shows an icon, 16 DIPs high, in place
+// of a label, which names it to assistive technology and to a toolbar's menu of what does
+// not fit.
 func iconButton(c *ui.Context, s *ui.SVG, label string) ui.Element {
-	b := ui.Button(c, "").Label(label)
+	b := ui.Button(c, "").Label(label).Padding(6)
 	b.Children(func() { ui.Icon(c, s).Size(16, 16) })
 	return b
 }
