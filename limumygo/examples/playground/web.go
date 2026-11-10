@@ -37,6 +37,16 @@ func main() {
 		a.win = mygo.NewWindow(mygo.WindowOptions{Title: "Playground · limu", Content: ui.View(a.view)})
 		a.post = a.win.Update
 		mygo.Theme.OnUpdated(func() { a.win.Update(func() {}) })
+		// The page's address is kept at the text, as a link to it, so that the link to the
+		// Rust playground in the page's bar, which carries the fragment, opens the same
+		// text. A text too long for a link leaves the address without one.
+		a.remember = func(src, _ string) {
+			link, ok := shareLink(pageURL(), src)
+			if !ok {
+				link = pageURL()
+			}
+			js.Global().Get("history").Call("replaceState", js.Null(), "", link)
+		}
 		a.shown = func() {
 			doc := js.Global().Get("document")
 			doc.Call("dispatchEvent", js.Global().Get("Event").New("limu:playground-shown"))

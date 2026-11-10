@@ -113,8 +113,8 @@ func (a *app) look(c *ui.Context) *appearance {
 	return appearanceNamed(a.appearance, c.Theme().Dark)
 }
 
-// view is the playground: the toolbar; the text and what limu makes of it, side by side,
-// or the text above in a narrow window; and the status bar under them.
+// view is the playground: the text and what limu makes of it, side by side, or the text
+// above in a narrow window, each under a bar of its own; and the status bar under them.
 func (a *app) view(c *ui.Context) {
 	ap := a.look(c)
 	c.SetTheme(ap.UI)
@@ -127,9 +127,9 @@ func (a *app) view(c *ui.Context) {
 	root := ui.Column(c).Fill().Background(ap.UI.Background)
 	w := root.LayoutBounds().W
 	root.Children(func() {
-		a.toolbar(c, ap)
 		text := func() {
 			ui.Column(c).Fill().Children(func() {
+				a.toolbar(c, ap)
 				ed := editor.View(c, a.code).Grow(1).FillWidth()
 				if a.focusEditor {
 					ed.Focus()
@@ -154,6 +154,8 @@ func (a *app) view(c *ui.Context) {
 	}
 }
 
+// toolbar is the bar over the text, as high as the bar over the output: the Examples menu,
+// which replaces the text, and on a desktop the appearances.
 func (a *app) toolbar(c *ui.Context, ap *appearance) {
 	t := ap.UI
 	ui.Toolbar(c, func() {
@@ -171,12 +173,13 @@ func (a *app) toolbar(c *ui.Context, ap *appearance) {
 				}
 			})
 		}
-	}).Label("Playground").FillWidth().Padding(4, 8).Background(t.Background).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
+	}).Label("Text").FillWidth().Padding(4, 8).Background(t.Background).BorderWidth(0, 0, 1, 0).BorderColor(t.Border)
 }
 
 // output is the pane of what limu makes of the text: the diagram, or its SVG, under a bar
-// of what can be done with it. The bar's buttons are there in either view, but Copy SVG,
-// so that changing the view does not move them, nor change the bar's height.
+// of the views and of what can be done with the diagram, Copy link and Download, which are
+// icons, so that the bar fits a narrow pane. The SVG has no button to copy it: its view is
+// an editor that is only read, whose text is selected and copied as any text is.
 func (a *app) output(c *ui.Context, ap *appearance) {
 	t := ap.UI
 	pane := ui.Column(c).Fill()
@@ -187,17 +190,10 @@ func (a *app) output(c *ui.Context, ap *appearance) {
 		ui.Toolbar(c, func() {
 			segmented(c, ap, &a.shows, "Diagram", "SVG").Label("View")
 			ui.Spacer(c)
-			if a.shows == viewSVG {
-				if ui.Button(c, "Copy SVG").Disabled(a.scene == nil).Clicked() {
-					a.ensureSVG(ap)
-					c.WriteClipboard(a.svgDoc)
-					c.Toast("Copied the SVG")
-				}
-			}
-			if ui.Button(c, "Copy link").Tooltip("Copy a link that opens this diagram in the playground").Clicked() {
+			if iconButton(c, linkIcon, "Copy link").Tooltip("Copy a link that opens this diagram in the playground").Clicked() {
 				a.share(c)
 			}
-			ui.MenuButton(c, "Download", func(m *ui.Menu) {
+			iconButton(c, downloadIcon, "Download").Tooltip("Download the diagram").Menu(func(m *ui.Menu) {
 				if m.Item("SVG").Disabled(a.scene == nil).Chosen() {
 					a.downloadSVG(ap)
 				}
