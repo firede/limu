@@ -4,6 +4,7 @@ package main
 
 import (
 	"log"
+	"strconv"
 	"syscall/js"
 
 	"github.com/egoist/mygo"
@@ -33,6 +34,10 @@ func main() {
 		src = firstSample()
 	}
 	a := newApp(src, appearanceSystem)
+	if split, ok := storedSplit(); ok {
+		a.split, a.keptSplit = split, split
+	}
+	a.rememberSplit = storeSplit
 	mygo.App.WhenReady(func() {
 		a.win = mygo.NewWindow(mygo.WindowOptions{Title: "Playground · limu", Content: ui.View(a.view)})
 		a.post = a.win.Update
@@ -61,6 +66,36 @@ func main() {
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// splitKey is where the browser keeps the split, a percentage written as a number. The
+// website's Rust playground keeps its split there too, so that the panes are as wide in one
+// as they were left in the other.
+const splitKey = "limu-playground-split"
+
+// storedSplit is the split the browser keeps, when it keeps one that leaves both panes.
+// A browser that refuses its storage throws, and then keeps none.
+func storedSplit() (split float32, ok bool) {
+	defer func() {
+		if recover() != nil {
+			split, ok = 0, false
+		}
+	}()
+	v := js.Global().Get("localStorage").Call("getItem", splitKey)
+	if v.Type() != js.TypeString {
+		return 0, false
+	}
+	f, err := strconv.ParseFloat(v.String(), 32)
+	if err != nil || !(f >= minSplit && f <= maxSplit) {
+		return 0, false
+	}
+	return float32(f), true
+}
+
+// storeSplit keeps the split in the browser, which may refuse.
+func storeSplit(split float32) {
+	defer func() { _ = recover() }()
+	js.Global().Get("localStorage").Call("setItem", splitKey, strconv.FormatFloat(float64(split), 'f', 1, 32))
 }
 
 // download has the browser download a file of data, as a link to it with a download

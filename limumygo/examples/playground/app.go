@@ -32,6 +32,14 @@ const (
 	monoStack = `ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace`
 )
 
+// The split is the percentage of the window the text takes: 42 until it is dragged, and
+// never so far to a side that a pane is lost.
+const (
+	defaultSplit = 42
+	minSplit     = 15
+	maxSplit     = 85
+)
+
 // barHeight is the height of the bar over the text and of the bar over the output, in DIPs,
 // so that the two line up whatever each holds.
 const barHeight = 37
@@ -90,6 +98,10 @@ type app struct {
 	// remember, when set, keeps the text and the appearance for the next run, as the
 	// desktop's settings do.
 	remember func(src, appearance string)
+	// rememberSplit, when set, keeps the split when it changes, as the browser's shell
+	// does, for the next visit. keptSplit is the split it was last given.
+	rememberSplit func(split float32)
+	keptSplit     float32
 }
 
 // newApp is the playground with a text and an appearance.
@@ -97,7 +109,8 @@ func newApp(src, appearance string) *app {
 	a := &app{
 		buf:        editor.NewBuffer(src),
 		plan:       planner{delay: editDelay},
-		split:      42,
+		split:      defaultSplit,
+		keptSplit:  defaultSplit,
 		appearance: appearance,
 	}
 	a.buf.SetLanguage(mermaid.Language)
@@ -152,6 +165,10 @@ func (a *app) view(c *ui.Context) {
 		split.Grow(1).FillWidth().MinHeight(0)
 		a.statusBar(c, ap)
 	})
+	if a.rememberSplit != nil && a.split != a.keptSplit {
+		a.keptSplit = a.split
+		a.rememberSplit(a.split)
+	}
 	if a.shown != nil && (a.scene != nil || a.blank || a.problem != nil) {
 		shown := a.shown
 		a.shown = nil
